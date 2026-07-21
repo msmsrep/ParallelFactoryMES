@@ -1,0 +1,17 @@
+# Build outputs
+bin/
+obj/
+*.user
+
+# IDE
+.vs/
+.idea/
+
+# Runtime artifacts (never commit: local DB, JWT signing key)
+*.db
+*.db-shm
+*.db-wal
+jwt-signing.key
+
+# Test results
+TestResults/

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MesApp.Api/MesApp.Api.csproj" />
+    <Project Path="src/MesApp.Core/MesApp.Core.csproj" />
+    <Project Path="src/MesApp.Infrastructure/MesApp.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MesApp.Api.Tests/MesApp.Api.Tests.csproj" />
+  </Folder>
+</Solution>
