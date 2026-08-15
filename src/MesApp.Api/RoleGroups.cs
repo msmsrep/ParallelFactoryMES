@@ -16,4 +16,8 @@ public static class RoleGroups
 
     /// <summary>ユーザー・スキル資格の管理（システム管理者専用）</summary>
     public const string UserAdmin = MesRoles.SystemAdmin;
+
+    /// <summary>在庫・物流オペレーション（受入・在庫操作・出庫/払出・出荷・棚卸）</summary>
+    public const string InventoryManage =
+        $"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}";
 }

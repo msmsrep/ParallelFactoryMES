@@ -28,6 +28,33 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
         return $"{prefix}{seq:000}";
     }
 
+    public async Task<string> NextPickingNoAsync(CancellationToken ct = default)
+    {
+        var prefix = $"PK{businessDate.Today:yyyyMMdd}-";
+        var seq = await NextSequenceAsync(
+            db.PickingOrders.Where(p => p.OrderNo.StartsWith(prefix)).Select(p => p.OrderNo),
+            prefix, ct);
+        return $"{prefix}{seq:0000}";
+    }
+
+    public async Task<string> NextShippingNoAsync(CancellationToken ct = default)
+    {
+        var prefix = $"SH{businessDate.Today:yyyyMMdd}-";
+        var seq = await NextSequenceAsync(
+            db.ShippingOrders.Where(s => s.ShippingNo.StartsWith(prefix)).Select(s => s.ShippingNo),
+            prefix, ct);
+        return $"{prefix}{seq:0000}";
+    }
+
+    public async Task<string> NextStocktakeNoAsync(CancellationToken ct = default)
+    {
+        var prefix = $"ST{businessDate.Today:yyyyMMdd}-";
+        var seq = await NextSequenceAsync(
+            db.Stocktakes.Where(s => s.StocktakeNo.StartsWith(prefix)).Select(s => s.StocktakeNo),
+            prefix, ct);
+        return $"{prefix}{seq:0000}";
+    }
+
     private static async Task<int> NextSequenceAsync(
         IQueryable<string> existingNumbers, string prefix, CancellationToken ct)
     {

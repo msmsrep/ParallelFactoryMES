@@ -31,11 +31,39 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<Lot> Lots => Set<Lot>();
 
+    // 製造実行系（Spec.md 5.2）
+    public DbSet<SetupRecord> SetupRecords => Set<SetupRecord>();
+    public DbSet<ChecklistRecord> ChecklistRecords => Set<ChecklistRecord>();
+    public DbSet<MaterialConsumption> MaterialConsumptions => Set<MaterialConsumption>();
+    public DbSet<ProductionRecord> ProductionRecords => Set<ProductionRecord>();
+    public DbSet<ProductionDataRecord> ProductionDataRecords => Set<ProductionDataRecord>();
+    public DbSet<WorkTimeRecord> WorkTimeRecords => Set<WorkTimeRecord>();
+    public DbSet<TroubleReport> TroubleReports => Set<TroubleReport>();
+    public DbSet<TransferOrder> TransferOrders => Set<TransferOrder>();
+
+    // 在庫・物流系（Spec.md 5.3）
+    public DbSet<InventoryStock> InventoryStocks => Set<InventoryStock>();
+    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<PickingOrder> PickingOrders => Set<PickingOrder>();
+    public DbSet<ShippingOrder> ShippingOrders => Set<ShippingOrder>();
+    public DbSet<Stocktake> Stocktakes => Set<Stocktake>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
         base.ConfigureConventions(builder);
 
         // enumは可読性のため文字列で保存する
+        builder.Properties<SetupType>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<ConsumptionMethod>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<WorkTimeType>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<TroubleCategory>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<TroubleStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<TransferOrderStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<InventoryTransactionType>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<PickingOrderType>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<PickingOrderStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<ShippingOrderStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<StocktakeStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ProductType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MakeOrBuy>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<EquipmentStatus>().HaveConversion<string>().HaveMaxLength(30);
@@ -240,6 +268,198 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .WithMany()
                 .HasForeignKey(x => x.AssignedEquipmentId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ---- 製造実行系 ----
+
+        builder.Entity<SetupRecord>(e =>
+        {
+            e.HasIndex(x => x.WorkOrderId);
+            e.Property(x => x.AbnormalityNote).HasMaxLength(1000);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.PerformedBy).WithMany().HasForeignKey(x => x.PerformedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ChecklistRecord>(e =>
+        {
+            e.HasIndex(x => x.WorkOrderId);
+            e.HasOne(x => x.Checklist).WithMany().HasForeignKey(x => x.ChecklistId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PerformedBy).WithMany().HasForeignKey(x => x.PerformedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Results).WithOne().HasForeignKey(x => x.ChecklistRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ChecklistResultItem>(e =>
+        {
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasOne(x => x.ChecklistItem).WithMany().HasForeignKey(x => x.ChecklistItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<MaterialConsumption>(e =>
+        {
+            e.HasIndex(x => x.WorkOrderId);
+            e.HasIndex(x => x.LotId); // トレースフォワード（使用先特定）用
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ProductionRecord>(e =>
+        {
+            e.HasIndex(x => x.WorkOrderId);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.PerformedBy).WithMany().HasForeignKey(x => x.PerformedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.OutputLot).WithMany().HasForeignKey(x => x.OutputLotId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<ProductionDataRecord>(e =>
+        {
+            e.HasIndex(x => x.WorkOrderId);
+            e.Property(x => x.Item).HasMaxLength(100);
+            e.Property(x => x.Value).HasMaxLength(500);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<WorkTimeRecord>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.StartedAt });
+            e.Property(x => x.IndirectCategory).HasMaxLength(100);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<TroubleReport>(e =>
+        {
+            e.HasIndex(x => x.Status);
+            e.Property(x => x.Content).HasMaxLength(2000);
+            e.Property(x => x.ResponseHistory).HasMaxLength(4000);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.ReportedBy).WithMany().HasForeignKey(x => x.ReportedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<TransferOrder>(e =>
+        {
+            e.HasIndex(x => x.Status);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.FromLocation).WithMany().HasForeignKey(x => x.FromLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ToLocation).WithMany().HasForeignKey(x => x.ToLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---- 在庫・物流系 ----
+
+        builder.Entity<InventoryStock>(e =>
+        {
+            e.HasIndex(x => new { x.LotId, x.LocationId }).IsUnique();
+            e.HasIndex(x => new { x.ProductId, x.LocationId });
+            e.Property(x => x.ConcurrencyStamp).HasMaxLength(32).IsConcurrencyToken();
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<InventoryTransaction>(e =>
+        {
+            e.HasIndex(x => x.Timestamp);
+            e.HasIndex(x => x.LotId);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.FromLocation).WithMany().HasForeignKey(x => x.FromLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ToLocation).WithMany().HasForeignKey(x => x.ToLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<PickingOrder>(e =>
+        {
+            e.HasIndex(x => x.OrderNo).IsUnique();
+            e.Property(x => x.OrderNo).HasMaxLength(50);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.ShippingOrder).WithMany().HasForeignKey(x => x.ShippingOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PickingOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<PickingLine>(e =>
+        {
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ShippingOrder>(e =>
+        {
+            e.HasIndex(x => x.ShippingNo).IsUnique();
+            e.Property(x => x.ShippingNo).HasMaxLength(50);
+            e.Property(x => x.Destination).HasMaxLength(200);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.ShippingOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ShippingLine>(e =>
+        {
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Stocktake>(e =>
+        {
+            e.HasIndex(x => x.StocktakeNo).IsUnique();
+            e.Property(x => x.StocktakeNo).HasMaxLength(50);
+            e.HasOne(x => x.TargetLocation).WithMany().HasForeignKey(x => x.TargetLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.StocktakeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<StocktakeLine>(e =>
+        {
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Lot>(e =>

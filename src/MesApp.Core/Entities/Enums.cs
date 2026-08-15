@@ -177,3 +177,140 @@ public enum LotStockStatus
     /// <summary>廃棄予定</summary>
     ToBeDiscarded,
 }
+
+/// <summary>段取り区分（B-20-50 前段取り／B-40-40 後段取り）</summary>
+public enum SetupType
+{
+    /// <summary>前段取り</summary>
+    Pre,
+    /// <summary>後段取り</summary>
+    Post,
+}
+
+/// <summary>部材投入の記録方式（Spec.md 5.2 MaterialConsumption）</summary>
+public enum ConsumptionMethod
+{
+    /// <summary>手動記録（B-30-20-01）</summary>
+    Manual,
+    /// <summary>バックフラッシュ（MBOM×完了数量から自動算出。B-40-10-09）</summary>
+    Backflush,
+}
+
+/// <summary>作業時間区分（B-30-30-02 直接／F-30-20-02 間接）</summary>
+public enum WorkTimeType
+{
+    /// <summary>直接作業（作業指示に紐づく）</summary>
+    Direct,
+    /// <summary>間接作業（段取り・部材準備・設備メンテ等）</summary>
+    Indirect,
+}
+
+/// <summary>トラブル区分（B-60-10-02。QCDS）</summary>
+public enum TroubleCategory
+{
+    /// <summary>品質（Quality）</summary>
+    Quality,
+    /// <summary>コスト（Cost）</summary>
+    Cost,
+    /// <summary>納期（Delivery）</summary>
+    Delivery,
+    /// <summary>安全（Safety）</summary>
+    Safety,
+}
+
+/// <summary>トラブル報告状態</summary>
+public enum TroubleStatus
+{
+    /// <summary>発生（未対応）</summary>
+    Open,
+    /// <summary>対応中</summary>
+    InProgress,
+    /// <summary>完了</summary>
+    Closed,
+}
+
+/// <summary>搬送・移動指示状態（Spec.md 5.2 TransferOrder）</summary>
+public enum TransferOrderStatus
+{
+    /// <summary>指示</summary>
+    Instructed,
+    /// <summary>完了</summary>
+    Completed,
+    /// <summary>取消</summary>
+    Canceled,
+}
+
+/// <summary>在庫トランザクション区分（Spec.md 5.3 InventoryTransaction）</summary>
+public enum InventoryTransactionType
+{
+    /// <summary>受入</summary>
+    Receipt,
+    /// <summary>入庫（完成品・半製品の在庫計上）</summary>
+    PutAway,
+    /// <summary>出庫</summary>
+    Issue,
+    /// <summary>払出（工程払出）</summary>
+    ProcessIssue,
+    /// <summary>払出戻し</summary>
+    IssueReturn,
+    /// <summary>移動</summary>
+    Move,
+    /// <summary>調整</summary>
+    Adjust,
+    /// <summary>廃棄</summary>
+    Discard,
+    /// <summary>返品</summary>
+    Return,
+    /// <summary>振替（品目振替・ロット振替）</summary>
+    Transfer,
+    /// <summary>分割</summary>
+    Split,
+    /// <summary>統合</summary>
+    Merge,
+    /// <summary>棚卸調整</summary>
+    StocktakeAdjust,
+    /// <summary>出荷</summary>
+    Ship,
+}
+
+/// <summary>ピッキング指示区分（Spec.md 5.3 PickingOrder）</summary>
+public enum PickingOrderType
+{
+    /// <summary>工程払出（D-20）</summary>
+    ProcessIssue,
+    /// <summary>出荷（D-40-20）</summary>
+    Shipping,
+}
+
+/// <summary>ピッキング指示状態</summary>
+public enum PickingOrderStatus
+{
+    /// <summary>指示</summary>
+    Instructed,
+    /// <summary>完了（払出済）</summary>
+    Completed,
+    /// <summary>取消</summary>
+    Canceled,
+}
+
+/// <summary>出荷指示状態（Spec.md 5.3 ShippingOrder）</summary>
+public enum ShippingOrderStatus
+{
+    /// <summary>指示</summary>
+    Instructed,
+    /// <summary>完了（出荷済）</summary>
+    Completed,
+    /// <summary>取消</summary>
+    Canceled,
+}
+
+/// <summary>棚卸状態（Spec.md 5.3 Stocktake）</summary>
+public enum StocktakeStatus
+{
+    /// <summary>指示（実棚入力中）</summary>
+    Instructed,
+    /// <summary>確定（差異調整済み）</summary>
+    Finalized,
+    /// <summary>取消</summary>
+    Canceled,
+}

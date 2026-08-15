@@ -3,6 +3,7 @@ using System;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MesApp.Infrastructure.Migrations
 {
     [DbContext(typeof(MesAppDbContext))]
-    partial class MesAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260815113419_Phase3ExecutionAndInventory")]
+    partial class Phase3ExecutionAndInventory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");

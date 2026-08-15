@@ -1,0 +1,116 @@
+using System.Security.Claims;
+using MesApp.Api.Services;
+using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Inventory;
+using MesApp.Core.Entities;
+using MesApp.Infrastructure;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace MesApp.Api.Controllers;
+
+/// <summary>
+/// 受入（D-10-10）：受入登録・在庫計上（受入ロット採番含む）と受入取消
+/// </summary>
+[ApiController]
+[Route("api/receiving")]
+[Authorize(Roles = RoleGroups.InventoryManage)]
+public class ReceivingController(
+    MesAppDbContext db,
+    InventoryService inventory,
+    NumberingService numbering,
+    IBusinessDateService businessDate,
+    IAuditLogger auditLogger) : ControllerBase
+{
+    /// <summary>受入登録（D-10-10-02。ロット生成＋在庫計上）</summary>
+    [HttpPost]
+    public async Task<ActionResult<LotResponse>> Receive(ReceivingRequest request, CancellationToken ct)
+    {
+        var product = await db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, ct);
+        if (product is null || !product.IsActive)
+        {
+            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）品目IDです。" });
+        }
+        if (!await db.Locations.AnyAsync(l => l.Id == request.LocationId && l.IsActive, ct))
+        {
+            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）ロケーションIDです。" });
+        }
+
+        var lotNumber = request.LotNumber;
+        if (string.IsNullOrWhiteSpace(lotNumber))
+        {
+            lotNumber = await numbering.NextLotNumberAsync(product.Code, ct);
+        }
+        else if (await db.Lots.AnyAsync(l => l.LotNumber == lotNumber, ct))
+        {
+            return Conflict(new ProblemDetails { Title = $"ロット番号 '{lotNumber}' は既に存在します。" });
+        }
+
+        var lot = new Lot
+        {
+            LotNumber = lotNumber,
+            ProductId = product.Id,
+            InitialQuantity = request.Quantity,
+            OriginType = LotOriginType.Receiving,
+            ManufacturedOn = businessDate.Today,
+            ExpiresOn = request.ExpiresOn,
+            StockStatus = LotStockStatus.Normal,
+        };
+        db.Lots.Add(lot);
+        await db.SaveChangesAsync(ct); // Lot.Idの確定
+
+        await inventory.AddAsync(lot, request.LocationId, request.Quantity,
+            InventoryTransactionType.Receipt, User.FindFirstValue(ClaimTypes.NameIdentifier),
+            note: request.Note, ct: ct);
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "Receive", nameof(Lot), lot.Id.ToString(),
+            detail: $"lot={lotNumber}, product={product.Code}, qty={request.Quantity}", ct: ct);
+
+        return new LotResponse(lot.Id, lot.LotNumber, product.Id, product.Code, product.Name,
+            lot.InitialQuantity, lot.OriginType, lot.StockStatus,
+            lot.ManufacturedOn, lot.ExpiresOn, lot.Grade, lot.ParentLotId);
+    }
+
+    /// <summary>
+    /// 受入取消（D-10-10-04）。受入後に在庫が動いていない（受入トランザクション1件のみ・
+    /// 在庫数量が受入数量と一致）場合のみ取消できる。
+    /// </summary>
+    [HttpPost("{lotId:int}/cancel")]
+    public async Task<IActionResult> Cancel(int lotId, CancellationToken ct)
+    {
+        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
+        if (lot is null)
+        {
+            return NotFound();
+        }
+        if (lot.OriginType != LotOriginType.Receiving)
+        {
+            return BadRequest(new ProblemDetails { Title = "受入由来のロットではありません。" });
+        }
+
+        var transactions = await db.InventoryTransactions.Where(t => t.LotId == lotId).ToListAsync(ct);
+        if (transactions.Count != 1 || transactions[0].Type != InventoryTransactionType.Receipt)
+        {
+            return Conflict(new ProblemDetails { Title = "受入後に在庫が変動しているため取消できません（数量調整で対応してください）。" });
+        }
+
+        var receipt = transactions[0];
+        try
+        {
+            await inventory.RemoveAsync(lot, receipt.ToLocationId!.Value, receipt.Quantity,
+                InventoryTransactionType.Adjust, User.FindFirstValue(ClaimTypes.NameIdentifier),
+                note: "受入取消", ct: ct);
+        }
+        catch (InventoryException ex)
+        {
+            return Conflict(new ProblemDetails { Title = ex.Message });
+        }
+        lot.InitialQuantity = 0;
+        lot.StockStatus = LotStockStatus.ToBeDiscarded;
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "ReceiveCancel", nameof(Lot), lotId.ToString(),
+            detail: $"lot={lot.LotNumber}", ct: ct);
+        return NoContent();
+    }
+}

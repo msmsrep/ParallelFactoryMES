@@ -1,0 +1,128 @@
+using System.ComponentModel.DataAnnotations;
+using MesApp.Core.Entities;
+
+namespace MesApp.Core.Contracts.Execution;
+
+// ---- 段取り実績（B-20-50、B-40-40）----
+
+public record SetupRecordRequest(
+    SetupType Type,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    string? AbnormalityNote);
+
+public record SetupRecordResponse(
+    int Id, int WorkOrderId, SetupType Type,
+    DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
+    string PerformedByUserId, string? PerformedByName, string? AbnormalityNote);
+
+// ---- チェックリスト実施（B-30-10）----
+
+public record ChecklistResultRequest(int ChecklistItemId, bool IsChecked, string? Note);
+
+public record ChecklistRecordRequest(
+    int ChecklistId,
+    List<ChecklistResultRequest> Results);
+
+public record ChecklistResultResponse(int ChecklistItemId, string Text, bool IsRequired, bool IsChecked, string? Note);
+
+public record ChecklistRecordResponse(
+    int Id, int ChecklistId, string ChecklistCode, string ChecklistName,
+    int? WorkOrderId, int? EquipmentId,
+    string PerformedByUserId, string? PerformedByName, DateTimeOffset PerformedAt,
+    List<ChecklistResultResponse> Results);
+
+// ---- 部材投入（B-30-20、B-40-10-08）----
+
+public record ConsumptionRequest(
+    int LotId,
+    int LocationId,
+    [Range(0.000001, double.MaxValue)] decimal Quantity);
+
+public record ConsumptionResponse(
+    int Id, int WorkOrderId, int ProductId, string ProductCode, string ProductName,
+    int LotId, string LotNumber, int? LocationId, decimal Quantity,
+    DateTimeOffset ConsumedAt, ConsumptionMethod Method);
+
+// ---- 生産実績（B-30-30、B-40-10）----
+
+public record ProductionRecordRequest(
+    [Range(0, double.MaxValue)] decimal GoodQuantity,
+    [Range(0, double.MaxValue)] decimal DefectQuantity,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    /// <summary>入庫先ロケーション（最終工程の実績で必須。在庫計上 B-40-10-02）</summary>
+    int? OutputLocationId,
+    /// <summary>バックフラッシュ実行（MBOM×(良品+不良)数量の部材を自動消費。B-40-10-09）</summary>
+    bool Backflush);
+
+public record ProductionRecordResponse(
+    int Id, int WorkOrderId, string WorkOrderNo,
+    string PerformedByUserId, string? PerformedByName,
+    decimal GoodQuantity, decimal DefectQuantity,
+    DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
+    int? OutputLotId, string? OutputLotNumber, int? OutputLocationId,
+    string? ApprovedByUserId, DateTimeOffset? ApprovedAt);
+
+/// <summary>製造履歴訂正（B-70-30-01。権限制御＋監査ログ。訂正理由必須）</summary>
+public record ProductionRecordCorrectionRequest(
+    [Range(0, double.MaxValue)] decimal GoodQuantity,
+    [Range(0, double.MaxValue)] decimal DefectQuantity,
+    [Required] string Reason);
+
+// ---- 製造条件データ（B-30-30-04）----
+
+public record DataRecordRequest(
+    [Required, MaxLength(100)] string Item,
+    [Required, MaxLength(500)] string Value);
+
+public record DataRecordResponse(
+    int Id, int WorkOrderId, string Item, string Value, DateTimeOffset RecordedAt);
+
+// ---- 作業時間記録（B-30-30-02、F-30-20）----
+
+public record WorkTimeRequest(
+    WorkTimeType Type,
+    string? IndirectCategory,
+    int? WorkOrderId,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    string? Note);
+
+public record WorkTimeResponse(
+    int Id, string UserId, string? UserName, WorkTimeType Type, string? IndirectCategory,
+    int? WorkOrderId, string? WorkOrderNo,
+    DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string? Note);
+
+// ---- トラブル報告（B-40-10-06、B-60-10-02〜04）----
+
+public record TroubleReportRequest(
+    DateTimeOffset OccurredAt,
+    TroubleCategory Category,
+    int? WorkOrderId,
+    int? EquipmentId,
+    [Required, MaxLength(2000)] string Content);
+
+/// <summary>対応履歴の追記と状態更新（B-60-10-03〜04）</summary>
+public record TroubleUpdateRequest(
+    string? ResponseNote,
+    TroubleStatus Status);
+
+public record TroubleReportResponse(
+    int Id, DateTimeOffset OccurredAt, TroubleCategory Category,
+    int? WorkOrderId, string? WorkOrderNo, int? EquipmentId, string? EquipmentName,
+    string Content, string? ResponseHistory, TroubleStatus Status,
+    string ReportedByUserId, string? ReportedByName, DateTimeOffset CreatedAt);
+
+// ---- 搬送・移動指示（B-50-10）----
+
+public record TransferOrderRequest(
+    int LotId,
+    [Range(0.000001, double.MaxValue)] decimal Quantity,
+    int FromLocationId,
+    int ToLocationId);
+
+public record TransferOrderResponse(
+    int Id, int LotId, string LotNumber, string ProductCode, decimal Quantity,
+    int FromLocationId, string FromLocationCode, int ToLocationId, string ToLocationCode,
+    TransferOrderStatus Status, DateTimeOffset CreatedAt, DateTimeOffset? ExecutedAt);
