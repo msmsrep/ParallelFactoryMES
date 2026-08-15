@@ -314,3 +314,90 @@ public enum StocktakeStatus
     /// <summary>取消</summary>
     Canceled,
 }
+
+/// <summary>検査指示の検査種別（Spec.md 5.4 InspectionOrder。C-20）</summary>
+public enum InspectionOrderType
+{
+    /// <summary>受入検査</summary>
+    Receiving,
+    /// <summary>工程内検査</summary>
+    InProcess,
+    /// <summary>製品完成品検査</summary>
+    FinalProduct,
+    /// <summary>サンプル検査</summary>
+    Sample,
+    /// <summary>再検査（C-20-50-01）</summary>
+    Reinspection,
+}
+
+/// <summary>検査指示状態（Spec.md 5.4 InspectionOrder）</summary>
+public enum InspectionOrderStatus
+{
+    /// <summary>指示</summary>
+    Instructed,
+    /// <summary>実施中</summary>
+    InProgress,
+    /// <summary>判定済</summary>
+    Judged,
+    /// <summary>承認済</summary>
+    Approved,
+    /// <summary>取消</summary>
+    Canceled,
+}
+
+/// <summary>検査判定（C-20-10-04）</summary>
+public enum InspectionJudgment
+{
+    /// <summary>合格</summary>
+    Pass,
+    /// <summary>不合格</summary>
+    Fail,
+}
+
+/// <summary>不適合・逸脱の発生元（Spec.md 5.4 NonconformanceReport）</summary>
+public enum NonconformanceSource
+{
+    /// <summary>生産実績（B-40-30）</summary>
+    Production,
+    /// <summary>検査（C-20）</summary>
+    Inspection,
+    /// <summary>受入（D-10-10）</summary>
+    Receiving,
+}
+
+/// <summary>不適合対応指示（リワーク/保留/廃棄/特採。C-30-20-01）</summary>
+public enum NonconformanceAction
+{
+    /// <summary>リワーク</summary>
+    Rework,
+    /// <summary>保留</summary>
+    Hold,
+    /// <summary>廃棄</summary>
+    Discard,
+    /// <summary>特別採用（特採。C-30-20-03）</summary>
+    SpecialAcceptance,
+}
+
+/// <summary>不適合・逸脱状態</summary>
+public enum NonconformanceStatus
+{
+    /// <summary>発生（未対応）</summary>
+    Open,
+    /// <summary>対応指示済</summary>
+    ActionInstructed,
+    /// <summary>対応完了</summary>
+    ActionCompleted,
+    /// <summary>承認済（クローズ）</summary>
+    Closed,
+}
+
+/// <summary>出荷判定結果（可/保留/特採。H-10-10-02）</summary>
+public enum ShipmentJudgmentResult
+{
+    /// <summary>可</summary>
+    Approved,
+    /// <summary>保留</summary>
+    Hold,
+    /// <summary>特別採用（特採）</summary>
+    SpecialAcceptance,
+}

@@ -102,6 +102,21 @@ public class ShippingOrdersController(
             return BadRequest(new ProblemDetails { Title = "出荷明細がありません。" });
         }
 
+        // 出荷判定ゲート（H-10-10、Spec.md 5.3 出荷判定参照）：
+        // この出荷指示を対象とする承認済みの「可」または「特採」判定が必要
+        var hasApprovedJudgment = await db.ShipmentJudgments.AnyAsync(j =>
+            j.ShippingOrderId == id
+            && j.ApprovedAt != null
+            && (j.Result == ShipmentJudgmentResult.Approved
+                || j.Result == ShipmentJudgmentResult.SpecialAcceptance), ct);
+        if (!hasApprovedJudgment)
+        {
+            return Conflict(new ProblemDetails
+            {
+                Title = "承認済みの出荷判定（可または特採）がないため出荷できません（H-10-10）。",
+            });
+        }
+
         var lotIds = request.Lines.Select(l => l.LotId).Distinct().ToList();
         var lots = await db.Lots.Where(l => lotIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, ct);
 

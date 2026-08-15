@@ -1,0 +1,305 @@
+using System.Net;
+using System.Net.Http.Json;
+using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Masters;
+using MesApp.Core.Contracts.Production;
+using MesApp.Core.Contracts.Quality;
+using MesApp.Core.Entities;
+
+namespace MesApp.Api.Tests;
+
+public class QualityTests
+{
+    /// <summary>完成品FG-01の完成品検査基準（外径9.5〜10.5）を登録する</summary>
+    private static async Task<InspectionItemResponse> CreateFinalInspectionItemAsync(
+        HttpClient admin, int productId, decimal lower = 9.5m, decimal upper = 10.5m)
+    {
+        var response = await admin.PostAsJsonAsync("/api/inspection-items",
+            new InspectionItemRequest("INS-01", "外径測定", productId, null, InspectionType.FinalProduct,
+                lower, upper, 10m, "ノギス", 1));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<InspectionItemResponse>())!;
+    }
+
+    [Fact]
+    public async Task 検査指示から実績登録判定承認まで通しで動作しロットステータスへ反映される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        // 検査指示発行（項目は品目の完成品基準を自動選択）→ ロットは検査待ちへ
+        var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var order = await created.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        Assert.StartsWith("IN", order!.OrderNo);
+        Assert.Single(order.Items);
+        var lotAfterCreate = await admin.GetFromJsonAsync<Core.Contracts.Inventory.LotResponse>(
+            $"/api/inventory/lots/{lot.Id}");
+        Assert.Equal(LotStockStatus.AwaitingInspection, lotAfterCreate!.StockStatus);
+
+        // 実績未登録では判定できない
+        var premature = await admin.PostAsJsonAsync(
+            $"/api/inspection-orders/{order.Id}/judge", new InspectionJudgeRequest(null));
+        Assert.Equal(HttpStatusCode.BadRequest, premature.StatusCode);
+
+        // 実績登録（規格内 → 自動で合格判定）
+        var results = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.0m, null, null) });
+        Assert.Equal(HttpStatusCode.OK, results.StatusCode);
+        var withResults = await results.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        Assert.Equal(InspectionJudgment.Pass, withResults!.Results[0].Judgment);
+
+        // 総合判定（合格）→ ロットは正常へ、グレードも設定（C-60-10-01）
+        var judged = await admin.PostAsJsonAsync(
+            $"/api/inspection-orders/{order.Id}/judge", new InspectionJudgeRequest("A"));
+        Assert.Equal(HttpStatusCode.OK, judged.StatusCode);
+        var judgedBody = await judged.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        Assert.Equal(InspectionJudgment.Pass, judgedBody!.OverallJudgment);
+        var lotAfterJudge = await admin.GetFromJsonAsync<Core.Contracts.Inventory.LotResponse>(
+            $"/api/inventory/lots/{lot.Id}");
+        Assert.Equal(LotStockStatus.Normal, lotAfterJudge!.StockStatus);
+        Assert.Equal("A", lotAfterJudge.Grade);
+
+        // 承認（C-20-10-06）
+        var approved = await admin.PostAsync($"/api/inspection-orders/{order.Id}/approve", null);
+        Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+    }
+
+    [Fact]
+    public async Task 不合格判定でロットが不良になり不適合が自動起票される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+        var order = await created.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+
+        // 規格外の測定値 → 自動で不合格
+        await admin.PostAsJsonAsync($"/api/inspection-orders/{order!.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 12.0m, null, null) });
+        var judged = await admin.PostAsJsonAsync(
+            $"/api/inspection-orders/{order.Id}/judge", new InspectionJudgeRequest(null));
+        var judgedBody = await judged.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        Assert.Equal(InspectionJudgment.Fail, judgedBody!.OverallJudgment);
+
+        // ロットは不良へ
+        var lotInfo = await admin.GetFromJsonAsync<Core.Contracts.Inventory.LotResponse>(
+            $"/api/inventory/lots/{lot.Id}");
+        Assert.Equal(LotStockStatus.Defective, lotInfo!.StockStatus);
+
+        // 不適合が自動起票される（発生元＝検査）
+        var nonconformances = await admin.GetFromJsonAsync<List<NonconformanceResponse>>(
+            "/api/nonconformances");
+        Assert.Single(nonconformances!);
+        Assert.Equal(NonconformanceSource.Inspection, nonconformances![0].Source);
+        Assert.Equal(lot.Id, nonconformances[0].LotId);
+    }
+
+    [Fact]
+    public async Task 検査実績の訂正で判定済み指示は再判定が必要になる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+        var order = await created.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        var results = await admin.PostAsJsonAsync($"/api/inspection-orders/{order!.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.0m, null, null) });
+        var resultId = (await results.Content.ReadFromJsonAsync<InspectionOrderResponse>())!.Results[0].Id;
+        await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/judge", new InspectionJudgeRequest(null));
+
+        // 訂正（C-20-50-07）→ 実施中へ戻り、ロットも検査待ちへ戻る
+        var corrected = await admin.PutAsJsonAsync(
+            $"/api/inspection-orders/{order.Id}/results/{resultId}",
+            new InspectionResultCorrectionRequest(12.0m, null, InspectionJudgment.Fail, "測定器の読み間違い"));
+        Assert.Equal(HttpStatusCode.OK, corrected.StatusCode);
+        var correctedBody = await corrected.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        Assert.Equal(InspectionOrderStatus.InProgress, correctedBody!.Status);
+        Assert.Null(correctedBody.OverallJudgment);
+        var lotInfo = await admin.GetFromJsonAsync<Core.Contracts.Inventory.LotResponse>(
+            $"/api/inventory/lots/{lot.Id}");
+        Assert.Equal(LotStockStatus.AwaitingInspection, lotInfo!.StockStatus);
+    }
+
+    [Fact]
+    public async Task 不適合の対応指示で保留はロットへ反映されリワークは指図が起票される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        // 生産で産出ロットを作る（リワーク指図の由来特定のため）
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var posted = await admin.PostAsJsonAsync(
+            $"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+            new Core.Contracts.Execution.ProductionRecordRequest(
+                10m, 0m, DateTimeOffset.Now, null, ctx.ProductLocationId, false));
+        var record = await posted.Content.ReadFromJsonAsync<Core.Contracts.Execution.ProductionRecordResponse>();
+        var outputLotId = record!.OutputLotId!.Value;
+
+        // 不適合起票（現場から）
+        var reported = await admin.PostAsJsonAsync("/api/nonconformances",
+            new NonconformanceCreateRequest(NonconformanceSource.Production, outputLotId,
+                order.WorkOrders[1].Id, null, "外観キズ", "作業ミス", null));
+        var nc = await reported.Content.ReadFromJsonAsync<NonconformanceResponse>();
+
+        // 対応指示：リワーク → リワーク指図が自動起票される
+        var instructed = await admin.PostAsJsonAsync($"/api/nonconformances/{nc!.Id}/instruct",
+            new NonconformanceActionRequest(NonconformanceAction.Rework, "再研磨すること"));
+        Assert.Equal(HttpStatusCode.OK, instructed.StatusCode);
+        var withRework = await instructed.Content.ReadFromJsonAsync<NonconformanceResponse>();
+        Assert.NotNull(withRework!.ReworkOrderId);
+        var reworkOrder = await admin.GetFromJsonAsync<ManufacturingOrderDetailResponse>(
+            $"/api/manufacturing-orders/{withRework.ReworkOrderId}");
+        Assert.Equal(ManufacturingOrderType.Rework, reworkOrder!.Order.OrderType);
+        Assert.Equal(order.Order.Id, reworkOrder.Order.SourceOrderId);
+
+        // 対応実行記録 → 承認でクローズ
+        var recorded = await admin.PostAsJsonAsync($"/api/nonconformances/{nc.Id}/record-action",
+            new NonconformanceActionRecordRequest("再研磨を実施し外観OK"));
+        Assert.Equal(HttpStatusCode.OK, recorded.StatusCode);
+        var approved = await admin.PostAsync($"/api/nonconformances/{nc.Id}/approve", null);
+        Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+        var closed = await approved.Content.ReadFromJsonAsync<NonconformanceResponse>();
+        Assert.Equal(NonconformanceStatus.Closed, closed!.Status);
+    }
+
+    [Fact]
+    public async Task 特採承認でロットが正常へ戻る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        var reported = await admin.PostAsJsonAsync("/api/nonconformances",
+            new NonconformanceCreateRequest(NonconformanceSource.Receiving, lot.Id, null, null,
+                "軽微な外観不良", null, null));
+        var nc = await reported.Content.ReadFromJsonAsync<NonconformanceResponse>();
+
+        // 保留指示 → ロット保留
+        await admin.PostAsJsonAsync($"/api/nonconformances/{nc!.Id}/instruct",
+            new NonconformanceActionRequest(NonconformanceAction.Hold, null));
+        var held = await admin.GetFromJsonAsync<Core.Contracts.Inventory.LotResponse>(
+            $"/api/inventory/lots/{lot.Id}");
+        Assert.Equal(LotStockStatus.OnHold, held!.StockStatus);
+
+        // 特採へ変更 → 対応記録 → 承認でロット正常化（C-30-20-03）
+        await admin.PostAsJsonAsync($"/api/nonconformances/{nc.Id}/instruct",
+            new NonconformanceActionRequest(NonconformanceAction.SpecialAcceptance, "顧客承認済みのため特採"));
+        await admin.PostAsJsonAsync($"/api/nonconformances/{nc.Id}/record-action",
+            new NonconformanceActionRecordRequest("特採処理を実施"));
+        (await admin.PostAsync($"/api/nonconformances/{nc.Id}/approve", null)).EnsureSuccessStatusCode();
+        var released = await admin.GetFromJsonAsync<Core.Contracts.Inventory.LotResponse>(
+            $"/api/inventory/lots/{lot.Id}");
+        Assert.Equal(LotStockStatus.Normal, released!.StockStatus);
+    }
+
+    [Fact]
+    public async Task トレースバックとトレースフォワードで部材と製品の連鎖を辿れる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var materialLot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        // 部材投入（トレーサビリティの連鎖を作る）＋最終工程で在庫計上
+        (await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[0].Id}/consumptions",
+            new Core.Contracts.Execution.ConsumptionRequest(materialLot.Id, ctx.MaterialLocationId, 20m)))
+            .EnsureSuccessStatusCode();
+        var posted = await admin.PostAsJsonAsync(
+            $"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+            new Core.Contracts.Execution.ProductionRecordRequest(
+                10m, 0m, DateTimeOffset.Now, null, ctx.ProductLocationId, false));
+        var record = await posted.Content.ReadFromJsonAsync<Core.Contracts.Execution.ProductionRecordResponse>();
+        var outputLotId = record!.OutputLotId!.Value;
+
+        // トレースバック：産出ロット → 投入部材ロット（H-30-10-01）
+        var back = await admin.GetFromJsonAsync<TraceResponse>($"/api/traceability/{outputLotId}/back");
+        Assert.Contains(back!.Nodes, n => n.LotId == materialLot.Id && n.Quantity == 20m);
+
+        // トレースフォワード：部材ロット → 産出ロット（H-30-10-02）
+        var forward = await admin.GetFromJsonAsync<TraceResponse>($"/api/traceability/{materialLot.Id}/forward");
+        Assert.Contains(forward!.Nodes, n => n.LotId == outputLotId);
+
+        // 履歴閲覧（H-30-10-03〜05）
+        var history = await admin.GetFromJsonAsync<LotHistoryResponse>($"/api/traceability/{outputLotId}/history");
+        Assert.NotEmpty(history!.ProductionHistory);
+        Assert.NotEmpty(history.InventoryHistory);
+    }
+
+    [Fact]
+    public async Task 品質分析サマリで不良集計と不適合状況を取得できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+            new Core.Contracts.Execution.ProductionRecordRequest(
+                8m, 2m, DateTimeOffset.Now, null, ctx.ProductLocationId, false));
+        await admin.PostAsJsonAsync("/api/nonconformances",
+            new NonconformanceCreateRequest(NonconformanceSource.Production, null,
+                order.WorkOrders[1].Id, null, "不良2個", "設備不調", null));
+
+        var summary = await admin.GetFromJsonAsync<QualitySummaryResponse>("/api/quality/summary");
+        var productRow = summary!.ByProduct.Single(r => r.Key == "FG-01");
+        Assert.Equal(8m, productRow.GoodQuantity);
+        Assert.Equal(2m, productRow.DefectQuantity);
+        Assert.Equal(20m, productRow.DefectRate);
+        Assert.Equal(1, summary.OpenNonconformanceCount);
+        Assert.True(summary.NonconformanceByCause.ContainsKey("設備不調"));
+    }
+
+    [Fact]
+    public async Task 品質系操作は担当ロールのみ実行できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+        using var operator_ = await TestAuth.CreateUserClientAsync(
+            factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
+        using var qc = await TestAuth.CreateUserClientAsync(
+            factory, admin, "qc1", "Passw0rd123", MesRoles.QualityControl);
+        using var qa = await TestAuth.CreateUserClientAsync(
+            factory, admin, "qa1", "Passw0rd123", MesRoles.QualityAssurance);
+
+        // 作業者は検査指示を発行できない／不適合の起票はできる
+        var byOperator = await operator_.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+        Assert.Equal(HttpStatusCode.Forbidden, byOperator.StatusCode);
+        var ncByOperator = await operator_.PostAsJsonAsync("/api/nonconformances",
+            new NonconformanceCreateRequest(NonconformanceSource.Production, lot.Id, null, null, "逸脱", null, null));
+        Assert.Equal(HttpStatusCode.Created, ncByOperator.StatusCode);
+
+        // 品質管理は検査指示を発行できる／出荷判定はできない
+        var byQc = await qc.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, [item.Id], null));
+        Assert.Equal(HttpStatusCode.Created, byQc.StatusCode);
+        var judgeByQc = await qc.PostAsJsonAsync("/api/shipment-judgments",
+            new ShipmentJudgmentCreateRequest(lot.Id, null, ShipmentJudgmentResult.Approved, null));
+        Assert.Equal(HttpStatusCode.Forbidden, judgeByQc.StatusCode);
+
+        // 品質保証は出荷判定できる
+        var judgeByQa = await qa.PostAsJsonAsync("/api/shipment-judgments",
+            new ShipmentJudgmentCreateRequest(lot.Id, null, ShipmentJudgmentResult.Approved, null));
+        Assert.Equal(HttpStatusCode.Created, judgeByQa.StatusCode);
+    }
+}

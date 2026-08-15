@@ -20,4 +20,10 @@ public static class RoleGroups
     /// <summary>在庫・物流オペレーション（受入・在庫操作・出庫/払出・出荷・棚卸）</summary>
     public const string InventoryManage =
         $"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}";
+
+    /// <summary>品質管理（検査指示・実績・判定・承認、不適合対応指示・承認）</summary>
+    public const string QualityManage = $"{MesRoles.SystemAdmin},{MesRoles.QualityControl}";
+
+    /// <summary>品質保証（出荷判定・判定承認）</summary>
+    public const string QaManage = $"{MesRoles.SystemAdmin},{MesRoles.QualityAssurance}";
 }

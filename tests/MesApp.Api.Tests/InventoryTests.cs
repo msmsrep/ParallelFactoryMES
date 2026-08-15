@@ -181,6 +181,19 @@ public class InventoryTests
         var shipping = await created.Content.ReadFromJsonAsync<ShippingOrderResponse>();
         Assert.StartsWith("SH", shipping!.ShippingNo);
 
+        // 出荷判定（承認済みの「可」）がないと出荷できない（H-10-10ゲート）
+        var blocked = await admin.PostAsJsonAsync($"/api/shipping-orders/{shipping.Id}/ship",
+            new ShipExecuteRequest([new(lot.Id, ctx.ProductLocationId, 20m)]));
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+
+        // 出荷判定→承認
+        var judged = await admin.PostAsJsonAsync("/api/shipment-judgments",
+            new Core.Contracts.Quality.ShipmentJudgmentCreateRequest(
+                null, shipping.Id, ShipmentJudgmentResult.Approved, null));
+        Assert.Equal(HttpStatusCode.Created, judged.StatusCode);
+        var judgment = await judged.Content.ReadFromJsonAsync<Core.Contracts.Quality.ShipmentJudgmentResponse>();
+        (await admin.PostAsync($"/api/shipment-judgments/{judgment!.Id}/approve", null)).EnsureSuccessStatusCode();
+
         // 指示数量超過は400
         var over = await admin.PostAsJsonAsync($"/api/shipping-orders/{shipping.Id}/ship",
             new ShipExecuteRequest([new(lot.Id, ctx.ProductLocationId, 70m)]));

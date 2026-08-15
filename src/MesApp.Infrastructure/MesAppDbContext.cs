@@ -48,6 +48,12 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<ShippingOrder> ShippingOrders => Set<ShippingOrder>();
     public DbSet<Stocktake> Stocktakes => Set<Stocktake>();
 
+    // 品質系（Spec.md 5.4）
+    public DbSet<InspectionOrder> InspectionOrders => Set<InspectionOrder>();
+    public DbSet<InspectionResult> InspectionResults => Set<InspectionResult>();
+    public DbSet<NonconformanceReport> NonconformanceReports => Set<NonconformanceReport>();
+    public DbSet<ShipmentJudgment> ShipmentJudgments => Set<ShipmentJudgment>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
         base.ConfigureConventions(builder);
@@ -64,6 +70,13 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<PickingOrderStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ShippingOrderStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<StocktakeStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<InspectionOrderType>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<InspectionOrderStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<InspectionJudgment>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<NonconformanceSource>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<NonconformanceAction>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<NonconformanceStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<ShipmentJudgmentResult>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ProductType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MakeOrBuy>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<EquipmentStatus>().HaveConversion<string>().HaveMaxLength(30);
@@ -459,6 +472,80 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---- 品質系 ----
+
+        builder.Entity<InspectionOrder>(e =>
+        {
+            e.HasIndex(x => x.OrderNo).IsUnique();
+            e.HasIndex(x => x.Status);
+            e.Property(x => x.OrderNo).HasMaxLength(50);
+            e.Property(x => x.Note).HasMaxLength(1000);
+            e.HasOne(x => x.TargetLot).WithMany().HasForeignKey(x => x.TargetLotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.TargetWorkOrder).WithMany().HasForeignKey(x => x.TargetWorkOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.RequestedBy).WithMany().HasForeignKey(x => x.RequestedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.InspectionOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Results).WithOne().HasForeignKey(x => x.InspectionOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<InspectionOrderItem>(e =>
+        {
+            e.HasIndex(x => new { x.InspectionOrderId, x.InspectionItemId }).IsUnique();
+            e.HasOne(x => x.InspectionItem).WithMany().HasForeignKey(x => x.InspectionItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<InspectionResult>(e =>
+        {
+            e.HasIndex(x => x.InspectionOrderId);
+            e.Property(x => x.TextValue).HasMaxLength(500);
+            e.Property(x => x.CorrectionNote).HasMaxLength(1000);
+            e.HasOne(x => x.InspectionItem).WithMany().HasForeignKey(x => x.InspectionItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.InspectedBy).WithMany().HasForeignKey(x => x.InspectedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<NonconformanceReport>(e =>
+        {
+            e.HasIndex(x => x.ReportNo).IsUnique();
+            e.HasIndex(x => x.Status);
+            e.Property(x => x.ReportNo).HasMaxLength(50);
+            e.Property(x => x.Content).HasMaxLength(2000);
+            e.Property(x => x.CauseCategory).HasMaxLength(100);
+            e.Property(x => x.CauseDetail).HasMaxLength(2000);
+            e.Property(x => x.ActionInstruction).HasMaxLength(1000);
+            e.Property(x => x.ActionRecord).HasMaxLength(2000);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.InspectionOrder).WithMany().HasForeignKey(x => x.InspectionOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.ReworkOrder).WithMany().HasForeignKey(x => x.ReworkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.ReportedBy).WithMany().HasForeignKey(x => x.ReportedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<ShipmentJudgment>(e =>
+        {
+            e.HasIndex(x => x.JudgmentNo).IsUnique();
+            e.HasIndex(x => x.ShippingOrderId);
+            e.Property(x => x.JudgmentNo).HasMaxLength(50);
+            e.Property(x => x.Note).HasMaxLength(1000);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ShippingOrder).WithMany().HasForeignKey(x => x.ShippingOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.JudgedBy).WithMany().HasForeignKey(x => x.JudgedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
