@@ -40,6 +40,7 @@ builder.Services.AddSingleton<SigningKeyProvider>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<RefreshTokenService>();
 builder.Services.AddSingleton<IBusinessDateService, BusinessDateService>();
+builder.Services.AddScoped<NumberingService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
