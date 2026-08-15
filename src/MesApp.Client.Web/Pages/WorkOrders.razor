@@ -1,0 +1,80 @@
+@page "/work-orders"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>作業指示 - Parallel Factory MES</PageTitle>
+
+<h1>作業指示一覧</h1>
+
+<div class="card">
+    <div class="actions" style="margin-bottom:8px;">
+        <select @bind="_statusFilter" @bind:after="LoadAsync">
+            <option value="">全状態</option>
+            <option value="Created">未配布</option>
+            <option value="Dispatched">配布済</option>
+            <option value="Started">着手</option>
+            <option value="Completed">完了</option>
+            <option value="Approved">承認済</option>
+        </select>
+    </div>
+
+    @if (_workOrders is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_workOrders.Count == 0)
+    {
+        <p class="text-muted">作業指示はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>指示番号</th>
+                    <th>指図番号</th>
+                    <th>品目</th>
+                    <th>工程</th>
+                    <th>計画数</th>
+                    <th>着手順</th>
+                    <th>担当者</th>
+                    <th>状態</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var workOrder in _workOrders)
+                {
+                    <tr>
+                        <td>@workOrder.WorkOrderNo</td>
+                        <td><a href="manufacturing-orders/@workOrder.ManufacturingOrderId">@workOrder.OrderNo</a></td>
+                        <td>@workOrder.ProductCode @workOrder.ProductName</td>
+                        <td>@workOrder.ProcessCode @workOrder.ProcessName</td>
+                        <td>@workOrder.PlannedQuantity</td>
+                        <td>@(workOrder.DispatchOrder?.ToString() ?? "-")</td>
+                        <td>@(workOrder.AssignedUserName ?? "-")</td>
+                        <td><StatusBadge Status="@workOrder.Status.ToString()" /></td>
+                        <td><a class="btn btn-secondary btn-sm" href="work-orders/@workOrder.Id/record">実績入力</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<WorkOrderResponse>? _workOrders;
+    private string _statusFilter = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var url = "api/work-orders";
+        if (!string.IsNullOrEmpty(_statusFilter))
+        {
+            url += $"?status={_statusFilter}";
+        }
+        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>(url);
+    }
+}

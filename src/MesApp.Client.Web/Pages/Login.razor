@@ -1,0 +1,87 @@
+@page "/login"
+@layout EmptyLayout
+@inject AuthService Auth
+@inject NavigationManager Navigation
+@inject HttpClient Http
+
+<PageTitle>ログイン - Parallel Factory MES</PageTitle>
+
+<div class="login-page">
+    <div class="login-box">
+        <h1>Parallel Factory MES</h1>
+
+        @if (_setupRequired)
+        {
+            <div class="alert alert-success">
+                初期セットアップが必要です。<a href="setup">初期管理者アカウントを作成</a>してください。
+            </div>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="form-field">
+            <label>ユーザー名</label>
+            <input @bind="_userName" @bind:event="oninput" @onkeyup="OnKeyUp" autocomplete="username" />
+        </div>
+        <div class="form-field">
+            <label>パスワード</label>
+            <input type="password" @bind="_password" @bind:event="oninput" @onkeyup="OnKeyUp"
+                   autocomplete="current-password" />
+        </div>
+        <button class="btn" disabled="@_busy" @onclick="LoginAsync">ログイン</button>
+    </div>
+</div>
+
+@code {
+    private string _userName = string.Empty;
+    private string _password = string.Empty;
+    private string? _error;
+    private bool _busy;
+    private bool _setupRequired;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var status = await Http.GetFromJsonAsync<SetupStatusResponse>("api/setup/status");
+            _setupRequired = status?.SetupRequired ?? false;
+        }
+        catch
+        {
+            // 接続不可時はログインフォームのみ表示
+        }
+    }
+
+    private async Task OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoginAsync();
+        }
+    }
+
+    private async Task LoginAsync()
+    {
+        if (_busy || string.IsNullOrWhiteSpace(_userName) || string.IsNullOrEmpty(_password))
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        try
+        {
+            _error = await Auth.LoginAsync(_userName, _password);
+            if (_error is null)
+            {
+                Navigation.NavigateTo("");
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

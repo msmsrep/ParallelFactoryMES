@@ -1,0 +1,154 @@
+@page "/manufacturing-orders/{Id:int}"
+@attribute [Authorize]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>製造指図詳細 - Parallel Factory MES</PageTitle>
+
+@if (_detail is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    var order = _detail.Order;
+    <h1>製造指図 @order.OrderNo</h1>
+
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    @if (_message is not null)
+    {
+        <div class="alert alert-success">@_message</div>
+    }
+
+    <div class="card">
+        <table class="table">
+            <tbody>
+                <tr>
+                    <th>品目</th><td>@order.ProductCode @order.ProductName</td>
+                    <th>数量</th><td>@order.Quantity</td>
+                </tr>
+                <tr>
+                    <th>納期</th><td>@(order.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                    <th>区分</th><td>@order.OrderType</td>
+                </tr>
+                <tr>
+                    <th>状態</th><td><StatusBadge Status="@order.Status.ToString()" /></td>
+                    <th>産出ロット</th><td>@(order.OutputLotNumber ?? "（展開時に採番）")</td>
+                </tr>
+                <tr>
+                    <th>備考</th><td colspan="3">@(order.Note ?? "-")</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+            <div class="actions mt-2">
+                @if (order.Status == ManufacturingOrderStatus.Draft)
+                {
+                    <button class="btn" disabled="@_busy" @onclick="ApproveAsync">承認（A-20-20-01）</button>
+                }
+                @if (order.Status == ManufacturingOrderStatus.Approved)
+                {
+                    <button class="btn" disabled="@_busy" @onclick="ExpandAsync">工程展開（B-10-10-01）</button>
+                }
+                @if (order.Status is not (ManufacturingOrderStatus.Completed or ManufacturingOrderStatus.Canceled))
+                {
+                    <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">取消</button>
+                }
+            </div>
+        </AuthorizeView>
+    </div>
+
+    <h2>作業指示（工程展開結果）</h2>
+    @if (_detail.WorkOrders.Count == 0)
+    {
+        <p class="text-muted">未展開です。承認後に工程展開すると工順に基づいて作業指示が生成されます。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>指示番号</th>
+                    <th>工程</th>
+                    <th>計画数</th>
+                    <th>着手順</th>
+                    <th>担当者</th>
+                    <th>設備</th>
+                    <th>状態</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var workOrder in _detail.WorkOrders)
+                {
+                    <tr>
+                        <td>@workOrder.WorkOrderNo</td>
+                        <td>@workOrder.ProcessCode @workOrder.ProcessName</td>
+                        <td>@workOrder.PlannedQuantity</td>
+                        <td>@(workOrder.DispatchOrder?.ToString() ?? "-")</td>
+                        <td>@(workOrder.AssignedUserName ?? "-")</td>
+                        <td>@(workOrder.AssignedEquipmentName ?? "-")</td>
+                        <td><StatusBadge Status="@workOrder.Status.ToString()" /></td>
+                        <td><a class="btn btn-secondary btn-sm" href="work-orders/@workOrder.Id/record">実績入力</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private ManufacturingOrderDetailResponse? _detail;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync() =>
+        _detail = await Http.GetFromJsonAsync<ManufacturingOrderDetailResponse>(
+            $"api/manufacturing-orders/{Id}");
+
+    private Task ApproveAsync() =>
+        PostActionAsync($"api/manufacturing-orders/{Id}/approve", null, "承認しました。");
+
+    private Task CancelAsync() =>
+        PostActionAsync($"api/manufacturing-orders/{Id}/cancel", null, "取消しました。");
+
+    private Task ExpandAsync() =>
+        PostActionAsync($"api/manufacturing-orders/{Id}/expand",
+            JsonContent.Create(new ExpandRequest(null)), "工程展開しました（産出ロット採番済み）。");
+
+    private async Task PostActionAsync(string url, HttpContent? content, string successMessage)
+    {
+        if (_busy)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsync(url, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                return;
+            }
+            _message = successMessage;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

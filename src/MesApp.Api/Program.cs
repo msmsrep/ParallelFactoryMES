@@ -8,6 +8,13 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Blazor WASMクライアントの静的配信（Spec.md 2.1：Webクライアントの静的配信もAPIが担う）。
+// 非Development環境（テスト・zip配布のdotnet run等）でも静的Webアセットを解決できるようにする
+if (!builder.Environment.IsProduction())
+{
+    builder.WebHost.UseStaticWebAssets();
+}
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
@@ -71,9 +78,15 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+// Blazor WASMクライアントの配信（index.html・_framework・css）
+app.UseBlazorFrameworkFiles();
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+// クライアント側ルーティングのフォールバック（/manufacturing-orders 等の直接アクセス）
+app.MapFallbackToFile("index.html");
 
 // DB初期化（マイグレーション適用・SQLite WAL）とロール・初期管理者シード
 await app.Services.InitializeDatabaseAsync();

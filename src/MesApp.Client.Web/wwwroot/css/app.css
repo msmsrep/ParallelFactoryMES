@@ -1,0 +1,197 @@
+/* Parallel Factory MES 共通スタイル（Phase 6：軽量な独自CSS。外部フレームワーク非依存） */
+
+:root {
+    --primary: #1b6ec2;
+    --primary-dark: #145a9e;
+    --bg: #f4f6f8;
+    --surface: #ffffff;
+    --border: #d7dde3;
+    --text: #212529;
+    --text-muted: #6c757d;
+    --danger: #c62828;
+    --success: #2e7d32;
+    --warning: #ef6c00;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    font-family: "Segoe UI", "Hiragino Sans", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+}
+
+.loading-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    color: var(--text-muted);
+}
+
+/* レイアウト */
+.app-layout { display: flex; min-height: 100vh; }
+
+.sidebar {
+    width: 220px;
+    background: #253544;
+    color: #dfe6ec;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar .brand {
+    padding: 16px;
+    font-weight: bold;
+    font-size: 15px;
+    color: #fff;
+    border-bottom: 1px solid #3a4d5f;
+}
+
+.sidebar nav { padding: 8px 0; }
+
+.sidebar a {
+    display: block;
+    padding: 10px 16px;
+    color: #dfe6ec;
+    text-decoration: none;
+}
+
+.sidebar a:hover { background: #31465a; }
+.sidebar a.active { background: var(--primary); color: #fff; }
+
+.main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.topbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 20px;
+}
+
+.content { padding: 20px; max-width: 1200px; }
+
+/* 見出し・カード */
+h1 { font-size: 20px; margin: 0 0 16px; }
+h2 { font-size: 16px; margin: 20px 0 8px; }
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+/* テーブル */
+.table { width: 100%; border-collapse: collapse; background: var(--surface); }
+.table th, .table td {
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    text-align: left;
+    white-space: nowrap;
+}
+.table th { background: #eef2f6; font-weight: 600; }
+.table tr:hover td { background: #f6f9fc; }
+
+/* フォーム */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.form-field { display: flex; flex-direction: column; gap: 4px; }
+.form-field label { font-size: 12px; color: var(--text-muted); }
+
+input, select, textarea {
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+
+/* ボタン */
+.btn {
+    display: inline-block;
+    padding: 6px 14px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: var(--primary);
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: none;
+}
+.btn:hover { background: var(--primary-dark); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn-secondary:hover { background: #eef2f6; }
+.btn-danger { background: var(--danger); }
+.btn-danger:hover { background: #a51f1f; }
+.btn-sm { padding: 2px 8px; font-size: 12px; }
+
+/* バッジ・メッセージ */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    background: #e0e5ea;
+    color: var(--text);
+}
+.badge-success { background: #dcedc8; color: var(--success); }
+.badge-warning { background: #ffe0b2; color: var(--warning); }
+.badge-danger { background: #ffcdd2; color: var(--danger); }
+.badge-info { background: #bbdefb; color: var(--primary-dark); }
+
+.alert {
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+.alert-danger { background: #ffebee; color: var(--danger); border: 1px solid #ef9a9a; }
+.alert-success { background: #e8f5e9; color: var(--success); border: 1px solid #a5d6a7; }
+
+.text-muted { color: var(--text-muted); }
+.text-danger { color: var(--danger); }
+.mt-2 { margin-top: 8px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ログイン画面 */
+.login-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+.login-box {
+    width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px;
+}
+.login-box h1 { text-align: center; }
+.login-box .form-field { margin-bottom: 12px; }
+.login-box .btn { width: 100%; margin-top: 8px; }
+
+#blazor-error-ui {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff3cd;
+    padding: 10px 20px;
+    border-top: 1px solid #ffe69c;
+    z-index: 1000;
+}
+#blazor-error-ui .dismiss { float: right; cursor: pointer; }

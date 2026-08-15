@@ -1,0 +1,32 @@
+@inherits LayoutComponentBase
+@inject AuthService Auth
+@inject TokenStore Tokens
+@inject NavigationManager Navigation
+
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="brand">Parallel Factory MES</div>
+        <NavMenu />
+    </aside>
+    <div class="main-area">
+        <header class="topbar">
+            <AuthorizeView>
+                <Authorized>
+                    <span class="text-muted">@Tokens.User?.DisplayName</span>
+                    <button class="btn btn-secondary btn-sm" @onclick="LogoutAsync">ログアウト</button>
+                </Authorized>
+            </AuthorizeView>
+        </header>
+        <main class="content">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private async Task LogoutAsync()
+    {
+        await Auth.LogoutAsync();
+        Navigation.NavigateTo("login");
+    }
+}

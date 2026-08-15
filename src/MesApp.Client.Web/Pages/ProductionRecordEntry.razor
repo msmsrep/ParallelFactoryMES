@@ -1,0 +1,238 @@
+@page "/work-orders/{Id:int}/record"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>実績入力 - Parallel Factory MES</PageTitle>
+
+@if (_workOrder is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <h1>実績入力：@_workOrder.WorkOrderNo</h1>
+    <p class="text-muted">
+        @_workOrder.ProductCode @_workOrder.ProductName ／ 工程 @_workOrder.ProcessCode @_workOrder.ProcessName
+        ／ 計画数 @_workOrder.PlannedQuantity ／ 状態 <StatusBadge Status="@_workOrder.Status.ToString()" />
+    </p>
+
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    @if (_message is not null)
+    {
+        <div class="alert alert-success">@_message</div>
+    }
+
+    @if (_workOrder.Status is WorkOrderStatus.Created or WorkOrderStatus.Dispatched)
+    {
+        <div class="card">
+            <button class="btn" disabled="@_busy" @onclick="StartAsync">着手（B-30-30-01）</button>
+        </div>
+    }
+
+    @if (_workOrder.Status is not (WorkOrderStatus.Approved or WorkOrderStatus.Canceled))
+    {
+        <div class="card">
+            <h2 style="margin-top:0;">出来高報告（B-40-10-01）</h2>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>良品数</label>
+                    <input type="number" @bind="_good" min="0" />
+                </div>
+                <div class="form-field">
+                    <label>不良数</label>
+                    <input type="number" @bind="_defect" min="0" />
+                </div>
+                <div class="form-field">
+                    <label>開始時刻</label>
+                    <input type="datetime-local" @bind="_startedAt" />
+                </div>
+                <div class="form-field">
+                    <label>終了時刻</label>
+                    <input type="datetime-local" @bind="_endedAt" />
+                </div>
+                <div class="form-field">
+                    <label>入庫先ロケーション（最終工程のみ必須）</label>
+                    <select @bind="_outputLocationId">
+                        <option value="0">選択してください</option>
+                        @foreach (var location in _locations)
+                        {
+                            <option value="@location.Id">@location.Code</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>
+                        <input type="checkbox" @bind="_backflush" style="width:auto;" />
+                        バックフラッシュ（MBOMから部材を自動消費。B-40-10-09）
+                    </label>
+                </div>
+            </div>
+            <button class="btn" disabled="@_busy" @onclick="SubmitAsync">実績を登録（作業完了報告）</button>
+        </div>
+    }
+
+    <h2>登録済みの実績</h2>
+    @if (_records.Count == 0)
+    {
+        <p class="text-muted">実績はまだありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>良品数</th>
+                    <th>不良数</th>
+                    <th>作業者</th>
+                    <th>開始</th>
+                    <th>終了</th>
+                    <th>産出ロット</th>
+                    <th>承認</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in _records)
+                {
+                    <tr>
+                        <td>@record.GoodQuantity</td>
+                        <td>@record.DefectQuantity</td>
+                        <td>@record.PerformedByName</td>
+                        <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                        <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
+                        <td>@(record.OutputLotNumber ?? "-")</td>
+                        <td>@(record.ApprovedAt is null ? "未承認" : "承認済")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+        @if (_workOrder.Status == WorkOrderStatus.Completed)
+        {
+            <div class="card">
+                <button class="btn" disabled="@_busy" @onclick="ApproveAsync">製造完了承認（B-40-10-10）</button>
+            </div>
+        }
+    </AuthorizeView>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private WorkOrderResponse? _workOrder;
+    private List<ProductionRecordResponse> _records = [];
+    private List<LocationOption> _locations = [];
+
+    private decimal _good;
+    private decimal _defect;
+    private DateTime _startedAt = DateTime.Now;
+    private DateTime? _endedAt;
+    private int _outputLocationId;
+    private bool _backflush;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    // ロケーションはコード表示のみ使用（MasterContractsのLocationResponseはenumを含むため簡易DTOで受ける）
+    private sealed record LocationOption(int Id, string Code);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _locations = await Http.GetFromJsonAsync<List<LocationOption>>("api/locations") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _workOrder = await Http.GetFromJsonAsync<WorkOrderResponse>($"api/work-orders/{Id}");
+        _records = await Http.GetFromJsonAsync<List<ProductionRecordResponse>>(
+            $"api/work-orders/{Id}/production-records") ?? [];
+    }
+
+    private async Task StartAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsync($"api/work-orders/{Id}/start", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "着手に失敗しました。";
+                return;
+            }
+            _message = "着手しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        if (_good + _defect <= 0)
+        {
+            _error = "良品数と不良数の合計は0より大きい必要があります。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/production-records",
+                new ProductionRecordRequest(
+                    _good, _defect,
+                    new DateTimeOffset(_startedAt),
+                    _endedAt is null ? null : new DateTimeOffset(_endedAt.Value),
+                    _outputLocationId == 0 ? null : _outputLocationId,
+                    _backflush));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "実績登録に失敗しました。";
+                return;
+            }
+            _message = "実績を登録しました。";
+            _good = 0;
+            _defect = 0;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ApproveAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsync($"api/work-orders/{Id}/approve", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                return;
+            }
+            _message = "承認しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,65 @@
+@page "/setup"
+@layout EmptyLayout
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>初期セットアップ - Parallel Factory MES</PageTitle>
+
+<div class="login-page">
+    <div class="login-box">
+        <h1>初期セットアップ</h1>
+        <p class="text-muted">初期管理者アカウントを作成します（初回起動時のみ有効。Spec 2.2 E）。</p>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="form-field">
+            <label>ユーザー名</label>
+            <input @bind="_userName" />
+        </div>
+        <div class="form-field">
+            <label>氏名（表示名）</label>
+            <input @bind="_displayName" />
+        </div>
+        <div class="form-field">
+            <label>パスワード</label>
+            <input type="password" @bind="_password" autocomplete="new-password" />
+        </div>
+        <button class="btn" disabled="@_busy" @onclick="SubmitAsync">作成してログイン画面へ</button>
+    </div>
+</div>
+
+@code {
+    private string _userName = string.Empty;
+    private string _displayName = string.Empty;
+    private string _password = string.Empty;
+    private string? _error;
+    private bool _busy;
+
+    private async Task SubmitAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/setup/initialize",
+                new InitializeRequest(_userName, _password, _displayName));
+            if (response.IsSuccessStatusCode)
+            {
+                Navigation.NavigateTo("login");
+                return;
+            }
+            _error = await AuthService.ReadProblemTitleAsync(response) ?? "セットアップに失敗しました。パスワード要件（8文字以上・英小文字・数字）を確認してください。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
