@@ -26,4 +26,7 @@ public static class RoleGroups
 
     /// <summary>品質保証（出荷判定・判定承認）</summary>
     public const string QaManage = $"{MesRoles.SystemAdmin},{MesRoles.QualityAssurance}";
+
+    /// <summary>設備保全（保全手順書・計画・指示・実績、治工具メンテナンス）</summary>
+    public const string MaintenanceManage = $"{MesRoles.SystemAdmin},{MesRoles.Maintenance}";
 }

@@ -54,6 +54,14 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<NonconformanceReport> NonconformanceReports => Set<NonconformanceReport>();
     public DbSet<ShipmentJudgment> ShipmentJudgments => Set<ShipmentJudgment>();
 
+    // 設備保全系（Spec.md 5.1 MaintenanceProcedure、5.5）
+    public DbSet<MaintenanceProcedure> MaintenanceProcedures => Set<MaintenanceProcedure>();
+    public DbSet<EquipmentLog> EquipmentLogs => Set<EquipmentLog>();
+    public DbSet<MaintenancePlan> MaintenancePlans => Set<MaintenancePlan>();
+    public DbSet<MaintenanceOrder> MaintenanceOrders => Set<MaintenanceOrder>();
+    public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
+    public DbSet<ToolUsage> ToolUsages => Set<ToolUsage>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
         base.ConfigureConventions(builder);
@@ -77,6 +85,11 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<NonconformanceAction>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<NonconformanceStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ShipmentJudgmentResult>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<EquipmentLogStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<MaintenanceCategory>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<MaintenancePlanStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<MaintenanceRequestType>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<MaintenanceOrderStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ProductType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MakeOrBuy>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<EquipmentStatus>().HaveConversion<string>().HaveMaxLength(30);
@@ -547,6 +560,75 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.JudgedBy).WithMany().HasForeignKey(x => x.JudgedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---- 設備保全系 ----
+
+        builder.Entity<MaintenanceProcedure>(e =>
+        {
+            e.HasIndex(x => x.ProcedureNo).IsUnique();
+            e.Property(x => x.ProcedureNo).HasMaxLength(50);
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Steps).HasMaxLength(4000);
+            e.HasOne(x => x.TargetEquipment).WithMany().HasForeignKey(x => x.TargetEquipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.TargetTool).WithMany().HasForeignKey(x => x.TargetToolId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<EquipmentLog>(e =>
+        {
+            e.HasIndex(x => x.EquipmentId);
+            e.Property(x => x.StopCause).HasMaxLength(500);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<MaintenancePlan>(e =>
+        {
+            e.HasIndex(x => new { x.EquipmentId, x.PlanYear });
+            e.Property(x => x.Note).HasMaxLength(1000);
+            e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<MaintenanceOrder>(e =>
+        {
+            e.HasIndex(x => x.OrderNo).IsUnique();
+            e.HasIndex(x => x.Status);
+            e.Property(x => x.OrderNo).HasMaxLength(50);
+            e.Property(x => x.Note).HasMaxLength(1000);
+            e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Tool).WithMany().HasForeignKey(x => x.ToolId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.MaintenancePlan).WithMany().HasForeignKey(x => x.MaintenancePlanId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.Procedure).WithMany().HasForeignKey(x => x.ProcedureId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasMany(x => x.Records).WithOne().HasForeignKey(x => x.MaintenanceOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<MaintenanceRecord>(e =>
+        {
+            e.Property(x => x.PartsUsed).HasMaxLength(1000);
+            e.Property(x => x.Result).HasMaxLength(2000);
+            e.Property(x => x.Note).HasMaxLength(1000);
+            e.HasOne(x => x.PerformedBy).WithMany().HasForeignKey(x => x.PerformedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ToolUsage>(e =>
+        {
+            e.HasIndex(x => x.ToolId);
+            e.HasOne(x => x.Tool).WithMany().HasForeignKey(x => x.ToolId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<Lot>(e =>

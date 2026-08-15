@@ -152,6 +152,9 @@ public class Tool
     /// <summary>寿命閾値（使用時間）</summary>
     public decimal? LifeThresholdHours { get; set; }
 
+    /// <summary>寿命カウンタのリセット日時（治工具メンテナンス完了時。以降の利用実績のみ寿命累計に算入）</summary>
+    public DateTimeOffset? LifeResetAt { get; set; }
+
     public ToolStatus Status { get; set; } = ToolStatus.Available;
 
     public bool IsActive { get; set; } = true;

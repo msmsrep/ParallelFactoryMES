@@ -401,3 +401,58 @@ public enum ShipmentJudgmentResult
     /// <summary>特別採用（特採）</summary>
     SpecialAcceptance,
 }
+
+/// <summary>設備稼働ログの状態（Spec.md 5.5 EquipmentLog。B-40-20、E-20-10）</summary>
+public enum EquipmentLogStatus
+{
+    /// <summary>稼働</summary>
+    Running,
+    /// <summary>停止</summary>
+    Stopped,
+    /// <summary>段取り</summary>
+    Setup,
+    /// <summary>故障</summary>
+    Failure,
+}
+
+/// <summary>保全種別（定期/計画外。Spec.md 5.5 MaintenancePlan）</summary>
+public enum MaintenanceCategory
+{
+    /// <summary>定期</summary>
+    Periodic,
+    /// <summary>計画外</summary>
+    Unplanned,
+}
+
+/// <summary>保全計画状態（E-30-10）</summary>
+public enum MaintenancePlanStatus
+{
+    /// <summary>計画</summary>
+    Planned,
+    /// <summary>指示発行済</summary>
+    Ordered,
+    /// <summary>完了</summary>
+    Completed,
+    /// <summary>取消</summary>
+    Canceled,
+}
+
+/// <summary>保全指示の依頼区分（計画/突発依頼。E-30-20、E-30-30）</summary>
+public enum MaintenanceRequestType
+{
+    /// <summary>計画（保全計画に基づく）</summary>
+    Planned,
+    /// <summary>突発依頼（計画外の保全依頼 E-30-30-01）</summary>
+    Spot,
+}
+
+/// <summary>保全指示状態</summary>
+public enum MaintenanceOrderStatus
+{
+    /// <summary>指示</summary>
+    Instructed,
+    /// <summary>完了（実績登録済み）</summary>
+    Completed,
+    /// <summary>取消</summary>
+    Canceled,
+}

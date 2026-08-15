@@ -73,6 +73,15 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
         return $"{prefix}{seq:0000}";
     }
 
+    public async Task<string> NextMaintenanceNoAsync(CancellationToken ct = default)
+    {
+        var prefix = $"MT{businessDate.Today:yyyyMMdd}-";
+        var seq = await NextSequenceAsync(
+            db.MaintenanceOrders.Where(m => m.OrderNo.StartsWith(prefix)).Select(m => m.OrderNo),
+            prefix, ct);
+        return $"{prefix}{seq:0000}";
+    }
+
     public async Task<string> NextJudgmentNoAsync(CancellationToken ct = default)
     {
         var prefix = $"SJ{businessDate.Today:yyyyMMdd}-";
