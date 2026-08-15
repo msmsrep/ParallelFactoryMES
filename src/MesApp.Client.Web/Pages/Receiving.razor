@@ -1,0 +1,177 @@
+@page "/receiving"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>受入 - Parallel Factory MES</PageTitle>
+
+<h1>受入</h1>
+<p class="text-muted">受入登録・在庫計上（D-10-10-02。受入ロット採番含む）、受入取消（D-10-10-04）、ラベル/現品票印刷（D-10-10-03）。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <h2 style="margin-top:0;">受入登録</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>品目</label>
+            <select @bind="_form.ProductId">
+                <option value="0">選択してください</option>
+                @foreach (var product in _products)
+                {
+                    <option value="@product.Id">@product.Code @product.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>数量</label>
+            <input type="number" @bind="_form.Quantity" />
+        </div>
+        <div class="form-field">
+            <label>入庫先ロケーション</label>
+            <select @bind="_form.LocationId">
+                <option value="0">選択してください</option>
+                @foreach (var location in _locations)
+                {
+                    <option value="@location.Id">@location.Code</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>ロット番号（空欄で自動採番）</label>
+            <ScanInput @bind-Value="_form.LotNumber" ShowSubmit="false" Placeholder="納入ロットをスキャン" />
+        </div>
+        <div class="form-field">
+            <label>有効期限</label>
+            <input type="date" @bind="_form.ExpiresOn" />
+        </div>
+        <div class="form-field">
+            <label>備考</label>
+            <input @bind="_form.Note" />
+        </div>
+    </div>
+    <button class="btn" disabled="@_busy" @onclick="ReceiveAsync">受入登録</button>
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">受入済みロット</h2>
+    @if (_stocks is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_stocks.Count == 0)
+    {
+        <p class="text-muted">受入在庫はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>ロット番号</th><th>品目</th><th>ロケーション</th><th>数量</th><th>ステータス</th><th>有効期限</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var stock in _stocks)
+                {
+                    <tr>
+                        <td>@stock.LotNumber</td>
+                        <td>@stock.ProductCode @stock.ProductName</td>
+                        <td>@stock.LocationCode</td>
+                        <td>@stock.Quantity</td>
+                        <td>@Labels.LotStatus(stock.LotStatus)</td>
+                        <td>@(stock.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                        <td class="actions">
+                            <a class="btn btn-secondary btn-sm" href="print/lot/@stock.LotId" target="_blank">現品票</a>
+                            <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                    @onclick="() => CancelAsync(stock.LotId)">受入取消</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private sealed class ReceivingForm
+    {
+        public int ProductId { get; set; }
+        public decimal Quantity { get; set; }
+        public int LocationId { get; set; }
+        public string? LotNumber { get; set; }
+        public DateTime? ExpiresOn { get; set; }
+        public string? Note { get; set; }
+    }
+
+    private readonly ReceivingForm _form = new();
+    private List<ProductResponse> _products = [];
+    private List<LocationResponse> _locations = [];
+    private List<StockResponse>? _stocks;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
+        _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks");
+
+    private async Task ReceiveAsync()
+    {
+        if (_form.ProductId == 0 || _form.LocationId == 0 || _form.Quantity <= 0)
+        {
+            _error = "品目・ロケーション・数量（0より大きい値）を指定してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/receiving",
+                new ReceivingRequest(_form.ProductId, _form.Quantity, _form.LocationId,
+                    string.IsNullOrWhiteSpace(_form.LotNumber) ? null : _form.LotNumber,
+                    _form.ExpiresOn is null ? null : DateOnly.FromDateTime(_form.ExpiresOn.Value),
+                    _form.Note));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "受入登録に失敗しました。";
+                return;
+            }
+            var lot = await response.Content.ReadFromJsonAsync<LotResponse>();
+            _message = $"受入しました（ロット {lot?.LotNumber}）。";
+            _form.Quantity = 0;
+            _form.LotNumber = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CancelAsync(int lotId)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsync($"api/receiving/{lotId}/cancel", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取消に失敗しました。";
+                return;
+            }
+            _message = "受入を取消しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

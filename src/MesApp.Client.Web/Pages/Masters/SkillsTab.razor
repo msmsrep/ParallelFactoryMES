@@ -1,0 +1,162 @@
+@inject HttpClient Http
+
+@* スキル・資格マスタ（Spec.md 5.1 SkillMaster。F-20-10-01） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@MesRoles.SystemAdmin">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "スキル・資格の登録" : $"編集（{_code}）")</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>コード</label>
+                <input @bind="_code" />
+            </div>
+            <div class="form-field">
+                <label>名称</label>
+                <input @bind="_name" />
+            </div>
+            <div class="form-field">
+                <label>種別</label>
+                <select @bind="_type">
+                    <option value="@SkillType.Skill">スキル</option>
+                    <option value="@SkillType.Certification">資格</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" style="width:auto;" @bind="_requiresExpiry" />
+                    有効期限管理が必要（期限切れは差立で不合格）
+                </label>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>コード</th><th>名称</th><th>種別</th><th>期限管理</th><th>状態</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.Code</td>
+                        <td>@item.Name</td>
+                        <td>@(item.Type == SkillType.Skill ? "スキル" : "資格")</td>
+                        <td>@(item.RequiresExpiry ? "要" : "不要")</td>
+                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@MesRoles.SystemAdmin" Context="admin">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<SkillResponse>? _items;
+    private int? _editingId;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private SkillType _type = SkillType.Skill;
+    private bool _requiresExpiry;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<SkillResponse>>("api/skills?includeInactive=true");
+
+    private void Edit(SkillResponse item)
+    {
+        _editingId = item.Id;
+        _code = item.Code;
+        _name = item.Name;
+        _type = item.Type;
+        _requiresExpiry = item.RequiresExpiry;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _name = string.Empty;
+        _type = SkillType.Skill;
+        _requiresExpiry = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "コードと名称を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new SkillRequest(_code, _name, _type, _requiresExpiry);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/skills", request)
+                : await Http.PutAsJsonAsync($"api/skills/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/skills/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

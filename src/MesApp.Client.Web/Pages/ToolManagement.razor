@@ -1,0 +1,206 @@
+@page "/tool-management"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>治工具管理 - Parallel Factory MES</PageTitle>
+
+<h1>治工具管理</h1>
+<p class="text-muted">利用実績の記録（E-60-20-01）、寿命通知（-02）、寿命分析（-03）。治工具マスタはマスタ管理、メンテナンス記録は設備保全から行います。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <h2 style="margin-top:0;">利用実績の記録</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>治工具</label>
+            <select @bind="_toolId">
+                <option value="0">選択してください</option>
+                @foreach (var tool in _tools)
+                {
+                    <option value="@tool.Id">@tool.Code @tool.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>関連作業指示</label>
+            <select @bind="_workOrderId">
+                <option value="0">なし</option>
+                @foreach (var workOrder in _workOrders)
+                {
+                    <option value="@workOrder.Id">@workOrder.WorkOrderNo（@workOrder.ProductCode）</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>使用回数</label>
+            <input type="number" @bind="_usageCount" />
+        </div>
+        <div class="form-field">
+            <label>使用時間（h）</label>
+            <input type="number" step="any" @bind="_usageHours" />
+        </div>
+    </div>
+    <button class="btn" disabled="@_busy" @onclick="RecordUsageAsync">利用実績を記録</button>
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">寿命ステータス（E-60-20-02：80%で交換時期接近、100%で要交換）</h2>
+    <label style="display:block;margin-bottom:8px;">
+        <input type="checkbox" style="width:auto;" @bind="_alertOnly" @bind:after="LoadAsync" />
+        警告・要交換のみ表示
+    </label>
+
+    @if (_lifeStatus is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_lifeStatus.Count == 0)
+    {
+        <p class="text-muted">対象の治工具はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>治工具</th><th>状態</th><th>使用回数</th><th>使用時間</th>
+                    <th>寿命消化率</th><th>通知</th><th>最終リセット</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _lifeStatus)
+                {
+                    <tr>
+                        <td>@row.ToolCode @row.ToolName</td>
+                        <td>@ToolStatusLabel(row.Status)</td>
+                        <td>@row.CumulativeCount @(row.LifeThresholdCount is null ? "" : $"/ {row.LifeThresholdCount}")</td>
+                        <td>@row.CumulativeHours @(row.LifeThresholdHours is null ? "" : $"/ {row.LifeThresholdHours}")</td>
+                        <td>
+                            @if (row.LifeUsageRate is decimal rate)
+                            {
+                                <text>@rate %</text>
+                                <BarMeter Value="@rate" />
+                            }
+                            else
+                            {
+                                <span class="text-muted">閾値未設定</span>
+                            }
+                        </td>
+                        <td>
+                            @if (row.IsLifeReached)
+                            {
+                                <span class="badge badge-danger">要交換・廃棄</span>
+                            }
+                            else if (row.IsWarning)
+                            {
+                                <span class="badge badge-warning">交換時期接近</span>
+                            }
+                            else
+                            {
+                                <text>-</text>
+                            }
+                        </td>
+                        <td>@(row.LifeResetAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">利用実績履歴</h2>
+    @if (_usages is null || _usages.Count == 0)
+    {
+        <p class="text-muted">利用実績はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>記録日時</th><th>治工具</th><th>作業指示</th><th>使用回数</th><th>使用時間</th></tr></thead>
+            <tbody>
+                @foreach (var usage in _usages)
+                {
+                    <tr>
+                        <td>@usage.RecordedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                        <td>@usage.ToolCode</td>
+                        <td>@(usage.WorkOrderNo ?? "-")</td>
+                        <td>@usage.UsageCount</td>
+                        <td>@(usage.UsageHours?.ToString() ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<ToolResponse> _tools = [];
+    private List<WorkOrderResponse> _workOrders = [];
+    private List<ToolLifeStatusRow>? _lifeStatus;
+    private List<ToolUsageResponse>? _usages;
+
+    private int _toolId;
+    private int _workOrderId;
+    private int _usageCount;
+    private decimal? _usageHours;
+    private bool _alertOnly;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
+        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _lifeStatus = await Http.GetFromJsonAsync<List<ToolLifeStatusRow>>(
+            $"api/tool-usages/life-status?alertOnly={_alertOnly.ToString().ToLowerInvariant()}");
+        _usages = await Http.GetFromJsonAsync<List<ToolUsageResponse>>("api/tool-usages");
+    }
+
+    private async Task RecordUsageAsync()
+    {
+        if (_toolId == 0)
+        {
+            _error = "治工具を選択してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/tool-usages",
+                new ToolUsageRequest(_toolId, _workOrderId == 0 ? null : _workOrderId,
+                    _usageCount, _usageHours));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                return;
+            }
+            _message = "利用実績を記録しました。";
+            _usageCount = 0;
+            _usageHours = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string ToolStatusLabel(ToolStatus status) => status switch
+    {
+        ToolStatus.Available => "使用可能",
+        ToolStatus.InUse => "使用中",
+        ToolStatus.UnderMaintenance => "メンテナンス中",
+        ToolStatus.Retired => "廃棄",
+        _ => status.ToString(),
+    };
+}

@@ -1,0 +1,264 @@
+@page "/process-progress"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>工程進捗・トラブル - Parallel Factory MES</PageTitle>
+
+<h1>工程進捗管理</h1>
+<p class="text-muted">工程毎の完了状況（B-60-10-01）と製造トラブルの発生報告・対応履歴（B-60-10-02〜04）。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <h2 style="margin-top:0;">工程別の進捗</h2>
+    @if (_workOrders is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>工程</th><th>未配布</th><th>配布済</th><th>着手</th><th>完了</th><th>承認済</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var group in _workOrders.Where(w => w.Status != WorkOrderStatus.Canceled)
+                    .GroupBy(w => $"{w.ProcessCode} {w.ProcessName}").OrderBy(g => g.Key))
+                {
+                    <tr>
+                        <td>@group.Key</td>
+                        <td>@group.Count(w => w.Status == WorkOrderStatus.Created)</td>
+                        <td>@group.Count(w => w.Status == WorkOrderStatus.Dispatched)</td>
+                        <td>@group.Count(w => w.Status == WorkOrderStatus.Started)</td>
+                        <td>@group.Count(w => w.Status == WorkOrderStatus.Completed)</td>
+                        <td>@group.Count(w => w.Status == WorkOrderStatus.Approved)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">トラブル報告（B-40-10-06）</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>区分（QCDS）</label>
+            <select @bind="_form.Category">
+                <option value="@TroubleCategory.Quality">品質</option>
+                <option value="@TroubleCategory.Cost">コスト</option>
+                <option value="@TroubleCategory.Delivery">納期</option>
+                <option value="@TroubleCategory.Safety">安全</option>
+            </select>
+        </div>
+        <div class="form-field">
+            <label>発生日時</label>
+            <input type="datetime-local" @bind="_form.OccurredAt" />
+        </div>
+        <div class="form-field">
+            <label>対象作業指示</label>
+            <select @bind="_form.WorkOrderId">
+                <option value="0">なし</option>
+                @foreach (var workOrder in _workOrders ?? [])
+                {
+                    <option value="@workOrder.Id">@workOrder.WorkOrderNo</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>対象設備</label>
+            <select @bind="_form.EquipmentId">
+                <option value="0">なし</option>
+                @foreach (var equipment in _equipments)
+                {
+                    <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
+                }
+            </select>
+        </div>
+    </div>
+    <div class="form-field">
+        <label>内容</label>
+        <textarea rows="2" @bind="_form.Content"></textarea>
+    </div>
+    <button class="btn mt-2" disabled="@_busy" @onclick="ReportAsync">トラブルを報告</button>
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">トラブル一覧・対応履歴</h2>
+    <select @bind="_statusFilter" @bind:after="LoadTroublesAsync" style="margin-bottom:8px;">
+        <option value="">全状態</option>
+        <option value="Open">発生（未対応）</option>
+        <option value="InProgress">対応中</option>
+        <option value="Closed">完了</option>
+    </select>
+
+    @if (_troubles is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_troubles.Count == 0)
+    {
+        <p class="text-muted">該当するトラブル報告はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>発生日時</th><th>区分</th><th>対象</th><th>内容</th><th>状態</th><th>対応履歴</th><th>対応記録</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var trouble in _troubles)
+                {
+                    <tr>
+                        <td>@trouble.OccurredAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                        <td>@CategoryLabel(trouble.Category)</td>
+                        <td>@(trouble.WorkOrderNo ?? trouble.EquipmentName ?? "-")</td>
+                        <td style="white-space:normal;max-width:260px;">@trouble.Content</td>
+                        <td>@TroubleStatusLabel(trouble.Status)</td>
+                        <td style="white-space:pre-wrap;max-width:280px;">@(trouble.ResponseHistory ?? "-")</td>
+                        <td>
+                            @if (trouble.Status != TroubleStatus.Closed)
+                            {
+                                <input placeholder="対応内容" value="@GetResponse(trouble.Id).Note"
+                                       @onchange="e => GetResponse(trouble.Id).Note = e.Value?.ToString()" />
+                                <div class="actions mt-2">
+                                    <button class="btn btn-sm" disabled="@_busy"
+                                            @onclick="() => UpdateTroubleAsync(trouble, TroubleStatus.InProgress)">追記</button>
+                                    <button class="btn btn-sm btn-secondary" disabled="@_busy"
+                                            @onclick="() => UpdateTroubleAsync(trouble, TroubleStatus.Closed)">完了</button>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private sealed class TroubleForm
+    {
+        public TroubleCategory Category { get; set; } = TroubleCategory.Quality;
+        public DateTime OccurredAt { get; set; } = DateTime.Now;
+        public int WorkOrderId { get; set; }
+        public int EquipmentId { get; set; }
+        public string Content { get; set; } = string.Empty;
+    }
+
+    private sealed class ResponseForm
+    {
+        public string? Note { get; set; }
+    }
+
+    private List<WorkOrderResponse>? _workOrders;
+    private List<EquipmentResponse> _equipments = [];
+    private List<TroubleReportResponse>? _troubles;
+    private readonly TroubleForm _form = new();
+    private readonly Dictionary<int, ResponseForm> _responses = [];
+    private string _statusFilter = string.Empty;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders");
+        _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
+        await LoadTroublesAsync();
+    }
+
+    private ResponseForm GetResponse(int id)
+    {
+        if (!_responses.TryGetValue(id, out var form))
+        {
+            form = new ResponseForm();
+            _responses[id] = form;
+        }
+        return form;
+    }
+
+    private async Task LoadTroublesAsync()
+    {
+        var url = "api/trouble-reports";
+        if (!string.IsNullOrEmpty(_statusFilter))
+        {
+            url += $"?status={_statusFilter}";
+        }
+        _troubles = await Http.GetFromJsonAsync<List<TroubleReportResponse>>(url);
+    }
+
+    private async Task ReportAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_form.Content))
+        {
+            _error = "内容を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/trouble-reports",
+                new TroubleReportRequest(new DateTimeOffset(_form.OccurredAt), _form.Category,
+                    _form.WorkOrderId == 0 ? null : _form.WorkOrderId,
+                    _form.EquipmentId == 0 ? null : _form.EquipmentId,
+                    _form.Content));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "報告に失敗しました。";
+                return;
+            }
+            _message = "トラブルを報告しました。";
+            _form.Content = string.Empty;
+            await LoadTroublesAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task UpdateTroubleAsync(TroubleReportResponse trouble, TroubleStatus status)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var note = GetResponse(trouble.Id).Note;
+            var response = await Http.PutAsJsonAsync($"api/trouble-reports/{trouble.Id}",
+                new TroubleUpdateRequest(note, status));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "更新に失敗しました。";
+                return;
+            }
+            _message = "対応履歴を更新しました。";
+            _responses.Remove(trouble.Id);
+            await LoadTroublesAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string CategoryLabel(TroubleCategory category) => category switch
+    {
+        TroubleCategory.Quality => "品質",
+        TroubleCategory.Cost => "コスト",
+        TroubleCategory.Delivery => "納期",
+        TroubleCategory.Safety => "安全",
+        _ => category.ToString(),
+    };
+
+    private static string TroubleStatusLabel(TroubleStatus status) => status switch
+    {
+        TroubleStatus.Open => "発生",
+        TroubleStatus.InProgress => "対応中",
+        TroubleStatus.Closed => "完了",
+        _ => status.ToString(),
+    };
+}

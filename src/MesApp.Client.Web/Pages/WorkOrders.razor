@@ -54,7 +54,11 @@
                         <td>@(workOrder.DispatchOrder?.ToString() ?? "-")</td>
                         <td>@(workOrder.AssignedUserName ?? "-")</td>
                         <td><StatusBadge Status="@workOrder.Status.ToString()" /></td>
-                        <td><a class="btn btn-secondary btn-sm" href="work-orders/@workOrder.Id/record">実績入力</a></td>
+                        <td class="actions">
+                            <a class="btn btn-secondary btn-sm" href="work-orders/@workOrder.Id/setup">段取り</a>
+                            <a class="btn btn-secondary btn-sm" href="work-orders/@workOrder.Id/record">実績入力</a>
+                            <a class="btn btn-secondary btn-sm" href="print/work-order/@workOrder.Id" target="_blank">指示書</a>
+                        </td>
                     </tr>
                 }
             </tbody>

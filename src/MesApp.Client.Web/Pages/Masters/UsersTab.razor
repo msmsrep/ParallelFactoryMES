@@ -1,0 +1,338 @@
+@inject HttpClient Http
+
+@* ユーザー/工場従業員管理（F-10-10）とスキル・資格の割当（F-20-10-02〜05）。システム管理者専用 *@
+<AuthorizeView Roles="@MesRoles.SystemAdmin">
+    <NotAuthorized>
+        <div class="card">
+            <p class="text-muted">ユーザー管理はシステム管理者のみ利用できます。</p>
+        </div>
+    </NotAuthorized>
+    <Authorized>
+        <Notice Error="@_error" Message="@_message" />
+
+        <div class="card">
+            <h2 style="margin-top:0;">@(_editingId is null ? "ユーザーの登録" : $"ユーザーの編集（{_userName}）")</h2>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>ユーザー名</label>
+                    <input @bind="_userName" disabled="@(_editingId is not null)" />
+                </div>
+                <div class="form-field">
+                    <label>氏名（表示名）</label>
+                    <input @bind="_displayName" />
+                </div>
+                @if (_editingId is null)
+                {
+                    <div class="form-field">
+                        <label>初期パスワード（初回ログイン時に変更を強制）</label>
+                        <input type="password" @bind="_password" autocomplete="new-password" />
+                    </div>
+                }
+                else
+                {
+                    <div class="form-field">
+                        <label>
+                            <input type="checkbox" style="width:auto;" @bind="_isActive" />
+                            在籍（無効化するとログイン不可）
+                        </label>
+                    </div>
+                }
+            </div>
+
+            <h2>ロール</h2>
+            <div class="form-grid">
+                @foreach (var role in MesRoles.All)
+                {
+                    <div class="form-field">
+                        <label>
+                            <input type="checkbox" style="width:auto;" checked="@_roles.Contains(role)"
+                                   @onchange="e => ToggleRole(role, (bool)(e.Value ?? false))" />
+                            @RoleLabel(role)
+                        </label>
+                    </div>
+                }
+            </div>
+
+            <div class="actions mt-2">
+                <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+                @if (_editingId is not null)
+                {
+                    <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            @if (_users is null)
+            {
+                <p class="text-muted">読み込み中...</p>
+            }
+            else
+            {
+                <table class="table">
+                    <thead>
+                        <tr><th>ユーザー名</th><th>氏名</th><th>ロール</th><th>在籍</th><th>パスワード</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var user in _users)
+                        {
+                            <tr>
+                                <td>@user.UserName</td>
+                                <td>@user.DisplayName</td>
+                                <td>@string.Join("、", user.Roles.Select(RoleLabel))</td>
+                                <td>@(user.IsActive ? "在籍" : "無効")</td>
+                                <td>@(user.MustChangePassword ? "要変更" : "-")</td>
+                                <td class="actions">
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => Edit(user)">編集</button>
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => SelectSkillsAsync(user)">スキル・資格</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        @if (_skillTarget is not null)
+        {
+            <div class="card">
+                <h2 style="margin-top:0;">@_skillTarget.DisplayName のスキル・資格（F-20-10）</h2>
+                <table class="table">
+                    <thead><tr><th>スキル・資格</th><th>取得日</th><th>有効期限</th><th>状態</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var line in _userSkills)
+                        {
+                            var skill = _skills.FirstOrDefault(s => s.Id == line.SkillId);
+                            <tr>
+                                <td>@skill?.Code @skill?.Name</td>
+                                <td>@(line.AcquiredOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                <td>@(line.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                <td>
+                                    @if (line.ExpiresOn is not null && line.ExpiresOn < DateOnly.FromDateTime(DateTime.Today))
+                                    {
+                                        <span class="badge badge-danger">期限切れ</span>
+                                    }
+                                    else if (line.ExpiresOn is not null
+                                             && line.ExpiresOn < DateOnly.FromDateTime(DateTime.Today.AddDays(30)))
+                                    {
+                                        <span class="badge badge-warning">期限接近</span>
+                                    }
+                                    else
+                                    {
+                                        <text>有効</text>
+                                    }
+                                </td>
+                                <td><button class="btn btn-danger btn-sm" @onclick="() => _userSkills.Remove(line)">削除</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>スキル・資格</label>
+                        <select @bind="_newSkillId">
+                            <option value="0">選択してください</option>
+                            @foreach (var skill in _skills)
+                            {
+                                <option value="@skill.Id">@skill.Code @skill.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>取得日</label>
+                        <input type="date" @bind="_newAcquiredOn" />
+                    </div>
+                    <div class="form-field">
+                        <label>有効期限</label>
+                        <input type="date" @bind="_newExpiresOn" />
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-secondary" @onclick="AddSkill">追加</button>
+                    <button class="btn" disabled="@_busy" @onclick="SaveSkillsAsync">スキルを保存（一括置換）</button>
+                </div>
+            </div>
+        }
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private List<UserSummaryResponse>? _users;
+    private List<SkillResponse> _skills = [];
+    private readonly List<string> _roles = [];
+
+    private string? _editingId;
+    private string _userName = string.Empty;
+    private string _displayName = string.Empty;
+    private string _password = string.Empty;
+    private bool _isActive = true;
+
+    private UserSummaryResponse? _skillTarget;
+    private readonly List<UserSkillRequest> _userSkills = [];
+    private int _newSkillId;
+    private DateTime? _newAcquiredOn;
+    private DateTime? _newExpiresOn;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _skills = await Http.GetFromJsonAsync<List<SkillResponse>>("api/skills") ?? [];
+            await LoadAsync();
+        }
+        catch (HttpRequestException)
+        {
+            // 管理者以外は取得できない
+        }
+    }
+
+    private async Task LoadAsync() =>
+        _users = await Http.GetFromJsonAsync<List<UserSummaryResponse>>("api/users?includeInactive=true");
+
+    private void ToggleRole(string role, bool selected)
+    {
+        if (selected)
+        {
+            if (!_roles.Contains(role))
+            {
+                _roles.Add(role);
+            }
+        }
+        else
+        {
+            _roles.Remove(role);
+        }
+    }
+
+    private void Edit(UserSummaryResponse user)
+    {
+        _editingId = user.Id;
+        _userName = user.UserName;
+        _displayName = user.DisplayName;
+        _isActive = user.IsActive;
+        _roles.Clear();
+        _roles.AddRange(user.Roles);
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _userName = string.Empty;
+        _displayName = string.Empty;
+        _password = string.Empty;
+        _isActive = true;
+        _roles.Clear();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_displayName))
+        {
+            _error = "氏名を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            HttpResponseMessage response;
+            if (_editingId is null)
+            {
+                if (string.IsNullOrWhiteSpace(_userName) || string.IsNullOrEmpty(_password))
+                {
+                    _error = "ユーザー名と初期パスワードを入力してください。";
+                    return;
+                }
+                response = await Http.PostAsJsonAsync("api/users",
+                    new CreateUserRequest(_userName, _password, _displayName, [.. _roles]));
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/users/{_editingId}",
+                    new UpdateUserRequest(_displayName, [.. _roles], _isActive));
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SelectSkillsAsync(UserSummaryResponse user)
+    {
+        _skillTarget = user;
+        _userSkills.Clear();
+        var skills = await Http.GetFromJsonAsync<List<UserSkillResponse>>($"api/users/{user.Id}/skills") ?? [];
+        _userSkills.AddRange(skills.Select(s => new UserSkillRequest(s.SkillId, s.AcquiredOn, s.ExpiresOn)));
+    }
+
+    private void AddSkill()
+    {
+        if (_newSkillId == 0)
+        {
+            _error = "スキル・資格を選択してください。";
+            return;
+        }
+        if (_userSkills.Any(s => s.SkillId == _newSkillId))
+        {
+            _error = "同一スキルが既に登録されています。";
+            return;
+        }
+        _error = null;
+        _userSkills.Add(new UserSkillRequest(_newSkillId,
+            _newAcquiredOn is null ? null : DateOnly.FromDateTime(_newAcquiredOn.Value),
+            _newExpiresOn is null ? null : DateOnly.FromDateTime(_newExpiresOn.Value)));
+        _newSkillId = 0;
+    }
+
+    private async Task SaveSkillsAsync()
+    {
+        if (_skillTarget is null)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/users/{_skillTarget.Id}/skills", _userSkills);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "スキル・資格を保存しました。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string RoleLabel(string role) => role switch
+    {
+        MesRoles.SystemAdmin => "システム管理者",
+        MesRoles.ProductionManager => "生産管理",
+        MesRoles.Operator => "現場作業者",
+        MesRoles.Logistics => "物流・倉庫",
+        MesRoles.QualityControl => "品質管理",
+        MesRoles.QualityAssurance => "品質保証",
+        MesRoles.Maintenance => "設備保全",
+        _ => role,
+    };
+}

@@ -1,0 +1,42 @@
+@page "/print/lot/{Id:int}"
+@attribute [Authorize]
+@inject HttpClient Http
+
+@* 現品票・ラベル（D-10-10-03、D-50-30-06）。Code39バーコードでスキャン運用に対応 *@
+<PageTitle>現品票 - Parallel Factory MES</PageTitle>
+
+@if (_lot is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <PrintButton Label="現品票を印刷 / PDF出力" />
+
+    <div class="print-sheet label-sheet">
+        <h1>現 品 票</h1>
+        <table class="table">
+            <tbody>
+                <tr><th>品目コード</th><td>@_lot.ProductCode</td></tr>
+                <tr><th>品目名</th><td>@_lot.ProductName</td></tr>
+                <tr><th>数量</th><td>@_lot.InitialQuantity</td></tr>
+                <tr><th>製造日/受入日</th><td>@(_lot.ManufacturedOn?.ToString("yyyy-MM-dd") ?? "-")</td></tr>
+                <tr><th>有効期限</th><td>@(_lot.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td></tr>
+                <tr><th>ステータス</th><td>@Labels.LotStatus(_lot.StockStatus)</td></tr>
+                <tr><th>グレード</th><td>@(_lot.Grade ?? "-")</td></tr>
+            </tbody>
+        </table>
+
+        <div class="barcode">@((MarkupString)Code39.ToSvg(_lot.LotNumber))</div>
+        <div class="barcode-text">@_lot.LotNumber</div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private LotResponse? _lot;
+
+    protected override async Task OnParametersSetAsync() =>
+        _lot = await Http.GetFromJsonAsync<LotResponse>($"api/inventory/lots/{Id}");
+}

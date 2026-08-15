@@ -1,0 +1,116 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* バーコード/QRスキャン共通コンポーネント（Spec.md 3.8）。
+   USB HIDリーダー：キーボード入力＋Enterで確定。カメラ：BarcodeDetector API。 *@
+<div class="scan-input">
+    <input value="@Value" @oninput="OnInput" @onkeyup="OnKeyUpAsync" placeholder="@Placeholder" />
+    <button type="button" class="btn btn-secondary btn-sm" @onclick="ToggleCameraAsync">
+        @(_scanning ? "停止" : "📷 カメラ")
+    </button>
+    @if (ShowSubmit)
+    {
+        <button type="button" class="btn btn-sm" @onclick="SubmitAsync">@SubmitLabel</button>
+    }
+</div>
+@if (_scanning)
+{
+    <video id="@_videoId" class="scan-video" muted playsinline></video>
+}
+@if (_cameraError is not null)
+{
+    <div class="text-danger">@_cameraError</div>
+}
+
+@code {
+    private readonly string _videoId = $"scan-{Guid.NewGuid():N}";
+    private DotNetObjectReference<ScanInput>? _selfRef;
+    private bool _scanning;
+    private string? _cameraError;
+
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    /// <summary>Enterキー・スキャン確定・確定ボタンで発火（読み取った値を渡す）</summary>
+    [Parameter] public EventCallback<string> OnScan { get; set; }
+
+    [Parameter] public string Placeholder { get; set; } = "スキャンまたは入力";
+    [Parameter] public bool ShowSubmit { get; set; } = true;
+    [Parameter] public string SubmitLabel { get; set; } = "照会";
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString();
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private async Task OnKeyUpAsync(KeyboardEventArgs e)
+    {
+        // USB HIDリーダーは読み取り後にEnterを送出する
+        if (e.Key == "Enter")
+        {
+            await SubmitAsync();
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Value))
+        {
+            await OnScan.InvokeAsync(Value.Trim());
+        }
+    }
+
+    private async Task ToggleCameraAsync()
+    {
+        if (_scanning)
+        {
+            await StopCameraAsync();
+            return;
+        }
+
+        _cameraError = null;
+        _scanning = true;
+        StateHasChanged(); // videoタグを先に描画してからJS側で参照する
+
+        _selfRef ??= DotNetObjectReference.Create(this);
+        var started = await JS.InvokeAsync<bool>("mesApp.scanner.start", _videoId, _selfRef);
+        if (!started)
+        {
+            _scanning = false;
+            _cameraError = "カメラを利用できません（未対応ブラウザ／権限拒否）。USBバーコードリーダーまたは手入力をご利用ください。";
+        }
+    }
+
+    private async Task StopCameraAsync()
+    {
+        if (_scanning)
+        {
+            _scanning = false;
+            await JS.InvokeVoidAsync("mesApp.scanner.stop");
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnScanned(string value)
+    {
+        _scanning = false;
+        Value = value;
+        await ValueChanged.InvokeAsync(Value);
+        await OnScan.InvokeAsync(value);
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await StopCameraAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // ページ離脱時はJS側も破棄済み
+        }
+        _selfRef?.Dispose();
+    }
+}

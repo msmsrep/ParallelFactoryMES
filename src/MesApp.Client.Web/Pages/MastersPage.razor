@@ -1,0 +1,56 @@
+@page "/masters"
+@attribute [Authorize]
+
+<PageTitle>マスタ管理 - Parallel Factory MES</PageTitle>
+
+<h1>マスタ管理</h1>
+<p class="text-muted">品目／MBOM／工順（BOP）／工程／設備（BOE）／治工具／ロケーション／検査項目・基準／チェックリスト／ユーザー・スキル資格。</p>
+
+<div class="tabs">
+    <button class="@TabClass("products")" @onclick='() => _tab = "products"'>品目・MBOM・工順</button>
+    <button class="@TabClass("processes")" @onclick='() => _tab = "processes"'>工程</button>
+    <button class="@TabClass("equipments")" @onclick='() => _tab = "equipments"'>設備（BOE）</button>
+    <button class="@TabClass("tools")" @onclick='() => _tab = "tools"'>治工具</button>
+    <button class="@TabClass("locations")" @onclick='() => _tab = "locations"'>ロケーション</button>
+    <button class="@TabClass("inspection")" @onclick='() => _tab = "inspection"'>検査項目・基準</button>
+    <button class="@TabClass("checklists")" @onclick='() => _tab = "checklists"'>チェックリスト</button>
+    <button class="@TabClass("skills")" @onclick='() => _tab = "skills"'>スキル・資格</button>
+    <button class="@TabClass("users")" @onclick='() => _tab = "users"'>ユーザー</button>
+</div>
+
+@switch (_tab)
+{
+    case "products":
+        <ProductsTab />
+        break;
+    case "processes":
+        <ProcessesTab />
+        break;
+    case "equipments":
+        <EquipmentsTab />
+        break;
+    case "tools":
+        <ToolsTab />
+        break;
+    case "locations":
+        <LocationsTab />
+        break;
+    case "inspection":
+        <InspectionItemsTab />
+        break;
+    case "checklists":
+        <ChecklistsTab />
+        break;
+    case "skills":
+        <SkillsTab />
+        break;
+    case "users":
+        <UsersTab />
+        break;
+}
+
+@code {
+    private string _tab = "products";
+
+    private string TabClass(string tab) => _tab == tab ? "active" : string.Empty;
+}

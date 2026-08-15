@@ -1,0 +1,180 @@
+@page "/traceability"
+@attribute [Authorize]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>トレーサビリティ - Parallel Factory MES</PageTitle>
+
+<h1>ロットトレーサビリティ</h1>
+<p class="text-muted">ロット番号によるトレースバック（製造元特定。H-30-10-01）／トレースフォワード（使用先特定。-02）、製造・検査・在庫履歴の閲覧（-03〜05）。</p>
+
+<Notice Error="@_error" Message="@null" />
+
+<div class="card">
+    <div class="form-field">
+        <label>ロット番号（バーコード/QRスキャン可）</label>
+        <ScanInput @bind-Value="_lotNumber" OnScan="SearchAsync" SubmitLabel="追跡" />
+    </div>
+</div>
+
+@if (_lot is not null)
+{
+    <div class="card">
+        <table class="table">
+            <tbody>
+                <tr>
+                    <th>ロット番号</th><td>@_lot.LotNumber</td>
+                    <th>品目</th><td>@_lot.ProductCode @_lot.ProductName</td>
+                </tr>
+                <tr>
+                    <th>在庫ステータス</th><td>@Labels.LotStatus(_lot.StockStatus)</td>
+                    <th>由来</th><td>@(_lot.OriginType == LotOriginType.Production ? "生産" : "受入")</td>
+                </tr>
+                <tr>
+                    <th>製造日/受入日</th><td>@(_lot.ManufacturedOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                    <th>有効期限</th><td>@(_lot.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                </tr>
+                <tr>
+                    <th>グレード</th><td>@(_lot.Grade ?? "-")</td>
+                    <th>現品票</th><td><a class="btn btn-secondary btn-sm" href="print/lot/@_lot.Id" target="_blank">発行</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tabs">
+        <button class="@TabClass("back")" @onclick='() => SetTab("back")'>トレースバック</button>
+        <button class="@TabClass("forward")" @onclick='() => SetTab("forward")'>トレースフォワード</button>
+        <button class="@TabClass("history")" @onclick='() => SetTab("history")'>履歴</button>
+    </div>
+
+    @if (_tab == "back")
+    {
+        <div class="card">
+            <h2 style="margin-top:0;">トレースバック（この製品に使われた部材ロット）</h2>
+            @if (_back is null || _back.Nodes.Count == 0)
+            {
+                <p class="text-muted">投入部材の記録はありません。</p>
+            }
+            else
+            {
+                <TraceTree Nodes="@_back.Nodes" />
+            }
+        </div>
+    }
+    else if (_tab == "forward")
+    {
+        <div class="card">
+            <h2 style="margin-top:0;">トレースフォワード（このロットの使用先）</h2>
+            @if (_forward is null || _forward.Nodes.Count == 0)
+            {
+                <p class="text-muted">使用先の記録はありません。</p>
+            }
+            else
+            {
+                <TraceTree Nodes="@_forward.Nodes" />
+            }
+        </div>
+    }
+    else if (_history is not null)
+    {
+        <div class="card">
+            <h2 style="margin-top:0;">製造履歴（H-30-10-03）</h2>
+            @if (_history.ProductionHistory.Count == 0)
+            {
+                <p class="text-muted">記録はありません。</p>
+            }
+            else
+            {
+                <ul>@foreach (var line in _history.ProductionHistory) { <li>@line</li> }</ul>
+            }
+
+            <h2>検査履歴（H-30-10-05）</h2>
+            @if (_history.InspectionHistory.Count == 0)
+            {
+                <p class="text-muted">記録はありません。</p>
+            }
+            else
+            {
+                <ul>@foreach (var line in _history.InspectionHistory) { <li>@line</li> }</ul>
+            }
+
+            <h2>在庫履歴</h2>
+            @if (_history.InventoryHistory.Count == 0)
+            {
+                <p class="text-muted">記録はありません。</p>
+            }
+            else
+            {
+                <ul>@foreach (var line in _history.InventoryHistory) { <li>@line</li> }</ul>
+            }
+        </div>
+    }
+}
+
+@code {
+    private string? _lotNumber;
+    private LotResponse? _lot;
+    private TraceResponse? _back;
+    private TraceResponse? _forward;
+    private LotHistoryResponse? _history;
+    private string _tab = "back";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 在庫画面などから ?lot=xxx で遷移された場合は自動で追跡する
+        var query = Navigation.ToAbsoluteUri(Navigation.Uri).Query.TrimStart('?');
+        var lot = query.Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Select(pair => pair.Split('=', 2))
+            .FirstOrDefault(parts => parts.Length == 2 && parts[0] == "lot");
+        if (lot is not null)
+        {
+            _lotNumber = Uri.UnescapeDataString(lot[1]);
+            await SearchAsync(_lotNumber);
+        }
+    }
+
+    private string TabClass(string tab) => _tab == tab ? "active" : string.Empty;
+
+    private async Task SetTab(string tab)
+    {
+        _tab = tab;
+        if (_lot is null)
+        {
+            return;
+        }
+        if (tab == "forward" && _forward is null)
+        {
+            _forward = await Http.GetFromJsonAsync<TraceResponse>($"api/traceability/{_lot.Id}/forward");
+        }
+        else if (tab == "history" && _history is null)
+        {
+            _history = await Http.GetFromJsonAsync<LotHistoryResponse>($"api/traceability/{_lot.Id}/history");
+        }
+    }
+
+    private async Task SearchAsync(string lotNumber)
+    {
+        _error = null;
+        _lot = null;
+        _back = null;
+        _forward = null;
+        _history = null;
+
+        // ロット番号 → ロットIDの解決（在庫が0のロットも追跡できるよう includeEmpty で検索）
+        var stocks = await Http.GetFromJsonAsync<List<StockResponse>>(
+            "api/inventory/stocks?includeEmpty=true") ?? [];
+        var match = stocks.FirstOrDefault(s =>
+            string.Equals(s.LotNumber, lotNumber.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+        {
+            _error = $"ロット '{lotNumber}' が見つかりません。";
+            return;
+        }
+
+        _lot = await Http.GetFromJsonAsync<LotResponse>($"api/inventory/lots/{match.LotId}");
+        _back = await Http.GetFromJsonAsync<TraceResponse>($"api/traceability/{match.LotId}/back");
+        _tab = "back";
+    }
+}

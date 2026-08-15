@@ -1,0 +1,59 @@
+@page "/print/stocktake/{Id:int}"
+@attribute [Authorize]
+@inject HttpClient Http
+
+@* 棚卸表（D-50-30-05） *@
+<PageTitle>棚卸表 - Parallel Factory MES</PageTitle>
+
+@if (_stocktake is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <PrintButton Label="棚卸表を印刷 / PDF出力" />
+
+    <div class="print-sheet">
+        <h1>棚 卸 表</h1>
+        <table class="table">
+            <tbody>
+                <tr>
+                    <th>棚卸番号</th><td>@_stocktake.StocktakeNo</td>
+                    <th>作成日</th><td>@_stocktake.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                </tr>
+                <tr>
+                    <th>状態</th><td>@_stocktake.Status</td>
+                    <th>確定日</th><td>@(_stocktake.FinalizedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table class="table">
+            <thead>
+                <tr><th>ロット番号</th><th>品目</th><th>ロケーション</th><th>理論数量</th><th>実棚数量</th><th>差異</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var line in _stocktake.Lines)
+                {
+                    <tr>
+                        <td>@line.LotNumber</td>
+                        <td>@line.ProductCode @line.ProductName</td>
+                        <td>@line.LocationCode</td>
+                        <td>@line.TheoreticalQuantity</td>
+                        <td>@(line.CountedQuantity?.ToString() ?? "　")</td>
+                        <td>@(line.Difference?.ToString() ?? "　")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private StocktakeResponse? _stocktake;
+
+    protected override async Task OnParametersSetAsync() =>
+        _stocktake = await Http.GetFromJsonAsync<StocktakeResponse>($"api/stocktakes/{Id}");
+}

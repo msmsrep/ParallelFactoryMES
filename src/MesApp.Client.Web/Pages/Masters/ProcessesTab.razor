@@ -1,0 +1,152 @@
+@inject HttpClient Http
+
+@* 工程マスタ（Spec.md 5.1 Process） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "工程の登録" : $"工程の編集（ID {_editingId}）")</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>工程コード</label>
+                <input @bind="_code" />
+            </div>
+            <div class="form-field">
+                <label>工程名</label>
+                <input @bind="_name" />
+            </div>
+            <div class="form-field">
+                <label>工程区分</label>
+                <select @bind="_category">
+                    <option value="@MakeOrBuy.InHouse">内製</option>
+                    <option value="@MakeOrBuy.Outsourced">外注</option>
+                </select>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>コード</th><th>工程名</th><th>区分</th><th>状態</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.Code</td>
+                        <td>@item.Name</td>
+                        <td>@(item.Category == MakeOrBuy.InHouse ? "内製" : "外注")</td>
+                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<ProcessResponse>? _items;
+    private int? _editingId;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private MakeOrBuy _category = MakeOrBuy.InHouse;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes?includeInactive=true");
+
+    private void Edit(ProcessResponse item)
+    {
+        _editingId = item.Id;
+        _code = item.Code;
+        _name = item.Name;
+        _category = item.Category;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _name = string.Empty;
+        _category = MakeOrBuy.InHouse;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "工程コードと工程名を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new ProcessRequest(_code, _name, _category);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/processes", request)
+                : await Http.PutAsJsonAsync($"api/processes/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/processes/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

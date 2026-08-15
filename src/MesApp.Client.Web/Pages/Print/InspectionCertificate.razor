@@ -1,0 +1,86 @@
+@page "/print/inspection/{Id:int}"
+@attribute [Authorize]
+@inject HttpClient Http
+
+@* 検査成績書（C-20-10-05） *@
+<PageTitle>検査成績書 - Parallel Factory MES</PageTitle>
+
+@if (_order is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <PrintButton Label="検査成績書を印刷 / PDF出力" />
+
+    <div class="print-sheet">
+        <h1>検 査 成 績 書</h1>
+        <table class="table">
+            <tbody>
+                <tr>
+                    <th>検査指示番号</th><td>@_order.OrderNo</td>
+                    <th>検査種別</th><td>@Inspections.TypeLabel(_order.Type)</td>
+                </tr>
+                <tr>
+                    <th>対象</th><td>@(_order.TargetLotNumber ?? _order.TargetWorkOrderNo ?? "-")</td>
+                    <th>発行日</th><td>@_order.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                </tr>
+                <tr>
+                    <th>総合判定</th>
+                    <td>
+                        @if (_order.OverallJudgment is InspectionJudgment judgment)
+                        {
+                            <strong>@(judgment == InspectionJudgment.Pass ? "合格" : "不合格")</strong>
+                        }
+                        else
+                        {
+                            <text>未判定</text>
+                        }
+                    </td>
+                    <th>判定日</th><td>@(_order.JudgedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
+                </tr>
+                <tr>
+                    <th>承認</th>
+                    <td colspan="3">@(_order.ApprovedAt is null ? "未承認" : $"承認済（{_order.ApprovedAt:yyyy-MM-dd}）")</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>検査結果</h2>
+        <table class="table">
+            <thead>
+                <tr><th>検査項目</th><th>規格値</th><th>検査方法</th><th>測定値</th><th>判定</th><th>検査者</th><th>検査日時</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var result in _order.Results)
+                {
+                    var item = _order.Items.FirstOrDefault(i => i.InspectionItemId == result.InspectionItemId);
+                    <tr>
+                        <td>@result.ItemCode @result.ItemName</td>
+                        <td>@(item?.LowerLimit?.ToString() ?? "-") 〜 @(item?.UpperLimit?.ToString() ?? "-")</td>
+                        <td>@(item?.Method ?? "-")</td>
+                        <td>@(result.MeasuredValue?.ToString() ?? result.TextValue ?? "-")</td>
+                        <td>@(result.Judgment == InspectionJudgment.Pass ? "合格" : "不合格")</td>
+                        <td>@result.InspectedByName</td>
+                        <td>@result.InspectedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if (_order.TargetLotNumber is not null)
+        {
+            <div class="barcode">@((MarkupString)Code39.ToSvg(_order.TargetLotNumber))</div>
+            <div class="barcode-text">@_order.TargetLotNumber</div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private InspectionOrderResponse? _order;
+
+    protected override async Task OnParametersSetAsync() =>
+        _order = await Http.GetFromJsonAsync<InspectionOrderResponse>($"api/inspection-orders/{Id}");
+}

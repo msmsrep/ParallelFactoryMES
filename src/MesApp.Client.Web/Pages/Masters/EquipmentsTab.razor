@@ -1,0 +1,211 @@
+@inject HttpClient Http
+
+@* 設備台帳/BOE（Spec.md 5.1 Equipment。E-10-10、I-10-20：保全タイプ・閾値・保全部品を含む） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "設備の登録" : $"設備の編集（{_assetNo}）")</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>資産番号</label>
+                <input @bind="_assetNo" />
+            </div>
+            <div class="form-field">
+                <label>設備名</label>
+                <input @bind="_name" />
+            </div>
+            <div class="form-field">
+                <label>設置場所</label>
+                <input @bind="_site" />
+            </div>
+            <div class="form-field">
+                <label>状態</label>
+                <select @bind="_status">
+                    <option value="@EquipmentStatus.Available">稼働可能</option>
+                    <option value="@EquipmentStatus.Stopped">停止中</option>
+                    <option value="@EquipmentStatus.UnderMaintenance">保全中</option>
+                    <option value="@EquipmentStatus.Retired">廃棄・除却</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>保全タイプ</label>
+                <select @bind="_maintenanceType">
+                    <option value="@MaintenanceType.None">対象外</option>
+                    <option value="@MaintenanceType.Calendar">カレンダ（日数）</option>
+                    <option value="@MaintenanceType.RunTime">稼働時間</option>
+                    <option value="@MaintenanceType.Count">使用回数</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>保全閾値</label>
+                <input type="number" step="any" @bind="_threshold" />
+            </div>
+            <div class="form-field">
+                <label>保全部品</label>
+                <input @bind="_parts" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>資産番号</th><th>設備名</th><th>設置場所</th><th>状態</th><th>保全タイプ</th><th>閾値</th><th>保全部品</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.AssetNo</td>
+                        <td>@item.Name</td>
+                        <td>@(item.Site ?? "-")</td>
+                        <td>@StatusLabel(item.Status)</td>
+                        <td>@MaintenanceTypeLabel(item.MaintenanceType)</td>
+                        <td>@(item.MaintenanceThreshold?.ToString() ?? "-")</td>
+                        <td>@(item.MaintenanceParts ?? "-")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<EquipmentResponse>? _items;
+    private int? _editingId;
+    private string _assetNo = string.Empty;
+    private string _name = string.Empty;
+    private string? _site;
+    private EquipmentStatus _status = EquipmentStatus.Available;
+    private MaintenanceType _maintenanceType = MaintenanceType.None;
+    private decimal? _threshold;
+    private string? _parts;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments?includeInactive=true");
+
+    private void Edit(EquipmentResponse item)
+    {
+        _editingId = item.Id;
+        _assetNo = item.AssetNo;
+        _name = item.Name;
+        _site = item.Site;
+        _status = item.Status;
+        _maintenanceType = item.MaintenanceType;
+        _threshold = item.MaintenanceThreshold;
+        _parts = item.MaintenanceParts;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _assetNo = string.Empty;
+        _name = string.Empty;
+        _site = null;
+        _status = EquipmentStatus.Available;
+        _maintenanceType = MaintenanceType.None;
+        _threshold = null;
+        _parts = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_assetNo) || string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "資産番号と設備名を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new EquipmentRequest(_assetNo, _name, _site, _status,
+                _maintenanceType, _threshold, _parts);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/equipments", request)
+                : await Http.PutAsJsonAsync($"api/equipments/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/equipments/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string StatusLabel(EquipmentStatus status) => status switch
+    {
+        EquipmentStatus.Available => "稼働可能",
+        EquipmentStatus.Stopped => "停止中",
+        EquipmentStatus.UnderMaintenance => "保全中",
+        EquipmentStatus.Retired => "廃棄・除却",
+        _ => status.ToString(),
+    };
+
+    private static string MaintenanceTypeLabel(MaintenanceType type) => type switch
+    {
+        MaintenanceType.None => "対象外",
+        MaintenanceType.Calendar => "カレンダ",
+        MaintenanceType.RunTime => "稼働時間",
+        MaintenanceType.Count => "使用回数",
+        _ => type.ToString(),
+    };
+}

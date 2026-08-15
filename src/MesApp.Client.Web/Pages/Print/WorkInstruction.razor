@@ -1,0 +1,90 @@
+@page "/print/work-order/{Id:int}"
+@attribute [Authorize]
+@inject HttpClient Http
+
+@* 作業指示書（B-10-30-04）。構成部品（MBOM）・工程情報を含む *@
+<PageTitle>作業指示書 - Parallel Factory MES</PageTitle>
+
+@if (_workOrder is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <PrintButton Label="作業指示書を印刷 / PDF出力" />
+
+    <div class="print-sheet">
+        <h1>作 業 指 示 書</h1>
+        <table class="table">
+            <tbody>
+                <tr>
+                    <th>指示番号</th><td>@_workOrder.WorkOrderNo</td>
+                    <th>指図番号</th><td>@_workOrder.OrderNo</td>
+                </tr>
+                <tr>
+                    <th>品目</th><td>@_workOrder.ProductCode @_workOrder.ProductName</td>
+                    <th>工程</th><td>@_workOrder.ProcessCode @_workOrder.ProcessName</td>
+                </tr>
+                <tr>
+                    <th>計画数</th><td>@_workOrder.PlannedQuantity</td>
+                    <th>着手順</th><td>@(_workOrder.DispatchOrder?.ToString() ?? "-")</td>
+                </tr>
+                <tr>
+                    <th>担当者</th><td>@(_workOrder.AssignedUserName ?? "-")</td>
+                    <th>設備</th><td>@(_workOrder.AssignedEquipmentName ?? "-")</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>構成部品（MBOM）</h2>
+        @if (_bom.Count == 0)
+        {
+            <p class="text-muted">MBOMは登録されていません。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead><tr><th>子品目</th><th>品目名</th><th>必要数量（計画数分）</th><th>内外製</th></tr></thead>
+                <tbody>
+                    @foreach (var line in _bom)
+                    {
+                        <tr>
+                            <td>@line.ChildProductCode</td>
+                            <td>@line.ChildProductName</td>
+                            <td>@(line.QuantityPer * _workOrder.PlannedQuantity)</td>
+                            <td>@(line.MakeOrBuy == MakeOrBuy.InHouse ? "内製" : "外注")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <h2>作業実施記録欄</h2>
+        <table class="table">
+            <thead><tr><th>開始時刻</th><th>終了時刻</th><th>良品数</th><th>不良数</th><th>作業者印</th></tr></thead>
+            <tbody>
+                <tr><td>　</td><td>　</td><td>　</td><td>　</td><td>　</td></tr>
+            </tbody>
+        </table>
+
+        <div class="barcode">@((MarkupString)Code39.ToSvg(_workOrder.WorkOrderNo))</div>
+        <div class="barcode-text">@_workOrder.WorkOrderNo</div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private WorkOrderResponse? _workOrder;
+    private List<BomItemResponse> _bom = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _workOrder = await Http.GetFromJsonAsync<WorkOrderResponse>($"api/work-orders/{Id}");
+        if (_workOrder is not null)
+        {
+            _bom = await Http.GetFromJsonAsync<List<BomItemResponse>>(
+                $"api/products/{_workOrder.ProductId}/bom") ?? [];
+        }
+    }
+}

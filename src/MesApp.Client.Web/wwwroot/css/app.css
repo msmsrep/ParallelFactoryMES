@@ -63,6 +63,13 @@ html, body {
 .sidebar a:hover { background: #31465a; }
 .sidebar a.active { background: var(--primary); color: #fff; }
 
+.sidebar .nav-group {
+    padding: 12px 16px 4px;
+    font-size: 11px;
+    color: #8fa3b5;
+    letter-spacing: 1px;
+}
+
 .main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
 .topbar {
@@ -183,6 +190,68 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 .login-box h1 { text-align: center; }
 .login-box .form-field { margin-bottom: 12px; }
 .login-box .btn { width: 100%; margin-top: 8px; }
+
+/* タブ（マスタ管理・在庫オペレーション等） */
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 16px;
+}
+.tabs button {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+.tabs button.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+/* バーコード/QRスキャン入力 */
+.scan-input { display: flex; gap: 6px; align-items: center; }
+.scan-input input { flex: 1; min-width: 160px; }
+.scan-video { width: 320px; max-width: 100%; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; }
+
+/* トレーサビリティのツリー表示 */
+.trace-tree, .trace-tree ul { list-style: none; padding-left: 18px; margin: 4px 0; }
+.trace-tree li { border-left: 1px solid var(--border); padding-left: 10px; margin: 4px 0; }
+
+/* 割合バー（品質分析・稼働率・治工具寿命） */
+.bar-meter {
+    width: 120px;
+    height: 12px;
+    background: #e6ebf0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.bar-meter-fill { height: 100%; background: var(--primary); }
+.bar-meter-fill.bar-warning { background: var(--warning); }
+.bar-meter-fill.bar-danger { background: var(--danger); }
+
+/* 帳票・ラベル（印刷レイアウト） */
+.print-sheet {
+    background: #fff;
+    padding: 24px;
+    max-width: 800px;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+}
+.print-sheet h1 { text-align: center; font-size: 18px; letter-spacing: 4px; }
+.label-sheet { width: 320px; }
+.label-sheet .barcode { text-align: center; margin: 10px 0 2px; }
+.label-sheet .barcode-text { text-align: center; font-family: monospace; letter-spacing: 1px; }
+
+@media print {
+    .sidebar, .topbar, .no-print { display: none !important; }
+    .content { padding: 0; max-width: none; }
+    body { background: #fff; }
+    .print-sheet { border: none; padding: 0; max-width: none; }
+    .table th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 
 #blazor-error-ui {
     position: fixed;

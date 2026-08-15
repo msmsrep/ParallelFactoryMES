@@ -1,0 +1,107 @@
+@page "/print/shipment-judgment/{Id:int}"
+@attribute [Authorize]
+@inject HttpClient Http
+
+@* 出荷判定書（H-10-10-04） *@
+<PageTitle>出荷判定書 - Parallel Factory MES</PageTitle>
+
+@if (_judgment is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <PrintButton Label="出荷判定書を印刷 / PDF出力" />
+
+    <div class="print-sheet">
+        <h1>出 荷 判 定 書</h1>
+        <table class="table">
+            <tbody>
+                <tr>
+                    <th>判定書番号</th><td>@_judgment.JudgmentNo</td>
+                    <th>判定日</th><td>@_judgment.JudgedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                </tr>
+                <tr>
+                    <th>対象出荷指示</th><td>@(_judgment.ShippingNo ?? "-")</td>
+                    <th>対象ロット</th><td>@(_judgment.LotNumber ?? "-")</td>
+                </tr>
+                <tr>
+                    <th>判定</th><td><strong>@ShipmentJudgments.ResultLabel(_judgment.Result)</strong></td>
+                    <th>判定者</th><td>@_judgment.JudgedByName</td>
+                </tr>
+                <tr>
+                    <th>承認</th>
+                    <td colspan="3">
+                        @(_judgment.ApprovedAt is null
+                            ? "未承認"
+                            : $"承認済（{_judgment.ApprovedAt:yyyy-MM-dd}）")
+                    </td>
+                </tr>
+                <tr><th>備考</th><td colspan="3">@(_judgment.Note ?? "-")</td></tr>
+            </tbody>
+        </table>
+
+        @if (_history is not null)
+        {
+            <h2>製造・検査履歴（H-10-10-01）</h2>
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <th style="width:120px;">製造履歴</th>
+                        <td>
+                            @if (_history.ProductionHistory.Count == 0)
+                            {
+                                <text>-</text>
+                            }
+                            else
+                            {
+                                @foreach (var line in _history.ProductionHistory)
+                                {
+                                    <div>@line</div>
+                                }
+                            }
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>検査履歴</th>
+                        <td>
+                            @if (_history.InspectionHistory.Count == 0)
+                            {
+                                <text>-</text>
+                            }
+                            else
+                            {
+                                @foreach (var line in _history.InspectionHistory)
+                                {
+                                    <div>@line</div>
+                                }
+                            }
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        }
+
+        @if (_judgment.LotNumber is not null)
+        {
+            <div class="barcode">@((MarkupString)Code39.ToSvg(_judgment.LotNumber))</div>
+            <div class="barcode-text">@_judgment.LotNumber</div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ShipmentJudgmentResponse? _judgment;
+    private LotHistoryResponse? _history;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _judgment = await Http.GetFromJsonAsync<ShipmentJudgmentResponse>($"api/shipment-judgments/{Id}");
+        if (_judgment?.LotId is int lotId)
+        {
+            _history = await Http.GetFromJsonAsync<LotHistoryResponse>($"api/traceability/{lotId}/history");
+        }
+    }
+}

@@ -1,0 +1,189 @@
+@page "/shipment-judgments"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>出荷判定 - Parallel Factory MES</PageTitle>
+
+<h1>出荷判定</h1>
+<p class="text-muted">出荷判定一覧・検査結果の確認（H-10-10-01）、判定（可／保留／特採。-02）、判定承認（-03）、判定書発行（-04）。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityAssurance}")">
+    <div class="card">
+        <h2 style="margin-top:0;">出荷判定の登録</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>対象出荷指示</label>
+                <select @bind="_shippingOrderId">
+                    <option value="0">なし</option>
+                    @foreach (var shipping in _shippingOrders)
+                    {
+                        <option value="@shipping.Id">@shipping.ShippingNo（@shipping.Destination）</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>対象ロット</label>
+                <select @bind="_lotId">
+                    <option value="0">なし</option>
+                    @foreach (var stock in _stocks)
+                    {
+                        <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode）</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>判定</label>
+                <select @bind="_result">
+                    <option value="@ShipmentJudgmentResult.Approved">可</option>
+                    <option value="@ShipmentJudgmentResult.Hold">保留</option>
+                    <option value="@ShipmentJudgmentResult.SpecialAcceptance">特別採用</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>備考</label>
+                <input @bind="_note" />
+            </div>
+        </div>
+        <p class="text-muted">出荷実行には、対象出荷指示に対する承認済みの「可」または「特採」判定が必要です。</p>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">判定を登録</button>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    <h2 style="margin-top:0;">判定一覧</h2>
+    @if (_judgments is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_judgments.Count == 0)
+    {
+        <p class="text-muted">出荷判定はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>判定書番号</th><th>対象出荷</th><th>対象ロット</th><th>判定</th><th>判定者</th><th>判定日</th><th>承認</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var judgment in _judgments)
+                {
+                    <tr>
+                        <td>@judgment.JudgmentNo</td>
+                        <td>@(judgment.ShippingNo ?? "-")</td>
+                        <td>@(judgment.LotNumber ?? "-")</td>
+                        <td><span class="badge @ResultClass(judgment.Result)">@ResultLabel(judgment.Result)</span></td>
+                        <td>@judgment.JudgedByName</td>
+                        <td>@judgment.JudgedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                        <td>@(judgment.ApprovedAt is null ? "未承認" : "承認済")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityAssurance}")" Context="qa">
+                                @if (judgment.ApprovedAt is null)
+                                {
+                                    <button class="btn btn-sm" disabled="@_busy"
+                                            @onclick="() => ApproveAsync(judgment.Id)">承認</button>
+                                }
+                            </AuthorizeView>
+                            <a class="btn btn-secondary btn-sm" href="print/shipment-judgment/@judgment.Id" target="_blank">判定書</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<ShipmentJudgmentResponse>? _judgments;
+    private List<ShippingOrderResponse> _shippingOrders = [];
+    private List<StockResponse> _stocks = [];
+
+    private int _shippingOrderId;
+    private int _lotId;
+    private ShipmentJudgmentResult _result = ShipmentJudgmentResult.Approved;
+    private string? _note;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _shippingOrders = await Http.GetFromJsonAsync<List<ShippingOrderResponse>>("api/shipping-orders") ?? [];
+        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        _judgments = await Http.GetFromJsonAsync<List<ShipmentJudgmentResponse>>("api/shipment-judgments");
+
+    private async Task CreateAsync()
+    {
+        if (_shippingOrderId == 0 && _lotId == 0)
+        {
+            _error = "対象出荷指示またはロットを選択してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/shipment-judgments",
+                new ShipmentJudgmentCreateRequest(
+                    _lotId == 0 ? null : _lotId,
+                    _shippingOrderId == 0 ? null : _shippingOrderId,
+                    _result, _note));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                return;
+            }
+            _message = "出荷判定を登録しました。承認すると出荷実行が可能になります。";
+            _note = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ApproveAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsync($"api/shipment-judgments/{id}/approve", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                return;
+            }
+            _message = "判定を承認しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    internal static string ResultLabel(ShipmentJudgmentResult result) => result switch
+    {
+        ShipmentJudgmentResult.Approved => "可",
+        ShipmentJudgmentResult.Hold => "保留",
+        ShipmentJudgmentResult.SpecialAcceptance => "特別採用",
+        _ => result.ToString(),
+    };
+
+    private static string ResultClass(ShipmentJudgmentResult result) => result switch
+    {
+        ShipmentJudgmentResult.Approved => "badge-success",
+        ShipmentJudgmentResult.Hold => "badge-danger",
+        _ => "badge-warning",
+    };
+}

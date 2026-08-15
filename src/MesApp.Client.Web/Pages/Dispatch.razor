@@ -1,0 +1,175 @@
+@page "/dispatch"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>差立 - Parallel Factory MES</PageTitle>
+
+<h1>差立（ディスパッチング）</h1>
+<p class="text-muted">作業指示への作業者・設備・着手順の割当（B-10-20）。作業者割当時は工順の必要スキル・資格を照合します（F-20-30-01）。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <div class="actions" style="margin-bottom:8px;">
+        <select @bind="_statusFilter" @bind:after="LoadAsync">
+            <option value="Created">未配布</option>
+            <option value="Dispatched">配布済</option>
+            <option value="">全状態</option>
+        </select>
+    </div>
+
+    @if (_workOrders is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_workOrders.Count == 0)
+    {
+        <p class="text-muted">対象の作業指示はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>指示番号</th><th>品目</th><th>工程</th><th>計画数</th>
+                    <th>作業者</th><th>設備</th><th>着手順</th><th>状態</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var workOrder in _workOrders)
+                {
+                    <tr>
+                        <td>@workOrder.WorkOrderNo</td>
+                        <td>@workOrder.ProductCode</td>
+                        <td>@workOrder.ProcessCode @workOrder.ProcessName</td>
+                        <td>@workOrder.PlannedQuantity</td>
+                        <td>
+                            <select value="@GetForm(workOrder.Id).UserId"
+                                    @onchange="e => GetForm(workOrder.Id).UserId = e.Value?.ToString()">
+                                <option value="">未割当</option>
+                                @foreach (var user in _users)
+                                {
+                                    <option value="@user.Id">@user.DisplayName</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <select value="@GetForm(workOrder.Id).EquipmentId"
+                                    @onchange="e => GetForm(workOrder.Id).EquipmentId = ToInt(e.Value)">
+                                <option value="0">未割当</option>
+                                @foreach (var equipment in _equipments)
+                                {
+                                    <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" style="width:70px;" value="@GetForm(workOrder.Id).Order"
+                                   @onchange="e => GetForm(workOrder.Id).Order = ToInt(e.Value)" />
+                        </td>
+                        <td><StatusBadge Status="@workOrder.Status.ToString()" /></td>
+                        <td>
+                            <button class="btn btn-sm" disabled="@_busy"
+                                    @onclick="() => DispatchAsync(workOrder)">割当</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private sealed class DispatchForm
+    {
+        public string? UserId { get; set; }
+        public int EquipmentId { get; set; }
+        public int Order { get; set; }
+    }
+
+    private List<WorkOrderResponse>? _workOrders;
+    private List<UserSummaryResponse> _users = [];
+    private List<EquipmentResponse> _equipments = [];
+    private readonly Dictionary<int, DispatchForm> _forms = [];
+    private string _statusFilter = "Created";
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // ユーザー一覧はシステム管理者のみ取得可能。取得できない場合は設備・着手順のみ割当可能とする
+        try
+        {
+            _users = await Http.GetFromJsonAsync<List<UserSummaryResponse>>("api/users") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _users = [];
+        }
+        _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
+        await LoadAsync();
+    }
+
+    private DispatchForm GetForm(int workOrderId)
+    {
+        if (!_forms.TryGetValue(workOrderId, out var form))
+        {
+            var workOrder = _workOrders?.FirstOrDefault(w => w.Id == workOrderId);
+            form = new DispatchForm
+            {
+                UserId = workOrder?.AssignedUserId,
+                EquipmentId = workOrder?.AssignedEquipmentId ?? 0,
+                Order = workOrder?.DispatchOrder ?? 0,
+            };
+            _forms[workOrderId] = form;
+        }
+        return form;
+    }
+
+    private static int ToInt(object? value) =>
+        int.TryParse(value?.ToString(), out var result) ? result : 0;
+
+    private async Task LoadAsync()
+    {
+        _forms.Clear();
+        var url = "api/work-orders";
+        if (!string.IsNullOrEmpty(_statusFilter))
+        {
+            url += $"?status={_statusFilter}";
+        }
+        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>(url);
+    }
+
+    private async Task DispatchAsync(WorkOrderResponse workOrder)
+    {
+        if (_busy)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var form = GetForm(workOrder.Id);
+            var response = await Http.PutAsJsonAsync($"api/work-orders/{workOrder.Id}/dispatch",
+                new DispatchRequest(
+                    string.IsNullOrEmpty(form.UserId) ? null : form.UserId,
+                    form.EquipmentId == 0 ? null : form.EquipmentId,
+                    form.Order == 0 ? null : form.Order));
+            if (!response.IsSuccessStatusCode)
+            {
+                // スキル・資格照合エラーもここに表示される（F-20-30-01）
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "差立に失敗しました。";
+                return;
+            }
+            _message = $"{workOrder.WorkOrderNo} を差立しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

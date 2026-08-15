@@ -1,0 +1,231 @@
+@inject HttpClient Http
+
+@* チェックリストマスタ（Spec.md 5.1 Checklist。B-30-10。HSE項目はカテゴリHseで登録 G-20/G-30） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "チェックリストの登録" : $"編集（{_code}）")</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>コード</label>
+                <input @bind="_code" />
+            </div>
+            <div class="form-field">
+                <label>名称</label>
+                <input @bind="_name" />
+            </div>
+            <div class="form-field">
+                <label>適用区分</label>
+                <select @bind="_category">
+                    <option value="@ChecklistCategory.Common">共通</option>
+                    <option value="@ChecklistCategory.Process">工程</option>
+                    <option value="@ChecklistCategory.Product">品目</option>
+                    <option value="@ChecklistCategory.Setup">段取り</option>
+                    <option value="@ChecklistCategory.Maintenance">保全</option>
+                    <option value="@ChecklistCategory.Hse">HSE（健康衛生・安全）</option>
+                </select>
+            </div>
+        </div>
+
+        <h2>項目</h2>
+        <table class="table">
+            <thead><tr><th>順序</th><th>チェック内容</th><th>必須</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var item in _items.OrderBy(i => i.Sequence))
+                {
+                    <tr>
+                        <td>@item.Sequence</td>
+                        <td>@item.Text</td>
+                        <td>@(item.IsRequired ? "必須" : "-")</td>
+                        <td><button class="btn btn-danger btn-sm" @onclick="() => _items.Remove(item)">削除</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>順序</label>
+                <input type="number" @bind="_itemSequence" />
+            </div>
+            <div class="form-field">
+                <label>チェック内容</label>
+                <input @bind="_itemText" />
+            </div>
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" style="width:auto;" @bind="_itemRequired" />
+                    必須項目（未チェックでは実施記録できない）
+                </label>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn btn-secondary" @onclick="AddItem">項目を追加</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    @if (_checklists is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>コード</th><th>名称</th><th>適用区分</th><th>項目数</th><th>状態</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var checklist in _checklists)
+                {
+                    <tr>
+                        <td>@checklist.Code</td>
+                        <td>@checklist.Name</td>
+                        <td>@CategoryLabel(checklist.Category)</td>
+                        <td>@checklist.Items.Count</td>
+                        <td>@(checklist.IsActive ? "有効" : "無効")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(checklist)">編集</button>
+                                @if (checklist.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(checklist.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<ChecklistResponse>? _checklists;
+    private readonly List<ChecklistItemRequest> _items = [];
+
+    private int? _editingId;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private ChecklistCategory _category = ChecklistCategory.Common;
+
+    private int _itemSequence = 1;
+    private string _itemText = string.Empty;
+    private bool _itemRequired = true;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() =>
+        _checklists = await Http.GetFromJsonAsync<List<ChecklistResponse>>("api/checklists?includeInactive=true");
+
+    private void Edit(ChecklistResponse checklist)
+    {
+        _editingId = checklist.Id;
+        _code = checklist.Code;
+        _name = checklist.Name;
+        _category = checklist.Category;
+        _items.Clear();
+        _items.AddRange(checklist.Items.Select(i => new ChecklistItemRequest(i.Sequence, i.Text, i.IsRequired)));
+        _itemSequence = _items.Count == 0 ? 1 : _items.Max(i => i.Sequence) + 1;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _name = string.Empty;
+        _category = ChecklistCategory.Common;
+        _items.Clear();
+        _itemSequence = 1;
+    }
+
+    private void AddItem()
+    {
+        if (string.IsNullOrWhiteSpace(_itemText))
+        {
+            _error = "チェック内容を入力してください。";
+            return;
+        }
+        if (_items.Any(i => i.Sequence == _itemSequence))
+        {
+            _error = "順序が重複しています。";
+            return;
+        }
+        _error = null;
+        _items.Add(new ChecklistItemRequest(_itemSequence, _itemText, _itemRequired));
+        _itemSequence = _items.Max(i => i.Sequence) + 1;
+        _itemText = string.Empty;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name) || _items.Count == 0)
+        {
+            _error = "コード・名称・項目（1件以上）を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new ChecklistRequest(_code, _name, _category, [.. _items]);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/checklists", request)
+                : await Http.PutAsJsonAsync($"api/checklists/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/checklists/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string CategoryLabel(ChecklistCategory category) => category switch
+    {
+        ChecklistCategory.Common => "共通",
+        ChecklistCategory.Process => "工程",
+        ChecklistCategory.Product => "品目",
+        ChecklistCategory.Setup => "段取り",
+        ChecklistCategory.Maintenance => "保全",
+        ChecklistCategory.Hse => "HSE",
+        _ => category.ToString(),
+    };
+}

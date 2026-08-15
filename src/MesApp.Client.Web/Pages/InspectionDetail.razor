@@ -1,0 +1,336 @@
+@page "/inspections/{Id:int}"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>検査詳細 - Parallel Factory MES</PageTitle>
+
+@if (_order is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <h1>検査指示 @_order.OrderNo</h1>
+    <p class="text-muted">
+        @Inspections.TypeLabel(_order.Type) ／ 対象：@(_order.TargetLotNumber ?? _order.TargetWorkOrderNo ?? "-")
+        ／ 状態：@Inspections.StatusLabel(_order.Status)
+        @if (_order.OverallJudgment is InspectionJudgment judgment)
+        {
+            <span class="badge @(judgment == InspectionJudgment.Pass ? "badge-success" : "badge-danger")">
+                @(judgment == InspectionJudgment.Pass ? "合格" : "不合格")
+            </span>
+        }
+        <a class="btn btn-secondary btn-sm" href="print/inspection/@Id" target="_blank">検査成績書</a>
+    </p>
+
+    <Notice Error="@_error" Message="@_message" />
+
+    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")">
+        @if (_order.Status is InspectionOrderStatus.Instructed or InspectionOrderStatus.InProgress)
+        {
+            <div class="card">
+                <h2 style="margin-top:0;">検査実績の入力（C-20-10-03。規格値から自動判定）</h2>
+                <table class="table">
+                    <thead>
+                        <tr><th>検査項目</th><th>規格値</th><th>検査方法</th><th>測定値</th><th>定性記録</th><th>判定（手動）</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _order.Items)
+                        {
+                            <tr>
+                                <td>@item.Code @item.Name</td>
+                                <td>
+                                    @(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")
+                                    @if (item.StandardValue is not null)
+                                    {
+                                        <span class="text-muted">（基準 @item.StandardValue）</span>
+                                    }
+                                </td>
+                                <td>@(item.Method ?? "-")</td>
+                                <td>
+                                    <input type="number" step="any" style="width:110px;"
+                                           value="@GetEntry(item.InspectionItemId).Measured"
+                                           @onchange="e => GetEntry(item.InspectionItemId).Measured = e.Value?.ToString()" />
+                                </td>
+                                <td>
+                                    <input style="width:130px;" value="@GetEntry(item.InspectionItemId).Text"
+                                           @onchange="e => GetEntry(item.InspectionItemId).Text = e.Value?.ToString()" />
+                                </td>
+                                <td>
+                                    <select value="@GetEntry(item.InspectionItemId).Judgment"
+                                            @onchange="e => GetEntry(item.InspectionItemId).Judgment = e.Value?.ToString()">
+                                        <option value="">自動判定</option>
+                                        <option value="Pass">合格</option>
+                                        <option value="Fail">不合格</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <button class="btn mt-2" disabled="@_busy" @onclick="SubmitResultsAsync">検査実績を登録</button>
+            </div>
+
+            <div class="card">
+                <h2 style="margin-top:0;">総合判定（C-20-10-04）</h2>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>グレード（任意。C-60-10-01）</label>
+                        <input @bind="_grade" placeholder="例：A" />
+                    </div>
+                </div>
+                <p class="text-muted">全検査項目の実績が合格なら合格。判定結果は対象ロットの在庫ステータスへ反映され、不合格時は不適合が自動起票されます。</p>
+                <button class="btn" disabled="@_busy" @onclick="JudgeAsync">判定する</button>
+            </div>
+        }
+
+        @if (_order.Status == InspectionOrderStatus.Judged)
+        {
+            <div class="card">
+                <button class="btn" disabled="@_busy" @onclick="ApproveAsync">検査承認（C-20-10-06）</button>
+            </div>
+        }
+    </AuthorizeView>
+
+    <div class="card">
+        <h2 style="margin-top:0;">検査実績</h2>
+        @if (_order.Results.Count == 0)
+        {
+            <p class="text-muted">実績はまだありません。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr><th>検査項目</th><th>サンプルNo</th><th>測定値</th><th>記録</th><th>判定</th><th>検査者</th><th>検査日時</th><th>訂正</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var result in _order.Results)
+                    {
+                        <tr>
+                            <td>@result.ItemCode @result.ItemName</td>
+                            <td>@result.SampleNo</td>
+                            <td>@(result.MeasuredValue?.ToString() ?? "-")</td>
+                            <td>@(result.TextValue ?? "-")</td>
+                            <td>
+                                <span class="badge @(result.Judgment == InspectionJudgment.Pass ? "badge-success" : "badge-danger")">
+                                    @(result.Judgment == InspectionJudgment.Pass ? "合格" : "不合格")
+                                </span>
+                            </td>
+                            <td>@result.InspectedByName</td>
+                            <td>@result.InspectedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                            <td>
+                                @if (_order.Status != InspectionOrderStatus.Approved)
+                                {
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => StartCorrection(result)">訂正</button>
+                                }
+                                @if (result.CorrectionNote is { Length: > 0 })
+                                {
+                                    <div class="text-muted" style="white-space:pre-wrap;">@result.CorrectionNote</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    @if (_correcting is not null)
+    {
+        <div class="card">
+            <h2 style="margin-top:0;">検査実績の訂正（C-20-50-07。理由必須・監査ログ記録）</h2>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>測定値</label>
+                    <input type="number" step="any" @bind="_correctMeasured" />
+                </div>
+                <div class="form-field">
+                    <label>判定</label>
+                    <select @bind="_correctJudgment">
+                        <option value="@InspectionJudgment.Pass">合格</option>
+                        <option value="@InspectionJudgment.Fail">不合格</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>訂正理由</label>
+                    <input @bind="_correctReason" />
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn" disabled="@_busy" @onclick="SubmitCorrectionAsync">訂正を登録</button>
+                <button class="btn btn-secondary" @onclick="() => _correcting = null">キャンセル</button>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private sealed class ResultEntry
+    {
+        public string? Measured { get; set; }
+        public string? Text { get; set; }
+        public string? Judgment { get; set; }
+    }
+
+    [Parameter] public int Id { get; set; }
+
+    private InspectionOrderResponse? _order;
+    private readonly Dictionary<int, ResultEntry> _entries = [];
+    private InspectionResultResponse? _correcting;
+    private decimal? _correctMeasured;
+    private InspectionJudgment _correctJudgment = InspectionJudgment.Pass;
+    private string? _correctReason;
+    private string? _grade;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _order = await Http.GetFromJsonAsync<InspectionOrderResponse>($"api/inspection-orders/{Id}");
+        _entries.Clear();
+    }
+
+    private ResultEntry GetEntry(int itemId)
+    {
+        if (!_entries.TryGetValue(itemId, out var entry))
+        {
+            entry = new ResultEntry();
+            _entries[itemId] = entry;
+        }
+        return entry;
+    }
+
+    private async Task SubmitResultsAsync()
+    {
+        var requests = new List<InspectionResultRequest>();
+        foreach (var (itemId, entry) in _entries)
+        {
+            var hasValue = !string.IsNullOrWhiteSpace(entry.Measured)
+                           || !string.IsNullOrWhiteSpace(entry.Text)
+                           || !string.IsNullOrWhiteSpace(entry.Judgment);
+            if (!hasValue)
+            {
+                continue;
+            }
+            requests.Add(new InspectionResultRequest(
+                itemId, null,
+                decimal.TryParse(entry.Measured, out var measured) ? measured : null,
+                string.IsNullOrWhiteSpace(entry.Text) ? null : entry.Text,
+                Enum.TryParse<InspectionJudgment>(entry.Judgment, out var judgment) ? judgment : null));
+        }
+        if (requests.Count == 0)
+        {
+            _error = "検査結果を入力してください。";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/inspection-orders/{Id}/results", requests);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                return;
+            }
+            _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+            _entries.Clear();
+            _message = "検査実績を登録しました。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task JudgeAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/inspection-orders/{Id}/judge",
+                new InspectionJudgeRequest(string.IsNullOrWhiteSpace(_grade) ? null : _grade));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "判定に失敗しました。";
+                return;
+            }
+            _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+            _message = _order?.OverallJudgment == InspectionJudgment.Fail
+                ? "不合格と判定しました。ロットは不良となり、不適合が自動起票されました。"
+                : "合格と判定しました。ロットは正常になりました。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ApproveAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsync($"api/inspection-orders/{Id}/approve", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                return;
+            }
+            _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+            _message = "検査を承認しました。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void StartCorrection(InspectionResultResponse result)
+    {
+        _correcting = result;
+        _correctMeasured = result.MeasuredValue;
+        _correctJudgment = result.Judgment;
+        _correctReason = null;
+    }
+
+    private async Task SubmitCorrectionAsync()
+    {
+        if (_correcting is null || string.IsNullOrWhiteSpace(_correctReason))
+        {
+            _error = "訂正理由を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/inspection-orders/{Id}/results/{_correcting.Id}",
+                new InspectionResultCorrectionRequest(_correctMeasured, _correcting.TextValue,
+                    _correctJudgment, _correctReason));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "訂正に失敗しました。";
+                return;
+            }
+            _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+            _correcting = null;
+            _message = "検査実績を訂正しました（判定済みの場合は再判定が必要です）。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

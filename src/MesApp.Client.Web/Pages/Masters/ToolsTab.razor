@@ -1,0 +1,188 @@
+@inject HttpClient Http
+
+@* 治工具マスタ（Spec.md 5.1 Tool。E-60。寿命閾値の設定） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "治工具の登録" : $"治工具の編集（{_code}）")</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>治工具コード</label>
+                <input @bind="_code" />
+            </div>
+            <div class="form-field">
+                <label>名称</label>
+                <input @bind="_name" />
+            </div>
+            <div class="form-field">
+                <label>種別</label>
+                <input @bind="_toolType" placeholder="型／切削工具／検査工具 など" />
+            </div>
+            <div class="form-field">
+                <label>寿命閾値（使用回数）</label>
+                <input type="number" @bind="_lifeCount" />
+            </div>
+            <div class="form-field">
+                <label>寿命閾値（使用時間h）</label>
+                <input type="number" step="any" @bind="_lifeHours" />
+            </div>
+            <div class="form-field">
+                <label>状態</label>
+                <select @bind="_status">
+                    <option value="@ToolStatus.Available">使用可能</option>
+                    <option value="@ToolStatus.InUse">使用中</option>
+                    <option value="@ToolStatus.UnderMaintenance">メンテナンス中</option>
+                    <option value="@ToolStatus.Retired">廃棄</option>
+                </select>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>コード</th><th>名称</th><th>種別</th><th>寿命(回数)</th><th>寿命(時間)</th><th>状態</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.Code</td>
+                        <td>@item.Name</td>
+                        <td>@(item.ToolType ?? "-")</td>
+                        <td>@(item.LifeThresholdCount?.ToString() ?? "-")</td>
+                        <td>@(item.LifeThresholdHours?.ToString() ?? "-")</td>
+                        <td>@StatusLabel(item.Status)</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<ToolResponse>? _items;
+    private int? _editingId;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private string? _toolType;
+    private int? _lifeCount;
+    private decimal? _lifeHours;
+    private ToolStatus _status = ToolStatus.Available;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools?includeInactive=true");
+
+    private void Edit(ToolResponse item)
+    {
+        _editingId = item.Id;
+        _code = item.Code;
+        _name = item.Name;
+        _toolType = item.ToolType;
+        _lifeCount = item.LifeThresholdCount;
+        _lifeHours = item.LifeThresholdHours;
+        _status = item.Status;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _name = string.Empty;
+        _toolType = null;
+        _lifeCount = null;
+        _lifeHours = null;
+        _status = ToolStatus.Available;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "治工具コードと名称を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new ToolRequest(_code, _name, _toolType, _lifeCount, _lifeHours, _status);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/tools", request)
+                : await Http.PutAsJsonAsync($"api/tools/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/tools/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string StatusLabel(ToolStatus status) => status switch
+    {
+        ToolStatus.Available => "使用可能",
+        ToolStatus.InUse => "使用中",
+        ToolStatus.UnderMaintenance => "メンテナンス中",
+        ToolStatus.Retired => "廃棄",
+        _ => status.ToString(),
+    };
+}

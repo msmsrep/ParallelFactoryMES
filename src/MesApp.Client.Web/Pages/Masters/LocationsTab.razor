@@ -1,0 +1,163 @@
+@inject HttpClient Http
+
+@* ロケーションマスタ（Spec.md 5.1 Location。D-50-20-01 棚番号・ロケーション管理） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "ロケーションの登録" : $"ロケーションの編集（{_code}）")</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>ロケーションコード</label>
+                <input @bind="_code" />
+            </div>
+            <div class="form-field">
+                <label>倉庫/エリア区分</label>
+                <select @bind="_areaType">
+                    <option value="@LocationAreaType.MaterialWarehouse">部材倉庫</option>
+                    <option value="@LocationAreaType.InProcess">工程内</option>
+                    <option value="@LocationAreaType.ProductWarehouse">製品倉庫</option>
+                    <option value="@LocationAreaType.ShippingArea">出荷場</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>棚番</label>
+                <input @bind="_shelfNo" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>コード</th><th>区分</th><th>棚番</th><th>状態</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.Code</td>
+                        <td>@AreaLabel(item.AreaType)</td>
+                        <td>@(item.ShelfNo ?? "-")</td>
+                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<LocationResponse>? _items;
+    private int? _editingId;
+    private string _code = string.Empty;
+    private LocationAreaType _areaType = LocationAreaType.MaterialWarehouse;
+    private string? _shelfNo;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations?includeInactive=true");
+
+    private void Edit(LocationResponse item)
+    {
+        _editingId = item.Id;
+        _code = item.Code;
+        _areaType = item.AreaType;
+        _shelfNo = item.ShelfNo;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _areaType = LocationAreaType.MaterialWarehouse;
+        _shelfNo = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code))
+        {
+            _error = "ロケーションコードを入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new LocationRequest(_code, _areaType, _shelfNo);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/locations", request)
+                : await Http.PutAsJsonAsync($"api/locations/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/locations/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string AreaLabel(LocationAreaType areaType) => areaType switch
+    {
+        LocationAreaType.MaterialWarehouse => "部材倉庫",
+        LocationAreaType.InProcess => "工程内",
+        LocationAreaType.ProductWarehouse => "製品倉庫",
+        LocationAreaType.ShippingArea => "出荷場",
+        _ => areaType.ToString(),
+    };
+}

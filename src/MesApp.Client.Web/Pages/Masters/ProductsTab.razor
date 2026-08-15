@@ -1,0 +1,478 @@
+@inject HttpClient Http
+
+@* 品目マスタ＋MBOM＋工順（BOP）（Spec.md 5.1、A-40-10／A-40-20） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "品目の登録" : $"品目の編集（{_code}）")</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>品目コード</label>
+                <input @bind="_code" />
+            </div>
+            <div class="form-field">
+                <label>品目名</label>
+                <input @bind="_name" />
+            </div>
+            <div class="form-field">
+                <label>単位</label>
+                <input @bind="_unit" />
+            </div>
+            <div class="form-field">
+                <label>品目区分</label>
+                <select @bind="_type">
+                    <option value="@ProductType.Product">製品</option>
+                    <option value="@ProductType.SemiFinished">半製品・中間品</option>
+                    <option value="@ProductType.Material">部材</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>規格</label>
+                <input @bind="_specification" />
+            </div>
+            <div class="form-field">
+                <label>標準不良率(%)</label>
+                <input type="number" step="any" @bind="_defectRate" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    @if (_products is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>コード</th><th>品目名</th><th>区分</th><th>単位</th><th>標準不良率</th><th>状態</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var product in _products)
+                {
+                    <tr>
+                        <td>@product.Code</td>
+                        <td>@product.Name</td>
+                        <td>@TypeLabel(product.Type)</td>
+                        <td>@product.Unit</td>
+                        <td>@product.StandardDefectRate %</td>
+                        <td>@(product.IsActive ? "有効" : "無効")</td>
+                        <td class="actions">
+                            <button class="btn btn-secondary btn-sm" @onclick="() => SelectAsync(product)">MBOM・工順</button>
+                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(product)">編集</button>
+                                @if (product.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(product.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (_selected is not null)
+{
+    <div class="card">
+        <h2 style="margin-top:0;">@_selected.Code @_selected.Name の MBOM（A-40-10）</h2>
+        <table class="table">
+            <thead><tr><th>子品目</th><th>必要数量（親1単位）</th><th>内外製</th><th>代替グループ</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var line in _bomLines)
+                {
+                    <tr>
+                        <td>@(_products?.FirstOrDefault(p => p.Id == line.ChildProductId)?.Code)</td>
+                        <td>@line.QuantityPer</td>
+                        <td>@(line.MakeOrBuy == MakeOrBuy.InHouse ? "内製" : "外注")</td>
+                        <td>@(line.AlternativeGroup ?? "-")</td>
+                        <td><button class="btn btn-danger btn-sm" @onclick="() => _bomLines.Remove(line)">削除</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="bom">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>子品目</label>
+                    <select @bind="_bomChildId">
+                        <option value="0">選択してください</option>
+                        @foreach (var product in _products ?? [])
+                        {
+                            <option value="@product.Id">@product.Code @product.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>必要数量</label>
+                    <input type="number" step="any" @bind="_bomQuantity" />
+                </div>
+                <div class="form-field">
+                    <label>内外製区分</label>
+                    <select @bind="_bomMakeOrBuy">
+                        <option value="@MakeOrBuy.InHouse">内製</option>
+                        <option value="@MakeOrBuy.Outsourced">外注</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>代替部品グループ</label>
+                    <input @bind="_bomAltGroup" />
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-secondary" @onclick="AddBomLine">明細に追加</button>
+                <button class="btn" disabled="@_busy" @onclick="SaveBomAsync">MBOMを保存（一括置換）</button>
+            </div>
+        </AuthorizeView>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">@_selected.Code の 工順（BOP。A-40-20）</h2>
+        <table class="table">
+            <thead>
+                <tr><th>順序</th><th>工程</th><th>標準作業(分)</th><th>標準段取(分)</th><th>必要スキル</th><th>設備</th><th>治工具</th><th>チェックリスト</th><th>管理項目</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var step in _routingSteps.OrderBy(s => s.Sequence))
+                {
+                    <tr>
+                        <td>@step.Sequence</td>
+                        <td>@(_processes.FirstOrDefault(p => p.Id == step.ProcessId)?.Code)</td>
+                        <td>@step.StandardWorkMinutes</td>
+                        <td>@step.StandardSetupMinutes</td>
+                        <td>@(_skills.FirstOrDefault(s => s.Id == step.RequiredSkillId)?.Name ?? "-")</td>
+                        <td>@(_equipments.FirstOrDefault(e => e.Id == step.EquipmentId)?.AssetNo ?? "-")</td>
+                        <td>@(_tools.FirstOrDefault(t => t.Id == step.ToolId)?.Code ?? "-")</td>
+                        <td>@(_checklists.FirstOrDefault(c => c.Id == step.ChecklistId)?.Code ?? "-")</td>
+                        <td>@(step.ControlItems ?? "-")</td>
+                        <td><button class="btn btn-danger btn-sm" @onclick="() => _routingSteps.Remove(step)">削除</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="routing">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>工程順序</label>
+                    <input type="number" @bind="_stepSequence" />
+                </div>
+                <div class="form-field">
+                    <label>工程</label>
+                    <select @bind="_stepProcessId">
+                        <option value="0">選択してください</option>
+                        @foreach (var process in _processes)
+                        {
+                            <option value="@process.Id">@process.Code @process.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>標準作業時間(分)</label>
+                    <input type="number" step="any" @bind="_stepWork" />
+                </div>
+                <div class="form-field">
+                    <label>標準段取り時間(分)</label>
+                    <input type="number" step="any" @bind="_stepSetup" />
+                </div>
+                <div class="form-field">
+                    <label>必要スキル・資格</label>
+                    <select @bind="_stepSkillId">
+                        <option value="0">なし</option>
+                        @foreach (var skill in _skills)
+                        {
+                            <option value="@skill.Id">@skill.Code @skill.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>使用設備</label>
+                    <select @bind="_stepEquipmentId">
+                        <option value="0">なし</option>
+                        @foreach (var equipment in _equipments)
+                        {
+                            <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>使用治工具</label>
+                    <select @bind="_stepToolId">
+                        <option value="0">なし</option>
+                        @foreach (var tool in _tools)
+                        {
+                            <option value="@tool.Id">@tool.Code @tool.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>チェックリスト</label>
+                    <select @bind="_stepChecklistId">
+                        <option value="0">なし</option>
+                        @foreach (var checklist in _checklists)
+                        {
+                            <option value="@checklist.Id">@checklist.Code @checklist.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>工程管理項目</label>
+                    <input @bind="_stepControlItems" placeholder="例：温度、回転数" />
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-secondary" @onclick="AddRoutingStep">工程を追加</button>
+                <button class="btn" disabled="@_busy" @onclick="SaveRoutingAsync">工順を保存（一括置換）</button>
+            </div>
+        </AuthorizeView>
+    </div>
+}
+
+@code {
+    private List<ProductResponse>? _products;
+    private List<ProcessResponse> _processes = [];
+    private List<SkillResponse> _skills = [];
+    private List<EquipmentResponse> _equipments = [];
+    private List<ToolResponse> _tools = [];
+    private List<ChecklistResponse> _checklists = [];
+
+    private ProductResponse? _selected;
+    private readonly List<BomItemRequest> _bomLines = [];
+    private readonly List<RoutingStepRequest> _routingSteps = [];
+
+    private int? _editingId;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private string _unit = "個";
+    private string? _specification;
+    private ProductType _type = ProductType.Product;
+    private decimal _defectRate;
+
+    private int _bomChildId;
+    private decimal _bomQuantity = 1;
+    private MakeOrBuy _bomMakeOrBuy = MakeOrBuy.InHouse;
+    private string? _bomAltGroup;
+
+    private int _stepSequence = 1;
+    private int _stepProcessId;
+    private decimal _stepWork;
+    private decimal _stepSetup;
+    private int _stepSkillId;
+    private int _stepEquipmentId;
+    private int _stepToolId;
+    private int _stepChecklistId;
+    private string? _stepControlItems;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
+        _skills = await Http.GetFromJsonAsync<List<SkillResponse>>("api/skills") ?? [];
+        _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
+        _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
+        _checklists = await Http.GetFromJsonAsync<List<ChecklistResponse>>("api/checklists") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products?includeInactive=true");
+
+    private void Edit(ProductResponse product)
+    {
+        _editingId = product.Id;
+        _code = product.Code;
+        _name = product.Name;
+        _unit = product.Unit;
+        _specification = product.Specification;
+        _type = product.Type;
+        _defectRate = product.StandardDefectRate;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _name = string.Empty;
+        _unit = "個";
+        _specification = null;
+        _type = ProductType.Product;
+        _defectRate = 0;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "品目コードと品目名を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new ProductRequest(_code, _name, _unit, _specification, _type, _defectRate);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/products", request)
+                : await Http.PutAsJsonAsync($"api/products/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/products/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SelectAsync(ProductResponse product)
+    {
+        _selected = product;
+        _bomLines.Clear();
+        _routingSteps.Clear();
+
+        var bom = await Http.GetFromJsonAsync<List<BomItemResponse>>($"api/products/{product.Id}/bom") ?? [];
+        _bomLines.AddRange(bom.Select(b =>
+            new BomItemRequest(b.ChildProductId, b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup)));
+
+        var routing = await Http.GetFromJsonAsync<List<RoutingStepResponse>>(
+            $"api/products/{product.Id}/routing") ?? [];
+        _routingSteps.AddRange(routing.Select(r => new RoutingStepRequest(
+            r.Sequence, r.ProcessId, r.StandardWorkMinutes, r.StandardSetupMinutes,
+            r.RequiredSkillId, r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId)));
+        _stepSequence = _routingSteps.Count == 0 ? 1 : _routingSteps.Max(s => s.Sequence) + 1;
+    }
+
+    private void AddBomLine()
+    {
+        if (_bomChildId == 0 || _bomQuantity <= 0)
+        {
+            _error = "子品目と必要数量を指定してください。";
+            return;
+        }
+        _error = null;
+        _bomLines.Add(new BomItemRequest(_bomChildId, _bomQuantity, _bomMakeOrBuy,
+            string.IsNullOrWhiteSpace(_bomAltGroup) ? null : _bomAltGroup));
+        _bomChildId = 0;
+    }
+
+    private async Task SaveBomAsync()
+    {
+        if (_selected is null)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/products/{_selected.Id}/bom", _bomLines);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "MBOMを保存しました。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void AddRoutingStep()
+    {
+        if (_stepProcessId == 0)
+        {
+            _error = "工程を選択してください。";
+            return;
+        }
+        if (_routingSteps.Any(s => s.Sequence == _stepSequence))
+        {
+            _error = "工程順序が重複しています。";
+            return;
+        }
+        _error = null;
+        _routingSteps.Add(new RoutingStepRequest(_stepSequence, _stepProcessId, _stepWork, _stepSetup,
+            _stepSkillId == 0 ? null : _stepSkillId,
+            _stepEquipmentId == 0 ? null : _stepEquipmentId,
+            _stepToolId == 0 ? null : _stepToolId,
+            string.IsNullOrWhiteSpace(_stepControlItems) ? null : _stepControlItems,
+            _stepChecklistId == 0 ? null : _stepChecklistId));
+        _stepSequence = _routingSteps.Max(s => s.Sequence) + 1;
+        _stepControlItems = null;
+    }
+
+    private async Task SaveRoutingAsync()
+    {
+        if (_selected is null)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/products/{_selected.Id}/routing", _routingSteps);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "工順（BOP）を保存しました。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string TypeLabel(ProductType type) => type switch
+    {
+        ProductType.Product => "製品",
+        ProductType.SemiFinished => "半製品",
+        ProductType.Material => "部材",
+        _ => type.ToString(),
+    };
+}

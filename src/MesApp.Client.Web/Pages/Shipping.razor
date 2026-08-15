@@ -1,0 +1,298 @@
+@page "/shipping"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>出荷管理 - Parallel Factory MES</PageTitle>
+
+<h1>出荷管理</h1>
+<p class="text-muted">出荷指示（D-40-20-01）、出荷実行・完了報告（D-40-30）、出荷伝票発行（D-40-30-07）。出荷には承認済みの出荷判定（可／特採）が必要です（H-10-10）。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <h2 style="margin-top:0;">出荷指示の作成</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>出荷先</label>
+            <input @bind="_destination" />
+        </div>
+        <div class="form-field">
+            <label>出荷予定日</label>
+            <input type="date" @bind="_plannedDate" />
+        </div>
+        <div class="form-field">
+            <label>品目</label>
+            <select @bind="_lineProductId">
+                <option value="0">選択してください</option>
+                @foreach (var product in _products)
+                {
+                    <option value="@product.Id">@product.Code @product.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>数量</label>
+            <input type="number" @bind="_lineQuantity" />
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn btn-secondary" @onclick="AddLine">明細に追加</button>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">出荷指示を作成</button>
+    </div>
+    @if (_lines.Count > 0)
+    {
+        <table class="table mt-2">
+            <thead><tr><th>品目</th><th>数量</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var line in _lines)
+                {
+                    <tr>
+                        <td>@(_products.FirstOrDefault(p => p.Id == line.ProductId)?.Code)</td>
+                        <td>@line.Quantity</td>
+                        <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">削除</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">出荷指示一覧</h2>
+    @if (_orders is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_orders.Count == 0)
+    {
+        <p class="text-muted">出荷指示はありません。</p>
+    }
+    else
+    {
+        @foreach (var order in _orders)
+        {
+            <div class="card">
+                <div class="actions" style="justify-content:space-between;">
+                    <div>
+                        <strong>@order.ShippingNo</strong>
+                        <span class="text-muted">@order.Destination</span>
+                        <span class="badge @StatusClass(order.Status)">@ShippingStatusLabel(order.Status)</span>
+                        <span class="text-muted">予定日 @(order.PlannedDate?.ToString("yyyy-MM-dd") ?? "-")</span>
+                    </div>
+                    <div class="actions">
+                        <a class="btn btn-secondary btn-sm" href="print/shipping/@order.Id" target="_blank">出荷伝票</a>
+                        @if (order.Status == ShippingOrderStatus.Instructed)
+                        {
+                            <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
+                        }
+                    </div>
+                </div>
+
+                <table class="table mt-2">
+                    <thead><tr><th>品目</th><th>指示数</th><th>出荷済</th></tr></thead>
+                    <tbody>
+                        @foreach (var line in order.Lines)
+                        {
+                            <tr>
+                                <td>@line.ProductCode @line.ProductName</td>
+                                <td>@line.Quantity</td>
+                                <td>@line.ShippedQuantity</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (order.Status == ShippingOrderStatus.Instructed)
+                {
+                    <h2>出荷実行（ロット指定）</h2>
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label>出荷ロット</label>
+                            <select value="@GetShip(order.Id).LotId"
+                                    @onchange="e => SetShipLot(order.Id, e.Value)">
+                                <option value="0">選択してください</option>
+                                @foreach (var stock in _stocks.Where(s => order.Lines.Any(l => l.ProductId == s.ProductId)))
+                                {
+                                    <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode / @stock.LocationCode / 在庫@stock.Quantity）</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label>数量</label>
+                            <input type="number" value="@GetShip(order.Id).Quantity"
+                                   @onchange="e => GetShip(order.Id).Quantity = ToDecimal(e.Value)" />
+                        </div>
+                    </div>
+                    <button class="btn" disabled="@_busy" @onclick="() => ShipAsync(order)">出荷実行・完了報告</button>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private sealed class ShipForm
+    {
+        public int LotId { get; set; }
+        public int LocationId { get; set; }
+        public decimal Quantity { get; set; }
+    }
+
+    private List<ShippingOrderResponse>? _orders;
+    private List<ProductResponse> _products = [];
+    private List<StockResponse> _stocks = [];
+    private readonly List<ShippingLineRequest> _lines = [];
+    private readonly Dictionary<int, ShipForm> _shipForms = [];
+
+    private string _destination = string.Empty;
+    private DateTime? _plannedDate;
+    private int _lineProductId;
+    private decimal _lineQuantity;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _orders = await Http.GetFromJsonAsync<List<ShippingOrderResponse>>("api/shipping-orders");
+        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
+    }
+
+    private ShipForm GetShip(int orderId)
+    {
+        if (!_shipForms.TryGetValue(orderId, out var form))
+        {
+            form = new ShipForm();
+            _shipForms[orderId] = form;
+        }
+        return form;
+    }
+
+    private void SetShipLot(int orderId, object? value)
+    {
+        var lotId = int.TryParse(value?.ToString(), out var parsed) ? parsed : 0;
+        var form = GetShip(orderId);
+        form.LotId = lotId;
+        form.LocationId = _stocks.FirstOrDefault(s => s.LotId == lotId)?.LocationId ?? 0;
+    }
+
+    private static decimal ToDecimal(object? value) =>
+        decimal.TryParse(value?.ToString(), out var result) ? result : 0;
+
+    private void AddLine()
+    {
+        if (_lineProductId == 0 || _lineQuantity <= 0)
+        {
+            _error = "品目と数量を指定してください。";
+            return;
+        }
+        _error = null;
+        _lines.Add(new ShippingLineRequest(_lineProductId, _lineQuantity));
+        _lineQuantity = 0;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_destination) || _lines.Count == 0)
+        {
+            _error = "出荷先と明細を指定してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/shipping-orders",
+                new ShippingOrderCreateRequest(_destination,
+                    _plannedDate is null ? null : DateOnly.FromDateTime(_plannedDate.Value),
+                    [.. _lines]));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                return;
+            }
+            _message = "出荷指示を作成しました。出荷前に出荷判定（可／特採）の承認が必要です。";
+            _lines.Clear();
+            _destination = string.Empty;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ShipAsync(ShippingOrderResponse order)
+    {
+        var form = GetShip(order.Id);
+        if (form.LotId == 0 || form.Quantity <= 0)
+        {
+            _error = "出荷ロットと数量を指定してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/shipping-orders/{order.Id}/ship",
+                new ShipExecuteRequest([new ShipLineRequest(form.LotId, form.LocationId, form.Quantity)]));
+            if (!response.IsSuccessStatusCode)
+            {
+                // 出荷判定未承認の場合もここで通知される（H-10-10ゲート）
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "出荷に失敗しました。";
+                return;
+            }
+            _message = "出荷を実行しました。";
+            _shipForms.Remove(order.Id);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CancelAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsync($"api/shipping-orders/{id}/cancel", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取消に失敗しました。";
+                return;
+            }
+            _message = "出荷指示を取消しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string ShippingStatusLabel(ShippingOrderStatus status) => status switch
+    {
+        ShippingOrderStatus.Instructed => "指示",
+        ShippingOrderStatus.Completed => "完了",
+        ShippingOrderStatus.Canceled => "取消",
+        _ => status.ToString(),
+    };
+
+    private static string StatusClass(ShippingOrderStatus status) => status switch
+    {
+        ShippingOrderStatus.Completed => "badge-success",
+        ShippingOrderStatus.Canceled => "badge-danger",
+        _ => "badge-info",
+    };
+}

@@ -1,0 +1,277 @@
+@page "/picking"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>出庫・払出 - Parallel Factory MES</PageTitle>
+
+<h1>出庫・工程払出</h1>
+<p class="text-muted">出庫指示・ピッキング指示（D-20-10。ロットは先入れ先出し（有効期限優先）で自動引当）、ピッキング実行・払出（D-20-20）。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <h2 style="margin-top:0;">ピッキング指示の作成</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>区分</label>
+            <select @bind="_type">
+                <option value="@PickingOrderType.ProcessIssue">工程払出</option>
+                <option value="@PickingOrderType.Shipping">出荷</option>
+            </select>
+        </div>
+        @if (_type == PickingOrderType.ProcessIssue)
+        {
+            <div class="form-field">
+                <label>払出先 作業指示</label>
+                <select @bind="_workOrderId">
+                    <option value="0">選択してください</option>
+                    @foreach (var workOrder in _workOrders)
+                    {
+                        <option value="@workOrder.Id">@workOrder.WorkOrderNo（@workOrder.ProductCode / @workOrder.ProcessCode）</option>
+                    }
+                </select>
+            </div>
+        }
+        else
+        {
+            <div class="form-field">
+                <label>払出先 出荷指示</label>
+                <select @bind="_shippingOrderId">
+                    <option value="0">選択してください</option>
+                    @foreach (var shipping in _shippingOrders)
+                    {
+                        <option value="@shipping.Id">@shipping.ShippingNo（@shipping.Destination）</option>
+                    }
+                </select>
+            </div>
+        }
+        <div class="form-field">
+            <label>品目</label>
+            <select @bind="_lineProductId">
+                <option value="0">選択してください</option>
+                @foreach (var product in _products)
+                {
+                    <option value="@product.Id">@product.Code @product.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>数量</label>
+            <input type="number" @bind="_lineQuantity" />
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn btn-secondary" @onclick="AddLine">明細に追加</button>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">ピッキング指示を作成</button>
+    </div>
+
+    @if (_lines.Count > 0)
+    {
+        <table class="table mt-2">
+            <thead><tr><th>品目</th><th>数量</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var line in _lines)
+                {
+                    <tr>
+                        <td>@(_products.FirstOrDefault(p => p.Id == line.ProductId)?.Code)</td>
+                        <td>@line.Quantity</td>
+                        <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">削除</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">ピッキング指示一覧</h2>
+    @if (_orders is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_orders.Count == 0)
+    {
+        <p class="text-muted">ピッキング指示はありません。</p>
+    }
+    else
+    {
+        @foreach (var order in _orders)
+        {
+            <div class="card">
+                <div class="actions" style="justify-content:space-between;">
+                    <div>
+                        <strong>@order.OrderNo</strong>
+                        <span class="badge">@(order.Type == PickingOrderType.ProcessIssue ? "工程払出" : "出荷")</span>
+                        <span class="badge @StatusClass(order.Status)">@PickingStatusLabel(order.Status)</span>
+                        <span class="text-muted">払出先：@(order.WorkOrderNo ?? order.ShippingNo ?? "-")</span>
+                    </div>
+                    @if (order.Status == PickingOrderStatus.Instructed)
+                    {
+                        <div class="actions">
+                            <button class="btn btn-sm" disabled="@_busy" @onclick="() => ExecuteAsync(order.Id)">ピッキング実行</button>
+                            <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
+                        </div>
+                    }
+                </div>
+                <table class="table mt-2">
+                    <thead>
+                        <tr><th>品目</th><th>引当ロット</th><th>ロケーション</th><th>数量</th><th>照合</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var line in order.Lines)
+                        {
+                            <tr>
+                                <td>@line.ProductCode @line.ProductName</td>
+                                <td>@line.LotNumber</td>
+                                <td>@line.LocationCode</td>
+                                <td>@line.Quantity</td>
+                                <td>
+                                    @if (order.Status == PickingOrderStatus.Instructed)
+                                    {
+                                        @* バーコード照合（D-20-20-01）：スキャン値と引当ロットの一致を確認 *@
+                                        <ScanInput Value="@GetScan(line.Id)" ShowSubmit="false"
+                                                   Placeholder="ロットをスキャン"
+                                                   ValueChanged="v => SetScan(line.Id, v)" />
+                                        @if (GetScan(line.Id) is { Length: > 0 } scanned)
+                                        {
+                                            @if (string.Equals(scanned.Trim(), line.LotNumber, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <span class="badge badge-success">一致</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-danger">不一致</span>
+                                            }
+                                        }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<PickingOrderResponse>? _orders;
+    private List<ProductResponse> _products = [];
+    private List<WorkOrderResponse> _workOrders = [];
+    private List<ShippingOrderResponse> _shippingOrders = [];
+    private readonly List<PickingRequestLine> _lines = [];
+    private readonly Dictionary<int, string?> _scans = [];
+
+    private PickingOrderType _type = PickingOrderType.ProcessIssue;
+    private int _workOrderId;
+    private int _shippingOrderId;
+    private int _lineProductId;
+    private decimal _lineQuantity;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
+        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders") ?? [];
+        _shippingOrders = await Http.GetFromJsonAsync<List<ShippingOrderResponse>>(
+            "api/shipping-orders?status=Instructed") ?? [];
+        await LoadAsync();
+    }
+
+    private string? GetScan(int lineId) => _scans.GetValueOrDefault(lineId);
+
+    private void SetScan(int lineId, string? value) => _scans[lineId] = value;
+
+    private async Task LoadAsync() =>
+        _orders = await Http.GetFromJsonAsync<List<PickingOrderResponse>>("api/picking-orders");
+
+    private void AddLine()
+    {
+        if (_lineProductId == 0 || _lineQuantity <= 0)
+        {
+            _error = "品目と数量を指定してください。";
+            return;
+        }
+        _error = null;
+        _lines.Add(new PickingRequestLine(_lineProductId, _lineQuantity));
+        _lineQuantity = 0;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_lines.Count == 0)
+        {
+            _error = "明細を追加してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/picking-orders",
+                new PickingOrderCreateRequest(_type,
+                    _workOrderId == 0 ? null : _workOrderId,
+                    _shippingOrderId == 0 ? null : _shippingOrderId,
+                    [.. _lines]));
+            if (!response.IsSuccessStatusCode)
+            {
+                // 在庫不足もここで通知される
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                return;
+            }
+            _message = "ピッキング指示を作成しました（先入れ先出しで引当）。";
+            _lines.Clear();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ExecuteAsync(int id) =>
+        await PostAsync($"api/picking-orders/{id}/execute", "ピッキングを実行しました（在庫引落し済み）。");
+
+    private async Task CancelAsync(int id) =>
+        await PostAsync($"api/picking-orders/{id}/cancel", "ピッキング指示を取消しました。");
+
+    private async Task PostAsync(string url, string successMessage)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsync(url, null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                return;
+            }
+            _message = successMessage;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string PickingStatusLabel(PickingOrderStatus status) => status switch
+    {
+        PickingOrderStatus.Instructed => "指示",
+        PickingOrderStatus.Completed => "完了",
+        PickingOrderStatus.Canceled => "取消",
+        _ => status.ToString(),
+    };
+
+    private static string StatusClass(PickingOrderStatus status) => status switch
+    {
+        PickingOrderStatus.Completed => "badge-success",
+        PickingOrderStatus.Canceled => "badge-danger",
+        _ => "badge-info",
+    };
+}

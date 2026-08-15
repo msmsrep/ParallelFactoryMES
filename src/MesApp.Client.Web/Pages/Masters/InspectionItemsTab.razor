@@ -1,0 +1,244 @@
+@inject HttpClient Http
+
+@* 検査項目・基準マスタ（Spec.md 5.1 InspectionItem。C-10-10。更新で版数が上がる） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "検査項目・基準の登録" : $"編集（{_code}）")</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>検査項目コード</label>
+                <input @bind="_code" />
+            </div>
+            <div class="form-field">
+                <label>名称</label>
+                <input @bind="_name" />
+            </div>
+            <div class="form-field">
+                <label>検査種別</label>
+                <select @bind="_type">
+                    <option value="@InspectionType.Receiving">受入検査</option>
+                    <option value="@InspectionType.InProcess">工程内検査</option>
+                    <option value="@InspectionType.FinalProduct">完成品検査</option>
+                    <option value="@InspectionType.Sample">サンプル検査</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>対象品目</label>
+                <select @bind="_productId">
+                    <option value="0">指定なし</option>
+                    @foreach (var product in _products)
+                    {
+                        <option value="@product.Id">@product.Code @product.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>対象工程</label>
+                <select @bind="_processId">
+                    <option value="0">指定なし</option>
+                    @foreach (var process in _processes)
+                    {
+                        <option value="@process.Id">@process.Code @process.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>規格値 下限</label>
+                <input type="number" step="any" @bind="_lower" />
+            </div>
+            <div class="form-field">
+                <label>規格値 上限</label>
+                <input type="number" step="any" @bind="_upper" />
+            </div>
+            <div class="form-field">
+                <label>基準値</label>
+                <input type="number" step="any" @bind="_standard" />
+            </div>
+            <div class="form-field">
+                <label>検査方法</label>
+                <input @bind="_method" />
+            </div>
+            <div class="form-field">
+                <label>サンプリング数</label>
+                <input type="number" @bind="_sampling" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新（版数+1）")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>コード</th><th>名称</th><th>種別</th><th>対象</th><th>規格値</th><th>方法</th><th>ｻﾝﾌﾟﾘﾝｸﾞ</th><th>版数</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.Code</td>
+                        <td>@item.Name</td>
+                        <td>@TypeLabel(item.Type)</td>
+                        <td>
+                            @(_products.FirstOrDefault(p => p.Id == item.TargetProductId)?.Code
+                              ?? _processes.FirstOrDefault(p => p.Id == item.TargetProcessId)?.Code ?? "-")
+                        </td>
+                        <td>@(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")</td>
+                        <td>@(item.Method ?? "-")</td>
+                        <td>@(item.SamplingCount?.ToString() ?? "-")</td>
+                        <td>v@item.Version</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<InspectionItemResponse>? _items;
+    private List<ProductResponse> _products = [];
+    private List<ProcessResponse> _processes = [];
+
+    private int? _editingId;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private InspectionType _type = InspectionType.FinalProduct;
+    private int _productId;
+    private int _processId;
+    private decimal? _lower;
+    private decimal? _upper;
+    private decimal? _standard;
+    private string? _method;
+    private int? _sampling;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
+        _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<InspectionItemResponse>>("api/inspection-items?includeInactive=true");
+
+    private void Edit(InspectionItemResponse item)
+    {
+        _editingId = item.Id;
+        _code = item.Code;
+        _name = item.Name;
+        _type = item.Type;
+        _productId = item.TargetProductId ?? 0;
+        _processId = item.TargetProcessId ?? 0;
+        _lower = item.LowerLimit;
+        _upper = item.UpperLimit;
+        _standard = item.StandardValue;
+        _method = item.Method;
+        _sampling = item.SamplingCount;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _name = string.Empty;
+        _type = InspectionType.FinalProduct;
+        _productId = 0;
+        _processId = 0;
+        _lower = null;
+        _upper = null;
+        _standard = null;
+        _method = null;
+        _sampling = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "検査項目コードと名称を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new InspectionItemRequest(_code, _name,
+                _productId == 0 ? null : _productId,
+                _processId == 0 ? null : _processId,
+                _type, _lower, _upper, _standard, _method, _sampling);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/inspection-items", request)
+                : await Http.PutAsJsonAsync($"api/inspection-items/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/inspection-items/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string TypeLabel(InspectionType type) => type switch
+    {
+        InspectionType.Receiving => "受入",
+        InspectionType.InProcess => "工程内",
+        InspectionType.FinalProduct => "完成品",
+        InspectionType.Sample => "サンプル",
+        _ => type.ToString(),
+    };
+}

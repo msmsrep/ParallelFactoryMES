@@ -1,0 +1,447 @@
+@page "/inventory"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>在庫照会・操作 - Parallel Factory MES</PageTitle>
+
+<h1>在庫照会・在庫オペレーション</h1>
+<p class="text-muted">在庫照会（D-10-30-01）、移動・調整・分割/統合/振替・ステータス変更・廃棄・期限アラート（D-10-30）。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="tabs">
+    <button class="@TabClass("stocks")" @onclick='() => SetTab("stocks")'>在庫照会</button>
+    <button class="@TabClass("ops")" @onclick='() => SetTab("ops")'>在庫操作</button>
+    <button class="@TabClass("expiring")" @onclick='() => SetTab("expiring")'>期限アラート</button>
+    <button class="@TabClass("transactions")" @onclick='() => SetTab("transactions")'>入出庫履歴</button>
+</div>
+
+@if (_tab == "stocks")
+{
+    <div class="card">
+        <div class="form-grid">
+            <div class="form-field">
+                <label>ロット番号で検索（スキャン可）</label>
+                <ScanInput @bind-Value="_searchLot" OnScan="OnLotScanAsync" SubmitLabel="検索" />
+            </div>
+            <div class="form-field">
+                <label>ロケーション</label>
+                <select @bind="_filterLocationId" @bind:after="LoadStocksAsync">
+                    <option value="0">全ロケーション</option>
+                    @foreach (var location in _locations)
+                    {
+                        <option value="@location.Id">@location.Code</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        @if (_stocks is null)
+        {
+            <p class="text-muted">読み込み中...</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr><th>ロット番号</th><th>品目</th><th>ロケーション</th><th>数量</th><th>ステータス</th><th>有効期限</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var stock in _stocks)
+                    {
+                        <tr>
+                            <td>@stock.LotNumber</td>
+                            <td>@stock.ProductCode @stock.ProductName</td>
+                            <td>@stock.LocationCode</td>
+                            <td>@stock.Quantity</td>
+                            <td>@Labels.LotStatus(stock.LotStatus)</td>
+                            <td>@(stock.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td class="actions">
+                                <button class="btn btn-secondary btn-sm"
+                                        @onclick="() => SelectStock(stock)">操作</button>
+                                <a class="btn btn-secondary btn-sm" href="print/lot/@stock.LotId" target="_blank">現品票</a>
+                                <a class="btn btn-secondary btn-sm" href="traceability?lot=@stock.LotNumber">追跡</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+else if (_tab == "ops")
+{
+    <div class="card">
+        <h2 style="margin-top:0;">対象在庫の選択</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>ロット</label>
+                <select @bind="_op.LotId">
+                    <option value="0">選択してください</option>
+                    @foreach (var stock in _stocks ?? [])
+                    {
+                        <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode / @stock.LocationCode / @stock.Quantity）</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>対象ロケーション</label>
+                <select @bind="_op.LocationId">
+                    <option value="0">選択してください</option>
+                    @foreach (var location in _locations)
+                    {
+                        <option value="@location.Id">@location.Code</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>数量</label>
+                <input type="number" @bind="_op.Quantity" />
+            </div>
+            <div class="form-field">
+                <label>理由・備考</label>
+                <input @bind="_op.Reason" />
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">在庫移動（D-10-30-02）</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>移動先ロケーション</label>
+                <select @bind="_op.ToLocationId">
+                    <option value="0">選択してください</option>
+                    @foreach (var location in _locations)
+                    {
+                        <option value="@location.Id">@location.Code</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <button class="btn" disabled="@_busy" @onclick="MoveAsync">移動</button>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">数量調整（D-10-30-04。理由必須）</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>実棚数量（調整後の数量）</label>
+                <input type="number" @bind="_op.NewQuantity" />
+            </div>
+        </div>
+        <button class="btn" disabled="@_busy" @onclick="AdjustAsync">数量を調整</button>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">ロット分割・統合・振替（D-10-30-05〜07）</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>新ロット番号（空欄で自動採番）</label>
+                <input @bind="_op.NewLotNumber" />
+            </div>
+            <div class="form-field">
+                <label>振替先品目（品目振替時）</label>
+                <select @bind="_op.NewProductId">
+                    <option value="0">同一品目</option>
+                    @foreach (var product in _products)
+                    {
+                        <option value="@product.Id">@product.Code @product.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>統合先ロット（統合時）</label>
+                <select @bind="_op.TargetLotId">
+                    <option value="0">選択してください</option>
+                    @foreach (var stock in _stocks ?? [])
+                    {
+                        <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode）</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SplitAsync">分割</button>
+            <button class="btn" disabled="@_busy" @onclick="MergeAsync">統合（対象ロット→統合先）</button>
+            <button class="btn" disabled="@_busy" @onclick="TransferAsync">振替</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">ステータス変更・廃棄・返品（D-10-30-08、D-50-30-01、D-10-10-05）</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>在庫ステータス</label>
+                <select @bind="_op.Status">
+                    <option value="@LotStockStatus.Normal">正常</option>
+                    <option value="@LotStockStatus.OnHold">保留</option>
+                    <option value="@LotStockStatus.AwaitingInspection">検査待ち</option>
+                    <option value="@LotStockStatus.Defective">不良</option>
+                    <option value="@LotStockStatus.ToBeDiscarded">廃棄予定</option>
+                </select>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="ChangeStatusAsync">ステータス変更</button>
+            <button class="btn btn-danger" disabled="@_busy" @onclick="DiscardAsync">廃棄</button>
+            <button class="btn btn-secondary" disabled="@_busy" @onclick="ReturnAsync">返品</button>
+            <button class="btn btn-secondary" disabled="@_busy" @onclick="IssueReturnAsync">払出戻し</button>
+        </div>
+    </div>
+}
+else if (_tab == "expiring")
+{
+    <div class="card">
+        <div class="form-field" style="max-width:220px;">
+            <label>何日以内の期限を表示するか</label>
+            <input type="number" @bind="_withinDays" @bind:after="LoadExpiringAsync" />
+        </div>
+    </div>
+    <div class="card">
+        @if (_expiring is null)
+        {
+            <p class="text-muted">読み込み中...</p>
+        }
+        else if (_expiring.Count == 0)
+        {
+            <p class="text-muted">期限接近・超過の在庫はありません。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr><th>ロット番号</th><th>品目</th><th>ロケーション</th><th>数量</th><th>有効期限</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var stock in _expiring)
+                    {
+                        <tr>
+                            <td>@stock.LotNumber</td>
+                            <td>@stock.ProductCode</td>
+                            <td>@stock.LocationCode</td>
+                            <td>@stock.Quantity</td>
+                            <td>
+                                @stock.ExpiresOn?.ToString("yyyy-MM-dd")
+                                @if (stock.ExpiresOn < DateOnly.FromDateTime(DateTime.Today))
+                                {
+                                    <span class="badge badge-danger">期限切れ</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-warning">期限接近</span>
+                                }
+                            </td>
+                            <td><a class="btn btn-secondary btn-sm" href="traceability?lot=@stock.LotNumber">追跡</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+else
+{
+    <div class="card">
+        @if (_transactions is null)
+        {
+            <p class="text-muted">読み込み中...</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr><th>日時</th><th>区分</th><th>ロット</th><th>品目</th><th>数量</th><th>移動元</th><th>移動先</th><th>備考</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var transaction in _transactions)
+                    {
+                        <tr>
+                            <td>@transaction.Timestamp.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                            <td>@TransactionTypeLabel(transaction.Type)</td>
+                            <td>@transaction.LotNumber</td>
+                            <td>@transaction.ProductCode</td>
+                            <td>@transaction.Quantity</td>
+                            <td>@(transaction.FromLocationCode ?? "-")</td>
+                            <td>@(transaction.ToLocationCode ?? "-")</td>
+                            <td>@(transaction.Note ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+@code {
+    private sealed class OpForm
+    {
+        public int LotId { get; set; }
+        public int LocationId { get; set; }
+        public int ToLocationId { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal NewQuantity { get; set; }
+        public string? NewLotNumber { get; set; }
+        public int NewProductId { get; set; }
+        public int TargetLotId { get; set; }
+        public LotStockStatus Status { get; set; } = LotStockStatus.Normal;
+        public string? Reason { get; set; }
+    }
+
+    private string _tab = "stocks";
+    private List<StockResponse>? _stocks;
+    private List<StockResponse>? _expiring;
+    private List<TransactionResponse>? _transactions;
+    private List<LocationResponse> _locations = [];
+    private List<ProductResponse> _products = [];
+    private readonly OpForm _op = new();
+    private string? _searchLot;
+    private int _filterLocationId;
+    private int _withinDays = 30;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
+        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
+        await LoadStocksAsync();
+    }
+
+    private string TabClass(string tab) => _tab == tab ? "active" : string.Empty;
+
+    private async Task SetTab(string tab)
+    {
+        _tab = tab;
+        _error = null;
+        _message = null;
+        if (tab == "expiring")
+        {
+            await LoadExpiringAsync();
+        }
+        else if (tab == "transactions")
+        {
+            _transactions = await Http.GetFromJsonAsync<List<TransactionResponse>>("api/inventory/transactions");
+        }
+        else
+        {
+            await LoadStocksAsync();
+        }
+    }
+
+    private async Task LoadStocksAsync()
+    {
+        var url = "api/inventory/stocks";
+        if (_filterLocationId != 0)
+        {
+            url += $"?locationId={_filterLocationId}";
+        }
+        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>(url);
+    }
+
+    private async Task LoadExpiringAsync() =>
+        _expiring = await Http.GetFromJsonAsync<List<StockResponse>>(
+            $"api/inventory/expiring?withinDays={_withinDays}");
+
+    private async Task OnLotScanAsync(string lotNumber)
+    {
+        await LoadStocksAsync();
+        _stocks = _stocks?
+            .Where(s => s.LotNumber.Contains(lotNumber, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        _message = _stocks?.Count > 0 ? null : $"ロット '{lotNumber}' の在庫は見つかりませんでした。";
+    }
+
+    private void SelectStock(StockResponse stock)
+    {
+        _op.LotId = stock.LotId;
+        _op.LocationId = stock.LocationId;
+        _op.Quantity = stock.Quantity;
+        _op.NewQuantity = stock.Quantity;
+        _op.Status = stock.LotStatus;
+        _tab = "ops";
+    }
+
+    private Task MoveAsync() => PostAsync("api/inventory/move",
+        new MoveRequest(_op.LotId, _op.LocationId, _op.ToLocationId, _op.Quantity), "在庫を移動しました。");
+
+    private Task AdjustAsync() => PostAsync("api/inventory/adjust",
+        new AdjustRequest(_op.LotId, _op.LocationId, _op.NewQuantity, _op.Reason ?? "実棚差異"), "数量を調整しました。");
+
+    private Task ChangeStatusAsync() => PostAsync("api/inventory/status",
+        new LotStatusRequest(_op.LotId, _op.Status, _op.Reason), "在庫ステータスを変更しました。");
+
+    private Task SplitAsync() => PostAsync("api/inventory/split",
+        new SplitRequest(_op.LotId, _op.LocationId, _op.Quantity,
+            string.IsNullOrWhiteSpace(_op.NewLotNumber) ? null : _op.NewLotNumber), "ロットを分割しました。");
+
+    private Task MergeAsync() => PostAsync("api/inventory/merge",
+        new MergeRequest(_op.LotId, _op.TargetLotId, _op.LocationId), "ロットを統合しました。");
+
+    private Task TransferAsync() => PostAsync("api/inventory/transfer",
+        new LotTransferRequest(_op.LotId, _op.LocationId, _op.Quantity,
+            _op.NewProductId == 0 ? null : _op.NewProductId,
+            string.IsNullOrWhiteSpace(_op.NewLotNumber) ? null : _op.NewLotNumber), "振替しました。");
+
+    private Task DiscardAsync() => PostAsync("api/inventory/discard",
+        new DiscardRequest(_op.LotId, _op.LocationId, _op.Quantity, _op.Reason), "廃棄しました。");
+
+    private Task ReturnAsync() => PostAsync("api/inventory/return",
+        new ReturnRequest(_op.LotId, _op.LocationId, _op.Quantity, _op.Reason), "返品しました。");
+
+    private Task IssueReturnAsync() => PostAsync("api/inventory/issue-return",
+        new IssueReturnRequest(_op.LotId, _op.LocationId, _op.Quantity, null), "払出戻しを登録しました。");
+
+    private async Task PostAsync<T>(string url, T body, string successMessage)
+    {
+        if (_busy)
+        {
+            return;
+        }
+        if (_op.LotId == 0)
+        {
+            _error = "対象ロットを選択してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(url, body);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                return;
+            }
+            _message = successMessage;
+            await LoadStocksAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string TransactionTypeLabel(InventoryTransactionType type) => type switch
+    {
+        InventoryTransactionType.Receipt => "受入",
+        InventoryTransactionType.PutAway => "入庫",
+        InventoryTransactionType.Issue => "出庫",
+        InventoryTransactionType.ProcessIssue => "工程払出",
+        InventoryTransactionType.IssueReturn => "払出戻し",
+        InventoryTransactionType.Move => "移動",
+        InventoryTransactionType.Adjust => "調整",
+        InventoryTransactionType.Discard => "廃棄",
+        InventoryTransactionType.Return => "返品",
+        InventoryTransactionType.Transfer => "振替",
+        InventoryTransactionType.Split => "分割",
+        InventoryTransactionType.Merge => "統合",
+        InventoryTransactionType.StocktakeAdjust => "棚卸調整",
+        InventoryTransactionType.Ship => "出荷",
+        _ => type.ToString(),
+    };
+}

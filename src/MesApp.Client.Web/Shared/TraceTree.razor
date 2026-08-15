@@ -1,0 +1,33 @@
+@* トレース結果の再帰ツリー表示（トレースバック／フォワード共通） *@
+<ul class="trace-tree">
+    @foreach (var node in Nodes)
+    {
+        <li>
+            <strong>@node.LotNumber</strong>
+            <span class="text-muted">@node.ProductCode @node.ProductName</span>
+            @if (node.Quantity is not null)
+            {
+                <span class="badge">@node.Quantity</span>
+            }
+            @if (node.WorkOrderNo is not null)
+            {
+                <span class="badge badge-info">@node.WorkOrderNo</span>
+            }
+            @if (node.IsLineage)
+            {
+                <span class="badge badge-warning">分割・振替</span>
+            }
+            <span class="badge">@Labels.LotStatus(node.StockStatus)</span>
+            <a class="btn btn-secondary btn-sm" href="traceability?lot=@node.LotNumber">この Lot を追跡</a>
+
+            @if (node.Children.Count > 0)
+            {
+                <TraceTree Nodes="@node.Children" />
+            }
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public List<TraceNode> Nodes { get; set; } = [];
+}

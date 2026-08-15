@@ -1,0 +1,249 @@
+@page "/work-orders/{Id:int}/setup"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>段取り・チェックリスト - Parallel Factory MES</PageTitle>
+
+@if (_workOrder is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <h1>段取り・チェックリスト：@_workOrder.WorkOrderNo</h1>
+    <p class="text-muted">
+        @_workOrder.ProductCode @_workOrder.ProductName ／ 工程 @_workOrder.ProcessCode @_workOrder.ProcessName
+        <a class="btn btn-secondary btn-sm" href="work-orders/@Id/record">実績入力へ</a>
+    </p>
+
+    <Notice Error="@_error" Message="@_message" />
+
+    <div class="card">
+        <h2 style="margin-top:0;">段取り実績（B-20-50 前段取り／B-40-40 後段取り）</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>区分</label>
+                <select @bind="_setupType">
+                    <option value="@SetupType.Pre">前段取り</option>
+                    <option value="@SetupType.Post">後段取り</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>開始時刻</label>
+                <input type="datetime-local" @bind="_startedAt" />
+            </div>
+            <div class="form-field">
+                <label>終了時刻</label>
+                <input type="datetime-local" @bind="_endedAt" />
+            </div>
+            <div class="form-field">
+                <label>異常報告（B-20-50-05）</label>
+                <input @bind="_abnormality" placeholder="異常があれば記入" />
+            </div>
+        </div>
+        <button class="btn" disabled="@_busy" @onclick="AddSetupAsync">段取り実績を記録</button>
+
+        @if (_setupRecords.Count > 0)
+        {
+            <table class="table mt-2">
+                <thead>
+                    <tr><th>区分</th><th>開始</th><th>終了</th><th>実施者</th><th>異常報告</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var record in _setupRecords)
+                    {
+                        <tr>
+                            <td>@(record.Type == SetupType.Pre ? "前段取り" : "後段取り")</td>
+                            <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                            <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
+                            <td>@record.PerformedByName</td>
+                            <td>@(record.AbnormalityNote ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">チェックリスト実施（B-30-10。HSE項目含む）</h2>
+        <div class="form-field" style="max-width:360px;">
+            <label>チェックリスト</label>
+            <select @bind="_selectedChecklistId" @bind:after="OnChecklistChanged">
+                <option value="0">選択してください</option>
+                @foreach (var checklist in _checklists)
+                {
+                    <option value="@checklist.Id">@checklist.Code @checklist.Name（@ChecklistCategoryLabel(checklist.Category)）</option>
+                }
+            </select>
+        </div>
+
+        @if (_selectedChecklist is not null)
+        {
+            <table class="table mt-2">
+                <thead>
+                    <tr><th style="width:60px;">確認</th><th>項目</th><th>必須</th><th>備考</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _selectedChecklist.Items)
+                    {
+                        <tr>
+                            <td>
+                                <input type="checkbox" checked="@_checks[item.Id].Checked"
+                                       @onchange="e => _checks[item.Id].Checked = (bool)(e.Value ?? false)" />
+                            </td>
+                            <td>@item.Text</td>
+                            <td>@(item.IsRequired ? "必須" : "-")</td>
+                            <td>
+                                <input value="@_checks[item.Id].Note"
+                                       @onchange="e => _checks[item.Id].Note = e.Value?.ToString()" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <button class="btn mt-2" disabled="@_busy" @onclick="SubmitChecklistAsync">チェックリストを記録</button>
+        }
+
+        @if (_checklistRecords.Count > 0)
+        {
+            <h2>実施履歴</h2>
+            <table class="table">
+                <thead>
+                    <tr><th>チェックリスト</th><th>実施者</th><th>実施日時</th><th>結果</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var record in _checklistRecords)
+                    {
+                        <tr>
+                            <td>@record.ChecklistCode @record.ChecklistName</td>
+                            <td>@record.PerformedByName</td>
+                            <td>@record.PerformedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                            <td>@record.Results.Count(r => r.IsChecked) / @record.Results.Count 項目</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+@code {
+    private sealed class CheckState
+    {
+        public bool Checked { get; set; }
+        public string? Note { get; set; }
+    }
+
+    [Parameter] public int Id { get; set; }
+
+    private WorkOrderResponse? _workOrder;
+    private List<SetupRecordResponse> _setupRecords = [];
+    private List<ChecklistResponse> _checklists = [];
+    private List<ChecklistRecordResponse> _checklistRecords = [];
+    private ChecklistResponse? _selectedChecklist;
+    private readonly Dictionary<int, CheckState> _checks = [];
+
+    private SetupType _setupType = SetupType.Pre;
+    private DateTime _startedAt = DateTime.Now;
+    private DateTime? _endedAt;
+    private string? _abnormality;
+    private int _selectedChecklistId;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _checklists = await Http.GetFromJsonAsync<List<ChecklistResponse>>("api/checklists") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _workOrder = await Http.GetFromJsonAsync<WorkOrderResponse>($"api/work-orders/{Id}");
+        _setupRecords = await Http.GetFromJsonAsync<List<SetupRecordResponse>>(
+            $"api/work-orders/{Id}/setup-records") ?? [];
+        _checklistRecords = await Http.GetFromJsonAsync<List<ChecklistRecordResponse>>(
+            $"api/work-orders/{Id}/checklist-records") ?? [];
+    }
+
+    private void OnChecklistChanged()
+    {
+        _selectedChecklist = _checklists.FirstOrDefault(c => c.Id == _selectedChecklistId);
+        _checks.Clear();
+        foreach (var item in _selectedChecklist?.Items ?? [])
+        {
+            _checks[item.Id] = new CheckState();
+        }
+    }
+
+    private async Task AddSetupAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/setup-records",
+                new SetupRecordRequest(_setupType, new DateTimeOffset(_startedAt),
+                    _endedAt is null ? null : new DateTimeOffset(_endedAt.Value), _abnormality));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                return;
+            }
+            _message = "段取り実績を記録しました。";
+            _abnormality = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SubmitChecklistAsync()
+    {
+        if (_selectedChecklist is null)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var results = _selectedChecklist.Items
+                .Select(i => new ChecklistResultRequest(i.Id, _checks[i.Id].Checked, _checks[i.Id].Note))
+                .ToList();
+            var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/checklist-records",
+                new ChecklistRecordRequest(_selectedChecklist.Id, results));
+            if (!response.IsSuccessStatusCode)
+            {
+                // 必須項目が未チェックの場合はここでエラーになる
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                return;
+            }
+            _message = "チェックリストを記録しました。";
+            OnChecklistChanged();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string ChecklistCategoryLabel(ChecklistCategory category) => category switch
+    {
+        ChecklistCategory.Common => "共通",
+        ChecklistCategory.Process => "工程",
+        ChecklistCategory.Product => "品目",
+        ChecklistCategory.Setup => "段取り",
+        ChecklistCategory.Maintenance => "保全",
+        ChecklistCategory.Hse => "HSE",
+        _ => category.ToString(),
+    };
+}

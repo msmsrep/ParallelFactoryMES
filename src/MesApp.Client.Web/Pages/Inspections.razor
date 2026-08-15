@@ -1,0 +1,218 @@
+@page "/inspections"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>検査管理 - Parallel Factory MES</PageTitle>
+
+<h1>検査管理</h1>
+<p class="text-muted">受入／工程内／完成品／サンプル／再検査の進捗一覧・検査指示発行（C-20）。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")">
+    <div class="card">
+        <h2 style="margin-top:0;">検査指示の発行（C-20-10-02）</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>検査種別</label>
+                <select @bind="_type">
+                    <option value="@InspectionOrderType.Receiving">受入検査</option>
+                    <option value="@InspectionOrderType.InProcess">工程内検査</option>
+                    <option value="@InspectionOrderType.FinalProduct">完成品検査</option>
+                    <option value="@InspectionOrderType.Sample">サンプル検査</option>
+                    <option value="@InspectionOrderType.Reinspection">再検査</option>
+                </select>
+            </div>
+            @if (_type == InspectionOrderType.InProcess)
+            {
+                <div class="form-field">
+                    <label>対象作業指示</label>
+                    <select @bind="_workOrderId">
+                        <option value="0">選択してください</option>
+                        @foreach (var workOrder in _workOrders)
+                        {
+                            <option value="@workOrder.Id">@workOrder.WorkOrderNo（@workOrder.ProductCode）</option>
+                        }
+                    </select>
+                </div>
+            }
+            <div class="form-field">
+                <label>対象ロット（スキャン可）</label>
+                <ScanInput @bind-Value="_lotNumber" ShowSubmit="false" Placeholder="ロットをスキャン" />
+            </div>
+            <div class="form-field">
+                <label>ロット選択</label>
+                <select @bind="_lotId">
+                    <option value="0">（スキャン入力または選択）</option>
+                    @foreach (var stock in _stocks)
+                    {
+                        <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode）</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>備考</label>
+                <input @bind="_note" />
+            </div>
+        </div>
+        <p class="text-muted">検査項目は種別・対象品目/工程に合致する検査基準から自動選択されます（C-10-10）。</p>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">検査指示を発行</button>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    <h2 style="margin-top:0;">検査進捗一覧（C-20-10-01）</h2>
+    <select @bind="_statusFilter" @bind:after="LoadAsync" style="margin-bottom:8px;">
+        <option value="">全状態</option>
+        <option value="Instructed">指示</option>
+        <option value="InProgress">実施中</option>
+        <option value="Judged">判定済</option>
+        <option value="Approved">承認済</option>
+        <option value="Canceled">取消</option>
+    </select>
+
+    @if (_orders is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_orders.Count == 0)
+    {
+        <p class="text-muted">検査指示はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>検査指示番号</th><th>種別</th><th>対象</th><th>状態</th><th>判定</th><th>発行日</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var order in _orders)
+                {
+                    <tr>
+                        <td>@order.OrderNo</td>
+                        <td>@TypeLabel(order.Type)</td>
+                        <td>@(order.TargetLotNumber ?? order.TargetWorkOrderNo ?? "-")</td>
+                        <td><span class="badge @StatusClass(order.Status)">@StatusLabel(order.Status)</span></td>
+                        <td>
+                            @if (order.OverallJudgment is InspectionJudgment judgment)
+                            {
+                                <span class="badge @(judgment == InspectionJudgment.Pass ? "badge-success" : "badge-danger")">
+                                    @(judgment == InspectionJudgment.Pass ? "合格" : "不合格")
+                                </span>
+                            }
+                            else
+                            {
+                                <text>-</text>
+                            }
+                        </td>
+                        <td>@order.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                        <td><a class="btn btn-secondary btn-sm" href="inspections/@order.Id">詳細・実績入力</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<InspectionOrderResponse>? _orders;
+    private List<StockResponse> _stocks = [];
+    private List<WorkOrderResponse> _workOrders = [];
+
+    private InspectionOrderType _type = InspectionOrderType.FinalProduct;
+    private int _lotId;
+    private string? _lotNumber;
+    private int _workOrderId;
+    private string? _note;
+    private string _statusFilter = string.Empty;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
+        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var url = "api/inspection-orders";
+        if (!string.IsNullOrEmpty(_statusFilter))
+        {
+            url += $"?status={_statusFilter}";
+        }
+        _orders = await Http.GetFromJsonAsync<List<InspectionOrderResponse>>(url);
+    }
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            // スキャン入力があればロット番号から対象ロットを解決する
+            var lotId = _lotId;
+            if (lotId == 0 && !string.IsNullOrWhiteSpace(_lotNumber))
+            {
+                lotId = _stocks.FirstOrDefault(s =>
+                    string.Equals(s.LotNumber, _lotNumber.Trim(), StringComparison.OrdinalIgnoreCase))?.LotId ?? 0;
+                if (lotId == 0)
+                {
+                    _error = $"ロット '{_lotNumber}' が見つかりません。";
+                    return;
+                }
+            }
+
+            var response = await Http.PostAsJsonAsync("api/inspection-orders",
+                new InspectionOrderCreateRequest(_type,
+                    lotId == 0 ? null : lotId,
+                    _workOrderId == 0 ? null : _workOrderId,
+                    null, _note));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "発行に失敗しました。";
+                return;
+            }
+            var created = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+            _message = $"検査指示 {created?.OrderNo} を発行しました（対象ロットは検査待ちになります）。";
+            _lotNumber = null;
+            _note = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    internal static string TypeLabel(InspectionOrderType type) => type switch
+    {
+        InspectionOrderType.Receiving => "受入",
+        InspectionOrderType.InProcess => "工程内",
+        InspectionOrderType.FinalProduct => "完成品",
+        InspectionOrderType.Sample => "サンプル",
+        InspectionOrderType.Reinspection => "再検査",
+        _ => type.ToString(),
+    };
+
+    internal static string StatusLabel(InspectionOrderStatus status) => status switch
+    {
+        InspectionOrderStatus.Instructed => "指示",
+        InspectionOrderStatus.InProgress => "実施中",
+        InspectionOrderStatus.Judged => "判定済",
+        InspectionOrderStatus.Approved => "承認済",
+        InspectionOrderStatus.Canceled => "取消",
+        _ => status.ToString(),
+    };
+
+    private static string StatusClass(InspectionOrderStatus status) => status switch
+    {
+        InspectionOrderStatus.Approved => "badge-success",
+        InspectionOrderStatus.Judged => "badge-warning",
+        InspectionOrderStatus.Canceled => "badge-danger",
+        _ => "badge-info",
+    };
+}
