@@ -1,0 +1,4 @@
+﻿Code,Name,ToolType,LifeThresholdCount,LifeThresholdHours,Status,IsActive
+TL-01,エンドミル φ10,切削工具,5000,,Available,true
+TL-02,ハウジング組立治具,治具,,2000,Available,true
+TL-03,トルクレンチ 10N・m,検査工具,20000,,Available,true

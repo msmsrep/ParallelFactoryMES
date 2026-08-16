@@ -1,0 +1,6 @@
+﻿Code,Name,Category,IsActive
+PR-10,機械加工,InHouse,true
+PR-20,表面処理,Outsourced,true
+PR-30,組立,InHouse,true
+PR-40,最終検査,InHouse,true
+PR-50,梱包,InHouse,true

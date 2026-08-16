@@ -1,0 +1,5 @@
+﻿AssetNo,Name,Site,Status,MaintenanceType,MaintenanceThreshold,MaintenanceParts,IsActive
+EQ-01,マシニングセンタ,第1工場 加工エリア,Available,Count,10000,"主軸ベルト, クーラントフィルタ",true
+EQ-02,組立ステーション,第1工場 組立エリア,Available,None,,,true
+EQ-03,三次元測定機,検査室,Available,Calendar,180,校正一式,true
+EQ-04,真空包装機,第1工場 出荷エリア,Available,RunTime,2000,シールヒーター,true

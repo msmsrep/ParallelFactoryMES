@@ -1,0 +1,5 @@
+﻿Code,Name,Type,RequiresExpiry,IsActive
+SK-01,マシニングセンタ操作,Skill,false,true
+SK-02,フォークリフト運転技能,Certification,true,true
+SK-03,社内検査員認定,Certification,true,true
+SK-04,組立作業,Skill,false,true

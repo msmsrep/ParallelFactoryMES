@@ -1,0 +1,7 @@
+﻿UserName,DisplayName,Roles,IsActive,InitialPassword
+pm001,生産 管理太郎,ProductionManager,true,ChangeMe0001
+op001,加工 一郎,Operator,true,ChangeMe0002
+op002,組立 二郎,Operator,true,ChangeMe0003
+qc001,品質 三子,QualityControl;QualityAssurance,true,ChangeMe0004
+lg001,物流 四郎,Logistics,true,ChangeMe0005
+mt001,保全 五郎,Maintenance,true,ChangeMe0006

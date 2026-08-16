@@ -1,0 +1,6 @@
+﻿ProductCode,Sequence,ProcessCode,StandardWorkMinutes,StandardSetupMinutes,RequiredSkillCode,EquipmentAssetNo,ToolCode,ChecklistCode,ControlItems
+SF-2000,10,PR-10,25,15,SK-01,EQ-01,TL-01,CL-01,"主軸回転数, 送り速度"
+SF-2000,20,PR-20,0,0,,,,,外注（アルマイト処理）
+FG-1000,10,PR-30,30,10,SK-04,EQ-02,TL-02,CL-02,締付トルク
+FG-1000,20,PR-40,15,5,SK-03,EQ-03,TL-03,,試験圧力
+FG-1000,30,PR-50,10,5,,EQ-04,,CL-03,

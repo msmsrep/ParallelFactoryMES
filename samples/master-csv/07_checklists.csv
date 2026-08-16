@@ -1,0 +1,9 @@
+﻿Code,Name,Category,IsActive,Sequence,Text,IsRequired
+CL-01,機械加工 始業前点検,Setup,true,1,クーラント液量の確認,true
+CL-01,機械加工 始業前点検,Setup,true,2,主軸まわりの異音確認,true
+CL-01,機械加工 始業前点検,Setup,true,3,切りくずの除去,false
+CL-02,組立段取り確認,Setup,true,1,治具の取り付け確認,true
+CL-02,組立段取り確認,Setup,true,2,トルクレンチの校正期限確認,true
+CL-03,安全衛生チェック,Hse,true,1,保護メガネ・手袋の着用,true
+CL-03,安全衛生チェック,Hse,true,2,非常停止ボタンの動作確認,true
+CL-03,安全衛生チェック,Hse,true,3,作業エリアの通路確保,false

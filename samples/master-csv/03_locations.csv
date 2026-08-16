@@ -1,0 +1,6 @@
+﻿Code,AreaType,ShelfNo,IsActive
+WH-M01,MaterialWarehouse,A-01-01,true
+WH-M02,MaterialWarehouse,A-01-02,true
+WIP-01,InProcess,,true
+WH-P01,ProductWarehouse,B-01-01,true
+SHIP-01,ShippingArea,,true
