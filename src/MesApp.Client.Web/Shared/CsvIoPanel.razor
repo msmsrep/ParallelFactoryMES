@@ -1,0 +1,223 @@
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+@* マスタのCSV一括入出力（エクスポート／テンプレート／取込）。取込はマスタ更新権限が必要 *@
+<div class="card">
+    <details>
+        <summary class="csv-summary">CSV入出力（@Label）</summary>
+
+        <p class="text-muted mt-2">
+            エクスポートしたCSVをExcelで編集して取り込めます。取込は
+            <strong>@KeyLabel が既存と一致すれば更新、無ければ新規登録</strong>です。
+            文字コードはUTF-8とShift_JISのどちらでも取り込めます。
+        </p>
+
+        <div class="actions">
+            <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="ExportAsync">CSVエクスポート</button>
+            <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="TemplateAsync">テンプレート（空のCSV）</button>
+        </div>
+
+        <AuthorizeView Roles="@Roles">
+            <div class="csv-import mt-2">
+                <div class="form-field">
+                    <label>取込ファイル（.csv）</label>
+                    <InputFile OnChange="OnFileSelected" accept=".csv,text/csv" />
+                </div>
+                <div class="actions mt-2">
+                    <label class="text-muted">
+                        <input type="checkbox" style="width:auto;" @bind="_dryRun" />
+                        検証のみ（DBに反映しない）
+                    </label>
+                    <button type="button" class="btn" disabled="@(_busy || _file is null)" @onclick="ImportAsync">
+                        取込を実行
+                    </button>
+                </div>
+            </div>
+        </AuthorizeView>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger mt-2">@_error</div>
+        }
+        @if (_result is not null)
+        {
+            @if (_result.Succeeded)
+            {
+                <div class="alert alert-success mt-2">
+                    @(_result.DryRun ? "検証のみ：エラーはありません。" : "取り込みました。")
+                    データ行 @_result.DataRows 件（新規 @_result.Created 件／更新 @_result.Updated 件）
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-danger mt-2">
+                    エラーが @_result.Errors.Count 件あります。<strong>1行でもエラーがあると全件取り消されます</strong>
+                    （DBは変更されていません）。修正して再度取り込んでください。
+                </div>
+                <table class="table">
+                    <thead><tr><th style="width:80px;">行</th><th>内容</th></tr></thead>
+                    <tbody>
+                        @foreach (var error in _result.Errors)
+                        {
+                            <tr>
+                                <td>@(error.Line > 0 ? error.Line.ToString() : "-")</td>
+                                <td>@error.Message</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+
+        @if (_columns is not null)
+        {
+            <details class="mt-2">
+                <summary class="csv-summary">列の説明</summary>
+                <table class="table mt-2">
+                    <thead><tr><th>列名</th><th>項目</th><th>必須</th><th>備考</th></tr></thead>
+                    <tbody>
+                        @foreach (var column in _columns)
+                        {
+                            <tr>
+                                <td><code>@column.Name</code></td>
+                                <td>@column.Label</td>
+                                <td>@(column.Required ? "必須" : "任意")</td>
+                                <td>@column.Note</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <p class="text-muted">
+                    列の順序は自由です。不要な列は削除できます（削除した列は現在の値を保ちます）。
+                </p>
+            </details>
+        }
+    </details>
+</div>
+
+@code {
+    /// <summary>マスタ種別（api/masters/csv/{Kind}）</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
+
+    /// <summary>画面表示用の名称</summary>
+    [Parameter] public string Label { get; set; } = string.Empty;
+
+    /// <summary>キー列の説明（例：品目コード）</summary>
+    [Parameter] public string KeyLabel { get; set; } = "コード";
+
+    /// <summary>取込を実行できるロール</summary>
+    [Parameter] public string Roles { get; set; } = $"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}";
+
+    /// <summary>取込成功後に一覧を再読み込みするためのコールバック</summary>
+    [Parameter] public EventCallback OnImported { get; set; }
+
+    private const long MaxUploadBytes = 5 * 1024 * 1024;
+
+    private List<CsvColumnInfo>? _columns;
+    private IBrowserFile? _file;
+    private CsvImportResult? _result;
+    private string? _error;
+    private bool _dryRun;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var kinds = await Http.GetFromJsonAsync<List<CsvKindInfo>>("api/masters/csv/kinds") ?? [];
+            var info = kinds.FirstOrDefault(k => k.Kind == Kind);
+            _columns = info?.Columns;
+            if (string.IsNullOrEmpty(Label) && info is not null)
+            {
+                Label = info.Label;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            // 列の説明が取れなくても入出力自体は利用できる
+        }
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs args)
+    {
+        _file = args.File;
+        _result = null;
+        _error = null;
+    }
+
+    private Task ExportAsync() => DownloadAsync($"api/masters/csv/{Kind}?includeInactive=true", $"{Kind}.csv");
+
+    private Task TemplateAsync() => DownloadAsync($"api/masters/csv/{Kind}/template", $"{Kind}_template.csv");
+
+    private async Task DownloadAsync(string url, string fallbackFileName)
+    {
+        _busy = true;
+        _error = null;
+        _result = null;
+        try
+        {
+            var response = await Http.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "CSVの出力に失敗しました。";
+                return;
+            }
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var fileName = response.Content.Headers.ContentDisposition?.FileName?.Trim('"');
+            await JS.InvokeVoidAsync("mesApp.downloadFile",
+                string.IsNullOrEmpty(fileName) ? fallbackFileName : fileName,
+                Convert.ToBase64String(bytes), "text/csv");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        if (_file is null)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _result = null;
+        try
+        {
+            if (_file.Size > MaxUploadBytes)
+            {
+                _error = $"ファイルサイズが大きすぎます（上限 {MaxUploadBytes / 1024 / 1024} MB）。";
+                return;
+            }
+
+            using var buffer = new MemoryStream();
+            await using (var stream = _file.OpenReadStream(MaxUploadBytes))
+            {
+                await stream.CopyToAsync(buffer);
+            }
+
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(buffer.ToArray());
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/csv");
+            content.Add(fileContent, "file", _file.Name);
+
+            var response = await Http.PostAsync($"api/masters/csv/{Kind}?dryRun={(_dryRun ? "true" : "false")}", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取込に失敗しました。";
+                return;
+            }
+
+            _result = await response.Content.ReadFromJsonAsync<CsvImportResult>();
+            if (_result is { Succeeded: true, DryRun: false })
+            {
+                await OnImported.InvokeAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

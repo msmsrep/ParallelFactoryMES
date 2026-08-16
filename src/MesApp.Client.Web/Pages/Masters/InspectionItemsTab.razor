@@ -75,6 +75,8 @@
     </div>
 </AuthorizeView>
 
+<CsvIoPanel Kind="inspection-items" Label="検査項目・基準" KeyLabel="検査項目コード" OnImported="LoadAsync" />
+
 <div class="card">
     @if (_items is null)
     {

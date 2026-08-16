@@ -46,6 +46,10 @@
     </div>
 </AuthorizeView>
 
+<CsvIoPanel Kind="products" Label="品目" KeyLabel="品目コード" OnImported="LoadAsync" />
+<CsvIoPanel Kind="bom" Label="MBOM" KeyLabel="親品目コード＋子品目コード" OnImported="ReloadSelectedAsync" />
+<CsvIoPanel Kind="routing" Label="工順（BOP）" KeyLabel="品目コード＋工程順序" OnImported="ReloadSelectedAsync" />
+
 <div class="card">
     @if (_products is null)
     {
@@ -361,6 +365,15 @@
         finally
         {
             _busy = false;
+        }
+    }
+
+    /// <summary>CSV取込後、選択中の品目のMBOM・工順を読み直す</summary>
+    private async Task ReloadSelectedAsync()
+    {
+        if (_selected is not null)
+        {
+            await SelectAsync(_selected);
         }
     }
 

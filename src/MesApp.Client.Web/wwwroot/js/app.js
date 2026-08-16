@@ -1,7 +1,24 @@
-// Parallel Factory MES クライアント用JS（帳票印刷・バーコード/QRスキャン。Spec.md 3.8）
+// Parallel Factory MES クライアント用JS（帳票印刷・バーコード/QRスキャン・CSVダウンロード。Spec.md 3.8）
 window.mesApp = {
     // 帳票・ラベル出力（ブラウザの印刷ダイアログ経由でPDF保存も可能）
     print: () => window.print(),
+
+    // APIから取得したファイル（Base64）をダウンロードさせる（マスタのCSV出力）
+    downloadFile: (fileName, base64, contentType) => {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        const url = URL.createObjectURL(new Blob([bytes], { type: contentType || 'text/csv' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
 
     scanner: {
         _stream: null,

@@ -211,6 +211,11 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 }
 .tabs button.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 
+/* マスタのCSV入出力パネル */
+.csv-summary { cursor: pointer; font-weight: 600; color: var(--primary-dark); }
+.csv-import { border-top: 1px solid var(--border); padding-top: 12px; }
+.csv-import .form-field { max-width: 420px; }
+
 /* バーコード/QRスキャン入力 */
 .scan-input { display: flex; gap: 6px; align-items: center; }
 .scan-input input { flex: 1; min-width: 160px; }

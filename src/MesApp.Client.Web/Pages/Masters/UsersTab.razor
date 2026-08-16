@@ -62,6 +62,11 @@
             </div>
         </div>
 
+        <CsvIoPanel Kind="users" Label="ユーザー" KeyLabel="ユーザー名"
+                    Roles="@MesRoles.SystemAdmin" OnImported="LoadAsync" />
+        <CsvIoPanel Kind="user-skills" Label="ユーザーのスキル・資格" KeyLabel="ユーザー名＋スキル・資格コード"
+                    Roles="@MesRoles.SystemAdmin" OnImported="ReloadSkillsAsync" />
+
         <div class="card">
             @if (_users is null)
             {
@@ -269,6 +274,15 @@
         finally
         {
             _busy = false;
+        }
+    }
+
+    /// <summary>CSV取込後、表示中のユーザーのスキル・資格を読み直す</summary>
+    private async Task ReloadSkillsAsync()
+    {
+        if (_skillTarget is not null)
+        {
+            await SelectSkillsAsync(_skillTarget);
         }
     }
 

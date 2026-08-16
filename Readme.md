@@ -85,6 +85,14 @@ DBファイル（`mesapp.db`）とJWT署名鍵（`jwt-signing.key`）は**起動
 5. 必要に応じて **検査管理** → **出荷判定** → **出荷管理**
    （出荷実行には、対象出荷指示に対する承認済みの出荷判定（可／特採）が必要です）
 
+マスタは1件ずつの入力のほか、マスタ管理の各タブにある **CSV入出力** から一括登録・出力ができます
+（テンプレートCSVの出力、UTF-8/Shift_JISの自動判別、エラー行の一覧表示、検証のみの実行に対応。
+1行でもエラーがあれば全件ロールバックします）。詳細は
+[ユーザーガイドのマスタ管理](https://msmsrep.github.io/ParallelFactoryMES/masters.html#csv)を参照してください。
+
+書き方の見本として、そのまま取り込めるサンプルデータ一式を [`samples/master-csv/`](samples/master-csv/) に置いています
+（ファイル名の番号順に取り込むと、製造指図から出荷まで試せる状態になります）。
+
 ## 配布・本番相当の実行
 
 ```bash
@@ -147,4 +155,6 @@ src/
   MesApp.Infrastructure  EF Core（DbContext、マイグレーション、DBプロバイダー切替）
 tests/
   MesApp.Api.Tests       APIの統合テスト
+samples/
+  master-csv             マスタ一括登録用のサンプルCSV（取込順にファイル名を採番）
 ```
