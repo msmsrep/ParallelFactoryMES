@@ -3,12 +3,7 @@
 製造実績管理システム（MES）。ASP.NET Core Web API（バックエンド）＋ Blazor WebAssembly（Webクライアント）で構成し、
 APIが同一オリジンでWebクライアントも配信します。
 
-- **ユーザーガイド（操作マニュアル）**: [docs/](docs/index.md) … GitHub Pages で公開する想定（Settings → Pages → Branch: `/docs`）
-- 仕様: [Spec.md](Spec.md)
-- 機能スコープの根拠: 『MES/MOM導入のための標準業務一覧』（一般財団法人エンジニアリング協会）
-  <https://www.enaa.or.jp/research/smart/mes>
-  ※ 同一覧は著作権がENAAに帰属するため本リポジトリには含めていません。上記より各自入手してください。
-  Spec.md の各要件に付記した業務プロセスNo（`A-20-10-01` 等）が同一覧に対応します。
+- **ユーザーガイド（操作マニュアル）**: [ユーザーガイド](https://msmsrep.github.io/ParallelFactoryMES/)
 
 ## ライセンス
 
