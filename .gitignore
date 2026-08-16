@@ -17,3 +17,8 @@ jwt-signing.key
 TestResults/
 
 .claude
+
+# 第三者著作物（一財）エンジニアリング協会『MES/MOM導入のための標準業務一覧』
+# 著作権はENAAに帰属するため公開リポジトリには含めない
+# 入手先: https://www.enaa.or.jp/research/smart/mes
+MES.md
