@@ -3,6 +3,7 @@
 製造実績管理システム（MES）。ASP.NET Core Web API（バックエンド）＋ Blazor WebAssembly（Webクライアント）で構成し、
 APIが同一オリジンでWebクライアントも配信します。
 
+- **ユーザーガイド（操作マニュアル）**: [docs/](docs/index.md) … GitHub Pages で公開する想定（Settings → Pages → Branch: `/docs`）
 - 仕様: [Spec.md](Spec.md)
 - 機能スコープの根拠: [MES.md](MES.md)（MES業務プロセス定義表）
 

@@ -1,0 +1,66 @@
+# Parallel Factory MES ユーザーガイド（GitHub Pages 設定）
+#
+# 公開手順：
+#   GitHub リポジトリ → Settings → Pages → Build and deployment
+#     Source: Deploy from a branch
+#     Branch: master（または main） / フォルダ: /docs
+#   数分後に https://<ユーザー名>.github.io/<リポジトリ名>/ で公開されます。
+#
+# ページ間のリンクはすべて相対リンク（例: getting-started.html）のため、
+# baseurl の設定は不要です。テーマは使わず _layouts/default.html を使用します。
+
+title: Parallel Factory MES ユーザーガイド
+description: 製造実績管理システム Parallel Factory MES の操作マニュアル
+
+lang: ja
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+
+# 左サイドバーのナビゲーション
+nav:
+  - section: はじめに
+    items:
+      - title: このガイドについて
+        url: index.html
+      - title: 導入と初期設定
+        url: getting-started.html
+      - title: 画面構成と共通操作
+        url: basics.html
+  - section: 準備
+    items:
+      - title: マスタ管理
+        url: masters.html
+  - section: 日々の業務
+    items:
+      - title: 生産管理
+        url: production.html
+      - title: 製造実行
+        url: execution.html
+      - title: 物流・在庫管理
+        url: logistics.html
+      - title: 品質管理
+        url: quality.html
+      - title: 品質保証
+        url: assurance.html
+      - title: 設備保全・治工具
+        url: maintenance.html
+  - section: 共通機能
+    items:
+      - title: 帳票・ラベル・スキャン
+        url: reports.html
+      - title: ロールと権限
+        url: roles.html
+  - section: 資料
+    items:
+      - title: リファレンス
+        url: reference.html
+      - title: 困ったときは
+        url: troubleshooting.html
+      - title: 管理者向け運用
+        url: operations.html

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if page.title and page.url != "/" %}{{ page.title }} | {% endif %}{{ site.title }}</title>
+<meta name="description" content="{{ page.description | default: site.description }}">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+
+<header class="topbar">
+  <button class="menu-toggle" aria-label="メニュー" onclick="document.body.classList.toggle('nav-open')">☰</button>
+  <a class="brand" href="index.html">Parallel Factory <strong>MES</strong></a>
+  <span class="brand-sub">ユーザーガイド</span>
+</header>
+
+<div class="shell">
+  <nav class="sidebar" aria-label="ガイド目次">
+    {% for group in site.nav %}
+    <div class="nav-group">
+      <div class="nav-section">{{ group.section }}</div>
+      <ul>
+        {% for item in group.items %}
+        <li>
+          <a href="{{ item.url }}"{% if page.nav_url == item.url %} class="current" aria-current="page"{% endif %}>{{ item.title }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </nav>
+
+  <main id="main" class="content">
+    <article>
+      {% if page.title %}<h1>{{ page.title }}</h1>{% endif %}
+      {% if page.lead %}<p class="lead">{{ page.lead }}</p>{% endif %}
+      {{ content }}
+    </article>
+
+    <nav class="pager" aria-label="ページ送り">
+      {% if page.prev_url %}<a class="prev" href="{{ page.prev_url }}">&larr; {{ page.prev_title }}</a>{% endif %}
+      {% if page.next_url %}<a class="next" href="{{ page.next_url }}">{{ page.next_title }} &rarr;</a>{% endif %}
+    </nav>
+
+    <footer class="foot">
+      <p>Parallel Factory MES ユーザーガイド ／ 対象バージョン：Phase 1〜7（シート・端末管理とWPFライセンスアプリは未実装）</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
