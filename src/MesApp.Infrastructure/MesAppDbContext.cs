@@ -30,6 +30,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     // 指図・実績系（Spec.md 5.2）／在庫系（5.3。Lotは産出ロット採番のため先行導入）
     public DbSet<ManufacturingOrder> ManufacturingOrders => Set<ManufacturingOrder>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
+    public DbSet<ManufacturingOrderMaterial> ManufacturingOrderMaterials => Set<ManufacturingOrderMaterial>();
     public DbSet<Lot> Lots => Set<Lot>();
     public DbSet<LotGenealogy> LotGenealogies => Set<LotGenealogy>();
     public DbSet<LotStatusHistory> LotStatusHistories => Set<LotStatusHistory>();
@@ -285,6 +286,20 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
+        builder.Entity<ManufacturingOrderMaterial>(e =>
+        {
+            e.HasIndex(x => new { x.ManufacturingOrderId, x.ChildProductId }).IsUnique();
+            e.Property(x => x.AlternativeGroup).HasMaxLength(50);
+            e.HasOne(x => x.ManufacturingOrder)
+                .WithMany(x => x.Materials)
+                .HasForeignKey(x => x.ManufacturingOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.ChildProduct)
+                .WithMany()
+                .HasForeignKey(x => x.ChildProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         builder.Entity<WorkOrder>(e =>
         {
             e.HasIndex(x => x.WorkOrderNo).IsUnique();
@@ -301,6 +316,15 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.HasOne(x => x.Process)
                 .WithMany()
                 .HasForeignKey(x => x.ProcessId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.ControlItems).HasMaxLength(500);
+            e.HasOne(x => x.RequiredSkill)
+                .WithMany()
+                .HasForeignKey(x => x.RequiredSkillId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.RoutingChecklist)
+                .WithMany()
+                .HasForeignKey(x => x.RoutingChecklistId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.AssignedUser)
                 .WithMany()

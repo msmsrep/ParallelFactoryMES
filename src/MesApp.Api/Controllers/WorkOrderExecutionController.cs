@@ -221,10 +221,11 @@ public class WorkOrderExecutionController(
         {
             return BadRequest(new ProblemDetails { Title = reason });
         }
-        // 指定外材料の投入を防ぐ（B-30-20）。MBOMに定義された部材以外は投入できない
-        var bomChildProductIds = await db.BomItems
-            .Where(b => b.ParentProductId == workOrder.ProductId)
-            .Select(b => b.ChildProductId)
+        // 指定外材料の投入を防ぐ（B-30-20）。基準は指図展開時に固定した予定材料であり、
+        // 途中でMBOMが改訂されてもこの指図の照合条件は変わらない（Spec.md 5.7）
+        var bomChildProductIds = await db.ManufacturingOrderMaterials
+            .Where(m => m.ManufacturingOrderId == workOrder.ManufacturingOrderId)
+            .Select(m => m.ChildProductId)
             .ToListAsync(ct);
         if (MaterialIssuePolicy.CheckAgainstBom(
                 workOrder.Product!.Code, bomChildProductIds, lot.Product!) is string bomReason)
@@ -373,12 +374,13 @@ public class WorkOrderExecutionController(
             // バックフラッシュ（B-40-10-09）：MBOM×完了数量の部材を自動消費
             if (request.Backflush)
             {
-                var bom = await db.BomItems.Include(b => b.ChildProduct)
-                    .Where(b => b.ParentProductId == workOrder.ProductId)
+                // 消費量の基準は展開時に固定した予定材料の原単位（Spec.md 5.7）
+                var bom = await db.ManufacturingOrderMaterials
+                    .Where(m => m.ManufacturingOrderId == workOrder.ManufacturingOrderId)
                     .ToListAsync(ct);
                 if (bom.Count == 0)
                 {
-                    return BadRequest(new ProblemDetails { Title = "MBOMが未登録のためバックフラッシュできません。" });
+                    return BadRequest(new ProblemDetails { Title = "予定材料が未登録（展開時にMBOMが未登録）のためバックフラッシュできません。" });
                 }
                 var totalProduced = request.GoodQuantity + request.DefectQuantity;
                 foreach (var bomItem in bom)

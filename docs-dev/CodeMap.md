@@ -17,7 +17,7 @@
 
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
-| 製造指図（発行・承認・変更・工程展開） | A-20 / B-10-10 | `Api/Controllers/ManufacturingOrdersController.cs`<br>`api/manufacturing-orders` | `Core/Entities/Production.cs`<br>ManufacturingOrder / WorkOrder / Lot | `/manufacturing-orders` `Web/Pages/ManufacturingOrders.razor`<br>`/manufacturing-orders/{id}` `ManufacturingOrderDetail.razor` | `Tests/ProductionTests.cs` |
+| 製造指図（発行・承認・変更・工程展開） | A-20 / B-10-10 | `Api/Controllers/ManufacturingOrdersController.cs`<br>`api/manufacturing-orders` | `Core/Entities/Production.cs`<br>ManufacturingOrder / **ManufacturingOrderMaterial**（予定材料＝展開時のMBOM固定） / WorkOrder（工順スナップショット付き） / Lot | `/manufacturing-orders` `Web/Pages/ManufacturingOrders.razor`<br>`/manufacturing-orders/{id}` `ManufacturingOrderDetail.razor` | `Tests/ProductionTests.cs` |
 | 品目マスタ・MBOM・工順/BOP | A-40-10 / A-40-20 | `ProductsController.cs` `api/products`<br>`ProcessesController.cs` `api/processes` | `Core/Entities/Masters.cs`<br>Product / BomItem / ProcessMaster / Routing | `/masters` `Web/Pages/Masters/ProductsTab.razor` / `ProcessesTab.razor` | `Tests/MasterTests.cs` |
 | マスタCSV一括入出力 | Spec.md 3.1 | `MasterCsvController.cs` `api/masters/csv`<br>`Api/Services/MasterCsvService.cs` / `.Import.cs` / `MasterCsvKinds.cs` / `CsvTable.cs` / `CsvFile.cs` | （各マスタ） | `Web/Shared/CsvIoPanel.razor`（各Tabに配置） | `Tests/MasterCsvTests.cs` |
 
@@ -91,7 +91,7 @@
 | 監査ログ | `Core/Abstractions/IAuditLogger.cs`<br>`Infra/Services/AuditLogger.cs`<br>`Core/Entities/AuditLog.cs` | Spec.md 7.6。**全ての書き込み系アクションで呼ぶ**。変更前後を追跡する操作は `detail:` に匿名オブジェクト（`{ before, after, reason }`）を渡す＝JSON保存。要約でよい操作は文字列のまま |
 | 採番（指図番号・ロット番号等） | `Api/Services/NumberingService.cs` | 新しい採番区分はここに追加 |
 | ロット使用可否（投入・引当・出荷の共通判定） | `Api/Policies/LotUsabilityPolicy.cs` | Spec.md 3.9。ステータス・有効期限の条件は**ここだけ**に置く。呼び先は `WorkOrderExecutionController`（投入）／`InventoryService.AllocateFefoAsync`（FEFO）／`ShippingOrdersController`（出荷） |
-| 部材投入のMBOM照合 | `Api/Policies/MaterialIssuePolicy.cs` | Spec.md 3.9。作業指示の品目のMBOMにない品目は投入不可。呼び先は `WorkOrderExecutionController.AddConsumption` |
+| 部材投入の照合（予定材料） | `Api/Policies/MaterialIssuePolicy.cs` | Spec.md 3.9・5.7。基準はMBOMの現在値ではなく**指図の予定材料**。呼び先は `WorkOrderExecutionController.AddConsumption` |
 | ロット在庫ステータス変更（＋状態履歴） | `Api/Services/LotStatusService.cs`<br>`Core/Entities/Production.cs`: LotStatusHistory | Spec.md 5.3。`Lot.StockStatus` を**直接代入しない**。呼び先は `InventoryController`／`InspectionOrdersController`／`NonconformanceController`／`ReceivingController` |
 | ロット系譜（分割・統合・振替） | `Core/Entities/Production.cs`: LotGenealogy<br>`InventoryController.AddGenealogy` | Spec.md 5.3・5.7。追跡の正は `Lot.ParentLotId` ではなくこちら。`TraceabilityController` はこの関係を辿る |
 | 製造日（業務日付）境界 | `Core/Abstractions/IBusinessDateService.cs`<br>`Api/Services/BusinessDateService.cs` | Spec.md 7章 |

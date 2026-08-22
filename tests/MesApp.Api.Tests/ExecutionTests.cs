@@ -112,16 +112,23 @@ public class ExecutionTests
             new ConsumptionRequest(materialLot.Id, ctx.MaterialLocationId, 20m));
         Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
 
-        // 代替部品としてMBOMへ登録すれば投入できるようになる（A-40-10-04）
+        // 代替部品としてMBOMへ登録しても、展開済みの指図の予定材料は変わらない（Spec.md 5.7）
         (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom",
             new List<Core.Contracts.Masters.BomItemRequest>
             {
                 new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
                 new(other.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
             })).EnsureSuccessStatusCode();
-        var retried = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
+        var stillRejected = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
             new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m));
-        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, stillRejected.StatusCode);
+
+        // 改訂後に展開した指図では代替部品として投入できる（A-40-10-04）
+        var newOrder = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var accepted2 = await admin.PostAsJsonAsync(
+            $"/api/work-orders/{newOrder.WorkOrders[0].Id}/consumptions",
+            new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m));
+        Assert.Equal(HttpStatusCode.OK, accepted2.StatusCode);
         Assert.Equal(95m, await Phase3TestData.GetStockQuantityAsync(admin, otherLot.Id));
     }
 

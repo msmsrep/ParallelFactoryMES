@@ -65,6 +65,61 @@ public class ProductionTests
     }
 
     [Fact]
+    public async Task 展開時に工順とMBOMが固定されマスタ改訂の影響を受けない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (productId, processId) = await SetupMastersAsync(admin); // 工順1: 標準30分/段取り10分
+        var material = await MasterTests.CreateProductAsync(admin, "RM-01", "部材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{productId}/bom",
+            new List<BomItemRequest> { new(material.Id, 2m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+
+        var order = await CreateOrderAsync(admin, productId, 10m);
+        (await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null)).EnsureSuccessStatusCode();
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        var detail = (await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+
+        // 工順スナップショット
+        Assert.Equal(30m, detail.WorkOrders[0].StandardWorkMinutes);
+        Assert.Equal(10m, detail.WorkOrders[0].StandardSetupMinutes);
+        // 予定材料（MBOM × 指図数量）
+        var planned = Assert.Single(detail.Materials!);
+        Assert.Equal("RM-01", planned.ProductCode);
+        Assert.Equal(2m, planned.QuantityPer);
+        Assert.Equal(20m, planned.PlannedQuantity);
+
+        // 展開後に工順とMBOMを改訂する
+        (await admin.PutAsJsonAsync($"/api/products/{productId}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, processId, 99m, 88m, null, null, null, null, null),
+                new(2, processId, 15m, 5m, null, null, null, null, null),
+            })).EnsureSuccessStatusCode();
+        var other = await MasterTests.CreateProductAsync(admin, "RM-02", "別部材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{productId}/bom",
+            new List<BomItemRequest> { new(other.Id, 3m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+
+        // 既に展開済みの指図は改訂前の条件のまま
+        var reloaded = await admin.GetFromJsonAsync<ManufacturingOrderDetailResponse>(
+            $"/api/manufacturing-orders/{order.Id}");
+        Assert.Equal(30m, reloaded!.WorkOrders[0].StandardWorkMinutes);
+        Assert.Equal(10m, reloaded.WorkOrders[0].StandardSetupMinutes);
+        var stillPlanned = Assert.Single(reloaded.Materials!);
+        Assert.Equal("RM-01", stillPlanned.ProductCode);
+        Assert.Equal(20m, stillPlanned.PlannedQuantity);
+
+        // 改訂後に展開した指図は新しい条件になる
+        var next = await CreateOrderAsync(admin, productId, 10m);
+        (await admin.PostAsync($"/api/manufacturing-orders/{next.Id}/approve", null)).EnsureSuccessStatusCode();
+        var nextExpanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{next.Id}/expand", new ExpandRequest(null));
+        var nextDetail = (await nextExpanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+        Assert.Equal(99m, nextDetail.WorkOrders[0].StandardWorkMinutes);
+        Assert.Equal("RM-02", Assert.Single(nextDetail.Materials!).ProductCode);
+    }
+
+    [Fact]
     public async Task 未承認の指図は展開できない()
     {
         using var factory = new ApiFactory();

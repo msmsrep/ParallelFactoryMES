@@ -87,11 +87,8 @@ public class WorkOrdersController(
                 return BadRequest(new ProblemDetails { Title = "割当作業者が存在しないか無効です。" });
             }
 
-            var requiredSkillId = await db.Routings
-                .Where(r => r.ProductId == workOrder.ProductId && r.Sequence == workOrder.RoutingSequence)
-                .Select(r => r.RequiredSkillId)
-                .FirstOrDefaultAsync(ct);
-            if (requiredSkillId is int skillId)
+            // 必要スキルは工順マスタの現在値ではなく、展開時点のスナップショットを使う（Spec.md 5.7）
+            if (workOrder.RequiredSkillId is int skillId)
             {
                 var today = businessDate.Today;
                 var userSkill = await db.UserSkills.Include(s => s.Skill)
@@ -157,5 +154,6 @@ public class WorkOrdersController(
             w.RoutingSequence, w.PlannedQuantity, w.DispatchOrder,
             w.AssignedUserId, w.AssignedUser?.DisplayName,
             w.AssignedEquipmentId, w.AssignedEquipment?.Name,
-            w.Status);
+            w.Status,
+            w.StandardWorkMinutes, w.StandardSetupMinutes, w.ControlItems);
 }

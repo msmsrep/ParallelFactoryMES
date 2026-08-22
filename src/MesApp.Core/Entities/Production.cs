@@ -40,6 +40,38 @@ public class ManufacturingOrder
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<WorkOrder> WorkOrders { get; set; } = [];
+
+    /// <summary>予定材料（展開時にMBOMから確定。Spec.md 5.7）</summary>
+    public List<ManufacturingOrderMaterial> Materials { get; set; } = [];
+}
+
+/// <summary>
+/// 指図の予定材料（Spec.md 5.2 ManufacturingOrderMaterial。A-40-10、B-30-20）。
+/// <para>
+/// MBOMは改訂され上書きされるため、指図展開時点の構成をここへ写して固定する。
+/// 部材投入の照合（B-30-20-01）とバックフラッシュ（B-40-10-09）はこの予定材料を基準にし、
+/// 仕掛中の指図が途中のMBOM改訂に影響されないようにする。
+/// </para>
+/// </summary>
+public class ManufacturingOrderMaterial
+{
+    public int Id { get; set; }
+
+    public int ManufacturingOrderId { get; set; }
+    public ManufacturingOrder? ManufacturingOrder { get; set; }
+
+    /// <summary>部材の品目</summary>
+    public int ChildProductId { get; set; }
+    public Product? ChildProduct { get; set; }
+
+    /// <summary>親1単位あたりの必要数量（展開時点のMBOMの値）</summary>
+    public decimal QuantityPer { get; set; }
+
+    /// <summary>予定数量（＝原単位 × 指図数量）</summary>
+    public decimal PlannedQuantity { get; set; }
+
+    /// <summary>代替部品グループ（展開時点のMBOMの値。同一グループ内は代替可）</summary>
+    public string? AlternativeGroup { get; set; }
 }
 
 /// <summary>作業指示（Spec.md 5.2 WorkOrder。製造指図×工程。B-10）</summary>
@@ -63,6 +95,27 @@ public class WorkOrder
     public int RoutingSequence { get; set; }
 
     public decimal PlannedQuantity { get; set; }
+
+    // ---- 工順（BOP）のスナップショット（指図展開時点で固定。Spec.md 5.7）----
+    // 工順マスタは改訂され上書きされるため、仕掛中・完了済みの指図が
+    // 「当時どの条件で作れと指示されたか」を後から説明できるようここへ写す
+
+    /// <summary>標準作業時間（分。展開時点の工順の値）</summary>
+    public decimal StandardWorkMinutes { get; set; }
+
+    /// <summary>標準段取り時間（分。展開時点の工順の値）</summary>
+    public decimal StandardSetupMinutes { get; set; }
+
+    /// <summary>必要スキル（展開時点の工順の値。差立のスキル照合 F-20-30-01 はこれを使う）</summary>
+    public int? RequiredSkillId { get; set; }
+    public SkillMaster? RequiredSkill { get; set; }
+
+    /// <summary>工程管理項目（温度・回転数など記録すべき製造条件の定義。展開時点の工順の値）</summary>
+    public string? ControlItems { get; set; }
+
+    /// <summary>工程・段取りで実施するチェックリスト（展開時点の工順の値）</summary>
+    public int? RoutingChecklistId { get; set; }
+    public Checklist? RoutingChecklist { get; set; }
 
     /// <summary>着手順（差立で設定。B-10-20-03。初期リリースでは順序強制はしない：Spec.md 3.9）</summary>
     public int? DispatchOrder { get; set; }

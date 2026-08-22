@@ -72,6 +72,7 @@ public class ManufacturingOrdersController(
             .Include(o => o.WorkOrders).ThenInclude(w => w.Process)
             .Include(o => o.WorkOrders).ThenInclude(w => w.AssignedUser)
             .Include(o => o.WorkOrders).ThenInclude(w => w.AssignedEquipment)
+            .Include(o => o.Materials).ThenInclude(m => m.ChildProduct)
             .FirstOrDefaultAsync(o => o.Id == id, ct);
         if (order is null)
         {
@@ -80,7 +81,11 @@ public class ManufacturingOrdersController(
         return new ManufacturingOrderDetailResponse(
             ToResponse(order),
             order.WorkOrders.OrderBy(w => w.RoutingSequence)
-                .Select(w => WorkOrdersController.ToResponse(w, order)).ToList());
+                .Select(w => WorkOrdersController.ToResponse(w, order)).ToList(),
+            order.Materials.OrderBy(m => m.ChildProduct!.Code)
+                .Select(m => new OrderMaterialResponse(
+                    m.ChildProductId, m.ChildProduct!.Code, m.ChildProduct!.Name,
+                    m.QuantityPer, m.PlannedQuantity, m.AlternativeGroup)).ToList());
     }
 
     /// <summary>指図登録（A-20-10-01 手動登録、B-10-10-04 突発、B-70-10-01 リワーク）</summary>
@@ -276,6 +281,8 @@ public class ManufacturingOrdersController(
         };
         db.Lots.Add(lot);
 
+        // 工順（BOP）は展開時点の値を作業指示へ写して固定する（Spec.md 5.7）。
+        // 以降に工順が改訂されても、この指図の標準時間・必要スキル・管理項目は変わらない
         foreach (var step in routing)
         {
             db.WorkOrders.Add(new WorkOrder
@@ -286,6 +293,28 @@ public class ManufacturingOrdersController(
                 ProcessId = step.ProcessId,
                 RoutingSequence = step.Sequence,
                 PlannedQuantity = order.Quantity,
+                StandardWorkMinutes = step.StandardWorkMinutes,
+                StandardSetupMinutes = step.StandardSetupMinutes,
+                RequiredSkillId = step.RequiredSkillId,
+                ControlItems = step.ControlItems,
+                RoutingChecklistId = step.ChecklistId,
+            });
+        }
+
+        // MBOMも展開時点で予定材料として固定する。以降の投入照合（B-30-20-01）と
+        // バックフラッシュ（B-40-10-09）はこの予定材料を基準にする
+        var bom = await db.BomItems
+            .Where(b => b.ParentProductId == order.ProductId)
+            .ToListAsync(ct);
+        foreach (var item in bom)
+        {
+            db.ManufacturingOrderMaterials.Add(new ManufacturingOrderMaterial
+            {
+                ManufacturingOrder = order,
+                ChildProductId = item.ChildProductId,
+                QuantityPer = item.QuantityPer,
+                PlannedQuantity = item.QuantityPer * order.Quantity,
+                AlternativeGroup = item.AlternativeGroup,
             });
         }
 
@@ -294,7 +323,13 @@ public class ManufacturingOrdersController(
         order.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Production", "Expand", nameof(ManufacturingOrder), id.ToString(),
-            detail: $"orderNo={order.OrderNo}, lot={lotNumber}, workOrders={routing.Count}", ct: ct);
+            detail: new
+            {
+                orderNo = order.OrderNo,
+                lot = lotNumber,
+                workOrders = routing.Count,
+                materials = bom.Count,
+            }, ct: ct);
         return await Get(id, ct);
     }
 
