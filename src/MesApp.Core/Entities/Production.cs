@@ -111,9 +111,71 @@ public class Lot
     /// <summary>グレード（検査結果により出荷先・品目が変わる製品の管理。C-60-10-01）</summary>
     public string? Grade { get; set; }
 
-    /// <summary>親ロット（分割・統合・振替の由来。系譜の保持）</summary>
+    /// <summary>
+    /// 親ロット（分割・振替の直接の由来。表示用の簡易参照であり、
+    /// 追跡の正は <see cref="LotGenealogy"/>（統合のように親が複数になる関係も表現できる）
+    /// </summary>
     public int? ParentLotId { get; set; }
     public Lot? ParentLot { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// ロット系譜（Spec.md 5.3 LotGenealogy。D-10-30-05〜07 分割・統合・振替）。
+/// トレーサビリティ（H-30-10）で前方・後方どちらにも辿れるよう、由来元（親）と由来先（子）の
+/// 関係を1レコード＝1関係で残す。統合のように親が複数になる関係も表現できる。
+/// </summary>
+public class LotGenealogy
+{
+    public int Id { get; set; }
+
+    /// <summary>由来元ロット（分割元・振替元・統合元）</summary>
+    public int ParentLotId { get; set; }
+    public Lot? ParentLot { get; set; }
+
+    /// <summary>由来先ロット（分割先・振替先・統合先）</summary>
+    public int ChildLotId { get; set; }
+    public Lot? ChildLot { get; set; }
+
+    public LotRelationType RelationType { get; set; }
+
+    /// <summary>関係が成立した数量</summary>
+    public decimal Quantity { get; set; }
+
+    public string? PerformedByUserId { get; set; }
+
+    public DateTimeOffset OccurredAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// ロット状態履歴（Spec.md 5.3 LotStatusHistory）。
+/// 在庫ステータスは現在状態しか持たないため、保留・解除などの判断を後から説明できるよう
+/// 遷移を業務履歴として残す（誰が・いつ・なぜ止め、どの判断で解除したか）。
+/// </summary>
+public class LotStatusHistory
+{
+    public int Id { get; set; }
+
+    public int LotId { get; set; }
+    public Lot? Lot { get; set; }
+
+    public LotStockStatus FromStatus { get; set; }
+
+    public LotStockStatus ToStatus { get; set; }
+
+    public LotStatusChangeSource Source { get; set; }
+
+    /// <summary>理由（保留理由・解除理由など）</summary>
+    public string? Reason { get; set; }
+
+    /// <summary>契機となった検査指示（検査由来の場合）</summary>
+    public int? InspectionOrderId { get; set; }
+
+    /// <summary>契機となった不適合（不適合由来の場合）</summary>
+    public int? NonconformanceReportId { get; set; }
+
+    public string? ChangedByUserId { get; set; }
+
+    public DateTimeOffset ChangedAt { get; set; } = DateTimeOffset.UtcNow;
 }

@@ -90,6 +90,8 @@
 | 監査ログ | `Core/Abstractions/IAuditLogger.cs`<br>`Infra/Services/AuditLogger.cs`<br>`Core/Entities/AuditLog.cs` | Spec.md 7.6。**全ての書き込み系アクションで呼ぶ** |
 | 採番（指図番号・ロット番号等） | `Api/Services/NumberingService.cs` | 新しい採番区分はここに追加 |
 | ロット使用可否（投入・引当・出荷の共通判定） | `Api/Policies/LotUsabilityPolicy.cs` | Spec.md 3.9。ステータス・有効期限の条件は**ここだけ**に置く。呼び先は `WorkOrderExecutionController`（投入）／`InventoryService.AllocateFefoAsync`（FEFO）／`ShippingOrdersController`（出荷） |
+| ロット在庫ステータス変更（＋状態履歴） | `Api/Services/LotStatusService.cs`<br>`Core/Entities/Production.cs`: LotStatusHistory | Spec.md 5.3。`Lot.StockStatus` を**直接代入しない**。呼び先は `InventoryController`／`InspectionOrdersController`／`NonconformanceController`／`ReceivingController` |
+| ロット系譜（分割・統合・振替） | `Core/Entities/Production.cs`: LotGenealogy<br>`InventoryController.AddGenealogy` | Spec.md 5.3・5.7。追跡の正は `Lot.ParentLotId` ではなくこちら。`TraceabilityController` はこの関係を辿る |
 | 製造日（業務日付）境界 | `Core/Abstractions/IBusinessDateService.cs`<br>`Api/Services/BusinessDateService.cs` | Spec.md 7章 |
 | DB・DbContext・スキーマ | `Infra/MesAppDbContext.cs`（653行）<br>`Infra/DependencyInjection.cs`（起動時 `MigrateAsync`）<br>`Infra/DatabaseOptions.cs` | SQLite。`Infra/Migrations/` は**読まない** |
 | 列挙型（全業務共通） | `Core/Entities/Enums.cs`（36種） | ステータス追加はここ。UI表示名は `Web/Shared/Labels.cs` |

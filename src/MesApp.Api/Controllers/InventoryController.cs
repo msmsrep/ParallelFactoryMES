@@ -21,6 +21,7 @@ public class InventoryController(
     MesAppDbContext db,
     InventoryService inventory,
     NumberingService numbering,
+    LotStatusService lotStatus,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
 {
@@ -204,7 +205,8 @@ public class InventoryController(
             return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
         }
         var before = lot.StockStatus;
-        lot.StockStatus = request.Status;
+        lotStatus.ChangeStatus(lot, request.Status, LotStatusChangeSource.Manual,
+            request.Reason, CurrentUserId);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "StatusChange", nameof(Lot), lot.Id.ToString(),
             detail: $"lot={lot.LotNumber}, {before} -> {request.Status}, reason={request.Reason}", ct: ct);
@@ -253,6 +255,7 @@ public class InventoryController(
             await db.SaveChangesAsync(ct); // newLot.Id確定＋在庫減算の確定
             await inventory.AddAsync(newLot, request.LocationId, request.Quantity,
                 InventoryTransactionType.Split, CurrentUserId, note: $"分割元 {lot.LotNumber}", ct: ct);
+            AddGenealogy(lot.Id, newLot.Id, LotRelationType.Split, request.Quantity);
         }
         catch (InventoryException ex)
         {
@@ -301,6 +304,8 @@ public class InventoryController(
                 InventoryTransactionType.Merge, CurrentUserId, note: $"統合 -> {target.LotNumber}", ct: ct);
             await inventory.AddAsync(target, request.LocationId, quantity,
                 InventoryTransactionType.Merge, CurrentUserId, note: $"統合元 {source.LotNumber}", ct: ct);
+            // 統合先ロットは親を複数持ちうるため、系譜はLot.ParentLotIdではなくLotGenealogyへ残す
+            AddGenealogy(source.Id, target.Id, LotRelationType.Merge, quantity);
         }
         catch (InventoryException ex)
         {
@@ -369,6 +374,7 @@ public class InventoryController(
             await db.SaveChangesAsync(ct);
             await inventory.AddAsync(newLot, request.LocationId, request.Quantity,
                 InventoryTransactionType.Transfer, CurrentUserId, note: $"振替元 {lot.LotNumber}", ct: ct);
+            AddGenealogy(lot.Id, newLot.Id, LotRelationType.Transfer, request.Quantity);
         }
         catch (InventoryException ex)
         {
@@ -446,4 +452,18 @@ public class InventoryController(
             detail: $"lot={lot.LotNumber}, qty={quantity}, reason={reason}", ct: ct);
         return NoContent();
     }
+
+    /// <summary>
+    /// ロット系譜の記録（分割・統合・振替）。トレーサビリティ（H-30-10）は
+    /// Lot.ParentLotIdではなくこの関係を辿るため、由来が生じる操作では必ず残す
+    /// </summary>
+    private void AddGenealogy(int parentLotId, int childLotId, LotRelationType relationType, decimal quantity) =>
+        db.LotGenealogies.Add(new LotGenealogy
+        {
+            ParentLotId = parentLotId,
+            ChildLotId = childLotId,
+            RelationType = relationType,
+            Quantity = quantity,
+            PerformedByUserId = CurrentUserId,
+        });
 }

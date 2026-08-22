@@ -20,6 +20,7 @@ public class ReceivingController(
     MesAppDbContext db,
     InventoryService inventory,
     NumberingService numbering,
+    LotStatusService lotStatus,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
 {
@@ -107,7 +108,8 @@ public class ReceivingController(
             return Conflict(new ProblemDetails { Title = ex.Message });
         }
         lot.InitialQuantity = 0;
-        lot.StockStatus = LotStockStatus.ToBeDiscarded;
+        lotStatus.ChangeStatus(lot, LotStockStatus.ToBeDiscarded, LotStatusChangeSource.Receiving,
+            "受入取消", User.FindFirstValue(ClaimTypes.NameIdentifier));
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "ReceiveCancel", nameof(Lot), lotId.ToString(),
             detail: $"lot={lot.LotNumber}", ct: ct);

@@ -21,6 +21,7 @@ namespace MesApp.Api.Controllers;
 public class InspectionOrdersController(
     MesAppDbContext db,
     NumberingService numbering,
+    LotStatusService lotStatus,
     IAuditLogger auditLogger) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -145,13 +146,16 @@ public class InspectionOrdersController(
             Items = itemIds.Select(i => new InspectionOrderItem { InspectionItemId = i }).ToList(),
         };
         db.InspectionOrders.Add(order);
+        await db.SaveChangesAsync(ct);
 
-        // 対象ロットを検査待ちへ（サンプル検査はロットを拘束しない）
+        // 対象ロットを検査待ちへ（サンプル検査はロットを拘束しない）。
+        // 履歴に検査指示IDを残すため、採番済みになってから変更する
         if (lot is not null && request.Type != InspectionOrderType.Sample)
         {
-            lot.StockStatus = LotStockStatus.AwaitingInspection;
+            lotStatus.ChangeStatus(lot, LotStockStatus.AwaitingInspection, LotStatusChangeSource.Inspection,
+                $"検査指示 {order.OrderNo} の発行", CurrentUserId, inspectionOrderId: order.Id);
+            await db.SaveChangesAsync(ct);
         }
-        await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Quality", "InspectionCreate", nameof(InspectionOrder), order.Id.ToString(),
             detail: $"orderNo={order.OrderNo}, type={order.Type}", ct: ct);
         var saved = await BaseQuery().FirstAsync(o => o.Id == order.Id, ct);
@@ -257,7 +261,9 @@ public class InspectionOrdersController(
             order.JudgedByUserId = null;
             if (order.TargetLot is not null && order.Type != InspectionOrderType.Sample)
             {
-                order.TargetLot.StockStatus = LotStockStatus.AwaitingInspection;
+                lotStatus.ChangeStatus(order.TargetLot, LotStockStatus.AwaitingInspection,
+                    LotStatusChangeSource.Inspection, $"検査実績の訂正による再判定待ち（{request.Reason}）",
+                    CurrentUserId, inspectionOrderId: order.Id);
             }
         }
         await db.SaveChangesAsync(ct);
@@ -311,7 +317,10 @@ public class InspectionOrdersController(
         // 判定結果のロット反映（Spec.md 5.7：検査待ち→正常/不良）
         if (order.TargetLot is not null && order.Type != InspectionOrderType.Sample)
         {
-            order.TargetLot.StockStatus = pass ? LotStockStatus.Normal : LotStockStatus.Defective;
+            lotStatus.ChangeStatus(order.TargetLot, pass ? LotStockStatus.Normal : LotStockStatus.Defective,
+                LotStatusChangeSource.Inspection,
+                $"検査指示 {order.OrderNo} の総合判定：{order.OverallJudgment}",
+                CurrentUserId, inspectionOrderId: order.Id);
             if (!string.IsNullOrWhiteSpace(request.Grade))
             {
                 order.TargetLot.Grade = request.Grade; // グレード管理（C-60-10-01）
@@ -382,7 +391,8 @@ public class InspectionOrdersController(
         // 検査待ちで拘束していたロットを解放する
         if (order.TargetLot is { StockStatus: LotStockStatus.AwaitingInspection })
         {
-            order.TargetLot.StockStatus = LotStockStatus.Normal;
+            lotStatus.ChangeStatus(order.TargetLot, LotStockStatus.Normal, LotStatusChangeSource.Inspection,
+                $"検査指示 {order.OrderNo} の取消による拘束解除", CurrentUserId, inspectionOrderId: order.Id);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Quality", "InspectionCancel", nameof(InspectionOrder), id.ToString(), ct: ct);

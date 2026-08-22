@@ -49,6 +49,7 @@ builder.Services.AddScoped<RefreshTokenService>();
 builder.Services.AddSingleton<IBusinessDateService, BusinessDateService>();
 builder.Services.AddScoped<NumberingService>();
 builder.Services.AddScoped<InventoryService>();
+builder.Services.AddScoped<LotStatusService>();
 builder.Services.AddScoped<MasterCsvService>();
 
 builder.Services

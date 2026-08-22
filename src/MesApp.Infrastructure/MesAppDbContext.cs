@@ -30,6 +30,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<ManufacturingOrder> ManufacturingOrders => Set<ManufacturingOrder>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<Lot> Lots => Set<Lot>();
+    public DbSet<LotGenealogy> LotGenealogies => Set<LotGenealogy>();
+    public DbSet<LotStatusHistory> LotStatusHistories => Set<LotStatusHistory>();
 
     // 製造実行系（Spec.md 5.2）
     public DbSet<SetupRecord> SetupRecords => Set<SetupRecord>();
@@ -104,6 +106,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<WorkOrderStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<LotOriginType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<LotStockStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<LotRelationType>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<LotStatusChangeSource>().HaveConversion<string>().HaveMaxLength(30);
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -648,6 +652,32 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .WithMany()
                 .HasForeignKey(x => x.ParentLotId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<LotGenealogy>(e =>
+        {
+            e.HasIndex(x => x.ParentLotId);
+            e.HasIndex(x => x.ChildLotId);
+            e.Property(x => x.PerformedByUserId).HasMaxLength(450);
+            e.HasOne(x => x.ParentLot)
+                .WithMany()
+                .HasForeignKey(x => x.ParentLotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ChildLot)
+                .WithMany()
+                .HasForeignKey(x => x.ChildLotId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<LotStatusHistory>(e =>
+        {
+            e.HasIndex(x => new { x.LotId, x.Id });
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.ChangedByUserId).HasMaxLength(450);
+            e.HasOne(x => x.Lot)
+                .WithMany()
+                .HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -178,6 +178,30 @@ public enum LotStockStatus
     ToBeDiscarded,
 }
 
+/// <summary>ロット系譜の関係区分（Spec.md 5.3 LotGenealogy。D-10-30-05〜07）</summary>
+public enum LotRelationType
+{
+    /// <summary>分割（1ロット → 複数ロット）</summary>
+    Split,
+    /// <summary>統合（複数ロット → 1ロット）</summary>
+    Merge,
+    /// <summary>品目振替・ロット振替</summary>
+    Transfer,
+}
+
+/// <summary>ロット状態変更の契機（Spec.md 5.3 LotStatusHistory）</summary>
+public enum LotStatusChangeSource
+{
+    /// <summary>在庫ステータス変更操作（D-10-30-08）</summary>
+    Manual,
+    /// <summary>検査指示・判定（C-20）</summary>
+    Inspection,
+    /// <summary>不適合の対応指示・承認（C-30）</summary>
+    Nonconformance,
+    /// <summary>受入取消（D-10-10-04）</summary>
+    Receiving,
+}
+
 /// <summary>段取り区分（B-20-50 前段取り／B-40-40 後段取り）</summary>
 public enum SetupType
 {

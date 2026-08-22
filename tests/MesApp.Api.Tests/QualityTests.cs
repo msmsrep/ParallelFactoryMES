@@ -243,6 +243,79 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 統合したロットも系譜として前方追跡できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 同一品目の部材ロット2つ。sourceをtargetへ統合し、targetだけを工程へ投入する
+        var source = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 40m, ctx.MaterialLocationId);
+        var target = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 60m, ctx.MaterialLocationId);
+        (await admin.PostAsJsonAsync("/api/inventory/merge",
+            new Core.Contracts.Inventory.MergeRequest(source.Id, target.Id, ctx.MaterialLocationId)))
+            .EnsureSuccessStatusCode();
+
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        (await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[0].Id}/consumptions",
+            new Core.Contracts.Execution.ConsumptionRequest(target.Id, ctx.MaterialLocationId, 20m)))
+            .EnsureSuccessStatusCode();
+        var posted = await admin.PostAsJsonAsync(
+            $"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+            new Core.Contracts.Execution.ProductionRecordRequest(
+                10m, 0m, DateTimeOffset.Now, null, ctx.ProductLocationId, false));
+        var record = await posted.Content.ReadFromJsonAsync<Core.Contracts.Execution.ProductionRecordResponse>();
+        var outputLotId = record!.OutputLotId!.Value;
+
+        // 前方追跡：統合元ロット → 統合先ロット → 産出ロット（統合の系譜がないとここで切れる）
+        var forward = await admin.GetFromJsonAsync<TraceResponse>($"/api/traceability/{source.Id}/forward");
+        var merged = Assert.Single(forward!.Nodes, n => n.LotId == target.Id);
+        Assert.Equal(LotRelationType.Merge, merged.Relation);
+        Assert.Equal(40m, merged.Quantity);
+        Assert.Contains(merged.Children, n => n.LotId == outputLotId);
+
+        // 後方追跡：産出ロット → 投入した統合先ロット → 統合元ロット
+        var back = await admin.GetFromJsonAsync<TraceResponse>($"/api/traceability/{outputLotId}/back");
+        var consumed = Assert.Single(back!.Nodes, n => n.LotId == target.Id);
+        Assert.Contains(consumed.Children, n => n.LotId == source.Id && n.Relation == LotRelationType.Merge);
+    }
+
+    [Fact]
+    public async Task ロットの保留と解除が状態履歴に残る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        (await admin.PostAsJsonAsync("/api/inventory/status",
+            new Core.Contracts.Inventory.LotStatusRequest(lot.Id, LotStockStatus.OnHold, "異臭の調査のため")))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/inventory/status",
+            new Core.Contracts.Inventory.LotStatusRequest(lot.Id, LotStockStatus.Normal, "調査完了・問題なし")))
+            .EnsureSuccessStatusCode();
+        // 現在値と同じ変更は履歴を作らない
+        (await admin.PostAsJsonAsync("/api/inventory/status",
+            new Core.Contracts.Inventory.LotStatusRequest(lot.Id, LotStockStatus.Normal, "重複操作")))
+            .EnsureSuccessStatusCode();
+
+        var history = await admin.GetFromJsonAsync<LotHistoryResponse>($"/api/traceability/{lot.Id}/history");
+        Assert.Equal(2, history!.StatusHistory.Count);
+
+        var hold = history.StatusHistory[0];
+        Assert.Equal(LotStockStatus.Normal, hold.FromStatus);
+        Assert.Equal(LotStockStatus.OnHold, hold.ToStatus);
+        Assert.Equal(LotStatusChangeSource.Manual, hold.Source);
+        Assert.Equal("異臭の調査のため", hold.Reason);
+        Assert.NotNull(hold.ChangedByName);
+
+        var release = history.StatusHistory[1];
+        Assert.Equal(LotStockStatus.OnHold, release.FromStatus);
+        Assert.Equal(LotStockStatus.Normal, release.ToStatus);
+        Assert.Equal("調査完了・問題なし", release.Reason);
+    }
+
+    [Fact]
     public async Task 品質分析サマリで不良集計と不適合状況を取得できる()
     {
         using var factory = new ApiFactory();

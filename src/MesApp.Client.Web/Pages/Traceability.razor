@@ -108,6 +108,38 @@
             {
                 <ul>@foreach (var line in _history.InventoryHistory) { <li>@line</li> }</ul>
             }
+
+            <h2>状態履歴（H-30-10-04）</h2>
+            @if (_history.StatusHistory.Count == 0)
+            {
+                <p class="text-muted">記録はありません。</p>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>日時</th>
+                            <th>遷移</th>
+                            <th>契機</th>
+                            <th>理由</th>
+                            <th>変更者</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in _history.StatusHistory)
+                        {
+                            <tr>
+                                <td>@entry.ChangedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@Labels.LotStatus(entry.FromStatus) → @Labels.LotStatus(entry.ToStatus)</td>
+                                <td>@Labels.LotStatusSource(entry.Source)</td>
+                                <td>@(entry.Reason ?? "-")</td>
+                                <td>@(entry.ChangedByName ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
         </div>
     }
 }

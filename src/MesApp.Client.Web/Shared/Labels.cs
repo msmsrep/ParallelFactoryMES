@@ -14,4 +14,21 @@ public static class Labels
         LotStockStatus.ToBeDiscarded => "廃棄予定",
         _ => status.ToString(),
     };
+
+    public static string LotRelation(LotRelationType relation) => relation switch
+    {
+        LotRelationType.Split => "分割",
+        LotRelationType.Merge => "統合",
+        LotRelationType.Transfer => "振替",
+        _ => relation.ToString(),
+    };
+
+    public static string LotStatusSource(LotStatusChangeSource source) => source switch
+    {
+        LotStatusChangeSource.Manual => "在庫操作",
+        LotStatusChangeSource.Inspection => "検査",
+        LotStatusChangeSource.Nonconformance => "不適合",
+        LotStatusChangeSource.Receiving => "受入",
+        _ => source.ToString(),
+    };
 }

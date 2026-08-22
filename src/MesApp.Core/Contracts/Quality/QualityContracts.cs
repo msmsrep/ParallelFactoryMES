@@ -108,22 +108,28 @@ public record TraceNode(
     LotStockStatus StockStatus,
     /// <summary>この連鎖を作った作業指示（投入/産出）</summary>
     string? WorkOrderNo,
-    /// <summary>投入/産出数量</summary>
+    /// <summary>投入/産出数量、または系譜の関係数量</summary>
     decimal? Quantity,
-    /// <summary>分割・振替による派生ロットか</summary>
-    bool IsLineage,
+    /// <summary>系譜（分割・統合・振替）による関係の場合はその区分。投入/産出の連鎖ならnull</summary>
+    LotRelationType? Relation,
     List<TraceNode> Children);
 
 public record TraceResponse(
     int LotId, string LotNumber, string ProductCode, string ProductName,
     List<TraceNode> Nodes);
 
-/// <summary>ロットの履歴閲覧（H-30-10-03〜05：製造・検査・在庫履歴）</summary>
+/// <summary>ロット状態履歴の1件（保留・解除などの遷移。Spec.md 5.3 LotStatusHistory）</summary>
+public record LotStatusHistoryEntry(
+    LotStockStatus FromStatus, LotStockStatus ToStatus, LotStatusChangeSource Source,
+    string? Reason, string? ChangedByName, DateTimeOffset ChangedAt);
+
+/// <summary>ロットの履歴閲覧（H-30-10-03〜05：製造・検査・在庫・状態履歴）</summary>
 public record LotHistoryResponse(
     int LotId, string LotNumber, string ProductCode, string ProductName,
     List<string> ProductionHistory,
     List<string> InspectionHistory,
-    List<string> InventoryHistory);
+    List<string> InventoryHistory,
+    List<LotStatusHistoryEntry> StatusHistory);
 
 // ---- 品質分析（C-40-10）----
 

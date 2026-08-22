@@ -11,7 +11,7 @@ namespace MesApp.Api.Controllers;
 /// ロットトレーサビリティ（Spec.md 3.7：H-30-10）。
 /// 追跡の連鎖：部材ロット → 部材投入（作業指示に紐付く）→ 作業指示 → 生産実績 → 産出ロット。
 /// トレースバック（製造元特定）は産出ロットから部材側へ、トレースフォワード（使用先特定）は
-/// 部材ロットから産出側へ辿る。分割・振替の系譜（Lot.ParentLotId）も追跡に含める。
+/// 部材ロットから産出側へ辿る。分割・統合・振替の系譜（LotGenealogy）も追跡に含める。
 /// </summary>
 [ApiController]
 [Route("api/traceability")]
@@ -82,8 +82,18 @@ public class TraceabilityController(MesAppDbContext db) : ControllerBase
                          (t.WorkOrder != null ? $" ({t.WorkOrder.WorkOrderNo})" : string.Empty))
             .ToListAsync(ct);
 
+        // 状態履歴（保留・解除などの遷移。誰が・いつ・なぜ止め、どの判断で解除したか）
+        var statusHistory = await db.LotStatusHistories.AsNoTracking()
+            .Where(h => h.LotId == lotId)
+            .OrderBy(h => h.Id)
+            .Select(h => new LotStatusHistoryEntry(
+                h.FromStatus, h.ToStatus, h.Source, h.Reason,
+                db.Users.Where(u => u.Id == h.ChangedByUserId).Select(u => u.DisplayName).FirstOrDefault(),
+                h.ChangedAt))
+            .ToListAsync(ct);
+
         return new LotHistoryResponse(lot.Id, lot.LotNumber, lot.Product!.Code, lot.Product!.Name,
-            production, inspections, transactions);
+            production, inspections, transactions, statusHistory);
     }
 
     /// <summary>産出ロット→（生成元作業指示の指図の全作業指示）→投入部材ロットを再帰的に辿る</summary>
@@ -96,13 +106,17 @@ public class TraceabilityController(MesAppDbContext db) : ControllerBase
         }
         var nodes = new List<TraceNode>();
 
-        // 系譜（分割・振替の親ロット）を辿る
-        if (lot.ParentLotId is int parentId && visited.Add(parentId))
+        // 系譜（分割・統合・振替の由来元ロット）を辿る。統合では親が複数になりうる
+        var origins = await db.LotGenealogies.AsNoTracking()
+            .Include(g => g.ParentLot).ThenInclude(l => l!.Product)
+            .Where(g => g.ChildLotId == lot.Id)
+            .OrderBy(g => g.Id)
+            .ToListAsync(ct);
+        foreach (var origin in origins.Where(g => visited.Add(g.ParentLotId)))
         {
-            var parent = await db.Lots.AsNoTracking().Include(l => l.Product)
-                .FirstAsync(l => l.Id == parentId, ct);
+            var parent = origin.ParentLot!;
             nodes.Add(new TraceNode(parent.Id, parent.LotNumber, parent.Product!.Code, parent.Product!.Name,
-                parent.StockStatus, null, null, IsLineage: true,
+                parent.StockStatus, null, origin.Quantity, origin.RelationType,
                 await BuildBackNodesAsync(parent, visited, depth + 1, ct)));
         }
 
@@ -124,7 +138,7 @@ public class TraceabilityController(MesAppDbContext db) : ControllerBase
                     : [];
                 nodes.Add(new TraceNode(materialLot.Id, materialLot.LotNumber,
                     materialLot.Product!.Code, materialLot.Product!.Name, materialLot.StockStatus,
-                    consumption.WorkOrder!.WorkOrderNo, consumption.Quantity, IsLineage: false, children));
+                    consumption.WorkOrder!.WorkOrderNo, consumption.Quantity, Relation: null, children));
             }
         }
         return nodes;
@@ -140,14 +154,17 @@ public class TraceabilityController(MesAppDbContext db) : ControllerBase
         }
         var nodes = new List<TraceNode>();
 
-        // 系譜（このロットから分割・振替された子ロット）
-        var childLots = await db.Lots.AsNoTracking().Include(l => l.Product)
-            .Where(l => l.ParentLotId == lot.Id)
+        // 系譜（このロットから分割・統合・振替された先のロット）
+        var derived = await db.LotGenealogies.AsNoTracking()
+            .Include(g => g.ChildLot).ThenInclude(l => l!.Product)
+            .Where(g => g.ParentLotId == lot.Id)
+            .OrderBy(g => g.Id)
             .ToListAsync(ct);
-        foreach (var child in childLots.Where(c => visited.Add(c.Id)))
+        foreach (var relation in derived.Where(g => visited.Add(g.ChildLotId)))
         {
+            var child = relation.ChildLot!;
             nodes.Add(new TraceNode(child.Id, child.LotNumber, child.Product!.Code, child.Product!.Name,
-                child.StockStatus, null, null, IsLineage: true,
+                child.StockStatus, null, relation.Quantity, relation.RelationType,
                 await BuildForwardNodesAsync(child, visited, depth + 1, ct)));
         }
 
@@ -170,7 +187,7 @@ public class TraceabilityController(MesAppDbContext db) : ControllerBase
                 : [];
             nodes.Add(new TraceNode(outputLot.Id, outputLot.LotNumber,
                 outputLot.Product!.Code, outputLot.Product!.Name, outputLot.StockStatus,
-                usage.WorkOrder!.WorkOrderNo, usage.Quantity, IsLineage: false, children));
+                usage.WorkOrder!.WorkOrderNo, usage.Quantity, Relation: null, children));
         }
         return nodes;
     }

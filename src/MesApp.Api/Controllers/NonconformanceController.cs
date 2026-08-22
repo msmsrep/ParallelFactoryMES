@@ -21,6 +21,7 @@ namespace MesApp.Api.Controllers;
 public class NonconformanceController(
     MesAppDbContext db,
     NumberingService numbering,
+    LotStatusService lotStatus,
     IAuditLogger auditLogger) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -123,10 +124,16 @@ public class NonconformanceController(
         switch (request.Action)
         {
             case NonconformanceAction.Hold when report.Lot is not null:
-                report.Lot.StockStatus = LotStockStatus.OnHold;
+                lotStatus.ChangeStatus(report.Lot, LotStockStatus.OnHold,
+                    LotStatusChangeSource.Nonconformance,
+                    $"不適合 {report.ReportNo} の保留指示（{request.Instruction}）",
+                    CurrentUserId, nonconformanceReportId: report.Id);
                 break;
             case NonconformanceAction.Discard when report.Lot is not null:
-                report.Lot.StockStatus = LotStockStatus.ToBeDiscarded;
+                lotStatus.ChangeStatus(report.Lot, LotStockStatus.ToBeDiscarded,
+                    LotStatusChangeSource.Nonconformance,
+                    $"不適合 {report.ReportNo} の廃棄指示（{request.Instruction}）",
+                    CurrentUserId, nonconformanceReportId: report.Id);
                 break;
             case NonconformanceAction.Rework when report.Lot is not null:
                 // リワーク指図の自動起票（B-70-10-01。由来指図が特定できる場合のみ）
@@ -211,7 +218,10 @@ public class NonconformanceController(
         // 特採：承認記録付きで次工程進行（Spec.md 5.7）
         if (report.Action == NonconformanceAction.SpecialAcceptance && report.Lot is not null)
         {
-            report.Lot.StockStatus = LotStockStatus.Normal;
+            lotStatus.ChangeStatus(report.Lot, LotStockStatus.Normal,
+                LotStatusChangeSource.Nonconformance,
+                $"不適合 {report.ReportNo} の特採承認による解放",
+                CurrentUserId, nonconformanceReportId: report.Id);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Quality", "NonconformanceApprove", nameof(NonconformanceReport),
