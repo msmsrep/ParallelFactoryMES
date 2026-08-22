@@ -86,6 +86,40 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task 有効期限切れの部材ロットは投入もバックフラッシュもできない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var expired = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId,
+            // 業務日付の境界（既定6時）で前日扱いになる時間帯でも確実に期限切れになるよう2日前にする
+            expiresOn: DateOnly.FromDateTime(DateTime.Today).AddDays(-2));
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        // 手動投入は拒否される
+        var manual = await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[0].Id}/consumptions",
+            new ConsumptionRequest(expired.Id, ctx.MaterialLocationId, 20m));
+        Assert.Equal(HttpStatusCode.BadRequest, manual.StatusCode);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, expired.Id));
+
+        // FEFO引当（バックフラッシュ）の対象からも除外され、他に在庫がなければ失敗する
+        var record = await admin.PostAsJsonAsync(
+            $"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+            new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now, null, ctx.ProductLocationId, Backflush: true));
+        Assert.Equal(HttpStatusCode.BadRequest, record.StatusCode);
+
+        // 期限内のロットを追加すればそちらが引き当てられる
+        var valid = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId,
+            expiresOn: DateOnly.FromDateTime(DateTime.Today).AddDays(30));
+        var retried = await admin.PostAsJsonAsync(
+            $"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+            new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now, null, ctx.ProductLocationId, Backflush: true));
+        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, expired.Id));
+        Assert.Equal(80m, await Phase3TestData.GetStockQuantityAsync(admin, valid.Id));
+    }
+
+    [Fact]
     public async Task バックフラッシュでMBOM数量分の部材が自動消費される()
     {
         using var factory = new ApiFactory();

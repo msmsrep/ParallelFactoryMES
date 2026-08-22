@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Inventory;
@@ -13,7 +14,8 @@ namespace MesApp.Api.Controllers;
 /// <summary>
 /// 出荷（D-40-20 出荷指示、D-40-30 出荷実行・完了報告）。
 /// 出荷実行はロット・ロケーション指定で在庫を引き落とす。部分出荷可能で、
-/// 全明細が出荷済みになると完了になる。出荷判定との連動はPhase 4で追加予定。
+/// 全明細が出荷済みになると完了になる。出荷には承認済みの出荷判定（H-10-10）が必要で、
+/// 併せてロットの使用可否（Spec.md 3.9。LotUsabilityPolicy）を満たす必要がある。
 /// </summary>
 [ApiController]
 [Route("api/shipping-orders")]
@@ -22,6 +24,7 @@ public class ShippingOrdersController(
     MesAppDbContext db,
     InventoryService inventory,
     NumberingService numbering,
+    IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
@@ -122,11 +125,18 @@ public class ShippingOrdersController(
 
         // ロットの品目単位で出荷指示明細との突合を行う
         var shipTotals = new Dictionary<int, decimal>(); // productId -> qty
+        var today = businessDate.Today;
         foreach (var line in request.Lines)
         {
             if (!lots.TryGetValue(line.LotId, out var lot))
             {
                 return BadRequest(new ProblemDetails { Title = "存在しないロットIDが含まれています。" });
+            }
+            // 出荷判定の承認後に保留・不良になったロットを出荷させない（判定書の存在だけでは不十分）。
+            // 特採は不適合承認時にステータスが正常へ戻るため、ここでは正常のみを許可すればよい
+            if (LotUsabilityPolicy.CheckShippable(lot, today) is string reason)
+            {
+                return Conflict(new ProblemDetails { Title = reason });
             }
             shipTotals[lot.ProductId] = shipTotals.GetValueOrDefault(lot.ProductId) + line.Quantity;
         }

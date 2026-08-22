@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
@@ -214,9 +215,10 @@ public class WorkOrderExecutionController(
         {
             return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
         }
-        if (lot.StockStatus != LotStockStatus.Normal)
+        // 投入可否（ステータス・有効期限）の判定は LotUsabilityPolicy に集約している
+        if (LotUsabilityPolicy.CheckIssuable(lot, businessDate.Today) is string reason)
         {
-            return BadRequest(new ProblemDetails { Title = $"ステータス '{lot.StockStatus}' のロットは投入できません。" });
+            return BadRequest(new ProblemDetails { Title = reason });
         }
 
         try

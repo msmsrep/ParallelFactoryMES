@@ -215,6 +215,65 @@ public class InventoryTests
     }
 
     [Fact]
+    public async Task 出荷判定の承認後に保留になったロットは出荷できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        var created = await admin.PostAsJsonAsync("/api/shipping-orders",
+            new ShippingOrderCreateRequest("出荷先A", null, [new(ctx.ProductId, 60m)]));
+        var shipping = (await created.Content.ReadFromJsonAsync<ShippingOrderResponse>())!;
+        var judged = await admin.PostAsJsonAsync("/api/shipment-judgments",
+            new Core.Contracts.Quality.ShipmentJudgmentCreateRequest(
+                null, shipping.Id, ShipmentJudgmentResult.Approved, null));
+        var judgment = (await judged.Content.ReadFromJsonAsync<Core.Contracts.Quality.ShipmentJudgmentResponse>())!;
+        (await admin.PostAsync($"/api/shipment-judgments/{judgment.Id}/approve", null)).EnsureSuccessStatusCode();
+
+        // 判定は承認済みでも、ロットが保留になっていれば出荷できない
+        await admin.PostAsJsonAsync("/api/inventory/status",
+            new LotStatusRequest(lot.Id, LotStockStatus.OnHold, "調査中"));
+        var held = await admin.PostAsJsonAsync($"/api/shipping-orders/{shipping.Id}/ship",
+            new ShipExecuteRequest([new(lot.Id, ctx.ProductLocationId, 20m)]));
+        Assert.Equal(HttpStatusCode.Conflict, held.StatusCode);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 保留を解除すれば出荷できる
+        await admin.PostAsJsonAsync("/api/inventory/status",
+            new LotStatusRequest(lot.Id, LotStockStatus.Normal, "調査完了"));
+        var shipped = await admin.PostAsJsonAsync($"/api/shipping-orders/{shipping.Id}/ship",
+            new ShipExecuteRequest([new(lot.Id, ctx.ProductLocationId, 20m)]));
+        Assert.Equal(HttpStatusCode.OK, shipped.StatusCode);
+        Assert.Equal(80m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+    }
+
+    [Fact]
+    public async Task 有効期限切れのロットは出荷できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId,
+            // 業務日付の境界（既定6時）で前日扱いになる時間帯でも確実に期限切れになるよう2日前にする
+            expiresOn: DateOnly.FromDateTime(DateTime.Today).AddDays(-2));
+
+        var created = await admin.PostAsJsonAsync("/api/shipping-orders",
+            new ShippingOrderCreateRequest("出荷先A", null, [new(ctx.ProductId, 60m)]));
+        var shipping = (await created.Content.ReadFromJsonAsync<ShippingOrderResponse>())!;
+        var judged = await admin.PostAsJsonAsync("/api/shipment-judgments",
+            new Core.Contracts.Quality.ShipmentJudgmentCreateRequest(
+                null, shipping.Id, ShipmentJudgmentResult.Approved, null));
+        var judgment = (await judged.Content.ReadFromJsonAsync<Core.Contracts.Quality.ShipmentJudgmentResponse>())!;
+        (await admin.PostAsync($"/api/shipment-judgments/{judgment.Id}/approve", null)).EnsureSuccessStatusCode();
+
+        var expired = await admin.PostAsJsonAsync($"/api/shipping-orders/{shipping.Id}/ship",
+            new ShipExecuteRequest([new(lot.Id, ctx.ProductLocationId, 20m)]));
+        Assert.Equal(HttpStatusCode.Conflict, expired.StatusCode);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+    }
+
+    [Fact]
     public async Task 棚卸で差異が調整される()
     {
         using var factory = new ApiFactory();

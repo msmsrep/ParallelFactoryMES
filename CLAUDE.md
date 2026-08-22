@@ -65,6 +65,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 - DTO は `MesApp.Core/Contracts/<領域>/` の `record`。エンティティを直接返さない
 - エラーは `ProblemDetails` + **日本語のメッセージ**（例: `$"ロケーションコード '{request.Code}' は既に存在します。"`）。重複は `Conflict`、未存在は `NotFound`
 - 作成・更新・削除の後に `auditLogger.LogAsync(...)` を呼ぶ
+- **複数の経路で必要になる業務判定は Controller に書かない**。`Api/Policies/` に置き、Controller はそれを呼んで結果を `ProblemDetails` に変換するだけにする（例：ロットの投入可否・引当可否・出荷可否は `LotUsabilityPolicy`）
 
 ## クライアント側の規約
 
