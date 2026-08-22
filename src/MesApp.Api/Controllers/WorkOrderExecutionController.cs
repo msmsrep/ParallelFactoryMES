@@ -201,7 +201,8 @@ public class WorkOrderExecutionController(
     public async Task<ActionResult<ConsumptionResponse>> AddConsumption(
         int id, ConsumptionRequest request, CancellationToken ct)
     {
-        var workOrder = await GetActiveWorkOrderAsync(id, ct);
+        var workOrder = await db.WorkOrders.Include(w => w.Product)
+            .FirstOrDefaultAsync(w => w.Id == id, ct);
         if (workOrder is null)
         {
             return NotFound();
@@ -210,7 +211,7 @@ public class WorkOrderExecutionController(
         {
             return Conflict(new ProblemDetails { Title = $"状態 '{workOrder.Status}' の作業指示には記録できません。" });
         }
-        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
+        var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
             return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
@@ -219,6 +220,16 @@ public class WorkOrderExecutionController(
         if (LotUsabilityPolicy.CheckIssuable(lot, businessDate.Today) is string reason)
         {
             return BadRequest(new ProblemDetails { Title = reason });
+        }
+        // 指定外材料の投入を防ぐ（B-30-20）。MBOMに定義された部材以外は投入できない
+        var bomChildProductIds = await db.BomItems
+            .Where(b => b.ParentProductId == workOrder.ProductId)
+            .Select(b => b.ChildProductId)
+            .ToListAsync(ct);
+        if (MaterialIssuePolicy.CheckAgainstBom(
+                workOrder.Product!.Code, bomChildProductIds, lot.Product!) is string bomReason)
+        {
+            return BadRequest(new ProblemDetails { Title = bomReason });
         }
 
         try
@@ -247,7 +258,7 @@ public class WorkOrderExecutionController(
         await auditLogger.LogAsync("Execution", "Consumption", nameof(WorkOrder), id.ToString(),
             detail: $"lot={lot.LotNumber}, qty={request.Quantity}", ct: ct);
 
-        var product = await db.Products.FirstAsync(p => p.Id == lot.ProductId, ct);
+        var product = lot.Product!;
         return new ConsumptionResponse(consumption.Id, id, product.Id, product.Code, product.Name,
             lot.Id, lot.LotNumber, request.LocationId, request.Quantity,
             consumption.ConsumedAt, consumption.Method);

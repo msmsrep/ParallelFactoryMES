@@ -86,6 +86,67 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task MBOMに含まれない品目のロットは投入できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin); // FG-01 の MBOM は RM-01 のみ
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrderId = order.WorkOrders[0].Id;
+
+        // MBOMにない品目（RM-02）のロットは、在庫があっても投入できない
+        var other = await MasterTests.CreateProductAsync(admin, "RM-02", "別部材", ProductType.Material);
+        var otherLot = await Phase3TestData.ReceiveAsync(admin, other.Id, 100m, ctx.MaterialLocationId);
+        var rejected = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
+            new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m));
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, otherLot.Id));
+
+        // MBOMの部材なら投入できる
+        var materialLot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var accepted = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
+            new ConsumptionRequest(materialLot.Id, ctx.MaterialLocationId, 20m));
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+
+        // 代替部品としてMBOMへ登録すれば投入できるようになる（A-40-10-04）
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom",
+            new List<Core.Contracts.Masters.BomItemRequest>
+            {
+                new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
+                new(other.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
+            })).EnsureSuccessStatusCode();
+        var retried = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
+            new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m));
+        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
+        Assert.Equal(95m, await Phase3TestData.GetStockQuantityAsync(admin, otherLot.Id));
+    }
+
+    [Fact]
+    public async Task MBOM未登録の品目には部材を投入できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // MBOMを持たない品目（工順のみ）を作る
+        var noBom = await MasterTests.CreateProductAsync(admin, "FG-02", "MBOM未登録品", ProductType.Product);
+        (await admin.PutAsJsonAsync($"/api/products/{noBom.Id}/routing",
+            new List<Core.Contracts.Masters.RoutingStepRequest>
+            {
+                new(1, ctx.ProcessId, 30m, 10m, null, null, null, null, null),
+            })).EnsureSuccessStatusCode();
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, noBom.Id, 10m);
+        var materialLot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        // 照合の基準がないため投入は拒否される（MBOMの整備を促す）
+        var rejected = await admin.PostAsJsonAsync(
+            $"/api/work-orders/{order.WorkOrders[0].Id}/consumptions",
+            new ConsumptionRequest(materialLot.Id, ctx.MaterialLocationId, 5m));
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, materialLot.Id));
+    }
+
+    [Fact]
     public async Task 有効期限切れの部材ロットは投入もバックフラッシュもできない()
     {
         using var factory = new ApiFactory();
