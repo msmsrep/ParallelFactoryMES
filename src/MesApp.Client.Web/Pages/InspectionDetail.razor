@@ -134,6 +134,31 @@ else
                 </tbody>
             </table>
         }
+
+        @* 訂正履歴（C-20-50-07）：元の記録を残したまま、誰がいつ何を根拠に直したかを示す *@
+        @if (_order.Corrections.Count > 0)
+        {
+            <h2>訂正履歴</h2>
+            <table class="table">
+                <thead>
+                    <tr><th>日時</th><th>検査項目</th><th>サンプルNo</th><th>訂正前</th><th>訂正後</th><th>理由</th><th>訂正者</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var correction in _order.Corrections)
+                    {
+                        <tr>
+                            <td>@correction.CorrectedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@correction.ItemCode @correction.ItemName</td>
+                            <td>@correction.SampleNo</td>
+                            <td>@FormatValue(correction.BeforeMeasuredValue, correction.BeforeTextValue, correction.BeforeJudgment)</td>
+                            <td>@FormatValue(correction.AfterMeasuredValue, correction.AfterTextValue, correction.AfterJudgment)</td>
+                            <td>@correction.Reason</td>
+                            <td>@(correction.CorrectedByName ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
     </div>
 
     @if (_correcting is not null)
@@ -166,6 +191,12 @@ else
 }
 
 @code {
+    private static string FormatValue(decimal? measured, string? text, InspectionJudgment judgment)
+    {
+        var value = measured?.ToString() ?? text ?? "-";
+        return $"{value}（{(judgment == InspectionJudgment.Pass ? "合格" : "不合格")}）";
+    }
+
     private sealed class ResultEntry
     {
         public string? Measured { get; set; }

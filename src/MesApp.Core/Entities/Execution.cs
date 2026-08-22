@@ -124,6 +124,41 @@ public class ProductionRecord
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
+/// <summary>
+/// 生産実績の訂正履歴（Spec.md 5.2 ProductionRecordCorrection。B-70-30-01）。
+/// <para>
+/// 実績は上書きで訂正されるため、訂正前の値がどこにも残らないと後から製造記録を説明できない。
+/// 訂正のたびに1レコードを追加し、訂正前値・訂正後値・訂正者・訂正日時・訂正理由を業務履歴として残す。
+/// 監査ログ（<see cref="AuditLog"/>）は操作の記録であり用途が異なる。こちらは製造記録・トレースから
+/// 参照する業務データとして扱う。
+/// </para>
+/// </summary>
+public class ProductionRecordCorrection
+{
+    public int Id { get; set; }
+
+    public int ProductionRecordId { get; set; }
+    public ProductionRecord? ProductionRecord { get; set; }
+
+    /// <summary>訂正対象の作業指示（ロット・工程から履歴を引くための非正規化）</summary>
+    public int WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
+    public decimal BeforeGoodQuantity { get; set; }
+    public decimal BeforeDefectQuantity { get; set; }
+
+    public decimal AfterGoodQuantity { get; set; }
+    public decimal AfterDefectQuantity { get; set; }
+
+    /// <summary>訂正理由（必須）</summary>
+    public string Reason { get; set; } = string.Empty;
+
+    public string? CorrectedByUserId { get; set; }
+    public AppUser? CorrectedBy { get; set; }
+
+    public DateTimeOffset CorrectedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 /// <summary>製造条件データ（Spec.md 5.2 ProductionDataRecord。B-30-30-04。手入力/CSV取込）</summary>
 public class ProductionDataRecord
 {

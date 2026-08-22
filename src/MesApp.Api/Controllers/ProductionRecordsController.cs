@@ -65,6 +65,20 @@ public class ProductionRecordsController(
             record.OutputLot.InitialQuantity += goodDelta;
         }
 
+        // 訂正前の値を業務履歴として残す（B-70-30-01）。実績自体は上書きされるため、
+        // これがないと製造記録・トレースから「何をどう直したか」を説明できない
+        db.ProductionRecordCorrections.Add(new ProductionRecordCorrection
+        {
+            ProductionRecordId = record.Id,
+            WorkOrderId = record.WorkOrderId,
+            BeforeGoodQuantity = record.GoodQuantity,
+            BeforeDefectQuantity = record.DefectQuantity,
+            AfterGoodQuantity = request.GoodQuantity,
+            AfterDefectQuantity = request.DefectQuantity,
+            Reason = request.Reason,
+            CorrectedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+        });
+
         record.GoodQuantity = request.GoodQuantity;
         record.DefectQuantity = request.DefectQuantity;
         await db.SaveChangesAsync(ct);

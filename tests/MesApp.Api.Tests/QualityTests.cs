@@ -372,6 +372,54 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 検査実績を訂正すると訂正前の記録が訂正履歴として残る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId); // 外径 9.5〜10.5
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+        var order = (await created.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+        var results = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.0m, null, null) });
+        var resultId = (await results.Content.ReadFromJsonAsync<InspectionOrderResponse>())!.Results[0].Id;
+
+        // 1回目の訂正：10.0 → 11.0（規格外なので不合格へ）
+        var corrected = await admin.PutAsJsonAsync(
+            $"/api/inspection-orders/{order.Id}/results/{resultId}",
+            new InspectionResultCorrectionRequest(11.0m, null, InspectionJudgment.Fail, "測定器の読み違い"));
+        Assert.Equal(HttpStatusCode.OK, corrected.StatusCode);
+        var afterFirst = (await corrected.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+
+        var first = Assert.Single(afterFirst.Corrections);
+        Assert.Equal(10.0m, first.BeforeMeasuredValue);
+        Assert.Equal(InspectionJudgment.Pass, first.BeforeJudgment);
+        Assert.Equal(11.0m, first.AfterMeasuredValue);
+        Assert.Equal(InspectionJudgment.Fail, first.AfterJudgment);
+        Assert.Equal("測定器の読み違い", first.Reason);
+        Assert.Equal("INS-01", first.ItemCode);
+        Assert.NotNull(first.CorrectedByName);
+
+        // 2回目の訂正：訂正履歴は積み上がり、1回目の記録も残る
+        (await admin.PutAsJsonAsync($"/api/inspection-orders/{order.Id}/results/{resultId}",
+            new InspectionResultCorrectionRequest(10.2m, null, InspectionJudgment.Pass, "再測定")))
+            .EnsureSuccessStatusCode();
+
+        var reloaded = await admin.GetFromJsonAsync<InspectionOrderResponse>(
+            $"/api/inspection-orders/{order.Id}");
+        Assert.Equal(2, reloaded!.Corrections.Count);
+        Assert.Equal(10.0m, reloaded.Corrections[0].BeforeMeasuredValue);
+        Assert.Equal(11.0m, reloaded.Corrections[1].BeforeMeasuredValue);
+        Assert.Equal(10.2m, reloaded.Corrections[1].AfterMeasuredValue);
+        Assert.Equal("再測定", reloaded.Corrections[1].Reason);
+        // 実績自体は最新の値になっている
+        Assert.Equal(10.2m, reloaded.Results[0].MeasuredValue);
+    }
+
+    [Fact]
     public async Task 品質分析サマリで不良集計と不適合状況を取得できる()
     {
         using var factory = new ApiFactory();

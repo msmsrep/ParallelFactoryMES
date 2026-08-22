@@ -56,7 +56,7 @@ public class InspectionOrdersController(
     public async Task<ActionResult<InspectionOrderResponse>> Get(int id, CancellationToken ct)
     {
         var order = await BaseQuery().FirstOrDefaultAsync(o => o.Id == id, ct);
-        return order is null ? NotFound() : ToResponse(order);
+        return order is null ? NotFound() : await ToResponseWithCorrectionsAsync(order, ct);
     }
 
     /// <summary>
@@ -259,6 +259,23 @@ public class InspectionOrdersController(
         }
 
         var before = new { value = result.MeasuredValue, text = result.TextValue, judgment = result.Judgment };
+
+        // 訂正前の記録を業務履歴として残す（C-20-50-07）。検査成績書に
+        // 「元の記録＋訂正理由・訂正者」を出せるようにするための正式な記録
+        db.InspectionResultCorrections.Add(new InspectionResultCorrection
+        {
+            InspectionResultId = result.Id,
+            InspectionOrderId = id,
+            BeforeMeasuredValue = result.MeasuredValue,
+            BeforeTextValue = result.TextValue,
+            BeforeJudgment = result.Judgment,
+            AfterMeasuredValue = request.MeasuredValue,
+            AfterTextValue = request.TextValue,
+            AfterJudgment = request.Judgment,
+            Reason = request.Reason,
+            CorrectedByUserId = CurrentUserId,
+        });
+
         result.MeasuredValue = request.MeasuredValue;
         result.TextValue = request.TextValue;
         result.Judgment = request.Judgment;
@@ -295,7 +312,7 @@ public class InspectionOrdersController(
                 reason = request.Reason,
             }, ct: ct);
         var saved = await BaseQuery().FirstAsync(o => o.Id == id, ct);
-        return ToResponse(saved);
+        return await ToResponseWithCorrectionsAsync(saved, ct);
     }
 
     /// <summary>
@@ -452,6 +469,49 @@ public class InspectionOrdersController(
             .Include(o => o.Results).ThenInclude(r => r.InspectionItem)
             .Include(o => o.Results).ThenInclude(r => r.InspectedBy);
 
+    /// <summary>
+    /// 訂正履歴付きの応答を組み立てる。訂正履歴は指示に属する業務履歴として返し、
+    /// 画面・検査成績書から「元の記録＋訂正理由・訂正者」を参照できるようにする
+    /// </summary>
+    private async Task<InspectionOrderResponse> ToResponseWithCorrectionsAsync(
+        InspectionOrder o, CancellationToken ct)
+    {
+        var corrections = await db.InspectionResultCorrections.AsNoTracking()
+            .Where(c => c.InspectionOrderId == o.Id)
+            .OrderBy(c => c.Id)
+            .Select(c => new
+            {
+                c.InspectionResultId,
+                c.BeforeMeasuredValue,
+                c.BeforeTextValue,
+                c.BeforeJudgment,
+                c.AfterMeasuredValue,
+                c.AfterTextValue,
+                c.AfterJudgment,
+                c.Reason,
+                CorrectedByName = c.CorrectedBy!.DisplayName,
+                c.CorrectedAt,
+                c.InspectionResult!.InspectionItemId,
+                c.InspectionResult!.SampleNo,
+            })
+            .ToListAsync(ct);
+
+        var response = ToResponse(o);
+        return response with
+        {
+            Corrections = corrections.Select(c =>
+            {
+                var item = SnapshotOf(o, c.InspectionItemId);
+                return new InspectionResultCorrectionResponse(
+                    c.InspectionResultId, item?.ItemCode ?? string.Empty, item?.ItemName ?? string.Empty,
+                    c.SampleNo,
+                    c.BeforeMeasuredValue, c.BeforeTextValue, c.BeforeJudgment,
+                    c.AfterMeasuredValue, c.AfterTextValue, c.AfterJudgment,
+                    c.Reason, c.CorrectedByName, c.CorrectedAt);
+            }).ToList(),
+        };
+    }
+
     private static InspectionOrderResponse ToResponse(InspectionOrder o) =>
         new(o.Id, o.OrderNo, o.Type, o.Status,
             o.TargetLotId, o.TargetLot?.LotNumber, o.TargetWorkOrderId, o.TargetWorkOrder?.WorkOrderNo,
@@ -466,7 +526,9 @@ public class InspectionOrdersController(
                 SnapshotOf(o, r.InspectionItemId)?.ItemCode ?? r.InspectionItem!.Code,
                 SnapshotOf(o, r.InspectionItemId)?.ItemName ?? r.InspectionItem!.Name,
                 r.SampleNo, r.MeasuredValue, r.TextValue, r.Judgment,
-                r.InspectedByUserId, r.InspectedBy?.DisplayName, r.InspectedAt, r.CorrectionNote)).ToList());
+                r.InspectedByUserId, r.InspectedBy?.DisplayName, r.InspectedAt, r.CorrectionNote)).ToList(),
+            // 訂正履歴は ToResponseWithCorrectionsAsync で詰める（一覧では取得しない）
+            []);
 
     private static InspectionOrderItem? SnapshotOf(InspectionOrder order, int inspectionItemId) =>
         order.Items.FirstOrDefault(i => i.InspectionItemId == inspectionItemId);

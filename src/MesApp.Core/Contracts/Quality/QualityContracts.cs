@@ -52,13 +52,24 @@ public record InspectionResultResponse(
     string InspectedByUserId, string? InspectedByName, DateTimeOffset InspectedAt,
     string? CorrectionNote);
 
+/// <summary>
+/// 検査実績の訂正履歴1件（C-20-50-07）。訂正前の記録を残したまま、
+/// 誰がいつ何を根拠に直したかを示す（Spec.md 5.4 InspectionResultCorrection）
+/// </summary>
+public record InspectionResultCorrectionResponse(
+    int InspectionResultId, string ItemCode, string ItemName, int SampleNo,
+    decimal? BeforeMeasuredValue, string? BeforeTextValue, InspectionJudgment BeforeJudgment,
+    decimal? AfterMeasuredValue, string? AfterTextValue, InspectionJudgment AfterJudgment,
+    string Reason, string? CorrectedByName, DateTimeOffset CorrectedAt);
+
 public record InspectionOrderResponse(
     int Id, string OrderNo, InspectionOrderType Type, InspectionOrderStatus Status,
     int? TargetLotId, string? TargetLotNumber, int? TargetWorkOrderId, string? TargetWorkOrderNo,
     InspectionJudgment? OverallJudgment, DateTimeOffset? JudgedAt,
     string? ApprovedByUserId, DateTimeOffset? ApprovedAt, string? Note, DateTimeOffset CreatedAt,
     List<InspectionOrderItemResponse> Items,
-    List<InspectionResultResponse> Results);
+    List<InspectionResultResponse> Results,
+    List<InspectionResultCorrectionResponse> Corrections);
 
 // ---- 不適合・逸脱（B-40-30、C-30）----
 
@@ -129,13 +140,21 @@ public record LotStatusHistoryEntry(
     LotStockStatus FromStatus, LotStockStatus ToStatus, LotStatusChangeSource Source,
     string? Reason, string? ChangedByName, DateTimeOffset ChangedAt);
 
-/// <summary>ロットの履歴閲覧（H-30-10-03〜05：製造・検査・在庫・状態履歴）</summary>
+/// <summary>生産実績の訂正履歴1件（B-70-30-01）</summary>
+public record ProductionCorrectionEntry(
+    string WorkOrderNo,
+    decimal BeforeGoodQuantity, decimal BeforeDefectQuantity,
+    decimal AfterGoodQuantity, decimal AfterDefectQuantity,
+    string Reason, string? CorrectedByName, DateTimeOffset CorrectedAt);
+
+/// <summary>ロットの履歴閲覧（H-30-10-03〜05：製造・検査・在庫・状態・訂正履歴）</summary>
 public record LotHistoryResponse(
     int LotId, string LotNumber, string ProductCode, string ProductName,
     List<string> ProductionHistory,
     List<string> InspectionHistory,
     List<string> InventoryHistory,
-    List<LotStatusHistoryEntry> StatusHistory);
+    List<LotStatusHistoryEntry> StatusHistory,
+    List<ProductionCorrectionEntry> CorrectionHistory);
 
 // ---- 品質分析（C-40-10）----
 

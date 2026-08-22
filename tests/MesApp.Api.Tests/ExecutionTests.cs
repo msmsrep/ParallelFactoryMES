@@ -329,6 +329,18 @@ public class ExecutionTests
         Assert.Equal(8m, correctedBody!.GoodQuantity);
         Assert.Equal(8m, await Phase3TestData.GetStockQuantityAsync(admin, record.OutputLotId.Value));
 
+        // 訂正前の値は業務履歴として残り、トレース画面の履歴から参照できる（B-70-30-01）
+        var history = await admin.GetFromJsonAsync<Core.Contracts.Quality.LotHistoryResponse>(
+            $"/api/traceability/{record.OutputLotId.Value}/history");
+        var correction = Assert.Single(history!.CorrectionHistory);
+        Assert.Equal(10m, correction.BeforeGoodQuantity);
+        Assert.Equal(0m, correction.BeforeDefectQuantity);
+        Assert.Equal(8m, correction.AfterGoodQuantity);
+        Assert.Equal(2m, correction.AfterDefectQuantity);
+        Assert.Equal("検査で2個不良判明", correction.Reason);
+        Assert.Equal(finalWo.WorkOrderNo, correction.WorkOrderNo);
+        Assert.NotNull(correction.CorrectedByName);
+
         // 訂正の監査証跡は変更前後と理由をJSONで残す（Spec.md 7.6）
         var detail = await GetLatestAuditDetailAsync(factory, "Execution", "Correct");
         using var json = JsonDocument.Parse(detail);

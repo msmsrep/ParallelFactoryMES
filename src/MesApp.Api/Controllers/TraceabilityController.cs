@@ -92,8 +92,19 @@ public class TraceabilityController(MesAppDbContext db) : ControllerBase
                 h.ChangedAt))
             .ToListAsync(ct);
 
+        // 実績訂正の履歴（B-70-30-01）。このロットを産出した実績への訂正を時系列で出す
+        var correctionHistory = await db.ProductionRecordCorrections.AsNoTracking()
+            .Where(c => c.ProductionRecord!.OutputLotId == lotId)
+            .OrderBy(c => c.Id)
+            .Select(c => new ProductionCorrectionEntry(
+                c.WorkOrder!.WorkOrderNo,
+                c.BeforeGoodQuantity, c.BeforeDefectQuantity,
+                c.AfterGoodQuantity, c.AfterDefectQuantity,
+                c.Reason, c.CorrectedBy!.DisplayName, c.CorrectedAt))
+            .ToListAsync(ct);
+
         return new LotHistoryResponse(lot.Id, lot.LotNumber, lot.Product!.Code, lot.Product!.Name,
-            production, inspections, transactions, statusHistory);
+            production, inspections, transactions, statusHistory, correctionHistory);
     }
 
     /// <summary>産出ロット→（生成元作業指示の指図の全作業指示）→投入部材ロットを再帰的に辿る</summary>

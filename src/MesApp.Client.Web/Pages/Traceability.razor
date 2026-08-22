@@ -140,6 +140,40 @@
                     </tbody>
                 </table>
             }
+
+            <h2>実績訂正履歴（B-70-30-01）</h2>
+            @if (_history.CorrectionHistory.Count == 0)
+            {
+                <p class="text-muted">記録はありません。</p>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>日時</th>
+                            <th>作業指示</th>
+                            <th>訂正前（良品/不良）</th>
+                            <th>訂正後（良品/不良）</th>
+                            <th>理由</th>
+                            <th>訂正者</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in _history.CorrectionHistory)
+                        {
+                            <tr>
+                                <td>@entry.CorrectedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@entry.WorkOrderNo</td>
+                                <td>@entry.BeforeGoodQuantity / @entry.BeforeDefectQuantity</td>
+                                <td>@entry.AfterGoodQuantity / @entry.AfterDefectQuantity</td>
+                                <td>@entry.Reason</td>
+                                <td>@(entry.CorrectedByName ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
         </div>
     }
 }

@@ -38,6 +38,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<ChecklistRecord> ChecklistRecords => Set<ChecklistRecord>();
     public DbSet<MaterialConsumption> MaterialConsumptions => Set<MaterialConsumption>();
     public DbSet<ProductionRecord> ProductionRecords => Set<ProductionRecord>();
+    public DbSet<ProductionRecordCorrection> ProductionRecordCorrections => Set<ProductionRecordCorrection>();
     public DbSet<ProductionDataRecord> ProductionDataRecords => Set<ProductionDataRecord>();
     public DbSet<WorkTimeRecord> WorkTimeRecords => Set<WorkTimeRecord>();
     public DbSet<TroubleReport> TroubleReports => Set<TroubleReport>();
@@ -53,6 +54,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     // 品質系（Spec.md 5.4）
     public DbSet<InspectionOrder> InspectionOrders => Set<InspectionOrder>();
     public DbSet<InspectionResult> InspectionResults => Set<InspectionResult>();
+    public DbSet<InspectionResultCorrection> InspectionResultCorrections => Set<InspectionResultCorrection>();
     public DbSet<NonconformanceReport> NonconformanceReports => Set<NonconformanceReport>();
     public DbSet<ShipmentJudgment> ShipmentJudgments => Set<ShipmentJudgment>();
 
@@ -359,6 +361,20 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
+        builder.Entity<ProductionRecordCorrection>(e =>
+        {
+            e.HasIndex(x => new { x.WorkOrderId, x.Id });
+            e.HasIndex(x => x.ProductionRecordId);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.CorrectedByUserId).HasMaxLength(450);
+            e.HasOne(x => x.ProductionRecord).WithMany().HasForeignKey(x => x.ProductionRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CorrectedBy).WithMany().HasForeignKey(x => x.CorrectedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
         builder.Entity<ProductionDataRecord>(e =>
         {
             e.HasIndex(x => x.WorkOrderId);
@@ -520,6 +536,20 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.Property(x => x.Method).HasMaxLength(500);
             e.HasOne(x => x.InspectionItem).WithMany().HasForeignKey(x => x.InspectionItemId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<InspectionResultCorrection>(e =>
+        {
+            e.HasIndex(x => new { x.InspectionOrderId, x.Id });
+            e.HasIndex(x => x.InspectionResultId);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.BeforeTextValue).HasMaxLength(500);
+            e.Property(x => x.AfterTextValue).HasMaxLength(500);
+            e.Property(x => x.CorrectedByUserId).HasMaxLength(450);
+            e.HasOne(x => x.InspectionResult).WithMany().HasForeignKey(x => x.InspectionResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.CorrectedBy).WithMany().HasForeignKey(x => x.CorrectedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<InspectionResult>(e =>

@@ -115,6 +115,42 @@ public class InspectionResult
     public string? CorrectionNote { get; set; }
 }
 
+/// <summary>
+/// 検査実績の訂正履歴（Spec.md 5.4 InspectionResultCorrection。C-20-50-07）。
+/// <para>
+/// 測定値・判定を上書きすると当時の記録が消えるため、訂正のたびに1レコードを追加し、
+/// 訂正前値・訂正後値・訂正者・訂正日時・訂正理由を業務履歴として残す。
+/// 検査成績書（C-20-10-05）に「元の記録＋訂正理由・訂正者」を出せるようにするための記録であり、
+/// 監査ログ（操作の記録）とは用途が異なる。
+/// </para>
+/// </summary>
+public class InspectionResultCorrection
+{
+    public int Id { get; set; }
+
+    public int InspectionResultId { get; set; }
+    public InspectionResult? InspectionResult { get; set; }
+
+    /// <summary>訂正対象の検査指示（成績書から履歴を引くための非正規化）</summary>
+    public int InspectionOrderId { get; set; }
+
+    public decimal? BeforeMeasuredValue { get; set; }
+    public string? BeforeTextValue { get; set; }
+    public InspectionJudgment BeforeJudgment { get; set; }
+
+    public decimal? AfterMeasuredValue { get; set; }
+    public string? AfterTextValue { get; set; }
+    public InspectionJudgment AfterJudgment { get; set; }
+
+    /// <summary>訂正理由（必須）</summary>
+    public string Reason { get; set; } = string.Empty;
+
+    public string? CorrectedByUserId { get; set; }
+    public AppUser? CorrectedBy { get; set; }
+
+    public DateTimeOffset CorrectedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 /// <summary>不適合・逸脱（Spec.md 5.4 NonconformanceReport。B-40-30、C-30）</summary>
 public class NonconformanceReport
 {
