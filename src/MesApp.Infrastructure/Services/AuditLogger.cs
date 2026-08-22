@@ -1,4 +1,7 @@
 using System.Security.Claims;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using Microsoft.AspNetCore.Http;
@@ -10,12 +13,19 @@ namespace MesApp.Infrastructure.Services;
 /// </summary>
 public class AuditLogger(MesAppDbContext db, IHttpContextAccessor httpContextAccessor) : IAuditLogger
 {
+    /// <summary>日本語をエスケープせずそのまま出力する（監査ログは人が読む前提のため）</summary>
+    private static readonly JsonSerializerOptions DetailJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
     public async Task LogAsync(
         string category,
         string action,
         string? targetType = null,
         string? targetId = null,
-        string? detail = null,
+        object? detail = null,
         CancellationToken ct = default)
     {
         var http = httpContextAccessor.HttpContext;
@@ -30,9 +40,17 @@ public class AuditLogger(MesAppDbContext db, IHttpContextAccessor httpContextAcc
             Action = action,
             TargetType = targetType,
             TargetId = targetId,
-            Detail = detail,
+            Detail = Serialize(detail),
             IpAddress = http?.Connection.RemoteIpAddress?.ToString(),
         });
         await db.SaveChangesAsync(ct);
     }
+
+    /// <summary>文字列はそのまま、それ以外はJSONとして保存する</summary>
+    private static string? Serialize(object? detail) => detail switch
+    {
+        null => null,
+        string text => text,
+        _ => JsonSerializer.Serialize(detail, DetailJsonOptions),
+    };
 }

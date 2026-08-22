@@ -1,9 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Entities;
+using MesApp.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MesApp.Api.Tests;
 
@@ -324,6 +328,30 @@ public class ExecutionTests
         var correctedBody = await corrected.Content.ReadFromJsonAsync<ProductionRecordResponse>();
         Assert.Equal(8m, correctedBody!.GoodQuantity);
         Assert.Equal(8m, await Phase3TestData.GetStockQuantityAsync(admin, record.OutputLotId.Value));
+
+        // 訂正の監査証跡は変更前後と理由をJSONで残す（Spec.md 7.6）
+        var detail = await GetLatestAuditDetailAsync(factory, "Execution", "Correct");
+        using var json = JsonDocument.Parse(detail);
+        Assert.Equal(10m, json.RootElement.GetProperty("before").GetProperty("good").GetDecimal());
+        Assert.Equal(0m, json.RootElement.GetProperty("before").GetProperty("defect").GetDecimal());
+        Assert.Equal(8m, json.RootElement.GetProperty("after").GetProperty("good").GetDecimal());
+        Assert.Equal(2m, json.RootElement.GetProperty("after").GetProperty("defect").GetDecimal());
+        Assert.Equal("検査で2個不良判明", json.RootElement.GetProperty("reason").GetString());
+        // 日本語はエスケープせずそのまま保存する（監査ログは人が読む前提）
+        Assert.Contains("検査で2個不良判明", detail);
+    }
+
+    /// <summary>指定した分類・操作の最新の監査ログ詳細を取得する（監査証跡の検証用）</summary>
+    private static async Task<string> GetLatestAuditDetailAsync(
+        ApiFactory factory, string category, string action)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+        var log = await db.AuditLogs.AsNoTracking()
+            .Where(a => a.Category == category && a.Action == action)
+            .OrderByDescending(a => a.Id)
+            .FirstAsync();
+        return log.Detail!;
     }
 
     [Fact]

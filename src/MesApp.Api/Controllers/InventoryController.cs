@@ -190,7 +190,14 @@ public class InventoryController(
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Adjust", nameof(Lot), lot.Id.ToString(),
-            detail: $"lot={lot.LotNumber}, {current} -> {request.NewQuantity}, reason={request.Reason}", ct: ct);
+            detail: new
+            {
+                lot = lot.LotNumber,
+                locationId = request.LocationId,
+                before = current,
+                after = request.NewQuantity,
+                reason = request.Reason,
+            }, ct: ct);
         return NoContent();
     }
 
@@ -209,7 +216,13 @@ public class InventoryController(
             request.Reason, CurrentUserId);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "StatusChange", nameof(Lot), lot.Id.ToString(),
-            detail: $"lot={lot.LotNumber}, {before} -> {request.Status}, reason={request.Reason}", ct: ct);
+            detail: new
+            {
+                lot = lot.LotNumber,
+                before = before.ToString(),
+                after = request.Status.ToString(),
+                reason = request.Reason,
+            }, ct: ct);
         return NoContent();
     }
 
@@ -263,7 +276,7 @@ public class InventoryController(
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Split", nameof(Lot), lot.Id.ToString(),
-            detail: $"{lot.LotNumber} -> {newLotNumber}, qty={request.Quantity}", ct: ct);
+            detail: new { from = lot.LotNumber, to = newLotNumber, quantity = request.Quantity }, ct: ct);
 
         return new LotResponse(newLot.Id, newLot.LotNumber, lot.ProductId, lot.Product!.Code, lot.Product!.Name,
             newLot.InitialQuantity, newLot.OriginType, newLot.StockStatus,
@@ -313,7 +326,7 @@ public class InventoryController(
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Merge", nameof(Lot), target.Id.ToString(),
-            detail: $"{source.LotNumber} -> {target.LotNumber}, qty={quantity}", ct: ct);
+            detail: new { from = source.LotNumber, to = target.LotNumber, quantity }, ct: ct);
         return NoContent();
     }
 
@@ -382,7 +395,12 @@ public class InventoryController(
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "LotTransfer", nameof(Lot), lot.Id.ToString(),
-            detail: $"{lot.LotNumber}({lot.Product!.Code}) -> {newLotNumber}({newProduct.Code}), qty={request.Quantity}", ct: ct);
+            detail: new
+            {
+                from = new { lot = lot.LotNumber, product = lot.Product!.Code },
+                to = new { lot = newLotNumber, product = newProduct.Code },
+                quantity = request.Quantity,
+            }, ct: ct);
 
         return new LotResponse(newLot.Id, newLot.LotNumber, newProduct.Id, newProduct.Code, newProduct.Name,
             newLot.InitialQuantity, newLot.OriginType, newLot.StockStatus,

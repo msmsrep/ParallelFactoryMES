@@ -258,7 +258,7 @@ public class InspectionOrdersController(
             return NotFound();
         }
 
-        var before = $"value={result.MeasuredValue}, judgment={result.Judgment}";
+        var before = new { value = result.MeasuredValue, text = result.TextValue, judgment = result.Judgment };
         result.MeasuredValue = request.MeasuredValue;
         result.TextValue = request.TextValue;
         result.Judgment = request.Judgment;
@@ -282,8 +282,18 @@ public class InspectionOrdersController(
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Quality", "InspectionCorrect", nameof(InspectionResult), resultId.ToString(),
-            detail: $"before({before}) -> after(value={request.MeasuredValue}, judgment={request.Judgment}), " +
-                    $"reason={request.Reason}", ct: ct);
+            detail: new
+            {
+                orderNo = order.OrderNo,
+                before,
+                after = new
+                {
+                    value = request.MeasuredValue,
+                    text = request.TextValue,
+                    judgment = request.Judgment,
+                },
+                reason = request.Reason,
+            }, ct: ct);
         var saved = await BaseQuery().FirstAsync(o => o.Id == id, ct);
         return ToResponse(saved);
     }

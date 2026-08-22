@@ -87,7 +87,7 @@
 | 認証（JWT＋リフレッシュ） | `Api/Controllers/AuthController.cs` `api/auth`<br>`Api/Services/JwtTokenService.cs` / `RefreshTokenService.cs` / `SigningKeyProvider.cs` / `JwtOptions.cs`<br>`Web/Auth/AuthService.cs` / `AuthMessageHandler.cs` / `TokenStore.cs` / `ApiAuthenticationStateProvider.cs` | Spec.md 7.4。`/login` `Login.razor`、`/change-password`。`Tests/AuthTests.cs` / `TestAuth.cs` |
 | ロール定義・権限グループ | `Core/Constants/MesRoles.cs`（7ロール）<br>`Api/RoleGroups.cs`（MasterWrite / ProductionManage / UserAdmin / InventoryManage 等） | 新しい組み合わせが要るときだけ RoleGroups に追加 |
 | 初期セットアップ（初期管理者） | `Api/Controllers/SetupController.cs` `api/setup`<br>`Api/Services/IdentitySeeder.cs` | Spec.md 2.2 E。`/setup` `Setup.razor`。`Tests/SetupTests.cs` |
-| 監査ログ | `Core/Abstractions/IAuditLogger.cs`<br>`Infra/Services/AuditLogger.cs`<br>`Core/Entities/AuditLog.cs` | Spec.md 7.6。**全ての書き込み系アクションで呼ぶ** |
+| 監査ログ | `Core/Abstractions/IAuditLogger.cs`<br>`Infra/Services/AuditLogger.cs`<br>`Core/Entities/AuditLog.cs` | Spec.md 7.6。**全ての書き込み系アクションで呼ぶ**。変更前後を追跡する操作は `detail:` に匿名オブジェクト（`{ before, after, reason }`）を渡す＝JSON保存。要約でよい操作は文字列のまま |
 | 採番（指図番号・ロット番号等） | `Api/Services/NumberingService.cs` | 新しい採番区分はここに追加 |
 | ロット使用可否（投入・引当・出荷の共通判定） | `Api/Policies/LotUsabilityPolicy.cs` | Spec.md 3.9。ステータス・有効期限の条件は**ここだけ**に置く。呼び先は `WorkOrderExecutionController`（投入）／`InventoryService.AllocateFefoAsync`（FEFO）／`ShippingOrdersController`（出荷） |
 | 部材投入のMBOM照合 | `Api/Policies/MaterialIssuePolicy.cs` | Spec.md 3.9。作業指示の品目のMBOMにない品目は投入不可。呼び先は `WorkOrderExecutionController.AddConsumption` |

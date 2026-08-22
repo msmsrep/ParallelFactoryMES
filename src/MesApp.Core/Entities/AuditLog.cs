@@ -27,7 +27,11 @@ public class AuditLog
     /// <summary>対象エンティティのID</summary>
     public string? TargetId { get; set; }
 
-    /// <summary>詳細（変更前後の値などをJSONで格納）</summary>
+    /// <summary>
+    /// 詳細。実績訂正・在庫操作など**変更前後を追跡したい操作はJSON**で格納する
+    /// （例：<c>{"before":{...},"after":{...},"reason":"..."}</c>）。
+    /// 作成・削除など要約で足りる操作は要約文字列を格納する
+    /// </summary>
     public string? Detail { get; set; }
 
     public string? IpAddress { get; set; }

@@ -37,7 +37,7 @@ public class ProductionRecordsController(
             return NotFound();
         }
 
-        var before = $"good={record.GoodQuantity}, defect={record.DefectQuantity}";
+        var before = new { good = record.GoodQuantity, defect = record.DefectQuantity };
         var goodDelta = request.GoodQuantity - record.GoodQuantity;
 
         // 在庫計上済み（最終工程）の実績訂正は在庫・ロット数量へ差分を反映
@@ -68,9 +68,15 @@ public class ProductionRecordsController(
         record.GoodQuantity = request.GoodQuantity;
         record.DefectQuantity = request.DefectQuantity;
         await db.SaveChangesAsync(ct);
+        // 訂正の証跡は後から追跡・検索できるよう構造化して残す（Spec.md 7.6）
         await auditLogger.LogAsync("Execution", "Correct", nameof(ProductionRecord), id.ToString(),
-            detail: $"before({before}) -> after(good={request.GoodQuantity}, defect={request.DefectQuantity}), " +
-                    $"reason={request.Reason}", ct: ct);
+            detail: new
+            {
+                workOrderNo = record.WorkOrder!.WorkOrderNo,
+                before,
+                after = new { good = request.GoodQuantity, defect = request.DefectQuantity },
+                reason = request.Reason,
+            }, ct: ct);
 
         return new ProductionRecordResponse(record.Id, record.WorkOrderId, record.WorkOrder!.WorkOrderNo,
             record.PerformedByUserId, record.PerformedBy?.DisplayName,
