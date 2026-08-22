@@ -38,7 +38,7 @@
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
 | 検査項目・基準マスタ | C-10-10 | `InspectionItemsController.cs` `api/inspection-items` | Masters.cs: InspectionItem | `/masters` `Masters/InspectionItemsTab.razor` | `Tests/MasterTests.cs` |
-| 検査指示・実績・判定・成績書 | C-20 | `InspectionOrdersController.cs` `api/inspection-orders` | `Core/Entities/Quality.cs`<br>InspectionOrder / InspectionOrderItem / InspectionResult | `/inspections` `Inspections.razor`<br>`/inspections/{id}` `InspectionDetail.razor`<br>`/print/inspection/{id}` `Print/InspectionCertificate.razor` | `Tests/QualityTests.cs` |
+| 検査指示・実績・判定・成績書 | C-20 | `InspectionOrdersController.cs` `api/inspection-orders` | `Core/Entities/Quality.cs`<br>InspectionOrder / InspectionOrderItem（**発行時点の基準スナップショット**。判定・成績書はこちらを使い、マスタ現在値を参照しない：Spec.md 5.7） / InspectionResult | `/inspections` `Inspections.razor`<br>`/inspections/{id}` `InspectionDetail.razor`<br>`/print/inspection/{id}` `Print/InspectionCertificate.razor` | `Tests/QualityTests.cs` |
 | 不適合・逸脱管理（特採・廃棄・保留） | C-30 / B-40-30 | `NonconformanceController.cs` `api/nonconformances` | Quality.cs: NonconformanceReport | `/nonconformances` `Nonconformances.razor` | `Tests/QualityTests.cs` |
 | 品質分析（不良項目別・工程別・期間別） | C-40-10 | `QualityAnalysisController.cs` `api/quality/summary` | （集計のみ） | `/quality-analysis` `QualityAnalysis.razor`<br>`Web/Shared/BarMeter.razor` | `Tests/QualityTests.cs` |
 | チェックリストマスタ（HSE含む） | B-30-10 / G-20-20-02 | `ChecklistsController.cs` `api/checklists` | Masters.cs: Checklist / ChecklistItem | `/masters` `Masters/ChecklistsTab.razor` | `Tests/MasterTests.cs` |

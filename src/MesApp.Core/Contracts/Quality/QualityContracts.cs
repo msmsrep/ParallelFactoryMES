@@ -35,8 +35,14 @@ public record InspectionResultCorrectionRequest(
 /// <summary>総合判定（C-20-10-04）。グレード指定で対象ロットのグレードも設定（C-60-10-01）</summary>
 public record InspectionJudgeRequest(string? Grade);
 
+/// <summary>
+/// 検査指示の対象項目。規格値・項目名は**指示発行時点のスナップショット**であり、
+/// マスタ改訂後もこの検査の判定根拠は変わらない（Spec.md 5.4）
+/// </summary>
 public record InspectionOrderItemResponse(
     int InspectionItemId, string Code, string Name,
+    /// <summary>参照した検査基準の版数（C-10-10-03）</summary>
+    int ItemVersion,
     decimal? LowerLimit, decimal? UpperLimit, decimal? StandardValue,
     string? Method, int? SamplingCount);
 

@@ -49,7 +49,7 @@ else
         <h2>検査結果</h2>
         <table class="table">
             <thead>
-                <tr><th>検査項目</th><th>規格値</th><th>検査方法</th><th>測定値</th><th>判定</th><th>検査者</th><th>検査日時</th></tr>
+                <tr><th>検査項目</th><th>規格値（版）</th><th>検査方法</th><th>測定値</th><th>判定</th><th>検査者</th><th>検査日時</th></tr>
             </thead>
             <tbody>
                 @foreach (var result in _order.Results)
@@ -57,7 +57,14 @@ else
                     var item = _order.Items.FirstOrDefault(i => i.InspectionItemId == result.InspectionItemId);
                     <tr>
                         <td>@result.ItemCode @result.ItemName</td>
-                        <td>@(item?.LowerLimit?.ToString() ?? "-") 〜 @(item?.UpperLimit?.ToString() ?? "-")</td>
+                        @* 規格値は指示発行時点のスナップショット。マスタを改訂しても当時の判定根拠が印字される *@
+                        <td>
+                            @(item?.LowerLimit?.ToString() ?? "-") 〜 @(item?.UpperLimit?.ToString() ?? "-")
+                            @if (item is not null)
+                            {
+                                <span class="text-muted">（第@(item.ItemVersion)版）</span>
+                            }
+                        </td>
                         <td>@(item?.Method ?? "-")</td>
                         <td>@(result.MeasuredValue?.ToString() ?? result.TextValue ?? "-")</td>
                         <td>@(result.Judgment == InspectionJudgment.Pass ? "合格" : "不合格")</td>

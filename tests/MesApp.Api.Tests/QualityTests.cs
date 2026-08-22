@@ -70,6 +70,62 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 検査基準を改訂しても発行済みの検査は当時の規格値で判定され成績書も変わらない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId); // 外径 9.5〜10.5（第1版）
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+        var order = (await created.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+        Assert.Equal(9.5m, order.Items[0].LowerLimit);
+        Assert.Equal(1, order.Items[0].ItemVersion);
+
+        // 発行後に基準を改訂（規格を厳しくし、項目名も変える）
+        var revised = await admin.PutAsJsonAsync($"/api/inspection-items/{item.Id}",
+            new InspectionItemRequest("INS-01", "外径測定（改訂）", ctx.ProductId, null,
+                InspectionType.FinalProduct, 9.9m, 10.1m, 10m, "マイクロメータ", 1));
+        revised.EnsureSuccessStatusCode();
+        Assert.Equal(2, (await revised.Content.ReadFromJsonAsync<InspectionItemResponse>())!.Version);
+
+        // 測定値10.3は旧規格（9.5〜10.5）では合格、新規格（9.9〜10.1）では不合格。
+        // 発行済みの検査は当時の規格で判定されなければならない
+        var results = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.3m, null, null) });
+        results.EnsureSuccessStatusCode();
+        var withResults = (await results.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+        Assert.Equal(InspectionJudgment.Pass, withResults.Results[0].Judgment);
+
+        // 成績書の表示元（詳細取得）も当時の規格値・項目名・版数を返す
+        var reloaded = await admin.GetFromJsonAsync<InspectionOrderResponse>(
+            $"/api/inspection-orders/{order.Id}");
+        Assert.Equal(9.5m, reloaded!.Items[0].LowerLimit);
+        Assert.Equal(10.5m, reloaded.Items[0].UpperLimit);
+        Assert.Equal("ノギス", reloaded.Items[0].Method);
+        Assert.Equal("外径測定", reloaded.Items[0].Name);
+        Assert.Equal(1, reloaded.Items[0].ItemVersion);
+        Assert.Equal("外径測定", reloaded.Results[0].ItemName);
+
+        // 改訂後に発行した検査は新しい基準で判定される
+        var lot2 = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+        var created2 = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot2.Id, null, null, null));
+        var order2 = (await created2.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+        Assert.Equal(9.9m, order2.Items[0].LowerLimit);
+        Assert.Equal(2, order2.Items[0].ItemVersion);
+        Assert.Equal("外径測定（改訂）", order2.Items[0].Name);
+
+        var results2 = await admin.PostAsJsonAsync($"/api/inspection-orders/{order2.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.3m, null, null) });
+        results2.EnsureSuccessStatusCode();
+        var withResults2 = (await results2.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+        Assert.Equal(InspectionJudgment.Fail, withResults2.Results[0].Judgment);
+    }
+
+    [Fact]
     public async Task 不合格判定でロットが不良になり不適合が自動起票される()
     {
         using var factory = new ApiFactory();

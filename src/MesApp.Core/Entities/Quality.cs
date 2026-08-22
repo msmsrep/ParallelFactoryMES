@@ -37,21 +37,51 @@ public class InspectionOrder
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>検査項目セット（指示作成時のスナップショット）</summary>
+    /// <summary>検査項目セット（指示作成時点の基準のスナップショット）</summary>
     public List<InspectionOrderItem> Items { get; set; } = [];
 
     public List<InspectionResult> Results { get; set; } = [];
 }
 
-/// <summary>検査指示の対象検査項目</summary>
+/// <summary>
+/// 検査指示の対象検査項目（Spec.md 5.4）。
+/// <para>
+/// 検査基準（<see cref="InspectionItem"/>）は改訂され、規格値は上書きされる。最新マスタで
+/// 過去ロットを判定・印字すると当時の判定根拠を再現できないため、**指示発行時点の基準を
+/// ここへ写して保持**する。自動判定・画面表示・検査成績書はこのスナップショットを使い、
+/// マスタは新規指示の作成時にのみ参照する（Spec.md 5.7）。
+/// </para>
+/// </summary>
 public class InspectionOrderItem
 {
     public int Id { get; set; }
 
     public int InspectionOrderId { get; set; }
 
+    /// <summary>基準の参照元（マスタ側の改訂履歴を辿るための参照であり、判定には使わない）</summary>
     public int InspectionItemId { get; set; }
     public InspectionItem? InspectionItem { get; set; }
+
+    // ---- 指示発行時点のスナップショット（以降マスタが改訂されても変わらない）----
+
+    /// <summary>検査項目コード</summary>
+    public string ItemCode { get; set; } = string.Empty;
+
+    /// <summary>検査項目名</summary>
+    public string ItemName { get; set; } = string.Empty;
+
+    /// <summary>参照した基準の版数（C-10-10-03）</summary>
+    public int ItemVersion { get; set; }
+
+    public decimal? LowerLimit { get; set; }
+
+    public decimal? UpperLimit { get; set; }
+
+    public decimal? StandardValue { get; set; }
+
+    public string? Method { get; set; }
+
+    public int? SamplingCount { get; set; }
 }
 
 /// <summary>検査実績（Spec.md 5.4 InspectionResult。C-20）</summary>

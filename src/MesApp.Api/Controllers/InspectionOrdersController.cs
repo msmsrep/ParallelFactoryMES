@@ -98,12 +98,14 @@ public class InspectionOrdersController(
         }
 
         // 検査項目セットの決定
-        List<int> itemIds;
+        List<InspectionItem> items;
         if (request.ItemIds is { Count: > 0 })
         {
-            itemIds = request.ItemIds.Distinct().ToList();
-            var found = await db.InspectionItems.CountAsync(i => itemIds.Contains(i.Id), ct);
-            if (found != itemIds.Count)
+            var itemIds = request.ItemIds.Distinct().ToList();
+            items = await db.InspectionItems.AsNoTracking()
+                .Where(i => itemIds.Contains(i.Id))
+                .ToListAsync(ct);
+            if (items.Count != itemIds.Count)
             {
                 return BadRequest(new ProblemDetails { Title = "存在しない検査項目IDが含まれています。" });
             }
@@ -120,13 +122,12 @@ public class InspectionOrdersController(
             };
             var productId = lot?.ProductId ?? workOrder!.ProductId;
             var processId = workOrder?.ProcessId;
-            itemIds = await db.InspectionItems
+            items = await db.InspectionItems.AsNoTracking()
                 .Where(i => i.IsActive && i.Type == itemType &&
                             (i.TargetProductId == productId ||
                              (processId != null && i.TargetProcessId == processId)))
-                .Select(i => i.Id)
                 .ToListAsync(ct);
-            if (itemIds.Count == 0)
+            if (items.Count == 0)
             {
                 return BadRequest(new ProblemDetails
                 {
@@ -143,7 +144,19 @@ public class InspectionOrdersController(
             TargetWorkOrderId = workOrder?.Id,
             RequestedByUserId = CurrentUserId,
             Note = request.Note,
-            Items = itemIds.Select(i => new InspectionOrderItem { InspectionItemId = i }).ToList(),
+            // 発行時点の基準を写す。以降マスタが改訂されても、この検査の判定根拠は変わらない
+            Items = items.Select(i => new InspectionOrderItem
+            {
+                InspectionItemId = i.Id,
+                ItemCode = i.Code,
+                ItemName = i.Name,
+                ItemVersion = i.Version,
+                LowerLimit = i.LowerLimit,
+                UpperLimit = i.UpperLimit,
+                StandardValue = i.StandardValue,
+                Method = i.Method,
+                SamplingCount = i.SamplingCount,
+            }).ToList(),
         };
         db.InspectionOrders.Add(order);
         await db.SaveChangesAsync(ct);
@@ -185,25 +198,26 @@ public class InspectionOrdersController(
             return BadRequest(new ProblemDetails { Title = "登録する実績がありません。" });
         }
 
-        var itemById = order.Items.ToDictionary(i => i.InspectionItemId, i => i.InspectionItem!);
+        var itemById = order.Items.ToDictionary(i => i.InspectionItemId);
         foreach (var request in requests)
         {
             if (!itemById.TryGetValue(request.InspectionItemId, out var item))
             {
                 return BadRequest(new ProblemDetails { Title = $"検査項目ID {request.InspectionItemId} はこの検査指示の対象ではありません。" });
             }
+            // 判定は指示発行時点の規格値（スナップショット）で行う
             var judgment = Judge(item, request.MeasuredValue, request.Judgment);
             if (judgment is null)
             {
                 return BadRequest(new ProblemDetails
                 {
-                    Title = $"検査項目 '{item.Code}' は規格値による自動判定ができません。judgmentを指定してください。",
+                    Title = $"検査項目 '{item.ItemCode}' は規格値による自動判定ができません。judgmentを指定してください。",
                 });
             }
             db.InspectionResults.Add(new InspectionResult
             {
                 InspectionOrderId = id,
-                InspectionItemId = item.Id,
+                InspectionItemId = item.InspectionItemId,
                 SampleNo = request.SampleNo ?? 1,
                 MeasuredValue = request.MeasuredValue,
                 TextValue = request.TextValue,
@@ -400,9 +414,12 @@ public class InspectionOrdersController(
         return ToResponse(saved);
     }
 
-    /// <summary>規格値との照合による自動判定（下限≦測定値≦上限）。判定不能ならnull</summary>
+    /// <summary>
+    /// 規格値との照合による自動判定（下限≦測定値≦上限）。判定不能ならnull。
+    /// 基準はマスタの現在値ではなく、指示発行時点のスナップショットを使う
+    /// </summary>
     private static InspectionJudgment? Judge(
-        InspectionItem item, decimal? measuredValue, InspectionJudgment? explicitJudgment)
+        InspectionOrderItem item, decimal? measuredValue, InspectionJudgment? explicitJudgment)
     {
         if (explicitJudgment is not null)
         {
@@ -430,11 +447,17 @@ public class InspectionOrdersController(
             o.TargetLotId, o.TargetLot?.LotNumber, o.TargetWorkOrderId, o.TargetWorkOrder?.WorkOrderNo,
             o.OverallJudgment, o.JudgedAt, o.ApprovedByUserId, o.ApprovedAt, o.Note, o.CreatedAt,
             o.Items.Select(i => new InspectionOrderItemResponse(
-                i.InspectionItemId, i.InspectionItem!.Code, i.InspectionItem!.Name,
-                i.InspectionItem!.LowerLimit, i.InspectionItem!.UpperLimit, i.InspectionItem!.StandardValue,
-                i.InspectionItem!.Method, i.InspectionItem!.SamplingCount)).ToList(),
+                i.InspectionItemId, i.ItemCode, i.ItemName, i.ItemVersion,
+                i.LowerLimit, i.UpperLimit, i.StandardValue,
+                i.Method, i.SamplingCount)).ToList(),
             o.Results.OrderBy(r => r.Id).Select(r => new InspectionResultResponse(
-                r.Id, r.InspectionItemId, r.InspectionItem!.Code, r.InspectionItem!.Name, r.SampleNo,
-                r.MeasuredValue, r.TextValue, r.Judgment,
+                r.Id, r.InspectionItemId,
+                // 項目名もマスタ現在値ではなくスナップショットから出す（改称しても記録は当時のまま）
+                SnapshotOf(o, r.InspectionItemId)?.ItemCode ?? r.InspectionItem!.Code,
+                SnapshotOf(o, r.InspectionItemId)?.ItemName ?? r.InspectionItem!.Name,
+                r.SampleNo, r.MeasuredValue, r.TextValue, r.Judgment,
                 r.InspectedByUserId, r.InspectedBy?.DisplayName, r.InspectedAt, r.CorrectionNote)).ToList());
+
+    private static InspectionOrderItem? SnapshotOf(InspectionOrder order, int inspectionItemId) =>
+        order.Items.FirstOrDefault(i => i.InspectionItemId == inspectionItemId);
 }

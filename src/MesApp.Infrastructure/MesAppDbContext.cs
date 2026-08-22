@@ -515,6 +515,9 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Entity<InspectionOrderItem>(e =>
         {
             e.HasIndex(x => new { x.InspectionOrderId, x.InspectionItemId }).IsUnique();
+            e.Property(x => x.ItemCode).HasMaxLength(50);
+            e.Property(x => x.ItemName).HasMaxLength(200);
+            e.Property(x => x.Method).HasMaxLength(500);
             e.HasOne(x => x.InspectionItem).WithMany().HasForeignKey(x => x.InspectionItemId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
