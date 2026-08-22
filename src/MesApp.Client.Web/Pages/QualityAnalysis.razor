@@ -103,6 +103,33 @@ else
         }
     </div>
 
+    @* 不良理由別の集計（C-40-10-01）。改善の対象を選ぶための構成比つき *@
+    <div class="card">
+        <h2 style="margin-top:0;">不良理由別の不良数</h2>
+        @if (_summary.ByDefectReason.Count == 0)
+        {
+            <p class="text-muted">対象期間の不良理由内訳はありません（実績入力で不良理由別の内訳を登録すると集計されます）。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead><tr><th>不良理由</th><th>区分</th><th>不良数</th><th>構成比</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var row in _summary.ByDefectReason)
+                    {
+                        <tr>
+                            <td>@row.Code @row.Name</td>
+                            <td>@Labels.DefectCategory(row.Category)</td>
+                            <td>@row.Quantity</td>
+                            <td>@row.Share %</td>
+                            <td><BarMeter Value="@row.Share" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
     <div class="card">
         <h2 style="margin-top:0;">不適合の原因区分別 発生件数</h2>
         @if (_summary.NonconformanceByCause.Count == 0)

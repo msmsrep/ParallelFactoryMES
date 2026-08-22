@@ -282,7 +282,9 @@ public class WorkOrderExecutionController(
                 r.GoodQuantity, r.DefectQuantity, r.ScrapQuantity, r.ReworkQuantity,
                 r.StartedAt, r.EndedAt,
                 r.OutputLotId, r.OutputLot!.LotNumber, r.OutputLocationId,
-                r.ApprovedByUserId, r.ApprovedAt))
+                r.ApprovedByUserId, r.ApprovedAt,
+                r.Defects.Select(d => new ProductionDefectResponse(
+                    d.DefectReasonId, d.DefectReason!.Code, d.DefectReason!.Name, d.Quantity, d.Note)).ToList()))
             .ToListAsync(ct);
     }
 
@@ -317,6 +319,30 @@ public class WorkOrderExecutionController(
                 Title = $"廃棄数と再作業待ち数の合計（{request.ScrapQuantity + request.ReworkQuantity}）が" +
                         $"不良数（{request.DefectQuantity}）を超えています。",
             });
+        }
+
+        // 不良理由別の内訳（C-40-10-01）。合計は不良数を超えられない（残りは理由未分類）
+        var defects = request.Defects ?? [];
+        if (defects.Count > 0)
+        {
+            if (defects.Sum(d => d.Quantity) > request.DefectQuantity)
+            {
+                return BadRequest(new ProblemDetails
+                {
+                    Title = $"不良理由別の内訳の合計（{defects.Sum(d => d.Quantity)}）が" +
+                            $"不良数（{request.DefectQuantity}）を超えています。",
+                });
+            }
+            var reasonIds = defects.Select(d => d.DefectReasonId).ToList();
+            if (reasonIds.Distinct().Count() != reasonIds.Count)
+            {
+                return BadRequest(new ProblemDetails { Title = "同じ不良理由が重複しています。" });
+            }
+            var found = await db.DefectReasons.CountAsync(r => reasonIds.Contains(r.Id) && r.IsActive, ct);
+            if (found != reasonIds.Count)
+            {
+                return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）不良理由IDが含まれています。" });
+            }
         }
 
         var order = workOrder.ManufacturingOrder!;
@@ -402,6 +428,12 @@ public class WorkOrderExecutionController(
             DefectQuantity = request.DefectQuantity,
             ScrapQuantity = request.ScrapQuantity,
             ReworkQuantity = request.ReworkQuantity,
+            Defects = defects.Select(d => new ProductionDefect
+            {
+                DefectReasonId = d.DefectReasonId,
+                Quantity = d.Quantity,
+                Note = d.Note,
+            }).ToList(),
             StartedAt = request.StartedAt,
             EndedAt = request.EndedAt,
             OutputLotId = outputLot?.Id,
@@ -426,7 +458,12 @@ public class WorkOrderExecutionController(
             record.PerformedByUserId, name, record.GoodQuantity, record.DefectQuantity,
             record.ScrapQuantity, record.ReworkQuantity,
             record.StartedAt, record.EndedAt, record.OutputLotId, outputLot?.LotNumber,
-            record.OutputLocationId, null, null);
+            record.OutputLocationId, null, null,
+            await db.ProductionDefects.AsNoTracking()
+                .Where(d => d.ProductionRecordId == record.Id)
+                .Select(d => new ProductionDefectResponse(
+                    d.DefectReasonId, d.DefectReason!.Code, d.DefectReason!.Name, d.Quantity, d.Note))
+                .ToListAsync(ct));
     }
 
     /// <summary>製造完了承認（B-40-10-10）。全作業指示が承認/取消済みになると指図も完了になる</summary>

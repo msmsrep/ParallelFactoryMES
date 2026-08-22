@@ -23,6 +23,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<InspectionItem> InspectionItems => Set<InspectionItem>();
     public DbSet<Checklist> Checklists => Set<Checklist>();
+    public DbSet<DefectReason> DefectReasons => Set<DefectReason>();
     public DbSet<SkillMaster> Skills => Set<SkillMaster>();
     public DbSet<UserSkill> UserSkills => Set<UserSkill>();
 
@@ -39,6 +40,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<MaterialConsumption> MaterialConsumptions => Set<MaterialConsumption>();
     public DbSet<ProductionRecord> ProductionRecords => Set<ProductionRecord>();
     public DbSet<ProductionRecordCorrection> ProductionRecordCorrections => Set<ProductionRecordCorrection>();
+    public DbSet<ProductionDefect> ProductionDefects => Set<ProductionDefect>();
     public DbSet<ProductionDataRecord> ProductionDataRecords => Set<ProductionDataRecord>();
     public DbSet<WorkTimeRecord> WorkTimeRecords => Set<WorkTimeRecord>();
     public DbSet<TroubleReport> TroubleReports => Set<TroubleReport>();
@@ -102,6 +104,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<LocationAreaType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<InspectionType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ChecklistCategory>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<DefectReasonCategory>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<SkillType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ManufacturingOrderType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ManufacturingOrderStatus>().HaveConversion<string>().HaveMaxLength(30);
@@ -214,6 +217,13 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.Property(x => x.Code).HasMaxLength(50);
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.Method).HasMaxLength(500);
+        });
+
+        builder.Entity<DefectReason>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(50);
+            e.Property(x => x.Name).HasMaxLength(200);
         });
 
         builder.Entity<Checklist>(e =>
@@ -359,6 +369,18 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.OutputLot).WithMany().HasForeignKey(x => x.OutputLotId)
                 .OnDelete(DeleteBehavior.SetNull);
+            e.HasMany(x => x.Defects).WithOne(x => x.ProductionRecord!)
+                .HasForeignKey(x => x.ProductionRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ProductionDefect>(e =>
+        {
+            e.HasIndex(x => x.ProductionRecordId);
+            e.HasIndex(x => x.DefectReasonId);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasOne(x => x.DefectReason).WithMany().HasForeignKey(x => x.DefectReasonId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<ProductionRecordCorrection>(e =>

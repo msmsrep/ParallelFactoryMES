@@ -56,6 +56,30 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
                 g.Sum(r => r.ScrapQuantity), g.Sum(r => r.ReworkQuantity)))
             .ToList();
 
+        // 不良理由別の集計（C-40-10-01）。改善活動の対象を選ぶための構成比も返す
+        var defects = (await db.ProductionDefects.AsNoTracking()
+                .Select(d => new
+                {
+                    d.ProductionRecord!.CreatedAt,
+                    d.Quantity,
+                    Code = d.DefectReason!.Code,
+                    Name = d.DefectReason!.Name,
+                    d.DefectReason!.Category,
+                })
+                .ToListAsync(ct))
+            .Where(d => (fromStart is null || d.CreatedAt >= fromStart)
+                        && (toEnd is null || d.CreatedAt < toEnd))
+            .ToList();
+        var defectTotal = defects.Sum(d => d.Quantity);
+        var byDefectReason = defects
+            .GroupBy(d => (d.Code, d.Name, d.Category))
+            .Select(g => new DefectReasonSummaryRow(
+                g.Key.Code, g.Key.Name, g.Key.Category,
+                g.Sum(d => d.Quantity),
+                defectTotal == 0 ? 0 : Math.Round(g.Sum(d => d.Quantity) / defectTotal * 100, 2)))
+            .OrderByDescending(r => r.Quantity).ThenBy(r => r.Code)
+            .ToList();
+
         var nonconformances = (await db.NonconformanceReports.AsNoTracking()
                 .Select(n => new { n.CreatedAt, n.CauseCategory, n.Status })
                 .ToListAsync(ct))
@@ -78,6 +102,7 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
         return new QualitySummaryResponse(
             byProduct,
             byProcess,
+            byDefectReason,
             byCause,
             inspections.Count(i => i.OverallJudgment == InspectionJudgment.Pass),
             inspections.Count(i => i.OverallJudgment == InspectionJudgment.Fail),

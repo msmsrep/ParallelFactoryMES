@@ -15,6 +15,16 @@ public static class Labels
         _ => status.ToString(),
     };
 
+    public static string DefectCategory(DefectReasonCategory category) => category switch
+    {
+        DefectReasonCategory.Material => "材質・部材",
+        DefectReasonCategory.Process => "加工・作業",
+        DefectReasonCategory.Equipment => "設備",
+        DefectReasonCategory.Human => "人的要因",
+        DefectReasonCategory.Other => "その他",
+        _ => category.ToString(),
+    };
+
     public static string LotRelation(LotRelationType relation) => relation switch
     {
         LotRelationType.Split => "分割",

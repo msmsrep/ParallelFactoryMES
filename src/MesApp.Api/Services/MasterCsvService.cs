@@ -34,6 +34,7 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.Locations => await ExportLocationsAsync(includeInactive, ct),
             MasterCsvKinds.InspectionItems => await ExportInspectionItemsAsync(includeInactive, ct),
             MasterCsvKinds.Checklists => await ExportChecklistsAsync(includeInactive, ct),
+            MasterCsvKinds.DefectReasons => await ExportDefectReasonsAsync(includeInactive, ct),
             MasterCsvKinds.Skills => await ExportSkillsAsync(includeInactive, ct),
             MasterCsvKinds.Bom => await ExportBomAsync(ct),
             MasterCsvKinds.Routing => await ExportRoutingAsync(ct),
@@ -95,6 +96,17 @@ public sealed partial class MasterCsvService(
         return [.. items.Select(l => new string?[]
         {
             l.Code, l.AreaType.ToString(), l.ShelfNo, Bool(l.IsActive),
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportDefectReasonsAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.DefectReasons.AsNoTracking()
+            .Where(r => includeInactive || r.IsActive)
+            .OrderBy(r => r.Code).ToListAsync(ct);
+        return [.. items.Select(r => new string?[]
+        {
+            r.Code, r.Name, r.Category.ToString(), Bool(r.IsActive),
         })];
     }
 

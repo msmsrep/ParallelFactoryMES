@@ -14,6 +14,7 @@
     <button class="@TabClass("locations")" @onclick='() => _tab = "locations"'>ロケーション</button>
     <button class="@TabClass("inspection")" @onclick='() => _tab = "inspection"'>検査項目・基準</button>
     <button class="@TabClass("checklists")" @onclick='() => _tab = "checklists"'>チェックリスト</button>
+    <button class="@TabClass("defect-reasons")" @onclick='() => _tab = "defect-reasons"'>不良理由</button>
     <button class="@TabClass("skills")" @onclick='() => _tab = "skills"'>スキル・資格</button>
     <button class="@TabClass("users")" @onclick='() => _tab = "users"'>ユーザー</button>
 </div>
@@ -40,6 +41,9 @@
         break;
     case "checklists":
         <ChecklistsTab />
+        break;
+    case "defect-reasons":
+        <DefectReasonsTab />
         break;
     case "skills":
         <SkillsTab />

@@ -95,6 +95,16 @@ public record LocationRequest(
 
 public record LocationResponse(int Id, string Code, LocationAreaType AreaType, string? ShelfNo, bool IsActive);
 
+// ---- 不良理由（DefectReason）----
+
+public record DefectReasonRequest(
+    [Required, MaxLength(50)] string Code,
+    [Required, MaxLength(200)] string Name,
+    DefectReasonCategory Category);
+
+public record DefectReasonResponse(
+    int Id, string Code, string Name, DefectReasonCategory Category, bool IsActive);
+
 // ---- 検査項目・基準（InspectionItem）----
 
 public record InspectionItemRequest(

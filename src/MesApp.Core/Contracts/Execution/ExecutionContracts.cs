@@ -46,6 +46,16 @@ public record ConsumptionResponse(
 
 // ---- 生産実績（B-30-30、B-40-10）----
 
+/// <summary>不良理由別の内訳1件（C-40-10-01。合計は不良数を超えられない）</summary>
+public record ProductionDefectRequest(
+    int DefectReasonId,
+    [Range(0, double.MaxValue)] decimal Quantity,
+    [MaxLength(500)] string? Note = null);
+
+public record ProductionDefectResponse(
+    int DefectReasonId, string DefectReasonCode, string DefectReasonName,
+    decimal Quantity, string? Note);
+
 public record ProductionRecordRequest(
     [Range(0, double.MaxValue)] decimal GoodQuantity,
     [Range(0, double.MaxValue)] decimal DefectQuantity,
@@ -58,7 +68,9 @@ public record ProductionRecordRequest(
     /// <summary>廃棄数（不良数の内訳。省略時0）</summary>
     [Range(0, double.MaxValue)] decimal ScrapQuantity = 0,
     /// <summary>再作業待ち数（不良数の内訳。省略時0）</summary>
-    [Range(0, double.MaxValue)] decimal ReworkQuantity = 0);
+    [Range(0, double.MaxValue)] decimal ReworkQuantity = 0,
+    /// <summary>不良理由別の内訳（省略可。合計は不良数を超えられない）</summary>
+    List<ProductionDefectRequest>? Defects = null);
 
 public record ProductionRecordResponse(
     int Id, int WorkOrderId, string WorkOrderNo,
@@ -67,7 +79,8 @@ public record ProductionRecordResponse(
     decimal ScrapQuantity, decimal ReworkQuantity,
     DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
     int? OutputLotId, string? OutputLotNumber, int? OutputLocationId,
-    string? ApprovedByUserId, DateTimeOffset? ApprovedAt);
+    string? ApprovedByUserId, DateTimeOffset? ApprovedAt,
+    List<ProductionDefectResponse>? Defects = null);
 
 /// <summary>製造履歴訂正（B-70-30-01。権限制御＋監査ログ。訂正理由必須）</summary>
 public record ProductionRecordCorrectionRequest(

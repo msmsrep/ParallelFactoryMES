@@ -131,6 +131,29 @@ public class ProductionRecord
     public DateTimeOffset? ApprovedAt { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>不良理由別の内訳（C-40-10-01）</summary>
+    public List<ProductionDefect> Defects { get; set; } = [];
+}
+
+/// <summary>
+/// 不良明細（Spec.md 5.2 ProductionDefect。B-40-10-01、C-40-10-01）。
+/// 生産実績の不良数を不良理由コード別に分解した内訳。理由別の集計（不良項目別分析）に使う。
+/// 合計は不良数を超えられない（残りは理由未分類の数量）
+/// </summary>
+public class ProductionDefect
+{
+    public int Id { get; set; }
+
+    public int ProductionRecordId { get; set; }
+    public ProductionRecord? ProductionRecord { get; set; }
+
+    public int DefectReasonId { get; set; }
+    public DefectReason? DefectReason { get; set; }
+
+    public decimal Quantity { get; set; }
+
+    public string? Note { get; set; }
 }
 
 /// <summary>

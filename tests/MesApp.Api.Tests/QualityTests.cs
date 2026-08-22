@@ -427,10 +427,14 @@ public class QualityTests
         var ctx = await Phase3TestData.SetupAsync(admin);
         await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
         var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var reason = await admin.PostAsJsonAsync("/api/defect-reasons",
+            new Core.Contracts.Masters.DefectReasonRequest("DF-01", "寸法外れ", DefectReasonCategory.Process));
+        var reasonId = (await reason.Content.ReadFromJsonAsync<Core.Contracts.Masters.DefectReasonResponse>())!.Id;
         await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
             new Core.Contracts.Execution.ProductionRecordRequest(
                 8m, 2m, DateTimeOffset.Now, null, ctx.ProductLocationId, false,
-                ScrapQuantity: 1m, ReworkQuantity: 1m));
+                ScrapQuantity: 1m, ReworkQuantity: 1m,
+                Defects: [new(reasonId, 2m)]));
         await admin.PostAsJsonAsync("/api/nonconformances",
             new NonconformanceCreateRequest(NonconformanceSource.Production, null,
                 order.WorkOrders[1].Id, null, "不良2個", "設備不調", null));
@@ -443,6 +447,11 @@ public class QualityTests
         // 廃棄・再作業待ちは不良数の内訳として集計される（不良率の算出には影響しない）
         Assert.Equal(1m, productRow.ScrapQuantity);
         Assert.Equal(1m, productRow.ReworkQuantity);
+        // 不良理由別の集計（C-40-10-01）。1理由のみなので構成比は100%
+        var reasonRow = Assert.Single(summary.ByDefectReason);
+        Assert.Equal("DF-01", reasonRow.Code);
+        Assert.Equal(2m, reasonRow.Quantity);
+        Assert.Equal(100m, reasonRow.Share);
         Assert.Equal(1, summary.OpenNonconformanceCount);
         Assert.True(summary.NonconformanceByCause.ContainsKey("設備不調"));
     }

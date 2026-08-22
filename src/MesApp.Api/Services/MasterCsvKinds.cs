@@ -16,6 +16,7 @@ public static class MasterCsvKinds
     public const string Locations = "locations";
     public const string InspectionItems = "inspection-items";
     public const string Checklists = "checklists";
+    public const string DefectReasons = "defect-reasons";
     public const string Skills = "skills";
     public const string Bom = "bom";
     public const string Routing = "routing";
@@ -94,6 +95,13 @@ public static class MasterCsvKinds
             new("Sequence", "項目の表示順", false, "空欄なら項目なし。取込時は同コードの項目を一括置換"),
             new("Text", "チェック内容", false, null),
             new("IsRequired", "必須項目", false, "true / false"),
+        ]),
+        new(DefectReasons, "不良理由", false,
+        [
+            new("Code", "不良理由コード", true, "既存コードと一致すれば更新、無ければ新規登録"),
+            new("Name", "不良理由名", true, null),
+            new("Category", "区分", false, "Material / Process / Equipment / Human / Other"),
+            new("IsActive", "有効", false, "true / false"),
         ]),
         new(Skills, "スキル・資格", false,
         [
@@ -177,6 +185,12 @@ public static class CsvEnumLabels
     public static readonly IReadOnlyDictionary<string, LocationAreaType> LocationAreaTypes = Build(
         ("部材倉庫", LocationAreaType.MaterialWarehouse), ("工程内", LocationAreaType.InProcess),
         ("製品倉庫", LocationAreaType.ProductWarehouse), ("出荷場", LocationAreaType.ShippingArea));
+
+    public static readonly IReadOnlyDictionary<string, DefectReasonCategory> DefectReasonCategories = Build(
+        ("材質・部材", DefectReasonCategory.Material), ("材質", DefectReasonCategory.Material),
+        ("加工・作業", DefectReasonCategory.Process), ("加工", DefectReasonCategory.Process),
+        ("設備", DefectReasonCategory.Equipment), ("人的要因", DefectReasonCategory.Human),
+        ("その他", DefectReasonCategory.Other));
 
     public static readonly IReadOnlyDictionary<string, InspectionType> InspectionTypes = Build(
         ("受入検査", InspectionType.Receiving), ("工程内検査", InspectionType.InProcess),

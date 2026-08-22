@@ -459,6 +459,45 @@ public class MasterCsvTests
         Assert.Equal("Code,AreaType,ShelfNo,IsActive\r\n", text);
     }
 
+    [Fact]
+    public async Task 不良理由マスタをCSVで入出力できる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        // テンプレートの列順（英語固定）
+        var template = await client.GetAsync("/api/masters/csv/defect-reasons/template");
+        template.EnsureSuccessStatusCode();
+        var bytes = await template.Content.ReadAsByteArrayAsync();
+        Assert.Equal("Code,Name,Category,IsActive\r\n", Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3));
+
+        // 取込（新規2件）。区分は日本語ラベルでも受け付ける
+        var result = await ImportAsync(client, "defect-reasons",
+            "Code,Name,Category,IsActive\nDF-01,寸法外れ,Process,true\nDF-02,キズ,材質・部材,true\n");
+        Assert.Equal(2, result.Created);
+        Assert.Equal(0, result.Updated);
+        Assert.Empty(result.Errors);
+
+        // 同じコードは更新になる
+        var again = await ImportAsync(client, "defect-reasons",
+            "Code,Name,Category,IsActive\nDF-01,寸法外れ（外径）,Equipment,true\n");
+        Assert.Equal(0, again.Created);
+        Assert.Equal(1, again.Updated);
+
+        var reasons = await client.GetFromJsonAsync<List<DefectReasonResponse>>("/api/defect-reasons");
+        Assert.Equal(2, reasons!.Count);
+        var updated = reasons.Single(r => r.Code == "DF-01");
+        Assert.Equal("寸法外れ（外径）", updated.Name);
+        Assert.Equal(DefectReasonCategory.Equipment, updated.Category);
+        Assert.Equal(DefectReasonCategory.Material, reasons.Single(r => r.Code == "DF-02").Category);
+
+        // 出力は取込した内容を返す
+        var export = await client.GetAsync("/api/masters/csv/defect-reasons");
+        export.EnsureSuccessStatusCode();
+        var exported = Encoding.UTF8.GetString(await export.Content.ReadAsByteArrayAsync());
+        Assert.Contains("DF-01,寸法外れ（外径）,Equipment,true", exported);
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {

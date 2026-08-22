@@ -168,11 +168,17 @@ public record DefectSummaryRow(
     string Key, decimal GoodQuantity, decimal DefectQuantity,
     decimal ScrapQuantity, decimal ReworkQuantity, decimal DefectRate);
 
+/// <summary>不良理由別の集計（C-40-10-01 不良項目別分析）</summary>
+public record DefectReasonSummaryRow(
+    string Code, string Name, DefectReasonCategory Category, decimal Quantity, decimal Share);
+
 public record QualitySummaryResponse(
     /// <summary>品目別の良品・不良集計（C-40-10-03）</summary>
     List<DefectSummaryRow> ByProduct,
     /// <summary>工程別の良品・不良集計</summary>
     List<DefectSummaryRow> ByProcess,
+    /// <summary>不良理由別の集計（C-40-10-01。数量の多い順）</summary>
+    List<DefectReasonSummaryRow> ByDefectReason,
     /// <summary>不適合の原因区分別件数</summary>
     Dictionary<string, int> NonconformanceByCause,
     /// <summary>検査の合否件数（判定済みのみ）</summary>

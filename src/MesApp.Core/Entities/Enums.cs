@@ -178,6 +178,21 @@ public enum LotStockStatus
     ToBeDiscarded,
 }
 
+/// <summary>不良理由の区分（Spec.md 5.1 DefectReason。C-40-10-01 不良項目別分析の集計軸）</summary>
+public enum DefectReasonCategory
+{
+    /// <summary>材質・部材</summary>
+    Material,
+    /// <summary>加工・作業</summary>
+    Process,
+    /// <summary>設備</summary>
+    Equipment,
+    /// <summary>人的要因</summary>
+    Human,
+    /// <summary>その他</summary>
+    Other,
+}
+
 /// <summary>ロット系譜の関係区分（Spec.md 5.3 LotGenealogy。D-10-30-05〜07）</summary>
 public enum LotRelationType
 {

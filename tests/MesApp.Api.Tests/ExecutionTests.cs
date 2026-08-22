@@ -273,6 +273,56 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task 不良数を不良理由別の内訳として記録できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        var dimension = await CreateDefectReasonAsync(admin, "DF-01", "寸法外れ", DefectReasonCategory.Process);
+        var scratch = await CreateDefectReasonAsync(admin, "DF-02", "キズ", DefectReasonCategory.Material);
+
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var finalWo = order.WorkOrders[1];
+
+        // 内訳の合計が不良数を超える指定は拒否される
+        var over = await admin.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(7m, 3m, DateTimeOffset.Now, null, ctx.ProductLocationId, false,
+                Defects: [new(dimension.Id, 2m), new(scratch.Id, 2m)]));
+        Assert.Equal(HttpStatusCode.BadRequest, over.StatusCode);
+
+        // 同じ理由の重複も拒否される
+        var duplicated = await admin.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(7m, 3m, DateTimeOffset.Now, null, ctx.ProductLocationId, false,
+                Defects: [new(dimension.Id, 1m), new(dimension.Id, 1m)]));
+        Assert.Equal(HttpStatusCode.BadRequest, duplicated.StatusCode);
+
+        // 良品7・不良3（寸法外れ2・キズ1）
+        var posted = await admin.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(7m, 3m, DateTimeOffset.Now, null, ctx.ProductLocationId, false,
+                Defects: [new(dimension.Id, 2m), new(scratch.Id, 1m)]));
+        Assert.Equal(HttpStatusCode.OK, posted.StatusCode);
+
+        var records = await admin.GetFromJsonAsync<List<ProductionRecordResponse>>(
+            $"/api/work-orders/{finalWo.Id}/production-records");
+        var defects = Assert.Single(records!).Defects!;
+        Assert.Equal(2, defects.Count);
+        Assert.Equal(2m, defects.Single(d => d.DefectReasonCode == "DF-01").Quantity);
+        Assert.Equal("キズ", defects.Single(d => d.DefectReasonCode == "DF-02").DefectReasonName);
+    }
+
+    /// <summary>不良理由マスタを1件登録する</summary>
+    private static async Task<Core.Contracts.Masters.DefectReasonResponse> CreateDefectReasonAsync(
+        HttpClient admin, string code, string name, DefectReasonCategory category)
+    {
+        var response = await admin.PostAsJsonAsync("/api/defect-reasons",
+            new Core.Contracts.Masters.DefectReasonRequest(code, name, category));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<Core.Contracts.Masters.DefectReasonResponse>())!;
+    }
+
+    [Fact]
     public async Task 段取り実績とチェックリストと製造条件データを記録できる()
     {
         using var factory = new ApiFactory();

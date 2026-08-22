@@ -117,6 +117,58 @@ public class MasterTests
     }
 
     [Fact]
+    public async Task 不良理由マスタを登録更新無効化でき重複コードは拒否される()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        var created = await client.PostAsJsonAsync("/api/defect-reasons",
+            new DefectReasonRequest("DF-01", "寸法外れ", DefectReasonCategory.Process));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var reason = (await created.Content.ReadFromJsonAsync<DefectReasonResponse>())!;
+        Assert.Equal(DefectReasonCategory.Process, reason.Category);
+        Assert.True(reason.IsActive);
+
+        // 同じコードは登録できない
+        var duplicate = await client.PostAsJsonAsync("/api/defect-reasons",
+            new DefectReasonRequest("DF-01", "別名称", DefectReasonCategory.Material));
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+
+        var updated = await client.PutAsJsonAsync($"/api/defect-reasons/{reason.Id}",
+            new DefectReasonRequest("DF-01", "寸法外れ（外径）", DefectReasonCategory.Equipment));
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        var updatedBody = (await updated.Content.ReadFromJsonAsync<DefectReasonResponse>())!;
+        Assert.Equal("寸法外れ（外径）", updatedBody.Name);
+        Assert.Equal(DefectReasonCategory.Equipment, updatedBody.Category);
+
+        // 無効化すると既定の一覧から外れる
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await client.DeleteAsync($"/api/defect-reasons/{reason.Id}")).StatusCode);
+        var active = await client.GetFromJsonAsync<List<DefectReasonResponse>>("/api/defect-reasons");
+        Assert.Empty(active!);
+        var all = await client.GetFromJsonAsync<List<DefectReasonResponse>>(
+            "/api/defect-reasons?includeInactive=true");
+        Assert.Single(all!);
+    }
+
+    [Fact]
+    public async Task 不良理由マスタの書き込みはマスタ管理ロールのみ()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        using var operator_ = await TestAuth.CreateUserClientAsync(
+            factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
+
+        var rejected = await operator_.PostAsJsonAsync("/api/defect-reasons",
+            new DefectReasonRequest("DF-99", "作業者が登録", DefectReasonCategory.Other));
+        Assert.Equal(HttpStatusCode.Forbidden, rejected.StatusCode);
+
+        // 参照はできる
+        var list = await operator_.GetAsync("/api/defect-reasons");
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+    }
+
+    [Fact]
     public async Task 設備と治工具とロケーションと検査項目とチェックリストを登録できる()
     {
         using var factory = new ApiFactory();

@@ -80,6 +80,9 @@ public sealed partial class MasterCsvService
                 case MasterCsvKinds.Checklists:
                     await ImportChecklistsAsync(table, errors, counter, ct);
                     break;
+                case MasterCsvKinds.DefectReasons:
+                    await ImportDefectReasonsAsync(table, errors, counter, ct);
+                    break;
                 case MasterCsvKinds.Skills:
                     await ImportSkillsAsync(table, errors, counter, ct);
                     break;
@@ -322,6 +325,49 @@ public sealed partial class MasterCsvService
             {
                 db.Tools.Add(tool);
                 byCode[code] = tool;
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
+    private async Task ImportDefectReasonsAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.DefectReasons.ToDictionaryAsync(r => r.Code, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 50);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "不良理由コード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var reason);
+            reason ??= new DefectReason { Code = code };
+
+            var name = reader.RequiredText("Name", 200);
+            var category = reader.Enum("Category", reason.Category, CsvEnumLabels.DefectReasonCategories);
+            var isActive = reader.Bool("IsActive", reason.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            reason.Name = name;
+            reason.Category = category;
+            reason.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.DefectReasons.Add(reason);
+                byCode[code] = reason;
                 counter.Created++;
             }
             else

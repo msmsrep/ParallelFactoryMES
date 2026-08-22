@@ -251,6 +251,25 @@ public class ChecklistItem
     public bool IsRequired { get; set; } = true;
 }
 
+/// <summary>
+/// 不良理由マスタ（Spec.md 5.1 DefectReason。C-40-10-01）。
+/// 生産実績の不良数の内訳（<see cref="ProductionDefect"/>）と不良項目別分析の集計軸に使う。
+/// 粒度は「現場が迷わず選べて、集計にも使える」範囲で定義する
+/// </summary>
+public class DefectReason
+{
+    public int Id { get; set; }
+
+    /// <summary>不良理由コード（一意）</summary>
+    public string Code { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public DefectReasonCategory Category { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
 /// <summary>スキル・資格マスタ（Spec.md 5.1 SkillMaster。F-20-10-01）</summary>
 public class SkillMaster
 {

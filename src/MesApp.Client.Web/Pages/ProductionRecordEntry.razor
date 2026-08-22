@@ -79,6 +79,31 @@ else
                     </label>
                 </div>
             </div>
+
+            @* 不良理由別の内訳（C-40-10-01）。合計は不良数を超えられない。残りは理由未分類 *@
+            @if (_defectReasons.Count > 0 && _defect > 0)
+            {
+                <h3>不良理由別の内訳</h3>
+                <table class="table">
+                    <thead><tr><th>不良理由</th><th>区分</th><th>数量</th></tr></thead>
+                    <tbody>
+                        @foreach (var reason in _defectReasons)
+                        {
+                            <tr>
+                                <td>@reason.Code @reason.Name</td>
+                                <td>@Labels.DefectCategory(reason.Category)</td>
+                                <td>
+                                    <input type="number" min="0" style="width:6rem;"
+                                           value="@GetDefectQuantity(reason.Id)"
+                                           @onchange="e => SetDefectQuantity(reason.Id, e.Value?.ToString())" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <p class="text-muted">内訳の合計 @_defectByReason.Values.Sum() / 不良数 @_defect</p>
+            }
+
             <button class="btn" disabled="@_busy" @onclick="SubmitAsync">実績を登録（作業完了報告）</button>
         </div>
     }
@@ -97,6 +122,7 @@ else
                     <th>不良数</th>
                     <th>廃棄</th>
                     <th>再作業待ち</th>
+                    <th>不良理由内訳</th>
                     <th>作業者</th>
                     <th>開始</th>
                     <th>終了</th>
@@ -112,6 +138,16 @@ else
                         <td>@record.DefectQuantity</td>
                         <td>@record.ScrapQuantity</td>
                         <td>@record.ReworkQuantity</td>
+                        <td>
+                            @if (record.Defects is { Count: > 0 })
+                            {
+                                @string.Join("、", record.Defects.Select(d => $"{d.DefectReasonCode} {d.Quantity}"))
+                            }
+                            else
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                        </td>
                         <td>@record.PerformedByName</td>
                         <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
@@ -149,6 +185,8 @@ else
     private DateTime? _endedAt;
     private int _outputLocationId;
     private bool _backflush;
+    private List<DefectReasonResponse> _defectReasons = [];
+    private readonly Dictionary<int, decimal> _defectByReason = [];
 
     private string? _error;
     private string? _message;
@@ -157,9 +195,25 @@ else
     // ロケーションはコード表示のみ使用（MasterContractsのLocationResponseはenumを含むため簡易DTOで受ける）
     private sealed record LocationOption(int Id, string Code);
 
+    private decimal GetDefectQuantity(int reasonId) =>
+        _defectByReason.TryGetValue(reasonId, out var quantity) ? quantity : 0;
+
+    private void SetDefectQuantity(int reasonId, string? value)
+    {
+        if (decimal.TryParse(value, out var quantity) && quantity > 0)
+        {
+            _defectByReason[reasonId] = quantity;
+        }
+        else
+        {
+            _defectByReason.Remove(reasonId);
+        }
+    }
+
     protected override async Task OnParametersSetAsync()
     {
         _locations = await Http.GetFromJsonAsync<List<LocationOption>>("api/locations") ?? [];
+        _defectReasons = await Http.GetFromJsonAsync<List<DefectReasonResponse>>("api/defect-reasons") ?? [];
         await LoadAsync();
     }
 
@@ -207,6 +261,11 @@ else
             _error = "廃棄数と再作業待ち数の合計は不良数を超えられません。";
             return;
         }
+        if (_defectByReason.Values.Sum() > _defect)
+        {
+            _error = "不良理由別の内訳の合計は不良数を超えられません。";
+            return;
+        }
         _busy = true;
         _error = null;
         _message = null;
@@ -218,7 +277,10 @@ else
                     new DateTimeOffset(_startedAt),
                     _endedAt is null ? null : new DateTimeOffset(_endedAt.Value),
                     _outputLocationId == 0 ? null : _outputLocationId,
-                    _backflush, _scrap, _rework));
+                    _backflush, _scrap, _rework,
+                    _defectByReason.Where(x => x.Value > 0)
+                        .Select(x => new ProductionDefectRequest(x.Key, x.Value))
+                        .ToList()));
             if (!response.IsSuccessStatusCode)
             {
                 _error = await AuthService.ReadProblemTitleAsync(response) ?? "実績登録に失敗しました。";
@@ -229,6 +291,7 @@ else
             _defect = 0;
             _scrap = 0;
             _rework = 0;
+            _defectByReason.Clear();
             await LoadAsync();
         }
         finally
