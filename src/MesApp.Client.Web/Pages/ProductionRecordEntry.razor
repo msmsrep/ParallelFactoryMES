@@ -45,6 +45,15 @@ else
                     <label>不良数</label>
                     <input type="number" @bind="_defect" min="0" />
                 </div>
+                @* 廃棄・再作業待ちは不良数の内訳（B-40-10-01）。残りは判定待ち・保留中の数量 *@
+                <div class="form-field">
+                    <label>うち廃棄数</label>
+                    <input type="number" @bind="_scrap" min="0" />
+                </div>
+                <div class="form-field">
+                    <label>うち再作業待ち数</label>
+                    <input type="number" @bind="_rework" min="0" />
+                </div>
                 <div class="form-field">
                     <label>開始時刻</label>
                     <input type="datetime-local" @bind="_startedAt" />
@@ -86,6 +95,8 @@ else
                 <tr>
                     <th>良品数</th>
                     <th>不良数</th>
+                    <th>廃棄</th>
+                    <th>再作業待ち</th>
                     <th>作業者</th>
                     <th>開始</th>
                     <th>終了</th>
@@ -99,6 +110,8 @@ else
                     <tr>
                         <td>@record.GoodQuantity</td>
                         <td>@record.DefectQuantity</td>
+                        <td>@record.ScrapQuantity</td>
+                        <td>@record.ReworkQuantity</td>
                         <td>@record.PerformedByName</td>
                         <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
@@ -130,6 +143,8 @@ else
 
     private decimal _good;
     private decimal _defect;
+    private decimal _scrap;
+    private decimal _rework;
     private DateTime _startedAt = DateTime.Now;
     private DateTime? _endedAt;
     private int _outputLocationId;
@@ -187,6 +202,11 @@ else
             _error = "良品数と不良数の合計は0より大きい必要があります。";
             return;
         }
+        if (_scrap + _rework > _defect)
+        {
+            _error = "廃棄数と再作業待ち数の合計は不良数を超えられません。";
+            return;
+        }
         _busy = true;
         _error = null;
         _message = null;
@@ -198,7 +218,7 @@ else
                     new DateTimeOffset(_startedAt),
                     _endedAt is null ? null : new DateTimeOffset(_endedAt.Value),
                     _outputLocationId == 0 ? null : _outputLocationId,
-                    _backflush));
+                    _backflush, _scrap, _rework));
             if (!response.IsSuccessStatusCode)
             {
                 _error = await AuthService.ReadProblemTitleAsync(response) ?? "実績登録に失敗しました。";
@@ -207,6 +227,8 @@ else
             _message = "実績を登録しました。";
             _good = 0;
             _defect = 0;
+            _scrap = 0;
+            _rework = 0;
             await LoadAsync();
         }
         finally

@@ -229,6 +229,50 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task 不良数の内訳として廃棄数と再作業待ち数を記録できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var finalWo = order.WorkOrders[1];
+
+        // 内訳の合計が不良数を超える指定は拒否される
+        var invalid = await admin.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(7m, 3m, DateTimeOffset.Now, null, ctx.ProductLocationId, false,
+                ScrapQuantity: 2m, ReworkQuantity: 2m));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+        // 良品7・不良3（うち廃棄2・再作業待ち1）
+        var posted = await admin.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(7m, 3m, DateTimeOffset.Now, null, ctx.ProductLocationId, false,
+                ScrapQuantity: 2m, ReworkQuantity: 1m));
+        Assert.Equal(HttpStatusCode.OK, posted.StatusCode);
+        var record = (await posted.Content.ReadFromJsonAsync<ProductionRecordResponse>())!;
+        Assert.Equal(2m, record.ScrapQuantity);
+        Assert.Equal(1m, record.ReworkQuantity);
+        // 在庫計上は良品数のみ（内訳は在庫に影響しない）
+        Assert.Equal(7m, await Phase3TestData.GetStockQuantityAsync(admin, record.OutputLotId!.Value));
+
+        // 訂正でも内訳を更新でき、訂正履歴に前後が残る（B-70-30-01）
+        var corrected = await admin.PutAsJsonAsync($"/api/production-records/{record.Id}",
+            new ProductionRecordCorrectionRequest(7m, 3m, "再作業判断の変更", ScrapQuantity: 1m, ReworkQuantity: 2m));
+        Assert.Equal(HttpStatusCode.OK, corrected.StatusCode);
+        var correctedBody = (await corrected.Content.ReadFromJsonAsync<ProductionRecordResponse>())!;
+        Assert.Equal(1m, correctedBody.ScrapQuantity);
+        Assert.Equal(2m, correctedBody.ReworkQuantity);
+
+        var history = await admin.GetFromJsonAsync<Core.Contracts.Quality.LotHistoryResponse>(
+            $"/api/traceability/{record.OutputLotId.Value}/history");
+        var entry = Assert.Single(history!.CorrectionHistory);
+        Assert.Equal(2m, entry.BeforeScrapQuantity);
+        Assert.Equal(1m, entry.BeforeReworkQuantity);
+        Assert.Equal(1m, entry.AfterScrapQuantity);
+        Assert.Equal(2m, entry.AfterReworkQuantity);
+    }
+
+    [Fact]
     public async Task 段取り実績とチェックリストと製造条件データを記録できる()
     {
         using var factory = new ApiFactory();

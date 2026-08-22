@@ -144,7 +144,9 @@ public record LotStatusHistoryEntry(
 public record ProductionCorrectionEntry(
     string WorkOrderNo,
     decimal BeforeGoodQuantity, decimal BeforeDefectQuantity,
+    decimal BeforeScrapQuantity, decimal BeforeReworkQuantity,
     decimal AfterGoodQuantity, decimal AfterDefectQuantity,
+    decimal AfterScrapQuantity, decimal AfterReworkQuantity,
     string Reason, string? CorrectedByName, DateTimeOffset CorrectedAt);
 
 /// <summary>ロットの履歴閲覧（H-30-10-03〜05：製造・検査・在庫・状態・訂正履歴）</summary>
@@ -158,7 +160,13 @@ public record LotHistoryResponse(
 
 // ---- 品質分析（C-40-10）----
 
-public record DefectSummaryRow(string Key, decimal GoodQuantity, decimal DefectQuantity, decimal DefectRate);
+/// <summary>
+/// 品目別・工程別の出来高集計（C-40-10-03）。廃棄・再作業待ちは不良数の内訳であり、
+/// 不良率は従来どおり 不良数 ÷ (良品数＋不良数) で算出する
+/// </summary>
+public record DefectSummaryRow(
+    string Key, decimal GoodQuantity, decimal DefectQuantity,
+    decimal ScrapQuantity, decimal ReworkQuantity, decimal DefectRate);
 
 public record QualitySummaryResponse(
     /// <summary>品目別の良品・不良集計（C-40-10-03）</summary>

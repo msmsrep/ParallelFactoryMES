@@ -56,7 +56,7 @@ else
         else
         {
             <table class="table">
-                <thead><tr><th>品目</th><th>良品数</th><th>不良数</th><th>不良率</th><th>構成</th></tr></thead>
+                <thead><tr><th>品目</th><th>良品数</th><th>不良数</th><th>うち廃棄</th><th>うち再作業待ち</th><th>不良率</th><th>構成</th></tr></thead>
                 <tbody>
                     @foreach (var row in _summary.ByProduct)
                     {
@@ -64,6 +64,8 @@ else
                             <td>@row.Key</td>
                             <td>@row.GoodQuantity</td>
                             <td>@row.DefectQuantity</td>
+                            <td>@row.ScrapQuantity</td>
+                            <td>@row.ReworkQuantity</td>
                             <td class="@(row.DefectRate > 0 ? "text-danger" : "")">@row.DefectRate %</td>
                             <td><BarMeter Value="@row.DefectRate" /></td>
                         </tr>
@@ -82,7 +84,7 @@ else
         else
         {
             <table class="table">
-                <thead><tr><th>工程</th><th>良品数</th><th>不良数</th><th>不良率</th><th>構成</th></tr></thead>
+                <thead><tr><th>工程</th><th>良品数</th><th>不良数</th><th>うち廃棄</th><th>うち再作業待ち</th><th>不良率</th><th>構成</th></tr></thead>
                 <tbody>
                     @foreach (var row in _summary.ByProcess)
                     {
@@ -90,6 +92,8 @@ else
                             <td>@row.Key</td>
                             <td>@row.GoodQuantity</td>
                             <td>@row.DefectQuantity</td>
+                            <td>@row.ScrapQuantity</td>
+                            <td>@row.ReworkQuantity</td>
                             <td class="@(row.DefectRate > 0 ? "text-danger" : "")">@row.DefectRate %</td>
                             <td><BarMeter Value="@row.DefectRate" /></td>
                         </tr>

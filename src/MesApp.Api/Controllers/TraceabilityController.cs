@@ -99,7 +99,9 @@ public class TraceabilityController(MesAppDbContext db) : ControllerBase
             .Select(c => new ProductionCorrectionEntry(
                 c.WorkOrder!.WorkOrderNo,
                 c.BeforeGoodQuantity, c.BeforeDefectQuantity,
+                c.BeforeScrapQuantity, c.BeforeReworkQuantity,
                 c.AfterGoodQuantity, c.AfterDefectQuantity,
+                c.AfterScrapQuantity, c.AfterReworkQuantity,
                 c.Reason, c.CorrectedBy!.DisplayName, c.CorrectedAt))
             .ToListAsync(ct);
 

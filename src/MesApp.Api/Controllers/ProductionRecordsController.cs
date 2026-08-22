@@ -37,7 +37,22 @@ public class ProductionRecordsController(
             return NotFound();
         }
 
-        var before = new { good = record.GoodQuantity, defect = record.DefectQuantity };
+        if (request.ScrapQuantity + request.ReworkQuantity > request.DefectQuantity)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = $"廃棄数と再作業待ち数の合計（{request.ScrapQuantity + request.ReworkQuantity}）が" +
+                        $"不良数（{request.DefectQuantity}）を超えています。",
+            });
+        }
+
+        var before = new
+        {
+            good = record.GoodQuantity,
+            defect = record.DefectQuantity,
+            scrap = record.ScrapQuantity,
+            rework = record.ReworkQuantity,
+        };
         var goodDelta = request.GoodQuantity - record.GoodQuantity;
 
         // 在庫計上済み（最終工程）の実績訂正は在庫・ロット数量へ差分を反映
@@ -73,14 +88,20 @@ public class ProductionRecordsController(
             WorkOrderId = record.WorkOrderId,
             BeforeGoodQuantity = record.GoodQuantity,
             BeforeDefectQuantity = record.DefectQuantity,
+            BeforeScrapQuantity = record.ScrapQuantity,
+            BeforeReworkQuantity = record.ReworkQuantity,
             AfterGoodQuantity = request.GoodQuantity,
             AfterDefectQuantity = request.DefectQuantity,
+            AfterScrapQuantity = request.ScrapQuantity,
+            AfterReworkQuantity = request.ReworkQuantity,
             Reason = request.Reason,
             CorrectedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
         });
 
         record.GoodQuantity = request.GoodQuantity;
         record.DefectQuantity = request.DefectQuantity;
+        record.ScrapQuantity = request.ScrapQuantity;
+        record.ReworkQuantity = request.ReworkQuantity;
         await db.SaveChangesAsync(ct);
         // 訂正の証跡は後から追跡・検索できるよう構造化して残す（Spec.md 7.6）
         await auditLogger.LogAsync("Execution", "Correct", nameof(ProductionRecord), id.ToString(),
@@ -88,13 +109,20 @@ public class ProductionRecordsController(
             {
                 workOrderNo = record.WorkOrder!.WorkOrderNo,
                 before,
-                after = new { good = request.GoodQuantity, defect = request.DefectQuantity },
+                after = new
+                {
+                    good = request.GoodQuantity,
+                    defect = request.DefectQuantity,
+                    scrap = request.ScrapQuantity,
+                    rework = request.ReworkQuantity,
+                },
                 reason = request.Reason,
             }, ct: ct);
 
         return new ProductionRecordResponse(record.Id, record.WorkOrderId, record.WorkOrder!.WorkOrderNo,
             record.PerformedByUserId, record.PerformedBy?.DisplayName,
-            record.GoodQuantity, record.DefectQuantity, record.StartedAt, record.EndedAt,
+            record.GoodQuantity, record.DefectQuantity, record.ScrapQuantity, record.ReworkQuantity,
+            record.StartedAt, record.EndedAt,
             record.OutputLotId, record.OutputLot?.LotNumber, record.OutputLocationId,
             record.ApprovedByUserId, record.ApprovedAt);
     }

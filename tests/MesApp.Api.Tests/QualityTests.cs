@@ -429,7 +429,8 @@ public class QualityTests
         var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
         await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
             new Core.Contracts.Execution.ProductionRecordRequest(
-                8m, 2m, DateTimeOffset.Now, null, ctx.ProductLocationId, false));
+                8m, 2m, DateTimeOffset.Now, null, ctx.ProductLocationId, false,
+                ScrapQuantity: 1m, ReworkQuantity: 1m));
         await admin.PostAsJsonAsync("/api/nonconformances",
             new NonconformanceCreateRequest(NonconformanceSource.Production, null,
                 order.WorkOrders[1].Id, null, "不良2個", "設備不調", null));
@@ -439,6 +440,9 @@ public class QualityTests
         Assert.Equal(8m, productRow.GoodQuantity);
         Assert.Equal(2m, productRow.DefectQuantity);
         Assert.Equal(20m, productRow.DefectRate);
+        // 廃棄・再作業待ちは不良数の内訳として集計される（不良率の算出には影響しない）
+        Assert.Equal(1m, productRow.ScrapQuantity);
+        Assert.Equal(1m, productRow.ReworkQuantity);
         Assert.Equal(1, summary.OpenNonconformanceCount);
         Assert.True(summary.NonconformanceByCause.ContainsKey("設備不調"));
     }

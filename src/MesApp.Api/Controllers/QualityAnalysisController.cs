@@ -33,6 +33,8 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
                     r.CreatedAt,
                     r.GoodQuantity,
                     r.DefectQuantity,
+                    r.ScrapQuantity,
+                    r.ReworkQuantity,
                     ProductCode = r.WorkOrder!.Product!.Code,
                     ProcessCode = r.WorkOrder!.Process!.Code,
                 })
@@ -44,12 +46,14 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
         var byProduct = records
             .GroupBy(r => r.ProductCode)
             .OrderBy(g => g.Key)
-            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity)))
+            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity),
+                g.Sum(r => r.ScrapQuantity), g.Sum(r => r.ReworkQuantity)))
             .ToList();
         var byProcess = records
             .GroupBy(r => r.ProcessCode)
             .OrderBy(g => g.Key)
-            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity)))
+            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity),
+                g.Sum(r => r.ScrapQuantity), g.Sum(r => r.ReworkQuantity)))
             .ToList();
 
         var nonconformances = (await db.NonconformanceReports.AsNoTracking()
@@ -80,6 +84,8 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
             nonconformances.Count(n => n.Status != NonconformanceStatus.Closed));
     }
 
-    private static DefectSummaryRow ToRow(string key, decimal good, decimal defect) =>
-        new(key, good, defect, good + defect == 0 ? 0 : Math.Round(defect / (good + defect) * 100, 2));
+    private static DefectSummaryRow ToRow(
+        string key, decimal good, decimal defect, decimal scrap, decimal rework) =>
+        new(key, good, defect, scrap, rework,
+            good + defect == 0 ? 0 : Math.Round(defect / (good + defect) * 100, 2));
 }

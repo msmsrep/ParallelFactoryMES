@@ -279,7 +279,8 @@ public class WorkOrderExecutionController(
             .Select(r => new ProductionRecordResponse(
                 r.Id, r.WorkOrderId, r.WorkOrder!.WorkOrderNo,
                 r.PerformedByUserId, r.PerformedBy!.DisplayName,
-                r.GoodQuantity, r.DefectQuantity, r.StartedAt, r.EndedAt,
+                r.GoodQuantity, r.DefectQuantity, r.ScrapQuantity, r.ReworkQuantity,
+                r.StartedAt, r.EndedAt,
                 r.OutputLotId, r.OutputLot!.LotNumber, r.OutputLocationId,
                 r.ApprovedByUserId, r.ApprovedAt))
             .ToListAsync(ct);
@@ -307,6 +308,15 @@ public class WorkOrderExecutionController(
         if (request.GoodQuantity + request.DefectQuantity <= 0)
         {
             return BadRequest(new ProblemDetails { Title = "良品数と不良数の合計は0より大きい必要があります。" });
+        }
+        // 廃棄・再作業待ちは不良数の内訳（B-40-10-01）。残りは判定待ち・保留中の数量になる
+        if (request.ScrapQuantity + request.ReworkQuantity > request.DefectQuantity)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = $"廃棄数と再作業待ち数の合計（{request.ScrapQuantity + request.ReworkQuantity}）が" +
+                        $"不良数（{request.DefectQuantity}）を超えています。",
+            });
         }
 
         var order = workOrder.ManufacturingOrder!;
@@ -390,6 +400,8 @@ public class WorkOrderExecutionController(
             PerformedByUserId = CurrentUserId!,
             GoodQuantity = request.GoodQuantity,
             DefectQuantity = request.DefectQuantity,
+            ScrapQuantity = request.ScrapQuantity,
+            ReworkQuantity = request.ReworkQuantity,
             StartedAt = request.StartedAt,
             EndedAt = request.EndedAt,
             OutputLotId = outputLot?.Id,
@@ -399,12 +411,20 @@ public class WorkOrderExecutionController(
         workOrder.Status = WorkOrderStatus.Completed;
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Execution", "ProductionRecord", nameof(WorkOrder), id.ToString(),
-            detail: $"good={request.GoodQuantity}, defect={request.DefectQuantity}, backflush={request.Backflush}", ct: ct);
+            detail: new
+            {
+                good = request.GoodQuantity,
+                defect = request.DefectQuantity,
+                scrap = request.ScrapQuantity,
+                rework = request.ReworkQuantity,
+                backflush = request.Backflush,
+            }, ct: ct);
 
         var name = await db.Users.Where(u => u.Id == record.PerformedByUserId)
             .Select(u => u.DisplayName).FirstOrDefaultAsync(ct);
         return new ProductionRecordResponse(record.Id, id, workOrder.WorkOrderNo,
             record.PerformedByUserId, name, record.GoodQuantity, record.DefectQuantity,
+            record.ScrapQuantity, record.ReworkQuantity,
             record.StartedAt, record.EndedAt, record.OutputLotId, outputLot?.LotNumber,
             record.OutputLocationId, null, null);
     }

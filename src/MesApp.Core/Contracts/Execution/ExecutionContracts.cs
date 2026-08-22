@@ -54,12 +54,17 @@ public record ProductionRecordRequest(
     /// <summary>入庫先ロケーション（最終工程の実績で必須。在庫計上 B-40-10-02）</summary>
     int? OutputLocationId,
     /// <summary>バックフラッシュ実行（MBOM×(良品+不良)数量の部材を自動消費。B-40-10-09）</summary>
-    bool Backflush);
+    bool Backflush,
+    /// <summary>廃棄数（不良数の内訳。省略時0）</summary>
+    [Range(0, double.MaxValue)] decimal ScrapQuantity = 0,
+    /// <summary>再作業待ち数（不良数の内訳。省略時0）</summary>
+    [Range(0, double.MaxValue)] decimal ReworkQuantity = 0);
 
 public record ProductionRecordResponse(
     int Id, int WorkOrderId, string WorkOrderNo,
     string PerformedByUserId, string? PerformedByName,
     decimal GoodQuantity, decimal DefectQuantity,
+    decimal ScrapQuantity, decimal ReworkQuantity,
     DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
     int? OutputLotId, string? OutputLotNumber, int? OutputLocationId,
     string? ApprovedByUserId, DateTimeOffset? ApprovedAt);
@@ -68,7 +73,9 @@ public record ProductionRecordResponse(
 public record ProductionRecordCorrectionRequest(
     [Range(0, double.MaxValue)] decimal GoodQuantity,
     [Range(0, double.MaxValue)] decimal DefectQuantity,
-    [Required] string Reason);
+    [Required] string Reason,
+    [Range(0, double.MaxValue)] decimal ScrapQuantity = 0,
+    [Range(0, double.MaxValue)] decimal ReworkQuantity = 0);
 
 // ---- 製造条件データ（B-30-30-04）----
 

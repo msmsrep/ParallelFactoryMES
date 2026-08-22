@@ -104,8 +104,17 @@ public class ProductionRecord
     /// <summary>良品数（B-40-10-01）</summary>
     public decimal GoodQuantity { get; set; }
 
-    /// <summary>不良数</summary>
+    /// <summary>不良数（不適合の総数。うち廃棄・再作業待ちの内訳を下の2項目で持つ）</summary>
     public decimal DefectQuantity { get; set; }
+
+    /// <summary>
+    /// 廃棄数（不良数の内訳。B-40-10-01）。良品にも再作業にもならず処分する数量。
+    /// 廃棄＋再作業待ち＝不良数とは限らない（残りは判定待ち・保留中の数量）
+    /// </summary>
+    public decimal ScrapQuantity { get; set; }
+
+    /// <summary>再作業待ち数（不良数の内訳。リワーク指図 B-70-10 との数量突合に使う）</summary>
+    public decimal ReworkQuantity { get; set; }
 
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? EndedAt { get; set; }
@@ -146,9 +155,13 @@ public class ProductionRecordCorrection
 
     public decimal BeforeGoodQuantity { get; set; }
     public decimal BeforeDefectQuantity { get; set; }
+    public decimal BeforeScrapQuantity { get; set; }
+    public decimal BeforeReworkQuantity { get; set; }
 
     public decimal AfterGoodQuantity { get; set; }
     public decimal AfterDefectQuantity { get; set; }
+    public decimal AfterScrapQuantity { get; set; }
+    public decimal AfterReworkQuantity { get; set; }
 
     /// <summary>訂正理由（必須）</summary>
     public string Reason { get; set; } = string.Empty;
