@@ -193,6 +193,21 @@ public enum DefectReasonCategory
     Other,
 }
 
+/// <summary>作業指示の状態変更の契機（Spec.md 5.2 WorkOrderStatusHistory）</summary>
+public enum WorkOrderStatusChangeSource
+{
+    /// <summary>差立（配布）（B-10-20）</summary>
+    Dispatch,
+    /// <summary>着手（B-30-30-01）</summary>
+    Start,
+    /// <summary>実績入力による作業完了報告（B-30-30-06）</summary>
+    ProductionRecord,
+    /// <summary>製造完了承認（B-40-10-10）</summary>
+    Approval,
+    /// <summary>指図取消への連動（A-20）</summary>
+    OrderCancel,
+}
+
 /// <summary>ロット系譜の関係区分（Spec.md 5.3 LotGenealogy。D-10-30-05〜07）</summary>
 public enum LotRelationType
 {

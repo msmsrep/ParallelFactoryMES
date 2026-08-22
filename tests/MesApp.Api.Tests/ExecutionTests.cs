@@ -60,6 +60,81 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task 作業指示の状態遷移が履歴として残る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrderId = order.WorkOrders[1].Id;
+
+        (await admin.PostAsync($"/api/work-orders/{workOrderId}/start", null)).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/production-records",
+            new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now, null, ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsync($"/api/work-orders/{workOrderId}/approve", null)).EnsureSuccessStatusCode();
+
+        var history = await admin.GetFromJsonAsync<List<Core.Contracts.Production.WorkOrderStatusHistoryEntry>>(
+            $"/api/work-orders/{workOrderId}/status-history");
+        Assert.Equal(3, history!.Count);
+
+        Assert.Equal(WorkOrderStatus.Created, history[0].FromStatus);
+        Assert.Equal(WorkOrderStatus.Started, history[0].ToStatus);
+        Assert.Equal(WorkOrderStatusChangeSource.Start, history[0].Source);
+        Assert.NotNull(history[0].ChangedByName);
+
+        Assert.Equal(WorkOrderStatus.Completed, history[1].ToStatus);
+        Assert.Equal(WorkOrderStatusChangeSource.ProductionRecord, history[1].Source);
+
+        Assert.Equal(WorkOrderStatus.Approved, history[2].ToStatus);
+        Assert.Equal(WorkOrderStatusChangeSource.Approval, history[2].Source);
+    }
+
+    [Fact]
+    public async Task 代替部品の投入は理由が必須で実績に代替として記録される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // RM-01を主材料、RM-02を代替部品としてMBOMに登録する
+        var alt = await MasterTests.CreateProductAsync(admin, "RM-02", "代替部材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom",
+            new List<Core.Contracts.Masters.BomItemRequest>
+            {
+                new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1", false),
+                new(alt.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1", true),
+            })).EnsureSuccessStatusCode();
+
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrderId = order.WorkOrders[0].Id;
+        var altLot = await Phase3TestData.ReceiveAsync(admin, alt.Id, 100m, ctx.MaterialLocationId);
+        var mainLot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        // 代替部品は理由なしでは投入できない
+        var noReason = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
+            new ConsumptionRequest(altLot.Id, ctx.MaterialLocationId, 5m));
+        Assert.Equal(HttpStatusCode.BadRequest, noReason.StatusCode);
+
+        // 理由を付ければ投入でき、代替として記録される
+        var withReason = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
+            new ConsumptionRequest(altLot.Id, ctx.MaterialLocationId, 5m, "主材料が欠品のため班長判断で代替"));
+        Assert.Equal(HttpStatusCode.OK, withReason.StatusCode);
+        var body = (await withReason.Content.ReadFromJsonAsync<ConsumptionResponse>())!;
+        Assert.True(body.IsSubstitute);
+        Assert.Equal("主材料が欠品のため班長判断で代替", body.SubstituteReason);
+
+        // 主材料は従来どおり理由なしで投入できる
+        var main = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
+            new ConsumptionRequest(mainLot.Id, ctx.MaterialLocationId, 20m));
+        Assert.Equal(HttpStatusCode.OK, main.StatusCode);
+        var mainBody = (await main.Content.ReadFromJsonAsync<ConsumptionResponse>())!;
+        Assert.False(mainBody.IsSubstitute);
+        Assert.Null(mainBody.SubstituteReason);
+    }
+
+    [Fact]
     public async Task 部材投入で在庫が引き落とされ投入実績が残る()
     {
         using var factory = new ApiFactory();

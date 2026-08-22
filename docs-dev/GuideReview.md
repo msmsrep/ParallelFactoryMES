@@ -10,14 +10,14 @@
 | 1. 出荷実行のロットステータス未確認 | **対応済**（Spec.md 改訂11、`Api/Policies/LotUsabilityPolicy.cs`） |
 | 2. 有効期限切れロットの投入・引当 | **対応済**（同上） |
 | 5. ロット統合の系譜が残らない | **対応済**（Spec.md 改訂12、`LotGenealogy`。統合されたロットも前方・後方追跡できる） |
-| 6. ロット状態・作業指示状態の履歴がない | **一部対応**（`LotStatusHistory` と `LotStatusService` でロットの状態遷移を記録。`WorkOrder.Status` の履歴は未着手） |
-| 3. 部材投入のMBOM照合がない | **一部対応**（Spec.md 改訂14、`MaterialIssuePolicy`。MBOM外の品目は投入不可。代替材料は代替部品グループで表現し、代替使用時の個別承認・理由記録と予定/実績の対比表示は未着手） |
+| 6. ロット状態・作業指示状態の履歴がない | **対応済**（Spec.md 改訂12・20。`LotStatusHistory` と `WorkOrderStatusHistory` の両方を追加し、状態変更を専用サービスへ集約） |
+| 3. 部材投入のMBOM照合がない | **対応済**（Spec.md 改訂14・19・20。予定材料に基づく照合、代替部品フラグと代替理由の必須化、指図詳細での予定材料表示まで実装。代替の事前承認フローのみ将来拡張） |
 | 4. 検査規格の版数が値を保存していない | **対応済**（Spec.md 改訂13、`InspectionOrderItem` へ発行時点の基準をスナップショット） |
 | 7. 実績訂正が上書き＋ログ文字列 | **対応済**（Spec.md 改訂15・16。`AuditLog.Detail` を構造化JSONへ。さらに訂正前の値を業務履歴（`ProductionRecordCorrection` / `InspectionResultCorrection`）として残し、トレース画面・検査詳細・検査成績書から参照できるようにした。訂正そのものへの承認フローは Spec.md の単段階承認方針に従い将来拡張） |
 | 8. 数量区分が良品／不良の2つだけ | **対応済**（Spec.md 改訂17・18。不良数の内訳として廃棄数・再作業待ち数を追加し、さらに不良理由マスタ（`DefectReason`）と不良明細（`ProductionDefect`）で理由別の内訳を記録・集計できるようにした） |
 | 9. MBOM・工順に有効期間／版がない | **対応済**（Spec.md 改訂19。マスタ側の版管理ではなく、指図展開時に工順とMBOMを実績側へ固定する方式を採用。差立のスキル照合・部材投入の照合・バックフラッシュがスナップショット基準になった） |
-| 10. 業務ルールの置き場 | **一部対応**（`Api/Policies/` を新設しロット使用可否を集約。投入可否のMBOM照合・出荷ゲートの残りは未着手） |
-| — | 未着手の指摘なし（3・6・10 の残りは各行に記載） |
+| 10. 業務ルールの置き場 | **対応済**（`Api/Policies/` に `LotUsabilityPolicy` / `MaterialIssuePolicy` / `ShipmentGatePolicy` を集約。状態変更は `LotStatusService` / `WorkOrderStatusService` 経由に統一。CLAUDE.md にも規約を追加） |
+| — | **全10項目 対応済**（将来拡張として切り分けた論点は各行に記載） |
 
 ## 総評
 

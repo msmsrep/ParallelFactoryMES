@@ -92,7 +92,7 @@
     <div class="card">
         <h2 style="margin-top:0;">@_selected.Code @_selected.Name の MBOM（A-40-10）</h2>
         <table class="table">
-            <thead><tr><th>子品目</th><th>必要数量（親1単位）</th><th>内外製</th><th>代替グループ</th><th></th></tr></thead>
+            <thead><tr><th>子品目</th><th>必要数量（親1単位）</th><th>内外製</th><th>代替グループ</th><th>代替部品</th><th></th></tr></thead>
             <tbody>
                 @foreach (var line in _bomLines)
                 {
@@ -101,6 +101,7 @@
                         <td>@line.QuantityPer</td>
                         <td>@(line.MakeOrBuy == MakeOrBuy.InHouse ? "内製" : "外注")</td>
                         <td>@(line.AlternativeGroup ?? "-")</td>
+                        <td>@(line.IsAlternative ? "代替" : "主")</td>
                         <td><button class="btn btn-danger btn-sm" @onclick="() => _bomLines.Remove(line)">削除</button></td>
                     </tr>
                 }
@@ -132,6 +133,13 @@
                 <div class="form-field">
                     <label>代替部品グループ</label>
                     <input @bind="_bomAltGroup" />
+                </div>
+                @* 代替部品の投入には理由の記録を求める（A-40-10-04） *@
+                <div class="form-field">
+                    <label>
+                        <input type="checkbox" @bind="_bomIsAlternative" style="width:auto;" />
+                        代替部品（主材料でない）
+                    </label>
                 </div>
             </div>
             <div class="actions">
@@ -266,6 +274,7 @@
     private decimal _bomQuantity = 1;
     private MakeOrBuy _bomMakeOrBuy = MakeOrBuy.InHouse;
     private string? _bomAltGroup;
+    private bool _bomIsAlternative;
 
     private int _stepSequence = 1;
     private int _stepProcessId;
@@ -385,7 +394,8 @@
 
         var bom = await Http.GetFromJsonAsync<List<BomItemResponse>>($"api/products/{product.Id}/bom") ?? [];
         _bomLines.AddRange(bom.Select(b =>
-            new BomItemRequest(b.ChildProductId, b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup)));
+            new BomItemRequest(b.ChildProductId, b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup,
+                b.IsAlternative)));
 
         var routing = await Http.GetFromJsonAsync<List<RoutingStepResponse>>(
             $"api/products/{product.Id}/routing") ?? [];
@@ -404,8 +414,9 @@
         }
         _error = null;
         _bomLines.Add(new BomItemRequest(_bomChildId, _bomQuantity, _bomMakeOrBuy,
-            string.IsNullOrWhiteSpace(_bomAltGroup) ? null : _bomAltGroup));
+            string.IsNullOrWhiteSpace(_bomAltGroup) ? null : _bomAltGroup, _bomIsAlternative));
         _bomChildId = 0;
+        _bomIsAlternative = false;
     }
 
     private async Task SaveBomAsync()

@@ -46,6 +46,12 @@ public class BomItem
 
     /// <summary>代替部品グループ（同一グループ内で代替可。A-40-10-04）</summary>
     public string? AlternativeGroup { get; set; }
+
+    /// <summary>
+    /// 代替部品か（A-40-10-04）。同一グループ内の「主材料でない行」を示す。
+    /// 代替部品の投入には理由の記録を求める（Spec.md 3.9 部材投入の照合）
+    /// </summary>
+    public bool IsAlternative { get; set; }
 }
 
 /// <summary>工程マスタ（Spec.md 5.1 Process）</summary>

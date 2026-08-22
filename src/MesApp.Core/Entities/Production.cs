@@ -72,6 +72,9 @@ public class ManufacturingOrderMaterial
 
     /// <summary>代替部品グループ（展開時点のMBOMの値。同一グループ内は代替可）</summary>
     public string? AlternativeGroup { get; set; }
+
+    /// <summary>代替部品か（展開時点のMBOMの値。投入時に理由の記録を求める）</summary>
+    public bool IsAlternative { get; set; }
 }
 
 /// <summary>作業指示（Spec.md 5.2 WorkOrder。製造指図×工程。B-10）</summary>
@@ -131,6 +134,34 @@ public class WorkOrder
     public WorkOrderStatus Status { get; set; } = WorkOrderStatus.Created;
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// 作業指示の状態履歴（Spec.md 5.2 WorkOrderStatusHistory）。
+/// 作業指示の状態は現在値しか持たないため、配布・着手・完了・承認・取消の遷移を
+/// 業務履歴として残し、工程進捗と製造記録を後から説明できるようにする
+/// （ロット状態履歴（5.3 LotStatusHistory）と同じ方針）。
+/// </summary>
+public class WorkOrderStatusHistory
+{
+    public int Id { get; set; }
+
+    public int WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
+    public WorkOrderStatus FromStatus { get; set; }
+
+    public WorkOrderStatus ToStatus { get; set; }
+
+    public WorkOrderStatusChangeSource Source { get; set; }
+
+    /// <summary>備考（取消理由など）</summary>
+    public string? Note { get; set; }
+
+    public string? ChangedByUserId { get; set; }
+    public AppUser? ChangedBy { get; set; }
+
+    public DateTimeOffset ChangedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>ロット（Spec.md 5.3 Lot。Phase 2では産出ロット採番 B-10-10-05 のために先行導入）</summary>

@@ -55,6 +55,11 @@ public record WorkOrderResponse(
     /// <summary>展開時点の工順スナップショット（工程管理項目）</summary>
     string? ControlItems = null);
 
+/// <summary>作業指示の状態履歴1件（Spec.md 5.2 WorkOrderStatusHistory）</summary>
+public record WorkOrderStatusHistoryEntry(
+    WorkOrderStatus FromStatus, WorkOrderStatus ToStatus, WorkOrderStatusChangeSource Source,
+    string? Note, string? ChangedByName, DateTimeOffset ChangedAt);
+
 /// <summary>差立：作業員割当（スキル照合 F-20-30-01）・設備割当・着手順（B-10-20-01〜03）</summary>
 public record DispatchRequest(
     string? AssignedUserId,

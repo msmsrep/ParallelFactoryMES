@@ -19,6 +19,7 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class ManufacturingOrdersController(
     MesAppDbContext db,
+    WorkOrderStatusService workOrderStatus,
     NumberingService numbering,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
@@ -222,7 +223,9 @@ public class ManufacturingOrdersController(
         foreach (var workOrder in order.WorkOrders.Where(w =>
                      w.Status is not (WorkOrderStatus.Completed or WorkOrderStatus.Approved)))
         {
-            workOrder.Status = WorkOrderStatus.Canceled;
+            workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Canceled,
+                WorkOrderStatusChangeSource.OrderCancel, User.FindFirstValue(ClaimTypes.NameIdentifier),
+                $"指図 {order.OrderNo} の取消に連動");
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Production", "Cancel", nameof(ManufacturingOrder), id.ToString(),
@@ -315,6 +318,7 @@ public class ManufacturingOrdersController(
                 QuantityPer = item.QuantityPer,
                 PlannedQuantity = item.QuantityPer * order.Quantity,
                 AlternativeGroup = item.AlternativeGroup,
+                IsAlternative = item.IsAlternative,
             });
         }
 

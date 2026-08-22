@@ -37,12 +37,15 @@ public record ChecklistRecordResponse(
 public record ConsumptionRequest(
     int LotId,
     int LocationId,
-    [Range(0.000001, double.MaxValue)] decimal Quantity);
+    [Range(0.000001, double.MaxValue)] decimal Quantity,
+    /// <summary>代替部品を投入する場合の理由（予定材料の代替行を投入するときは必須。A-40-10-04）</summary>
+    [MaxLength(500)] string? SubstituteReason = null);
 
 public record ConsumptionResponse(
     int Id, int WorkOrderId, int ProductId, string ProductCode, string ProductName,
     int LotId, string LotNumber, int? LocationId, decimal Quantity,
-    DateTimeOffset ConsumedAt, ConsumptionMethod Method);
+    DateTimeOffset ConsumedAt, ConsumptionMethod Method,
+    bool IsSubstitute = false, string? SubstituteReason = null);
 
 // ---- 生産実績（B-30-30、B-40-10）----
 

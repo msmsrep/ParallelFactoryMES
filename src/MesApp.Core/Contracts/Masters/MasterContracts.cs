@@ -23,11 +23,14 @@ public record BomItemRequest(
     int ChildProductId,
     [Range(0.000001, double.MaxValue)] decimal QuantityPer,
     MakeOrBuy MakeOrBuy,
-    string? AlternativeGroup);
+    string? AlternativeGroup,
+    /// <summary>代替部品か（同一グループ内の主材料でない行。投入時に理由の記録を求める）</summary>
+    bool IsAlternative = false);
 
 public record BomItemResponse(
     int Id, int ChildProductId, string ChildProductCode, string ChildProductName,
-    decimal QuantityPer, MakeOrBuy MakeOrBuy, string? AlternativeGroup);
+    decimal QuantityPer, MakeOrBuy MakeOrBuy, string? AlternativeGroup,
+    bool IsAlternative = false);
 
 // ---- 工程（Process）----
 

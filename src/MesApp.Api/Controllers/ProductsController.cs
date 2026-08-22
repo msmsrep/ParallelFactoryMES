@@ -124,7 +124,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             .OrderBy(b => b.ChildProduct!.Code)
             .Select(b => new BomItemResponse(
                 b.Id, b.ChildProductId, b.ChildProduct!.Code, b.ChildProduct!.Name,
-                b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup))
+                b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup, b.IsAlternative))
             .ToListAsync(ct);
     }
 
@@ -164,6 +164,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             QuantityPer = i.QuantityPer,
             MakeOrBuy = i.MakeOrBuy,
             AlternativeGroup = i.AlternativeGroup,
+            IsAlternative = i.IsAlternative,
         }));
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Master", "Update", "Bom", id.ToString(),

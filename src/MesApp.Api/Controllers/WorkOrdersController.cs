@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Entities;
@@ -16,6 +18,7 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class WorkOrdersController(
     MesAppDbContext db,
+    WorkOrderStatusService workOrderStatus,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
 {
@@ -58,6 +61,25 @@ public class WorkOrdersController(
     {
         var workOrder = await BaseQuery().FirstOrDefaultAsync(w => w.Id == id, ct);
         return workOrder is null ? NotFound() : ToResponse(workOrder, workOrder.ManufacturingOrder!);
+    }
+
+    /// <summary>
+    /// 状態履歴（Spec.md 5.2 WorkOrderStatusHistory）。配布・着手・完了・承認・取消の遷移を時系列で返す
+    /// </summary>
+    [HttpGet("{id:int}/status-history")]
+    public async Task<ActionResult<List<WorkOrderStatusHistoryEntry>>> StatusHistory(
+        int id, CancellationToken ct)
+    {
+        if (!await db.WorkOrders.AnyAsync(w => w.Id == id, ct))
+        {
+            return NotFound();
+        }
+        return await db.WorkOrderStatusHistories.AsNoTracking()
+            .Where(h => h.WorkOrderId == id)
+            .OrderBy(h => h.Id)
+            .Select(h => new WorkOrderStatusHistoryEntry(
+                h.FromStatus, h.ToStatus, h.Source, h.Note, h.ChangedBy!.DisplayName, h.ChangedAt))
+            .ToListAsync(ct);
     }
 
     /// <summary>
@@ -125,7 +147,8 @@ public class WorkOrdersController(
         workOrder.AssignedUserId = request.AssignedUserId;
         workOrder.AssignedEquipmentId = request.AssignedEquipmentId;
         workOrder.DispatchOrder = request.DispatchOrder;
-        workOrder.Status = WorkOrderStatus.Dispatched;
+        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Dispatched,
+            WorkOrderStatusChangeSource.Dispatch, User.FindFirstValue(ClaimTypes.NameIdentifier));
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Production", "Dispatch", nameof(WorkOrder), id.ToString(),
             detail: $"workOrderNo={workOrder.WorkOrderNo}, user={request.AssignedUserId}, " +

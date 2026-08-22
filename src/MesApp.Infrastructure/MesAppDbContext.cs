@@ -31,6 +31,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<ManufacturingOrder> ManufacturingOrders => Set<ManufacturingOrder>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<ManufacturingOrderMaterial> ManufacturingOrderMaterials => Set<ManufacturingOrderMaterial>();
+    public DbSet<WorkOrderStatusHistory> WorkOrderStatusHistories => Set<WorkOrderStatusHistory>();
     public DbSet<Lot> Lots => Set<Lot>();
     public DbSet<LotGenealogy> LotGenealogies => Set<LotGenealogy>();
     public DbSet<LotStatusHistory> LotStatusHistories => Set<LotStatusHistory>();
@@ -114,6 +115,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<LotStockStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<LotRelationType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<LotStatusChangeSource>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<WorkOrderStatusChangeSource>().HaveConversion<string>().HaveMaxLength(30);
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -286,6 +288,17 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
+        builder.Entity<WorkOrderStatusHistory>(e =>
+        {
+            e.HasIndex(x => new { x.WorkOrderId, x.Id });
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.ChangedByUserId).HasMaxLength(450);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.ChangedBy).WithMany().HasForeignKey(x => x.ChangedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
         builder.Entity<ManufacturingOrderMaterial>(e =>
         {
             e.HasIndex(x => new { x.ManufacturingOrderId, x.ChildProductId }).IsUnique();
@@ -372,6 +385,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
 
         builder.Entity<MaterialConsumption>(e =>
         {
+            e.Property(x => x.SubstituteReason).HasMaxLength(500);
             e.HasIndex(x => x.WorkOrderId);
             e.HasIndex(x => x.LotId); // トレースフォワード（使用先特定）用
             e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)

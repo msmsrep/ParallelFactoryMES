@@ -168,7 +168,7 @@ public sealed partial class MasterCsvService(
         return [.. items.Select(b => new string?[]
         {
             b.ParentProduct!.Code, b.ChildProduct!.Code, Num(b.QuantityPer),
-            b.MakeOrBuy.ToString(), b.AlternativeGroup,
+            b.MakeOrBuy.ToString(), b.AlternativeGroup, Bool(b.IsAlternative),
         })];
     }
 

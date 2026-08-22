@@ -87,6 +87,12 @@ public class MaterialConsumption
 
     public ConsumptionMethod Method { get; set; }
 
+    /// <summary>代替部品としての投入か（A-40-10-04。予定材料の代替行を投入した場合）</summary>
+    public bool IsSubstitute { get; set; }
+
+    /// <summary>代替を使った理由（代替投入時は必須。誰がどの理由で認めたかを残す）</summary>
+    public string? SubstituteReason { get; set; }
+
     public string? RecordedByUserId { get; set; }
 }
 

@@ -639,6 +639,7 @@ public sealed partial class MasterCsvService
                 var quantity = reader.NumberOrNull("QuantityPer", null, 0.000001m);
                 var makeOrBuy = reader.Enum("MakeOrBuy", MakeOrBuy.InHouse, CsvEnumLabels.MakeOrBuys);
                 var alternativeGroup = reader.Text("AlternativeGroup", null, 50);
+                var isAlternative = reader.Bool("IsAlternative", false);
                 if (quantity is null && !reader.Failed)
                 {
                     reader.Fail("QuantityPer（必要数量）は必須です。");
@@ -663,6 +664,7 @@ public sealed partial class MasterCsvService
                     QuantityPer = quantity!.Value,
                     MakeOrBuy = makeOrBuy,
                     AlternativeGroup = alternativeGroup,
+                    IsAlternative = isAlternative,
                 });
             }
             if (failed)

@@ -19,21 +19,36 @@ public static class MaterialIssuePolicy
     /// 投入部材と予定材料の照合。投入できない場合は日本語の理由を返す（可ならnull）。
     /// </summary>
     /// <param name="parentProductCode">作業指示の品目コード（＝MBOMの親品目）</param>
-    /// <param name="plannedProductIds">指図の予定材料の品目ID。代替部品グループの各行も含む</param>
+    /// <param name="planned">指図の予定材料（代替部品の行も含む）</param>
     /// <param name="material">投入しようとしている部材の品目</param>
+    /// <param name="substituteReason">代替として投入する場合の理由（代替行の投入では必須）</param>
     public static string? CheckAgainstBom(
-        string parentProductCode, IReadOnlyCollection<int> plannedProductIds, Product material)
+        string parentProductCode,
+        IReadOnlyCollection<ManufacturingOrderMaterial> planned,
+        Product material,
+        string? substituteReason)
     {
-        if (plannedProductIds.Count == 0)
+        if (planned.Count == 0)
         {
             return $"この指図には予定材料がありません（品目 '{parentProductCode}' のMBOMが未登録のまま展開されています）。" +
                    "MBOMを登録してから指図を展開し直してください。";
         }
-        if (!plannedProductIds.Contains(material.Id))
+        var target = planned.FirstOrDefault(m => m.ChildProductId == material.Id);
+        if (target is null)
         {
             return $"品目 '{material.Code}' は '{parentProductCode}' の予定材料に含まれないため投入できません" +
                    "（代替部品として使う場合はMBOMの代替部品グループへ登録し、指図を展開し直してください）。";
         }
+        // 代替部品の投入は「誰がどの理由で認めたか」を残す（A-40-10-04）
+        if (target.IsAlternative && string.IsNullOrWhiteSpace(substituteReason))
+        {
+            return $"品目 '{material.Code}' は代替部品のため、代替を使う理由（substituteReason）の入力が必要です。";
+        }
         return null;
     }
+
+    /// <summary>投入しようとしている部材が予定材料上の代替部品か</summary>
+    public static bool IsSubstitute(
+        IReadOnlyCollection<ManufacturingOrderMaterial> planned, Product material) =>
+        planned.FirstOrDefault(m => m.ChildProductId == material.Id)?.IsAlternative ?? false;
 }

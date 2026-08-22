@@ -22,6 +22,7 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class WorkOrderExecutionController(
     MesAppDbContext db,
+    WorkOrderStatusService workOrderStatus,
     InventoryService inventory,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
@@ -41,7 +42,8 @@ public class WorkOrderExecutionController(
         {
             return Conflict(new ProblemDetails { Title = $"状態 '{workOrder.Status}' の作業指示は着手できません。" });
         }
-        workOrder.Status = WorkOrderStatus.Started;
+        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Started,
+            WorkOrderStatusChangeSource.Start, CurrentUserId);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Execution", "Start", nameof(WorkOrder), id.ToString(),
             detail: $"workOrderNo={workOrder.WorkOrderNo}", ct: ct);
@@ -193,7 +195,8 @@ public class WorkOrderExecutionController(
             .OrderBy(c => c.Id)
             .Select(c => new ConsumptionResponse(
                 c.Id, c.WorkOrderId, c.ProductId, c.Product!.Code, c.Product!.Name,
-                c.LotId, c.Lot!.LotNumber, c.LocationId, c.Quantity, c.ConsumedAt, c.Method))
+                c.LotId, c.Lot!.LotNumber, c.LocationId, c.Quantity, c.ConsumedAt, c.Method,
+                c.IsSubstitute, c.SubstituteReason))
             .ToListAsync(ct);
     }
 
@@ -223,15 +226,15 @@ public class WorkOrderExecutionController(
         }
         // 指定外材料の投入を防ぐ（B-30-20）。基準は指図展開時に固定した予定材料であり、
         // 途中でMBOMが改訂されてもこの指図の照合条件は変わらない（Spec.md 5.7）
-        var bomChildProductIds = await db.ManufacturingOrderMaterials
+        var planned = await db.ManufacturingOrderMaterials.AsNoTracking()
             .Where(m => m.ManufacturingOrderId == workOrder.ManufacturingOrderId)
-            .Select(m => m.ChildProductId)
             .ToListAsync(ct);
         if (MaterialIssuePolicy.CheckAgainstBom(
-                workOrder.Product!.Code, bomChildProductIds, lot.Product!) is string bomReason)
+                workOrder.Product!.Code, planned, lot.Product!, request.SubstituteReason) is string bomReason)
         {
             return BadRequest(new ProblemDetails { Title = bomReason });
         }
+        var isSubstitute = MaterialIssuePolicy.IsSubstitute(planned, lot.Product!);
 
         try
         {
@@ -252,17 +255,26 @@ public class WorkOrderExecutionController(
             LocationId = request.LocationId,
             Quantity = request.Quantity,
             Method = ConsumptionMethod.Manual,
+            IsSubstitute = isSubstitute,
+            SubstituteReason = isSubstitute ? request.SubstituteReason : null,
             RecordedByUserId = CurrentUserId,
         };
         db.MaterialConsumptions.Add(consumption);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Execution", "Consumption", nameof(WorkOrder), id.ToString(),
-            detail: $"lot={lot.LotNumber}, qty={request.Quantity}", ct: ct);
+            detail: new
+            {
+                lot = lot.LotNumber,
+                quantity = request.Quantity,
+                isSubstitute,
+                substituteReason = isSubstitute ? request.SubstituteReason : null,
+            }, ct: ct);
 
         var product = lot.Product!;
         return new ConsumptionResponse(consumption.Id, id, product.Id, product.Code, product.Name,
             lot.Id, lot.LotNumber, request.LocationId, request.Quantity,
-            consumption.ConsumedAt, consumption.Method);
+            consumption.ConsumedAt, consumption.Method,
+            consumption.IsSubstitute, consumption.SubstituteReason);
     }
 
     // ---- 生産実績（B-40-10-01 出来高、B-40-10-02 在庫計上、B-40-10-09 バックフラッシュ）----
@@ -442,7 +454,8 @@ public class WorkOrderExecutionController(
             OutputLocationId = outputLot is not null ? request.OutputLocationId : null,
         };
         db.ProductionRecords.Add(record);
-        workOrder.Status = WorkOrderStatus.Completed;
+        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Completed,
+            WorkOrderStatusChangeSource.ProductionRecord, CurrentUserId);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Execution", "ProductionRecord", nameof(WorkOrder), id.ToString(),
             detail: new
@@ -484,7 +497,8 @@ public class WorkOrderExecutionController(
             return Conflict(new ProblemDetails { Title = $"状態 '{workOrder.Status}' の作業指示は承認できません（完了済みのみ）。" });
         }
 
-        workOrder.Status = WorkOrderStatus.Approved;
+        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Approved,
+            WorkOrderStatusChangeSource.Approval, CurrentUserId);
         var now = DateTimeOffset.UtcNow;
         await db.ProductionRecords
             .Where(r => r.WorkOrderId == id && r.ApprovedAt == null)
