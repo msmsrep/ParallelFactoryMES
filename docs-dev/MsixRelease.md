@@ -75,6 +75,13 @@ Partner Center でアプリ名を予約すると「製品管理 → 製品ID」�
 Add-AppxPackage -Path 'artifacts\msix\ParallelFactoryMES_1.0.0.0_x64_signed.msix'
 ```
 
+**同じバージョンの入れ直しはブロックされる**（`0x80073CFB`：同じIDで内容が異なるパッケージ）。
+検証中に作り直したものを入れるときは、先にアンインストールする。
+
+```powershell
+Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
+```
+
 起動:
 
 ```powershell
@@ -99,6 +106,9 @@ Get-Content "$env:LOCALAPPDATA\ParallelFactoryMES\startup.log" -Tail 30
 
 どの行で止まっているかで切り分けられる（Webアプリの組み立て → DB初期化 → Kestrel起動 →
 WebView2初期化 → 画面表示）。起動が2分を超えると打ち切ってウィンドウにエラーを表示する。
+
+正常に終了したときは「終了処理を完了しました」「正常終了」まで残る。
+「終了処理を開始します」で止まっている場合はプロセスが終了しきれていない。
 
 二重起動は抑止され、2つ目以降は既存のウィンドウを前面に出して終了する
 （同じSQLiteファイルを複数プロセスで奪い合わないようにするため）。ログには

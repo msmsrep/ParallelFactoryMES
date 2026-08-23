@@ -42,6 +42,10 @@ internal static class Program
         {
             ReportFatal(ex);
         }
+
+        // WebView2が非フォアグラウンドスレッドを抱えたままだとプロセスが残り、
+        // 次回起動が二重起動と判定されて何も起きなくなる。確実に終了させる。
+        Environment.Exit(0);
     }
 
     private static void ReportFatal(Exception? exception)
@@ -73,7 +77,18 @@ internal static class Program
             {
                 ShowWindow(other.MainWindowHandle, SW_RESTORE);
                 SetForegroundWindow(other.MainWindowHandle);
+                return;
             }
+
+            // 前面に出すウィンドウが無い＝終了しきれていないプロセスが残っている。
+            // 黙って終わると「押しても何も起きない」状態になるため、対処方法を伝える。
+            StartupLog.Write("表示できるウィンドウが見つかりませんでした（終了処理中のプロセスが残存）");
+            MessageBox.Show(
+                "前回のウィンドウがまだ終了処理中です。数秒待ってからもう一度起動してください。\n\n"
+                + "解消しない場合はタスクマネージャーで「ParallelFactoryMES」を終了してください。",
+                "Parallel Factory MES",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {

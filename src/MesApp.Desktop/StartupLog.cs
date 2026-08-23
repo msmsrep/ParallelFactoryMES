@@ -10,6 +10,9 @@ internal static class StartupLog
 {
     private static readonly object _gate = new();
 
+    // BOMを付ける。付けないとWindows PowerShellのGet-ContentがANSIとして読み、日本語が化ける
+    private static readonly System.Text.UTF8Encoding _encoding = new(encoderShouldEmitUTF8Identifier: true);
+
     private static readonly Lazy<string?> _path = new(() =>
     {
         try
@@ -45,7 +48,8 @@ internal static class StartupLog
             {
                 File.AppendAllText(
                     path,
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{Environment.ProcessId}] {message}{Environment.NewLine}");
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{Environment.ProcessId}] {message}{Environment.NewLine}",
+                    _encoding);
             }
         }
         catch

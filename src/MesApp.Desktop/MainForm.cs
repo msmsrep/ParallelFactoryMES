@@ -176,12 +176,35 @@ internal sealed class MainForm : Form
     {
         base.OnFormClosed(e);
 
-        if (_app is not null)
+        var app = Interlocked.Exchange(ref _app, null);
+        if (app is null)
         {
-            // ウィンドウを閉じたらSQLiteの書き込みを確実に終わらせてからプロセスを終了する
-            StartupLog.Write("終了処理を開始します");
-            _app.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
-            _app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            return;
         }
+
+        StartupLog.Write("終了処理を開始します");
+        try
+        {
+            // ウィンドウを閉じたらSQLiteの書き込みを確実に終わらせてからプロセスを終了する。
+            // ただしUIスレッド上で待つと StopAsync の継続がUIスレッドを必要として詰まり、
+            // プロセスが終了できなくなる（ウィンドウなしのプロセスが残り続ける）。
+            // 継続がスレッドプールで動くよう Task.Run の中で待つ。
+            var shutdown = Task.Run(async () =>
+            {
+                await app.StopAsync(TimeSpan.FromSeconds(5));
+                await app.DisposeAsync();
+            });
+
+            if (!shutdown.Wait(TimeSpan.FromSeconds(10)))
+            {
+                StartupLog.Write("終了処理が時間内に完了しませんでした。プロセスを終了します");
+            }
+        }
+        catch (Exception ex)
+        {
+            StartupLog.WriteException("終了処理に失敗", ex);
+        }
+
+        StartupLog.Write("終了処理を完了しました");
     }
 }
