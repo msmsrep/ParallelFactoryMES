@@ -1,4 +1,5 @@
 using MesApp.Api;
+using MesApp.Api.Services;
 using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -32,6 +33,19 @@ internal sealed class MainForm : Form
         Text = "起動しています…",
     };
 
+    /// <summary>初回ログイン前だけ表示する資格情報の案内（ストア配布では手順書が手元にないため）</summary>
+    private readonly Label _initialCredentials = new()
+    {
+        Dock = DockStyle.Top,
+        AutoSize = false,
+        Height = 56,
+        TextAlign = ContentAlignment.MiddleCenter,
+        BackColor = Color.FromArgb(255, 249, 219),
+        ForeColor = Color.FromArgb(90, 60, 0),
+        Padding = new Padding(12, 0, 12, 0),
+        Visible = false,
+    };
+
     private WebApplication? _app;
 
     public MainForm(string[] args)
@@ -44,8 +58,11 @@ internal sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         WindowState = FormWindowState.Maximized;
 
-        Controls.Add(_webView);
+        // ドッキングはZオーダーの大きい方から処理されるため、上端に出す案内を先に、
+        // 残りを埋める要素を後に追加する
+        Controls.Add(_initialCredentials);
         Controls.Add(_status);
+        Controls.Add(_webView);
     }
 
     protected override async void OnLoad(EventArgs e)
@@ -65,8 +82,17 @@ internal sealed class MainForm : Form
                     $"{StartupTimeout.TotalMinutes:0}分以内にローカルサーバーを起動できませんでした。");
             }
 
-            var address = await startup;
+            var (address, initialCredentials) = await startup;
             StartupLog.Write($"APIの起動完了: {address}");
+
+            if (initialCredentials is not null)
+            {
+                StartupLog.Write("初期管理者が未ログインのため資格情報を画面に案内します");
+                _initialCredentials.Text =
+                    $"初回ログイン　ユーザー名: {initialCredentials.UserName}　パスワード: {initialCredentials.Password}"
+                    + "\n（ログイン後にパスワードの変更を求められます。変更するとこの案内は消えます）";
+                _initialCredentials.Visible = true;
+            }
 
             SetStatus("画面を読み込んでいます…");
             await ShowClientAsync(address);
@@ -88,8 +114,8 @@ internal sealed class MainForm : Form
         }
     }
 
-    /// <summary>プロセス内でKestrelを起動し、実際に割り当てられたループバックURLを返す</summary>
-    private async Task<string> StartApiAsync()
+    /// <summary>プロセス内でKestrelを起動し、ループバックURLと（あれば）初回ログイン情報を返す</summary>
+    private async Task<(string Address, InitialCredentials? InitialCredentials)> StartApiAsync()
     {
         // ポート0でOSに空きポートを選ばせる（現場PCで使用中ポートと衝突しないようにするため）。
         // コンテンツルートは実行ファイルの場所に固定する（MSIXでは起動時の作業ディレクトリが一定しないため）。
@@ -104,7 +130,7 @@ internal sealed class MainForm : Form
         _app = MesAppHost.Build(hostArgs);
 
         StartupLog.Write("データベースを初期化します");
-        await MesAppHost.InitializeAsync(_app);
+        var initialCredentials = await MesAppHost.InitializeAsync(_app);
 
         StartupLog.Write("Kestrelを起動します");
         await _app.StartAsync();
@@ -112,8 +138,10 @@ internal sealed class MainForm : Form
         var addresses = _app.Services.GetRequiredService<IServer>()
             .Features.Get<IServerAddressesFeature>()?.Addresses;
 
-        return addresses?.FirstOrDefault()
-               ?? throw new InvalidOperationException("ローカルサーバーのアドレスを取得できませんでした。");
+        var address = addresses?.FirstOrDefault()
+                      ?? throw new InvalidOperationException("ローカルサーバーのアドレスを取得できませんでした。");
+
+        return (address, initialCredentials);
     }
 
     /// <summary>WebView2を初期化してクライアント画面を表示する</summary>

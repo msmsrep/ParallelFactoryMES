@@ -59,4 +59,31 @@ public static class IdentitySeeder
                 string.Join("; ", result.Errors.Select(e => e.Description)));
         }
     }
+
+    /// <summary>
+    /// シードした初期管理者がまだ初回ログイン（パスワード変更）を済ませていない場合に、その資格情報を返す。
+    /// デスクトップ配布（Spec.md 7.8）では利用者が手元に手順書を持たないため、画面に案内する必要がある。
+    /// パスワード変更が済むと null になり、案内は自動的に消える。
+    /// </summary>
+    public static async Task<InitialCredentials?> GetPendingInitialCredentialsAsync(
+        IServiceProvider serviceProvider, IConfiguration configuration)
+    {
+        var seedUserName = configuration["MesAdmin:UserName"];
+        var seedPassword = configuration["MesAdmin:Password"];
+        if (string.IsNullOrWhiteSpace(seedUserName) || string.IsNullOrWhiteSpace(seedPassword))
+        {
+            return null;
+        }
+
+        using var scope = serviceProvider.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+
+        var admin = await userManager.FindByNameAsync(seedUserName);
+        return admin is { MustChangePassword: true }
+            ? new InitialCredentials(seedUserName, seedPassword)
+            : null;
+    }
 }
+
+/// <summary>初回ログイン前の初期管理者の資格情報</summary>
+public sealed record InitialCredentials(string UserName, string Password);

@@ -116,10 +116,14 @@ public static class MesAppHost
         return app;
     }
 
-    /// <summary>DB初期化（マイグレーション適用・SQLite WAL）とロール・初期管理者シード</summary>
-    public static async Task InitializeAsync(WebApplication app)
+    /// <summary>
+    /// DB初期化（マイグレーション適用・SQLite WAL）とロール・初期管理者シード。
+    /// 初期管理者がまだパスワードを変更していない場合はその資格情報を返す（デスクトップ配布で画面に案内するため）。
+    /// </summary>
+    public static async Task<InitialCredentials?> InitializeAsync(WebApplication app)
     {
         await app.Services.InitializeDatabaseAsync();
         await IdentitySeeder.SeedAsync(app.Services, app.Configuration);
+        return await IdentitySeeder.GetPendingInitialCredentialsAsync(app.Services, app.Configuration);
     }
 }
