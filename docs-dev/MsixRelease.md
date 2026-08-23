@@ -40,6 +40,9 @@ Partner Center でアプリ名を予約すると「製品管理 → 製品ID」�
 | `Publisher` | パッケージ/ID/発行者 |
 | `PublisherDisplayName` | パッケージ/ID/発行者表示名 |
 
+本リポジトリでは設定済み（Store ID: `9P9FQJZH23HC` / PFN: `msmsrep.ParallelFactoryMES_77t1an0ygyrva`）。
+いずれも公開される識別子であり秘密情報ではない。
+
 3つの値がどれか1つでも `PLACEHOLDER` のままだと `Pack-Msix.ps1` は停止する。
 リポジトリ外で管理したい場合は `-IdentityFile <パス>` で別ファイルを指定する。
 
