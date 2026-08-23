@@ -18,6 +18,7 @@
 改訂18: 2026-08-22（不良理由マスタ（DefectReason）と不良明細（ProductionDefect）を追加。実績入力で不良数を不良理由別に分解して記録し、品質分析に不良理由別の不良数・構成比の集計（C-40-10-01）を追加。マスタ管理画面に不良理由タブとCSV一括入出力を追加）
 改訂19: 2026-08-22（製造指図の工程展開時に工順とMBOMを実績側へ固定する方式を追加。作業指示に工順スナップショット（標準時間・必要スキル・工程管理項目・チェックリスト）、指図に予定材料（ManufacturingOrderMaterial）を持たせ、差立のスキル照合・部材投入の照合・バックフラッシュをスナップショット基準に変更。5.2節にエンティティ、5.7節に「指図展開時のマスタ固定」を追加）
 改訂20: 2026-08-23（作業指示の状態履歴（WorkOrderStatusHistory）を追加し、配布・着手・完了・承認・取消の遷移を記録。MBOMに代替部品フラグを追加し、代替部品の投入時に代替理由の入力を必須として投入実績へ記録するようにした。出荷判定ゲートの条件をShipmentGatePolicyへ集約）
+改訂21: 2026-08-23（単独PC完結のデスクトップ配布形態（MesApp.Desktop）を追加。プロセス内でKestrelをループバック起動しWebView2でBlazorクライアントを表示するMSIXアプリとしてMicrosoft Storeへ公開する。DBファイル・JWT署名鍵の既定の保存先を実行ファイルの隣から書き込み可能なユーザーデータディレクトリへ変更。7.2節に配布形態、7.8節にMSIX公開の要件を追加）
 参考: みんなのMES（min-MES） https://min-mes.com/ / OSS: https://github.com/mihatama/open-mes-project
 
 ---
@@ -89,6 +90,7 @@ HSE〔G〕はチェックリスト項目への健康衛生・安全項目の組�
 - **MesApp.Api（バックエンド）**: 唯一のデータアクセス主体。認証、業務ロジック（在庫整合性チェック、実績集計など）、シート・端末管理、ライセンス検証をすべて担う。MesApp.Client.Webの静的ファイル配信も行う。DBは1つのみ保持し、クライアントからの直接アクセスは行わせない。
 - **MesApp.Client.Web**: Blazor WebAssemblyとして実装し、ブラウザからAPIを呼び出すMES機能の唯一のクライアント。シート割当済み（アクティベート済み）端末からのみ利用可能。
 - **MesApp.LicenseApp**: Windows Store配布のWPFアプリ。役割は「ライセンスアドオン（恒久エディション／サブスクリプション）の購入」と「エンタイトルメントのMesApp.Apiへの同期」のみ。バックエンドURL設定と管理者認証の画面を持つ。MES業務機能・シート割当機能は持たない。
+- **MesApp.Desktop**: 単独PCで完結させるためのデスクトップホスト（Windows専用・MSIX配布）。MES業務機能そのものは持たず、`MesAppHost`でMesApp.Apiをプロセス内に起動し（ループバックアドレス・OSが選ぶ空きポート）、その画面をWebView2で表示するだけの薄いシェル。サーバーを別途立てられない小規模利用者向けの配布形態で、業務ロジックはWeb版とまったく同じものを使う（7.8節）。
 - **MesApp.Core**: ドメインモデル・DTO・APIコントラクト（リクエスト/レスポンス型）。API・Webクライアント・ライセンスアプリで共有。
 
 ### 2.2 認証・ライセンス・端末アクティベーションの流れ
@@ -241,6 +243,7 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
 }
 ```
 
+- **接続文字列の`Data Source`が相対パスのときは、書き込み可能なユーザーデータディレクトリ（既定`%LOCALAPPDATA%\ParallelFactoryMES`、環境変数`MESAPP_DATA_DIR`で変更可）を基準に絶対パス化する**（`MesAppDataDirectory`）。実行ファイルの隣に作るとMSIX配布時にインストール先が読み取り専用で書き込めないため。JWT署名鍵（`Jwt:SigningKeyFile`）も同じ規則で解決する。絶対パス指定はそのまま使う。
 - `MesApp.Infrastructure`内でプロバイダーごとの`UseSqlite` / `UseNpgsql` / `UseSqlServer`を設定値に応じて切り替える。
 - マイグレーションはプロバイダーごとに作成が必要（EF Coreの制約）。初期実装ではSQLiteのみ対応し、後続フェーズでPostgreSQL/SQL Server対応を追加する。
 - SQLite利用時の同時アクセス対策：ASP.NET Coreは並行リクエストを処理するため、SQLiteでも書き込み競合は発生し得る。WALモードを有効化し、busy timeoutを設定し、書き込み競合時（SQLITE_BUSY）のリトライを実装する。数十端末規模まではこの構成で運用可能とするが、高負荷が想定される場合はPostgreSQL等への切替を推奨する旨をドキュメントに明記する。
@@ -410,7 +413,8 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
 - **Storeポリシー適合の事前確認**：アプリ内で価値を消費せず外部システム（オンプレMES）のライセンスをIAPで販売する本モデルがMicrosoft Store認定ポリシー（10.8系）に適合するかは自明でないため、**Phase 9を待たずプロジェクト初期に**Partner Centerでのポリシー確認（必要に応じて最小構成アプリでの審査通過確認）を実施する。不適合と判明した場合は代替方式（ベンダー直販のライセンスキー方式等）へ課金モデルを再検討する
 
 ### 7.2 配布形態
-- **Windows Store（MSIX）**: MesApp.LicenseApp（WPFライセンスアプリ）の配布経路
+- **Windows Store（MSIX・単独PC向け）**: MesApp.Desktop。API・DB・Webクライアントを1つのパッケージに同梱し、1台のPCで完結して動作させる（7.8節）
+- **Windows Store（MSIX・ライセンスアプリ）**: MesApp.LicenseApp（WPFライセンスアプリ）の配布経路
 - **Zip配布**: MesApp.Api（バックエンド、Webクライアント静的ファイル同梱）のビルド済みバイナリをzip化し、社内サーバー等に手動配置できるようにする
 - **Docker配布**: MesApp.Api（Webクライアント同梱）および既定DBをDockerイメージ化し、`docker-compose.yml`で一括起動できるようにする（バックエンドのセルフホスト手段として）
 - MesApp.Client.Webは必ずMesApp.Apiが配信する（別配信は行わない。端末アクティベーション制御と配信を一体化するため）
@@ -443,6 +447,21 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
 - SQLite利用時：稼働中のオンラインバックアップ手段（`VACUUM INTO` またはSQLite Backup API）を用いた定期バックアップ手順を提供する。WALモードで稼働するため、**稼働中のDBファイル単純コピーは行わない**ことを運用手順書に明記する。Docker構成ではバックアップ用ボリュームとバックアップスクリプトを`docker-compose.yml`に同梱する
 - PostgreSQL/SQL Server利用時：各DBの標準手段（`pg_dump`等）によるバックアップを前提とし、推奨手順をドキュメント化する
 - リストア手順（バックアップファイルの差し替え→API再起動）と、リストアの影響範囲（デバイストークン・シート割当・実績データがバックアップ時点へ巻き戻る。リストア後に端末の再アクティベートが必要になり得る）を運用手順書に明記する
+- MesApp.Desktop（7.8節）ではDBの実体は`%LOCALAPPDATA%\ParallelFactoryMES\mesapp.db`。MSIXのファイルシステムリダイレクトにより実際には`%LOCALAPPDATA%\Packages\<パッケージファミリー名>\LocalCache\Local\ParallelFactoryMES\`配下へ書かれる点を運用手順書に明記する（**アプリのアンインストールで消える**ため、バックアップの取得先として案内する）
+
+### 7.8 単独PC向けMSIX配布（Microsoft Store）
+
+サーバーを別途用意できない利用者向けに、MesApp.Desktopを1つのMSIXパッケージとしてMicrosoft Storeで配布する。
+
+- **構成**：`MesApp.Desktop`（WinForms + WebView2）が`MesAppHost.Build`でMesApp.Apiをプロセス内に起動する。待受は`http://127.0.0.1:0`（OSが空きポートを選ぶ）で、外部からは接続できない。表示は同一プロセスのWebView2で、ユーザーから見えるのはひとつのデスクトップアプリのウィンドウのみ
+- **エントリポイントの共有**：サーバー実行（`MesApp.Api/Program.cs`）とデスクトップ実行の双方が`MesAppHost`を使う。デスクトップ起動時はエントリアセンブリがAPIでなくなりコントローラの自動探索が働かないため、`MesAppHost`でAPIアセンブリを`ApplicationPart`として明示登録する
+- **発行形態**：自己完結（`SelfContained`）で発行し、配布先に.NETランタイムを要求しない。アーキテクチャごと（x64 / arm64）にパッケージを作る
+- **書き込み先**：インストール先（`C:\Program Files\WindowsApps\...`）は読み取り専用のため、DB・JWT署名鍵・WebView2ユーザーデータはすべて`MesAppDataDirectory`（`%LOCALAPPDATA%\ParallelFactoryMES`）配下に置く（4章）
+- **前提ランタイム**：Microsoft Edge WebView2ランタイム。Windows 11には標準搭載。未導入時は起動時に検出し、日本語のメッセージで導入を案内する
+- **初回起動**：ユーザーが存在しないときのみ`MesAdmin`設定の初期管理者を作成する。初期パスワードは初回ログイン時に変更を強制する（`MustChangePassword`）
+- **パッケージID**：`Identity`の`Name` / `Publisher` / `PublisherDisplayName`はPartner Centerが発行する値を使う。バージョンは`x.y.z.0`（第4桁は0）
+- **署名**：ストア配布ではMicrosoft Storeが署名するため、提出用パッケージは署名しない。手元での動作確認時のみ自己署名する
+- **手順**：`build/Pack-Msix.ps1`（発行→不要ファイル除去→マニフェスト生成→`makeappx pack`）。詳細は`docs-dev/MsixRelease.md`
 
 ---
 
@@ -481,12 +500,19 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
       /Controllers
       /Services                  … 業務ロジック、シート・端末管理、ライセンス検証
       Dockerfile
+    /MesApp.Desktop              … WinForms + WebView2（単独PC向けMSIX配布のホスト）
+      /Assets                    … MSIXのタイル画像・アプリアイコン
+      Package.appxmanifest
     /MesApp.Core                 … 共通ドメインモデル・DTO・APIコントラクト
     /MesApp.Infrastructure        … EF Core、DBプロバイダー切替、リポジトリ実装（API専用）
   /tests
     /MesApp.Api.Tests
   /docker
     docker-compose.yml            … MesApp.Api + DB（必要に応じ）を一括起動
+  /build
+    Pack-Msix.ps1                 … MSIXパッケージの作成
+    New-MsixAssets.ps1            … タイル画像・アイコンの生成
+    msix-identity.json            … Partner CenterのパッケージID
   /docs
     仕様書.md（本ドキュメント）
 ```

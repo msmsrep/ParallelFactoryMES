@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using MesApp.Infrastructure;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -17,18 +18,21 @@ public class SigningKeyProvider
         var opt = options.Value;
         byte[] keyBytes;
 
+        // 相対パス指定はデータディレクトリ基準に解決する（MSIX配布ではインストール先に書き込めないため）
+        var keyFile = MesAppDataDirectory.Resolve(opt.SigningKeyFile);
+
         if (!string.IsNullOrWhiteSpace(opt.SigningKey))
         {
             keyBytes = Convert.FromBase64String(opt.SigningKey);
         }
-        else if (File.Exists(opt.SigningKeyFile))
+        else if (File.Exists(keyFile))
         {
-            keyBytes = Convert.FromBase64String(File.ReadAllText(opt.SigningKeyFile).Trim());
+            keyBytes = Convert.FromBase64String(File.ReadAllText(keyFile).Trim());
         }
         else
         {
             keyBytes = RandomNumberGenerator.GetBytes(64);
-            File.WriteAllText(opt.SigningKeyFile, Convert.ToBase64String(keyBytes));
+            File.WriteAllText(keyFile, Convert.ToBase64String(keyBytes));
         }
 
         if (keyBytes.Length < 32)

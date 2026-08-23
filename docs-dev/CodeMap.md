@@ -102,5 +102,8 @@
 | DTO | `Core/Contracts/{Auth,Execution,Inventory,Maintenance,Masters,Production,Quality,Setup,Users}/` | すべて `record`。エンティティを直接返さない |
 | 共通UIコンポーネント | `Web/Shared/`<br>Notice / CsvIoPanel / StatusBadge / BarMeter / ScanInput / PrintButton / TraceTree / Labels.cs / Code39.cs | 新規CSSクラスを増やさない |
 | 画面導線 | `Web/Layout/NavMenu.razor` / `MainLayout.razor` / `EmptyLayout.razor`（印刷用） | 新規画面は NavMenu 登録を忘れない |
-| 静的配信（WASMをAPIが配信） | `Api/Program.cs`（`UseStaticWebAssets`） | Spec.md 2.1。`Tests/StaticHostingTests.cs` |
+| Webアプリの組み立て（DI・パイプライン） | `Api/MesAppHost.cs`（`Build` / `InitializeAsync`）<br>`Api/Program.cs`（サーバー実行の1行だけ） | サービス登録・ミドルウェアの追加は**ここ**。サーバー実行とデスクトップ実行の共通の起点 |
+| 静的配信（WASMをAPIが配信） | `Api/MesAppHost.cs`（`UseStaticWebAssets` / `UseBlazorFrameworkFiles`） | Spec.md 2.1。`Tests/StaticHostingTests.cs` |
+| データ保存先（DB・署名鍵） | `Infra/MesAppDataDirectory.cs` | Spec.md 4章。相対パスは `%LOCALAPPDATA%\ParallelFactoryMES` 基準に解決。環境変数 `MESAPP_DATA_DIR` で変更可 |
+| デスクトップ配布（MSIX） | `src/MesApp.Desktop/`（`Program.cs` / `MainForm.cs` / `Package.appxmanifest` / `Assets/`）<br>`build/Pack-Msix.ps1` / `New-MsixAssets.ps1` / `msix-identity.json` | Spec.md 7.8。手順は `docs-dev/MsixRelease.md`。業務ロジックは持たない（Kestrel起動＋WebView2表示のみ） |
 | テスト基盤 | `Tests/ApiFactory.cs`（一時SQLite）/ `TestAuth.cs` / `Phase3TestData.cs` | 新しいテスト基盤は作らない |

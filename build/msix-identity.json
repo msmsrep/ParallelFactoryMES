@@ -1,0 +1,7 @@
+{
+  "_comment": "Partner Center の「製品ID → 製品管理 → 製品IDs」に表示される値を入れる。未設定のままだと Pack-Msix.ps1 が停止する。",
+  "IdentityName": "PLACEHOLDER.ParallelFactoryMES",
+  "Publisher": "CN=PLACEHOLDER-0000-0000-0000-000000000000",
+  "PublisherDisplayName": "PLACEHOLDER",
+  "Version": "1.0.0.0"
+}

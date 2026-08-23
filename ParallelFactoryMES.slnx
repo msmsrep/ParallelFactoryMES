@@ -3,6 +3,7 @@
     <Project Path="src/MesApp.Api/MesApp.Api.csproj" />
     <Project Path="src/MesApp.Client.Web/MesApp.Client.Web.csproj" />
     <Project Path="src/MesApp.Core/MesApp.Core.csproj" />
+    <Project Path="src/MesApp.Desktop/MesApp.Desktop.csproj" />
     <Project Path="src/MesApp.Infrastructure/MesApp.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">

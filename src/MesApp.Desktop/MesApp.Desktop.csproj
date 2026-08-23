@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MesApp.Desktop</RootNamespace>
+    <!-- MSIXの実行ファイル名。ストア表示名と揃える -->
+    <AssemblyName>ParallelFactoryMES</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <!-- 単独PC配布のため配布先に.NETランタイムを要求しない -->
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- MesApp.Api（サーバー実行用のExe）を自己完結アプリから参照するために必要 -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+    <SatelliteResourceLanguages>ja;en</SatelliteResourceLanguages>
+    <!-- Webプロジェクト扱いだがデスクトップアプリなのでlaunchSettings.jsonは作らない -->
+    <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MSIXのタイル画像。パッケージのAssets\ にそのまま入る必要がある -->
+    <None Remove="Assets\**" />
+    <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MesApp.Api\MesApp.Api.csproj" />
+  </ItemGroup>
+
+  <!--
+    Microsoft.Web.WebView2 はWinForms版とWPF版の両方を参照に加える。
+    WPF版はWindowsBase 5.0を要求し、UseWPFを有効にしていない本プロジェクトでは
+    バージョン競合の警告（MSB3277）になるため、使わないWPF版を参照から外す。
+  -->
+  <Target Name="RemoveWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
+
+</Project>

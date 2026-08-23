@@ -1,5 +1,6 @@
 using MesApp.Core.Abstractions;
 using MesApp.Infrastructure.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +20,7 @@ public static class DependencyInjection
             switch (options.Provider)
             {
                 case "Sqlite":
-                    db.UseSqlite(options.ConnectionString, sqlite =>
+                    db.UseSqlite(ResolveSqliteConnectionString(options.ConnectionString), sqlite =>
                         sqlite.CommandTimeout(30));
                     break;
                 case "PostgreSql":
@@ -34,6 +35,26 @@ public static class DependencyInjection
 
         services.AddScoped<IAuditLogger, AuditLogger>();
         return services;
+    }
+
+    /// <summary>
+    /// SQLite接続文字列のData Sourceを書き込み可能な絶対パスへ解決する。
+    /// 相対パス（既定の"mesapp.db"）は実行ファイルの隣に作られてしまい、MSIX配布時に書き込めないため。
+    /// </summary>
+    private static string ResolveSqliteConnectionString(string connectionString)
+    {
+        var builder = new SqliteConnectionStringBuilder(connectionString);
+
+        // インメモリDB（:memory: / Mode=Memory）はファイルではないので触らない
+        if (string.IsNullOrWhiteSpace(builder.DataSource)
+            || builder.Mode == SqliteOpenMode.Memory
+            || builder.DataSource == ":memory:")
+        {
+            return connectionString;
+        }
+
+        builder.DataSource = MesAppDataDirectory.Resolve(builder.DataSource);
+        return builder.ToString();
     }
 
     /// <summary>
