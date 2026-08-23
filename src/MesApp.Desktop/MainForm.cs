@@ -14,6 +14,9 @@ namespace MesApp.Desktop;
 /// </summary>
 internal sealed class MainForm : Form
 {
+    /// <summary>初回起動はマイグレーションとシードが走るため長めに取る</summary>
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(2);
+
     private readonly string[] _args;
 
     private readonly WebView2 _webView = new()
@@ -51,18 +54,37 @@ internal sealed class MainForm : Form
 
         try
         {
-            var address = await StartApiAsync();
+            SetStatus("データベースを準備しています…");
+
+            // UIスレッドのSynchronizationContext上でホストの起動を待つとデッドロックし得るため、
+            // 起動処理はスレッドプールで動かす（ウィンドウが出たまま無反応になるのを防ぐ）。
+            var startup = Task.Run(StartApiAsync);
+            if (await Task.WhenAny(startup, Task.Delay(StartupTimeout)) != startup)
+            {
+                throw new TimeoutException(
+                    $"{StartupTimeout.TotalMinutes:0}分以内にローカルサーバーを起動できませんでした。");
+            }
+
+            var address = await startup;
+            StartupLog.Write($"APIの起動完了: {address}");
+
+            SetStatus("画面を読み込んでいます…");
             await ShowClientAsync(address);
+            StartupLog.Write("画面の表示完了");
         }
-        catch (WebView2RuntimeNotFoundException)
+        catch (WebView2RuntimeNotFoundException ex)
         {
+            StartupLog.WriteException("WebView2ランタイムが見つからない", ex);
             ShowStartupFailure(
                 "表示に必要な Microsoft Edge WebView2 ランタイムが見つかりません。\n"
                 + "Microsoft のサイトから WebView2 ランタイムをインストールしてから、もう一度起動してください。");
         }
         catch (Exception ex)
         {
-            ShowStartupFailure($"起動に失敗しました。\n\n{ex.Message}");
+            StartupLog.WriteException("起動に失敗", ex);
+            ShowStartupFailure(
+                $"起動に失敗しました。\n\n{ex.Message}\n\n"
+                + $"詳細は次のファイルに記録されています:\n{Path.Combine(MesAppDataDirectory.Current, "startup.log")}");
         }
     }
 
@@ -78,8 +100,13 @@ internal sealed class MainForm : Form
             "--urls", "http://127.0.0.1:0",
         ];
 
+        StartupLog.Write("Webアプリを組み立てます");
         _app = MesAppHost.Build(hostArgs);
+
+        StartupLog.Write("データベースを初期化します");
         await MesAppHost.InitializeAsync(_app);
+
+        StartupLog.Write("Kestrelを起動します");
         await _app.StartAsync();
 
         var addresses = _app.Services.GetRequiredService<IServer>()
@@ -94,6 +121,7 @@ internal sealed class MainForm : Form
     {
         // ユーザーデータフォルダーは既定では実行ファイルの隣に作られる。
         // MSIXのインストール先は読み取り専用なので、書き込み可能なデータディレクトリを明示する。
+        StartupLog.Write("WebView2を初期化します");
         var environment = await CoreWebView2Environment.CreateAsync(
             userDataFolder: Path.Combine(MesAppDataDirectory.Current, "WebView2"));
 
@@ -115,6 +143,14 @@ internal sealed class MainForm : Form
 
         _status.Visible = false;
         _webView.Visible = true;
+        _webView.Focus();
+    }
+
+    private void SetStatus(string message)
+    {
+        StartupLog.Write(message);
+        _status.Text = message;
+        _status.Refresh();
     }
 
     private static void OpenInDefaultBrowser(string uri)
@@ -143,6 +179,7 @@ internal sealed class MainForm : Form
         if (_app is not null)
         {
             // ウィンドウを閉じたらSQLiteの書き込みを確実に終わらせてからプロセスを終了する
+            StartupLog.Write("終了処理を開始します");
             _app.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
             _app.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }

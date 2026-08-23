@@ -88,6 +88,22 @@ Start-Process "shell:AppsFolder\msmsrep.ParallelFactoryMES_77t1an0ygyrva!Paralle
 - マスタ登録・指図・実績入力が一通り動く
 - アプリを閉じて再起動しても入力したデータが残っている
 
+### 起動できないとき
+
+起動処理は `%LOCALAPPDATA%\ParallelFactoryMES\startup.log` に記録される。
+ウィンドウが出ない・出たまま進まない場合は、まずこれを見る。
+
+```powershell
+Get-Content "$env:LOCALAPPDATA\ParallelFactoryMES\startup.log" -Tail 30
+```
+
+どの行で止まっているかで切り分けられる（Webアプリの組み立て → DB初期化 → Kestrel起動 →
+WebView2初期化 → 画面表示）。起動が2分を超えると打ち切ってウィンドウにエラーを表示する。
+
+二重起動は抑止され、2つ目以降は既存のウィンドウを前面に出して終了する
+（同じSQLiteファイルを複数プロセスで奪い合わないようにするため）。ログには
+「既に起動しているため既存のウィンドウを前面に出して終了します」と残る。
+
 ### データの置き場所
 
 インストール先は `C:\Program Files\WindowsApps\...`（読み取り専用）。
