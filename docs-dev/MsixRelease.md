@@ -119,11 +119,17 @@ WebView2初期化 → 画面表示）。起動が2分を超えると打ち切っ
 ### データの置き場所
 
 インストール先は `C:\Program Files\WindowsApps\...`（読み取り専用）。
-DB・JWT署名鍵・WebView2ユーザーデータは `%LOCALAPPDATA%\ParallelFactoryMES\` に書かれる。
+DB・JWT署名鍵・WebView2ユーザーデータ・起動ログは、パッケージ専用のデータ領域に書かれる。
 
-MSIXのファイルシステムリダイレクトは**起きない**（`%LOCALAPPDATA%\Packages\<PFN>\LocalCache\` 配下ではなく実パス）。
-そのため**アンインストールしてもデータは残る**。まっさらな状態で初回起動を確認したいときは、
-アンインストール後にこのフォルダーを手動で削除する。
+```
+%LOCALAPPDATA%\Packages\msmsrep.ParallelFactoryMES_77t1an0ygyrva\LocalState```
+
+**アンインストールするとこのフォルダーごと削除される**（検証済み）。
+まっさらな状態の初回起動を確認したいときは、アンインストールするだけでよい。
+逆に、残したいデータがあるときは事前に退避する。
+
+MSIXのファイルシステムリダイレクトは起きないため、この振り分けはアプリ側で行っている
+（`PackagedDataDirectory`。パッケージ外で直接起動したときは `%LOCALAPPDATA%\ParallelFactoryMES\`）。
 
 アンインストール:
 

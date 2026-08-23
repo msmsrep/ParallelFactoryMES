@@ -15,7 +15,11 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // データの置き場所を最初に決める。ログを含むすべての書き込みがこれに従うため、他より先に呼ぶ
+        PackagedDataDirectory.Apply();
+
         StartupLog.Write("起動開始");
+        StartupLog.Write($"データディレクトリ: {MesApp.Infrastructure.MesAppDataDirectory.Current}");
 
         // 同じSQLiteファイルを複数プロセスで奪い合うと起動が詰まるため、2つ目以降は既存ウィンドウを前面に出して終了する
         using var mutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
