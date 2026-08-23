@@ -1,6 +1,23 @@
+using System.Runtime.CompilerServices;
 using MesApp.Infrastructure;
 
 namespace MesApp.Api.Tests;
+
+/// <summary>
+/// テストが開発マシンの実データディレクトリ（%LOCALAPPDATA%\ParallelFactoryMES）を作らないよう、
+/// どのテストより先に一時ディレクトリへ向ける。MesAppDataDirectory.Current は初回参照で確定するため
+/// モジュール初期化子で設定する。
+/// </summary>
+internal static class TestDataDirectory
+{
+    [ModuleInitializer]
+    internal static void Redirect()
+    {
+        Environment.SetEnvironmentVariable(
+            MesAppDataDirectory.EnvironmentVariableName,
+            Path.Combine(Path.GetTempPath(), "mesapp-tests", Guid.NewGuid().ToString("N")));
+    }
+}
 
 /// <summary>
 /// 単独PC向けMSIX配布のためのデータ保存先の解決（Spec.md 4章・7.8）。

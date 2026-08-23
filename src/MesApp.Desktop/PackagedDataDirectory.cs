@@ -43,49 +43,9 @@ internal static class PackagedDataDirectory
             "Packages", packageFamilyName, "LocalState");
 
         Directory.CreateDirectory(target);
-        MoveLegacyData(target);
 
         Environment.SetEnvironmentVariable(
             Infrastructure.MesAppDataDirectory.EnvironmentVariableName, target);
-    }
-
-    /// <summary>
-    /// パッケージ外に作られた旧データを一度だけ移す。
-    /// 移行前の版で作ったDBを黙って捨てないため（移行後は空になった旧フォルダーを削除する）。
-    /// </summary>
-    private static void MoveLegacyData(string target)
-    {
-        try
-        {
-            var legacy = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "ParallelFactoryMES");
-
-            if (!Directory.Exists(legacy) || File.Exists(Path.Combine(target, "mesapp.db")))
-            {
-                return;
-            }
-
-            foreach (var file in Directory.GetFiles(legacy))
-            {
-                File.Move(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);
-            }
-
-            foreach (var directory in Directory.GetDirectories(legacy))
-            {
-                var destination = Path.Combine(target, Path.GetFileName(directory));
-                if (!Directory.Exists(destination))
-                {
-                    Directory.Move(directory, destination);
-                }
-            }
-
-            Directory.Delete(legacy, recursive: true);
-        }
-        catch
-        {
-            // 移行に失敗しても起動は続ける（旧データはそのまま残る）
-        }
     }
 
     private static string? TryGetPackageFamilyName()
