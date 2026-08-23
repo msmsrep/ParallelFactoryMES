@@ -447,7 +447,7 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
 - SQLite利用時：稼働中のオンラインバックアップ手段（`VACUUM INTO` またはSQLite Backup API）を用いた定期バックアップ手順を提供する。WALモードで稼働するため、**稼働中のDBファイル単純コピーは行わない**ことを運用手順書に明記する。Docker構成ではバックアップ用ボリュームとバックアップスクリプトを`docker-compose.yml`に同梱する
 - PostgreSQL/SQL Server利用時：各DBの標準手段（`pg_dump`等）によるバックアップを前提とし、推奨手順をドキュメント化する
 - リストア手順（バックアップファイルの差し替え→API再起動）と、リストアの影響範囲（デバイストークン・シート割当・実績データがバックアップ時点へ巻き戻る。リストア後に端末の再アクティベートが必要になり得る）を運用手順書に明記する
-- MesApp.Desktop（7.8節）ではDBの実体は`%LOCALAPPDATA%\ParallelFactoryMES\mesapp.db`。MSIXのファイルシステムリダイレクトにより実際には`%LOCALAPPDATA%\Packages\<パッケージファミリー名>\LocalCache\Local\ParallelFactoryMES\`配下へ書かれる点を運用手順書に明記する（**アプリのアンインストールで消える**ため、バックアップの取得先として案内する）
+- MesApp.Desktop（7.8節）ではDBの実体は`%LOCALAPPDATA%\ParallelFactoryMES\mesapp.db`。MSIXでインストールした場合もファイルシステムのリダイレクトは起きず、この実パスへ直接書かれる（実測で確認済み）。**アプリをアンインストールしてもDBは残る**ため、データを消したい場合はこのフォルダーを手動で削除する必要がある点を運用手順書に明記する。WALモードで稼働するため、バックアップは稼働中のファイルコピーではなく`VACUUM INTO`で取得する
 
 ### 7.8 単独PC向けMSIX配布（Microsoft Store）
 

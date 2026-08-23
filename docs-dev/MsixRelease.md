@@ -56,19 +56,29 @@ Partner Center でアプリ名を予約すると「製品管理 → 製品ID」�
 ./build/Pack-Msix.ps1 -SelfSign
 ```
 
-自己署名証明書を作成して署名する。インストールには証明書を信頼させる必要がある
-（スクリプトが実行すべきコマンドを表示する。**管理者権限の PowerShell** で実行する）。
+**`-AllowUnsigned` は使えない。** フルトラストのデスクトップアプリを含むパッケージは
+開発者モードが有効でも未署名ではインストールできない
+（`0x80073D2B`：未署名のパッケージに実行可能ファイルのアクティブ化を含めることはできません）。
+署名が必須。
+
+`-SelfSign` は提出用パッケージを書き換えず、`..._signed.msix` を別に作る。
+発行元（`CN=5E0CB4C9-...`）が一致する有効な証明書が `Cert:\CurrentUser\My` にあれば
+それを再利用し、無いときだけ新規作成する（検証のたびに証明書が増えないようにするため）。
+
+証明書が `Cert:\LocalMachine\TrustedPeople` に未登録のときだけ、スクリプトが登録コマンドを表示する。
+その場合は**管理者権限の PowerShell** で実行する（MSIXのサイドロードでは
+`Root` ではなく `TrustedPeople` に入れれば足りる。信頼範囲を広げないため）。
+
+インストール（管理者権限は不要）:
 
 ```powershell
-Export-Certificate -Cert Cert:\CurrentUser\My\<拇印> -FilePath $env:TEMP\mes-test.cer
-Import-Certificate -FilePath $env:TEMP\mes-test.cer -CertStoreLocation Cert:\LocalMachine\Root
-Add-AppxPackage 'artifacts\msix\ParallelFactoryMES_1.0.0.0_x64.msix'
+Add-AppxPackage -Path 'artifacts\msix\ParallelFactoryMES_1.0.0.0_x64_signed.msix'
 ```
 
-パッケージ化せずに素早く確認したいときは、ステージングされた実行ファイルを直接起動してもよい。
+起動:
 
 ```powershell
-./artifacts/msix/stage-x64/ParallelFactoryMES.exe
+Start-Process "shell:AppsFolder\msmsrep.ParallelFactoryMES_77t1an0ygyrva!ParallelFactoryMES"
 ```
 
 ### 確認する項目
@@ -76,9 +86,16 @@ Add-AppxPackage 'artifacts\msix\ParallelFactoryMES_1.0.0.0_x64.msix'
 - ウィンドウが開き、ログイン画面が表示される
 - 初期管理者（`admin` / `Mes-admin1`）でログインでき、パスワード変更を求められる
 - マスタ登録・指図・実績入力が一通り動く
-- データが `%LOCALAPPDATA%\Packages\<パッケージファミリー名>\LocalCache\Local\ParallelFactoryMES\` に作られる
-  （パッケージ外実行時は `%LOCALAPPDATA%\ParallelFactoryMES\`）
 - アプリを閉じて再起動しても入力したデータが残っている
+
+### データの置き場所
+
+インストール先は `C:\Program Files\WindowsApps\...`（読み取り専用）。
+DB・JWT署名鍵・WebView2ユーザーデータは `%LOCALAPPDATA%\ParallelFactoryMES\` に書かれる。
+
+MSIXのファイルシステムリダイレクトは**起きない**（`%LOCALAPPDATA%\Packages\<PFN>\LocalCache\` 配下ではなく実パス）。
+そのため**アンインストールしてもデータは残る**。まっさらな状態で初回起動を確認したいときは、
+アンインストール後にこのフォルダーを手動で削除する。
 
 アンインストール:
 
