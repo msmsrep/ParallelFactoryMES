@@ -6,6 +6,10 @@ namespace MesApp.Api;
 /// <summary>
 /// エンドポイント用のロールグループ（Spec.md 7.4：RBACはAPI側で一元判定）。
 /// 参照系は認証済みユーザー全員に開放し、更新系のみロールで絞る。
+/// <para>
+/// 例外として、<b>異常や使用実績の記録は絞らない</b>（設備稼働報告・治工具使用実績・保全依頼・不適合報告）。
+/// 気づいた人がその場で上げられることを優先する。絞ると報告が落ち、記録が残らないほうが害が大きい。
+/// </para>
 /// </summary>
 public static class RoleGroups
 {
@@ -14,6 +18,14 @@ public static class RoleGroups
 
     /// <summary>製造指図の発行・変更・展開・差立・承認（Spec.md 3.9：単段階承認）</summary>
     public const string ProductionManage = $"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}";
+
+    /// <summary>
+    /// 製造実行の記録（着手・段取り・チェックリスト・部材投入・実績報告・製造条件データ・作業時間）。
+    /// 現場作業者ロールの定義そのもの（<see cref="MesRoles.Operator"/>）であり、
+    /// 品質・保全・物流の担当者が製造実績を報告できる状態は監査上説明できない（Spec.md 7.4）
+    /// </summary>
+    public const string ShopFloorRecord =
+        $"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Operator}";
 
     /// <summary>ユーザー・スキル資格の管理（システム管理者専用）</summary>
     public const string UserAdmin = MesRoles.SystemAdmin;

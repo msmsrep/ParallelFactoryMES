@@ -31,6 +31,7 @@ public class WorkOrderExecutionController(
 
     /// <summary>着手（B-30-30-01）。未配布でも着手可能（差立を省略する小規模運用を許容）</summary>
     [HttpPost("start")]
+    [Authorize(Roles = RoleGroups.ShopFloorRecord)]
     public async Task<IActionResult> Start(int id, CancellationToken ct)
     {
         var workOrder = await db.WorkOrders.FindAsync([id], ct);
@@ -69,6 +70,7 @@ public class WorkOrderExecutionController(
     }
 
     [HttpPost("setup-records")]
+    [Authorize(Roles = RoleGroups.ShopFloorRecord)]
     public async Task<ActionResult<SetupRecordResponse>> AddSetupRecord(
         int id, SetupRecordRequest request, CancellationToken ct)
     {
@@ -122,6 +124,7 @@ public class WorkOrderExecutionController(
 
     /// <summary>チェックリスト実施記録。必須項目が未チェックの場合は登録を拒否する</summary>
     [HttpPost("checklist-records")]
+    [Authorize(Roles = RoleGroups.ShopFloorRecord)]
     public async Task<ActionResult<ChecklistRecordResponse>> AddChecklistRecord(
         int id, ChecklistRecordRequest request, CancellationToken ct)
     {
@@ -201,6 +204,7 @@ public class WorkOrderExecutionController(
     }
 
     [HttpPost("consumptions")]
+    [Authorize(Roles = RoleGroups.ShopFloorRecord)]
     public async Task<ActionResult<ConsumptionResponse>> AddConsumption(
         int id, ConsumptionRequest request, CancellationToken ct)
     {
@@ -312,6 +316,7 @@ public class WorkOrderExecutionController(
     /// </para>
     /// </summary>
     [HttpPost("production-records")]
+    [Authorize(Roles = RoleGroups.ShopFloorRecord)]
     public async Task<ActionResult<ProductionRecordResponse>> AddProductionRecord(
         int id, ProductionRecordRequest request, CancellationToken ct)
     {
@@ -546,6 +551,7 @@ public class WorkOrderExecutionController(
     }
 
     [HttpPost("data-records")]
+    [Authorize(Roles = RoleGroups.ShopFloorRecord)]
     public async Task<ActionResult<List<DataRecordResponse>>> AddDataRecords(
         int id, List<DataRecordRequest> requests, CancellationToken ct)
     {

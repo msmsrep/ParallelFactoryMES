@@ -602,4 +602,38 @@ public class ExecutionTests
         var approve = await operator_.PostAsync($"/api/work-orders/{finalWo.Id}/approve", null);
         Assert.Equal(HttpStatusCode.Forbidden, approve.StatusCode);
     }
+
+    [Fact]
+    public async Task 品質担当は製造実行の記録ができないが異常報告はできる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var finalWo = order.WorkOrders[1];
+        using var qc = await TestAuth.CreateUserClientAsync(
+            factory, admin, "qc1", "Passw0rd123", Core.Constants.MesRoles.QualityControl);
+
+        // 製造実行の記録は現場作業者・生産管理・システム管理者のみ（Spec.md 7.4）
+        var start = await qc.PostAsync($"/api/work-orders/{finalWo.Id}/start", null);
+        Assert.Equal(HttpStatusCode.Forbidden, start.StatusCode);
+
+        var record = await qc.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now, null, ctx.ProductLocationId, false));
+        Assert.Equal(HttpStatusCode.Forbidden, record.StatusCode);
+
+        var workTime = await qc.PostAsJsonAsync("/api/work-time-records",
+            new WorkTimeRequest(WorkTimeType.Direct, null, finalWo.Id, DateTimeOffset.Now, null, null));
+        Assert.Equal(HttpStatusCode.Forbidden, workTime.StatusCode);
+
+        // 異常・使用実績の記録は絞らない（意図的な例外。気づいた人が上げられるようにする）
+        var trouble = await qc.PostAsJsonAsync("/api/trouble-reports",
+            new TroubleReportRequest(DateTimeOffset.Now, TroubleCategory.Quality, finalWo.Id, null, "異音"));
+        Assert.Equal(HttpStatusCode.Created, trouble.StatusCode);
+
+        // 参照は従来どおり可能
+        Assert.Equal(HttpStatusCode.OK,
+            (await qc.GetAsync($"/api/work-orders/{finalWo.Id}/production-records")).StatusCode);
+    }
 }
