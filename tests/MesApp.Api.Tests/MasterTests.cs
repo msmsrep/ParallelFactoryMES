@@ -224,4 +224,48 @@ public class MasterTests
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<ProcessResponse>())!;
     }
+
+    [Fact]
+    public async Task 最後のシステム管理者は無効化も降格もできない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var me = (await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users"))!
+            .Single(u => u.UserName == TestAuth.AdminUser);
+
+        // 自分を無効化する
+        var deactivate = await admin.PutAsJsonAsync($"/api/users/{me.Id}",
+            new UpdateUserRequest(me.DisplayName, [MesRoles.SystemAdmin], false));
+        Assert.Equal(HttpStatusCode.Conflict, deactivate.StatusCode);
+
+        // 自分からシステム管理者ロールを外す
+        var demote = await admin.PutAsJsonAsync($"/api/users/{me.Id}",
+            new UpdateUserRequest(me.DisplayName, [MesRoles.ProductionManager], true));
+        Assert.Equal(HttpStatusCode.Conflict, demote.StatusCode);
+
+        // 変更されていない（管理者のまま操作できる）
+        var after = (await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users"))!
+            .Single(u => u.UserName == TestAuth.AdminUser);
+        Assert.True(after.IsActive);
+        Assert.Contains(MesRoles.SystemAdmin, after.Roles);
+    }
+
+    [Fact]
+    public async Task 別の管理者がいれば降格できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var created = await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("admin2", "Passw0rd123", "管理者2", [MesRoles.SystemAdmin]));
+        created.EnsureSuccessStatusCode();
+
+        var me = (await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users"))!
+            .Single(u => u.UserName == TestAuth.AdminUser);
+        var demote = await admin.PutAsJsonAsync($"/api/users/{me.Id}",
+            new UpdateUserRequest(me.DisplayName, [MesRoles.ProductionManager], true));
+
+        Assert.Equal(HttpStatusCode.OK, demote.StatusCode);
+    }
 }

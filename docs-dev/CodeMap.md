@@ -98,6 +98,7 @@
 | ロット使用可否（投入・引当・出荷の共通判定） | `Api/Policies/LotUsabilityPolicy.cs` | Spec.md 3.9。ステータス・有効期限の条件は**ここだけ**に置く。呼び先は `WorkOrderExecutionController`（投入）／`InventoryService.AllocateFefoAsync`（FEFO）／`ShippingOrdersController`（出荷） |
 | 部材投入の照合（予定材料） | `Api/Policies/MaterialIssuePolicy.cs` | Spec.md 3.9・5.7。基準はMBOMの現在値ではなく**指図の予定材料**。呼び先は `WorkOrderExecutionController.AddConsumption` |
 | 作業指示ステータス変更（＋状態履歴） | `Api/Services/WorkOrderStatusService.cs`<br>`Core/Entities/Production.cs`: WorkOrderStatusHistory | Spec.md 5.2。`WorkOrder.Status` を**直接代入しない**。履歴は `GET api/work-orders/{id}/status-history` |
+| システム管理者を失わない | `Api/Policies/LastAdminPolicy.cs` | Spec.md 3.6。有効なシステム管理者が0人になる無効化・降格を拒否する。呼び先は `UsersController.Update`（1件ずつ判定）／`MasterCsvService.Import.ImportUsersAsync`（**全行の適用後**に判定。行順で引き継ぎを弾かないため）。`Tests/MasterTests.cs` / `MasterCsvTests.cs` |
 | 出荷判定ゲート | `Api/Policies/ShipmentGatePolicy.cs` | Spec.md 3.9。承認済みの「可／特採」判定の条件はここだけに置く |
 | ロット在庫ステータス変更（＋状態履歴） | `Api/Services/LotStatusService.cs`<br>`Core/Entities/Production.cs`: LotStatusHistory | Spec.md 5.3。`Lot.StockStatus` を**直接代入しない**。呼び先は `InventoryController`／`InspectionOrdersController`／`NonconformanceController`／`ReceivingController` |
 | ロット系譜（分割・統合・振替） | `Core/Entities/Production.cs`: LotGenealogy<br>`InventoryController.AddGenealogy` | Spec.md 5.3・5.7。追跡の正は `Lot.ParentLotId` ではなくこちら。`TraceabilityController` はこの関係を辿る |

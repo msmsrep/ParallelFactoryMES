@@ -1,3 +1,4 @@
+using MesApp.Api.Policies;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -862,6 +863,13 @@ public sealed partial class MasterCsvService
                 await refreshTokenService.RevokeAllForUserAsync(user.Id, ct);
             }
             counter.Updated++;
+        }
+
+        // 「Aを降格してからBを昇格する」順序を誤って弾かないよう、全行を適用したあとに確認する。
+        // エラーを立てれば取込全体がロールバックされる
+        if (errors.Count == 0 && !await LastAdminPolicy.HasActiveAdminAsync(userManager))
+        {
+            errors.Add(new CsvImportError(0, LastAdminPolicy.NoAdminRemains));
         }
     }
 

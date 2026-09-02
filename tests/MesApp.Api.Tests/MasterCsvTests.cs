@@ -498,6 +498,33 @@ public class MasterCsvTests
         Assert.Contains("DF-01,寸法外れ（外径）,Equipment,true", exported);
     }
 
+    [Fact]
+    public async Task ユーザーCSVで最後のシステム管理者を降格できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        // 唯一の管理者を生産管理担当者へ降格する取込は失敗し、何も反映されない
+        var demote = await ImportAsync(admin, "users", $"""
+            UserName,DisplayName,Roles,IsActive
+            {TestAuth.AdminUser},管理者,ProductionManager,true
+            """);
+        Assert.False(demote.Succeeded);
+        Assert.Contains(demote.Errors, e => e.Message.Contains("システム管理者"));
+
+        var unchanged = (await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users"))!
+            .Single(u => u.UserName == TestAuth.AdminUser);
+        Assert.Contains(MesRoles.SystemAdmin, unchanged.Roles);
+
+        // 同じ取込の中で別の管理者を立てるなら通る（行の順序に依存しない）
+        var handover = await ImportAsync(admin, "users", $"""
+            UserName,DisplayName,Roles,IsActive,InitialPassword
+            {TestAuth.AdminUser},管理者,ProductionManager,true,
+            admin2,管理者2,SystemAdmin,true,Passw0rd123
+            """);
+        Assert.True(handover.Succeeded, string.Join(" / ", handover.Errors.Select(e => e.Message)));
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {

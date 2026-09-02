@@ -1,3 +1,4 @@
+using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
@@ -94,6 +95,13 @@ public class UsersController(
         if (invalidRoles.Count > 0)
         {
             return BadRequest(new ProblemDetails { Title = $"不明なロールが含まれています: {string.Join(", ", invalidRoles)}" });
+        }
+
+        // 最後のシステム管理者を無効化・降格すると誰も権限操作できなくなる（復旧はDB操作のみ）
+        var lastAdmin = await LastAdminPolicy.CheckUpdateAsync(userManager, user, request.IsActive, request.Roles);
+        if (lastAdmin is not null)
+        {
+            return Conflict(new ProblemDetails { Title = lastAdmin });
         }
 
         user.DisplayName = request.DisplayName;
