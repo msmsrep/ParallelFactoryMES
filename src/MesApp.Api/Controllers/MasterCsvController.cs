@@ -1,5 +1,4 @@
 using MesApp.Api.Services;
-using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,7 +31,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         {
             return NotFound(new ProblemDetails { Title = $"CSV出力に対応していないマスタです：{kind}" });
         }
-        if (info.UserAdminOnly && !User.IsInRole(MesRoles.SystemAdmin))
+        if (info.UserAdminOnly && !RoleGroups.IsInGroup(User, RoleGroups.UserAdmin))
         {
             return Forbid();
         }
@@ -100,10 +99,9 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         return await service.ImportAsync(info, csv, dryRun, ct);
     }
 
+    /// <summary>ユーザー系はユーザー管理権限、それ以外はマスタ更新権限（組み合わせはRoleGroupsが持つ）</summary>
     private bool CanWrite(CsvKindInfo kind) =>
-        kind.UserAdminOnly
-            ? User.IsInRole(MesRoles.SystemAdmin)
-            : User.IsInRole(MesRoles.SystemAdmin) || User.IsInRole(MesRoles.ProductionManager);
+        RoleGroups.IsInGroup(User, kind.UserAdminOnly ? RoleGroups.UserAdmin : RoleGroups.MasterWrite);
 
     /// <summary>Excelでそのまま開けるようUTF-8 BOM付きで返す</summary>
     private FileContentResult CsvFileResult(string csv, string fileName) =>

@@ -1,5 +1,6 @@
 using MesApp.Client.Web;
 using MesApp.Client.Web.Auth;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
@@ -27,7 +28,8 @@ builder.Services.AddScoped(sp =>
 {
     var handler = new AuthMessageHandler(
         sp.GetRequiredService<TokenStore>(),
-        sp.GetRequiredService<AuthService>())
+        sp.GetRequiredService<AuthService>(),
+        sp.GetRequiredService<NavigationManager>())
     {
         InnerHandler = new HttpClientHandler(),
     };

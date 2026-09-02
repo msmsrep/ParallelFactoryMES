@@ -184,4 +184,44 @@ public class AuthTests
         await TestAuth.LoginAsync(client, "worker1", "NewPassw0rd456");
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/locations")).StatusCode);
     }
+
+    [Fact]
+    public async Task 失効済みリフレッシュトークンの再提示でセッション全体を失効させる()
+    {
+        using var factory = new ApiFactory();
+        // Cookieを手で持ち回るため自動Cookie管理は使わない
+        using var client = factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = false });
+        await SetupAdminAsync(client);
+
+        var login = await client.PostAsJsonAsync(
+            "/api/auth/login", new LoginRequest(AdminUser, AdminPassword));
+        login.EnsureSuccessStatusCode();
+        var oldCookie = ExtractRefreshCookie(login);
+
+        // 正常なローテーション。ここで旧トークンは失効する
+        var rotated = await RefreshWithCookieAsync(client, oldCookie);
+        Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
+        var newCookie = ExtractRefreshCookie(rotated);
+
+        // 失効済みの旧トークンを再提示（盗用の想定）
+        var reuse = await RefreshWithCookieAsync(client, oldCookie);
+        Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
+
+        // 正規の利用者が持っている新トークンも巻き添えで失効している（再ログインが必要）
+        var afterReuse = await RefreshWithCookieAsync(client, newCookie);
+        Assert.Equal(HttpStatusCode.Unauthorized, afterReuse.StatusCode);
+    }
+
+    private static string ExtractRefreshCookie(HttpResponseMessage response) =>
+        response.Headers.GetValues("Set-Cookie")
+            .First(v => v.StartsWith("mesapp_rt=", StringComparison.Ordinal))
+            .Split(';')[0];
+
+    private static Task<HttpResponseMessage> RefreshWithCookieAsync(HttpClient client, string cookie)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        request.Headers.Add("Cookie", cookie);
+        return client.SendAsync(request);
+    }
 }

@@ -5,6 +5,7 @@ using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace MesApp.Api;
@@ -83,10 +84,15 @@ public static class MesAppHost
 
         builder.Services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+            .AddJwtBearer();
+
+        // 検証鍵はDIのSigningKeyProvider（シングルトン）から取る。
+        // ここで別インスタンスを作ると、鍵ファイルが無い初回に発行側と検証側で別の鍵が生まれる
+        builder.Services
+            .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<SigningKeyProvider, IOptions<JwtOptions>>((options, keyProvider, jwtOptions) =>
             {
-                var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-                var keyProvider = new SigningKeyProvider(Microsoft.Extensions.Options.Options.Create(jwt));
+                var jwt = jwtOptions.Value;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,

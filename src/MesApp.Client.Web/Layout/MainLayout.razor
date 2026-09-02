@@ -18,13 +18,35 @@
             </AuthorizeView>
         </header>
         <main class="content">
-            @Body
+            @* 画面の読み込み（GET）が失敗しても、リロードするまで操作不能にならないようにする *@
+            <ErrorBoundary @ref="_errorBoundary">
+                <ChildContent>@Body</ChildContent>
+                <ErrorContent>
+                    <div class="card">
+                        <div class="alert alert-danger">
+                            画面の読み込みに失敗しました。通信状態を確認して再試行してください。
+                        </div>
+                        <div class="actions">
+                            <button class="btn" @onclick="RetryAsync">再試行</button>
+                        </div>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
         </main>
     </div>
 </div>
 
 @code {
     private const string ChangePasswordPath = "change-password";
+
+    private ErrorBoundary? _errorBoundary;
+
+    /// <summary>エラー表示から復帰する（同じ画面を組み立て直す）</summary>
+    private Task RetryAsync()
+    {
+        _errorBoundary?.Recover();
+        return Task.CompletedTask;
+    }
 
     /// <summary>
     /// 初期パスワードのままの利用者はパスワード変更画面へ誘導する。
@@ -33,6 +55,9 @@
     /// </summary>
     protected override void OnParametersSet()
     {
+        // 画面を移ったらエラー表示は解除する（前の画面の失敗を引きずらない）
+        _errorBoundary?.Recover();
+
         if (Tokens.User?.MustChangePassword != true)
         {
             return;

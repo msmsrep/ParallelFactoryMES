@@ -59,8 +59,20 @@ public class AuthController(
             return Unauthorized(new ProblemDetails { Title = "リフレッシュトークンがありません。再ログインしてください。" });
         }
 
-        var current = await refreshTokenService.ValidateAsync(plainToken, ct);
-        if (current is null)
+        var validation = await refreshTokenService.ValidateAsync(plainToken, ct);
+
+        // 失効済みトークンの再提示は盗用の疑い。そのユーザーの全トークンを失効させて再ログインを強制する
+        if (validation.IsReuse)
+        {
+            await refreshTokenService.RevokeAllForUserAsync(validation.ReusedByUserId!, ct);
+            await auditLogger.LogAsync("Auth", "RefreshTokenReuse", "User", validation.ReusedByUserId, ct: ct);
+            DeleteRefreshCookie();
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "セッションを失効させました。お手数ですが再ログインしてください。",
+            });
+        }
+        if (validation.Token is not { } current)
         {
             DeleteRefreshCookie();
             return Unauthorized(new ProblemDetails { Title = "リフレッシュトークンが無効です。再ログインしてください。" });

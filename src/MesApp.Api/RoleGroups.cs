@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using MesApp.Core.Constants;
 
 namespace MesApp.Api;
@@ -29,4 +30,13 @@ public static class RoleGroups
 
     /// <summary>設備保全（保全手順書・計画・指示・実績、治工具メンテナンス）</summary>
     public const string MaintenanceManage = $"{MesRoles.SystemAdmin},{MesRoles.Maintenance}";
+
+    /// <summary>
+    /// ロールグループに属するか。属性（<c>[Authorize(Roles = ...)]</c>）で表せず、
+    /// アクションの中で条件分岐する場合（種別ごとに必要権限が変わるマスタCSV取込など）に使う。
+    /// ロールの組み合わせをコントローラへ直書きしないための入口。
+    /// </summary>
+    public static bool IsInGroup(ClaimsPrincipal user, string roleGroup) =>
+        roleGroup.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(user.IsInRole);
 }

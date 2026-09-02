@@ -90,6 +90,8 @@
 | 初回パスワード変更の強制 | `Api/MustChangePasswordFilter.cs`（＋`AllowPendingPasswordChange`属性）<br>`Core/Constants/MesClaimTypes.cs`<br>`Api/Services/JwtTokenService.cs`（クレーム付与）<br>`Web/Layout/MainLayout.razor`（画面誘導） | Spec.md 7.4。未変更のトークンは参照系も403。素通しするアクションには`[AllowPendingPasswordChange]`を付ける（現状は`api/auth/me`と`api/auth/change-password`のみ）。`Tests/AuthTests.cs` |
 | ロール定義・権限グループ | `Core/Constants/MesRoles.cs`（7ロール）<br>`Api/RoleGroups.cs`（MasterWrite / ProductionManage / UserAdmin / InventoryManage 等） | 新しい組み合わせが要るときだけ RoleGroups に追加 |
 | 初期セットアップ（初期管理者） | `Api/Controllers/SetupController.cs` `api/setup`<br>`Api/Services/IdentitySeeder.cs` | Spec.md 2.2 E。`/setup` `Setup.razor`。`Tests/SetupTests.cs` |
+| ビルド共通設定 | `Directory.Build.props` | `TreatWarningsAsErrors` でDoD 1（新規の警告を増やさない）をビルドで担保する。`TargetFramework` は Desktop だけ `net10.0-windows` のため各csprojに残す |
+| クライアントのエラー処理 | `Web/Layout/MainLayout.razor`（`ErrorBoundary`）<br>`Web/Auth/AuthMessageHandler.cs`（401時のリフレッシュ→失敗ならログイン画面へ）<br>`Web/Auth/AuthService.cs`（`EndSession`） | 画面のGET失敗でアプリ全体が操作不能にならないようにする。書き込み系は各画面の`_error` + `<Notice>` が担当（従来どおり） |
 | 監査ログ | `Core/Abstractions/IAuditLogger.cs`<br>`Infra/Services/AuditLogger.cs`<br>`Core/Entities/AuditLog.cs` | Spec.md 7.6。**全ての書き込み系アクションで呼ぶ**。変更前後を追跡する操作は `detail:` に匿名オブジェクト（`{ before, after, reason }`）を渡す＝JSON保存。要約でよい操作は文字列のまま |
 | 採番（指図番号・ロット番号等） | `Api/Services/NumberingService.cs` | 新しい採番区分はここに追加 |
 | ロット使用可否（投入・引当・出荷の共通判定） | `Api/Policies/LotUsabilityPolicy.cs` | Spec.md 3.9。ステータス・有効期限の条件は**ここだけ**に置く。呼び先は `WorkOrderExecutionController`（投入）／`InventoryService.AllocateFefoAsync`（FEFO）／`ShippingOrdersController`（出荷） |

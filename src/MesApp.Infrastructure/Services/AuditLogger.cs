@@ -43,7 +43,11 @@ public class AuditLogger(MesAppDbContext db, IHttpContextAccessor httpContextAcc
             Detail = Serialize(detail),
             IpAddress = http?.Connection.RemoteIpAddress?.ToString(),
         });
-        await db.SaveChangesAsync(ct);
+
+        // 監査ログは業務データの保存後に呼ばれる。ここで ct を尊重すると、
+        // 利用者が画面を閉じた瞬間などに「業務データは確定したのに記録が残らない」ことが起きるため、
+        // 保存だけはキャンセルさせない（Spec.md 7.6：書き込み系は必ず記録する）。
+        await db.SaveChangesAsync(CancellationToken.None);
     }
 
     /// <summary>文字列はそのまま、それ以外はJSONとして保存する</summary>

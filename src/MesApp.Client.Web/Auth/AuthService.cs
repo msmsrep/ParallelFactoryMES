@@ -55,6 +55,20 @@ public class AuthService(HttpClient bareClient, TokenStore tokenStore, ApiAuthen
         }
     }
 
+    /// <summary>
+    /// サーバーへ問い合わせずに手元のセッションだけ破棄する
+    /// （リフレッシュに失敗した＝サーバー側は既に無効、という場面で使う）
+    /// </summary>
+    public void EndSession()
+    {
+        if (!tokenStore.IsAuthenticated)
+        {
+            return;
+        }
+        tokenStore.Clear();
+        stateProvider.NotifyChanged();
+    }
+
     public async Task LogoutAsync()
     {
         try
