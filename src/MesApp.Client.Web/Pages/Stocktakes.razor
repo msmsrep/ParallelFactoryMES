@@ -9,6 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")">
 <div class="card">
     <h2 style="margin-top:0;">棚卸指示の作成</h2>
     <div class="form-grid">
@@ -25,6 +26,7 @@
     </div>
     <button class="btn" disabled="@_busy" @onclick="CreateAsync">棚卸指示を作成（現在庫をスナップショット）</button>
 </div>
+</AuthorizeView>
 
 <div class="card">
     <h2 style="margin-top:0;">棚卸一覧</h2>
@@ -102,11 +104,13 @@
 
         @if (_selected.Status == StocktakeStatus.Instructed)
         {
-            <div class="actions mt-2">
-                <button class="btn" disabled="@_busy" @onclick="SaveCountsAsync">実棚数を登録</button>
-                <button class="btn" disabled="@_busy" @onclick="FinalizeAsync">確定（差異を棚卸調整）</button>
-                <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">取消</button>
-            </div>
+            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")">
+                <div class="actions mt-2">
+                    <button class="btn" disabled="@_busy" @onclick="SaveCountsAsync">実棚数を登録</button>
+                    <button class="btn" disabled="@_busy" @onclick="FinalizeAsync">確定（差異を棚卸調整）</button>
+                    <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">取消</button>
+                </div>
+            </AuthorizeView>
         }
     </div>
 }

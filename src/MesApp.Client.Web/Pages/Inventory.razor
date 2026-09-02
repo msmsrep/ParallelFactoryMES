@@ -74,6 +74,7 @@
 }
 else if (_tab == "ops")
 {
+    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")">
     <div class="card">
         <h2 style="margin-top:0;">対象在庫の選択</h2>
         <div class="form-grid">
@@ -184,6 +185,7 @@ else if (_tab == "ops")
             <button class="btn btn-secondary" disabled="@_busy" @onclick="IssueReturnAsync">払出戻し</button>
         </div>
     </div>
+    </AuthorizeView>
 }
 else if (_tab == "expiring")
 {

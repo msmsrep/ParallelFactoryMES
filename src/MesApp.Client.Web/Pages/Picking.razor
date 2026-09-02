@@ -9,6 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
+<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")">
 <div class="card">
     <h2 style="margin-top:0;">ピッキング指示の作成</h2>
     <div class="form-grid">
@@ -75,6 +76,7 @@
         </table>
     }
 </div>
+</AuthorizeView>
 
 <div class="card">
     <h2 style="margin-top:0;">ピッキング指示一覧</h2>
@@ -100,10 +102,12 @@
                     </div>
                     @if (order.Status == PickingOrderStatus.Instructed)
                     {
-                        <div class="actions">
-                            <button class="btn btn-sm" disabled="@_busy" @onclick="() => ExecuteAsync(order.Id)">ピッキング実行</button>
-                            <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
-                        </div>
+                        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")" Context="inventoryWrite">
+                            <div class="actions">
+                                <button class="btn btn-sm" disabled="@_busy" @onclick="() => ExecuteAsync(order.Id)">ピッキング実行</button>
+                                <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
+                            </div>
+                        </AuthorizeView>
                     }
                 </div>
                 <table class="table mt-2">

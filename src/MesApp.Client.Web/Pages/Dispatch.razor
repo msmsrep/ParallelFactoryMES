@@ -69,8 +69,10 @@
                         </td>
                         <td><StatusBadge Status="@workOrder.Status.ToString()" /></td>
                         <td>
-                            <button class="btn btn-sm" disabled="@_busy"
-                                    @onclick="() => DispatchAsync(workOrder)">割当</button>
+                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+                                <button class="btn btn-sm" disabled="@_busy"
+                                        @onclick="() => DispatchAsync(workOrder)">割当</button>
+                            </AuthorizeView>
                         </td>
                     </tr>
                 }

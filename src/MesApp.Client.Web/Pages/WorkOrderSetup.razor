@@ -41,7 +41,9 @@ else
                 <input @bind="_abnormality" placeholder="異常があれば記入" />
             </div>
         </div>
-        <button class="btn" disabled="@_busy" @onclick="AddSetupAsync">段取り実績を記録</button>
+        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Operator}")">
+            <button class="btn" disabled="@_busy" @onclick="AddSetupAsync">段取り実績を記録</button>
+        </AuthorizeView>
 
         @if (_setupRecords.Count > 0)
         {
@@ -102,7 +104,9 @@ else
                     }
                 </tbody>
             </table>
-            <button class="btn mt-2" disabled="@_busy" @onclick="SubmitChecklistAsync">チェックリストを記録</button>
+            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Operator}")" Context="checklistWrite">
+                <button class="btn mt-2" disabled="@_busy" @onclick="SubmitChecklistAsync">チェックリストを記録</button>
+            </AuthorizeView>
         }
 
         @if (_checklistRecords.Count > 0)
