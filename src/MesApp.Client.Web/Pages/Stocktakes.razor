@@ -9,7 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")">
+<AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
     <h2 style="margin-top:0;">棚卸指示の作成</h2>
     <div class="form-grid">
@@ -104,7 +104,7 @@
 
         @if (_selected.Status == StocktakeStatus.Instructed)
         {
-            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")">
+            <AuthorizeView Roles="@MesRoleGroups.InventoryManage">
                 <div class="actions mt-2">
                     <button class="btn" disabled="@_busy" @onclick="SaveCountsAsync">実棚数を登録</button>
                     <button class="btn" disabled="@_busy" @onclick="FinalizeAsync">確定（差異を棚卸調整）</button>

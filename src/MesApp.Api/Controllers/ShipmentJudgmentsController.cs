@@ -48,7 +48,7 @@ public class ShipmentJudgmentsController(
 
     /// <summary>出荷判定（H-10-10-02。対象はロットまたは出荷指示）</summary>
     [HttpPost]
-    [Authorize(Roles = RoleGroups.QaManage)]
+    [Authorize(Roles = MesRoleGroups.QaManage)]
     public async Task<ActionResult<ShipmentJudgmentResponse>> Create(
         ShipmentJudgmentCreateRequest request, CancellationToken ct)
     {
@@ -85,7 +85,7 @@ public class ShipmentJudgmentsController(
 
     /// <summary>判定承認（H-10-10-03）</summary>
     [HttpPost("{id:int}/approve")]
-    [Authorize(Roles = RoleGroups.QaManage)]
+    [Authorize(Roles = MesRoleGroups.QaManage)]
     public async Task<ActionResult<ShipmentJudgmentResponse>> Approve(int id, CancellationToken ct)
     {
         var judgment = await db.ShipmentJudgments.FirstOrDefaultAsync(j => j.Id == id, ct);

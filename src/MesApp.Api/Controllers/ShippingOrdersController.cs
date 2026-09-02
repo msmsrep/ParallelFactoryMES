@@ -54,7 +54,7 @@ public class ShippingOrdersController(
 
     /// <summary>出荷指示の作成（D-40-20-01）</summary>
     [HttpPost]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<ShippingOrderResponse>> Create(
         ShippingOrderCreateRequest request, CancellationToken ct)
     {
@@ -91,7 +91,7 @@ public class ShippingOrdersController(
     /// 部分出荷可。全明細が満たされると完了（D-40-30-05））
     /// </summary>
     [HttpPost("{id:int}/ship")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<ShippingOrderResponse>> Ship(
         int id, ShipExecuteRequest request, CancellationToken ct)
     {
@@ -187,7 +187,7 @@ public class ShippingOrdersController(
     }
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<ShippingOrderResponse>> Cancel(int id, CancellationToken ct)
     {
         var order = await db.ShippingOrders.FindAsync([id], ct);

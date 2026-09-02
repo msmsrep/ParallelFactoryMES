@@ -33,9 +33,9 @@ dotnet ef migrations add <Name> --project src/MesApp.Infrastructure --startup-pr
 
 | プロジェクト | 責務 |
 |:--|:--|
-| `src/MesApp.Core` | エンティティ（`Entities/`）、DTO（`Contracts/<領域>/`、record）、`Constants/MesRoles.cs`、抽象（`Abstractions/`）。外部依存なし |
+| `src/MesApp.Core` | エンティティ（`Entities/`）、DTO（`Contracts/<領域>/`、record）、`Constants/MesRoles.cs`・`Constants/MesRoleGroups.cs`、抽象（`Abstractions/`）。外部依存なし |
 | `src/MesApp.Infrastructure` | `MesAppDbContext`、EF Core (SQLite)、`Migrations/`、`Services/AuditLogger.cs`、DI 拡張 |
-| `src/MesApp.Api` | Controllers、業務サービス（`Services/`）、`RoleGroups.cs`、JWT 認証、Blazor WASM の静的配信 |
+| `src/MesApp.Api` | Controllers、業務サービス（`Services/`）、JWT 認証、Blazor WASM の静的配信 |
 | `src/MesApp.Client.Web` | Blazor WASM。`Pages/`、`Pages/Masters/*Tab.razor`、`Shared/` 共通コンポーネント、`Auth/` |
 | `tests/MesApp.Api.Tests` | xUnit + `WebApplicationFactory`。テストごとに一時 SQLite |
 | `tests/MesApp.Client.Web.Tests` | xUnit + bUnit。全画面に効く横断的な振る舞い（`MainLayout` 等）だけを対象にする |
@@ -59,9 +59,9 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 ## API 側の規約
 
 - コントローラは**プライマリコンストラクタで DI**：`public class XController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase`
-- 属性は `[ApiController]` / `[Route("api/xxx")]`（小文字複数形）/ クラスに `[Authorize]`
+- 属性は `[ApiController]` / `[Route("api/xxx")]`（小文字複数形）/ クラスに `[Authorize]`。**クラスに `[Authorize(Roles = ...)]` は付けない**（属性がアクションと合成され、参照系を開放できなくなる）
 - クラスの XML コメントに**根拠を書く**：`/// <summary>ロケーションマスタ（Spec.md 5.1 Location。D-50-20-01）</summary>`
-- 書き込み系アクションに `[Authorize(Roles = RoleGroups.Xxx)]`。ロール定数は `MesRoles`、組み合わせは `RoleGroups`（新しい組み合わせが要るときだけ `RoleGroups.cs` に追加）
+- 書き込み系アクションに `[Authorize(Roles = MesRoleGroups.Xxx)]`。ロール定数は `MesRoles`、組み合わせは `MesRoleGroups`（新しい組み合わせが要るときだけ `Core/Constants/MesRoleGroups.cs` に追加）。**API と画面で同じ定数を使う**（別々に書くと片方だけ直したときに表示と権限がずれる）
 - 参照系は `AsNoTracking()`、全アクションに `CancellationToken ct`
 - DTO は `MesApp.Core/Contracts/<領域>/` の `record`。エンティティを直接返さない
 - エラーは `ProblemDetails` + **日本語のメッセージ**（例: `$"ロケーションコード '{request.Code}' は既に存在します。"`）。重複は `Conflict`、未存在は `NotFound`
@@ -73,7 +73,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 
 - `@inject HttpClient Http`。認証ヘッダは `Auth/AuthMessageHandler` が付与する
 - 冒頭に根拠コメント：`@* ロケーションマスタ（Spec.md 5.1 Location。D-50-20-01） *@`
-- メッセージ表示は `<Notice Error="@_error" Message="@_message" />`、権限制御は `<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},...")">`
+- メッセージ表示は `<Notice Error="@_error" Message="@_message" />`、権限制御は `<AuthorizeView Roles="@MesRoleGroups.Xxx">`（APIと同じ定数を使う。書き込みの操作要素だけを隠し、画面自体は開けたままにする）
 - CSV 入出力は `<CsvIoPanel Kind="..." Label="..." KeyLabel="..." OnImported="LoadAsync" />`
 - マスタ画面は `Pages/Masters/<名前>Tab.razor` を追加し `MastersPage.razor` に登録。独立画面は `Pages/` に置き `Layout/NavMenu.razor` に導線を追加
 - フィールドは `_camelCase`、共通スタイルは既存の `card` / `form-grid` / `form-field` / `btn` / `btn-secondary` / `actions` / `text-muted` を使う（新規 CSS クラスを増やさない）
@@ -86,7 +86,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 
 ## 新機能を追加する順序
 
-Entity（`Core/Entities`）→ `MesAppDbContext` 設定 → マイグレーション → DTO（`Core/Contracts`）→ Controller → 必要なら `RoleGroups` → Razor 画面 → `MastersPage`/`NavMenu` 登録 → CSV 対応（`MasterCsvKinds`）→ テスト → `Spec.md` 更新
+Entity（`Core/Entities`）→ `MesAppDbContext` 設定 → マイグレーション → DTO（`Core/Contracts`）→ Controller → 必要なら `MesRoleGroups` → Razor 画面 → `MastersPage`/`NavMenu` 登録 → CSV 対応（`MasterCsvKinds`）→ テスト → `Spec.md` 更新
 
 ## 完了の定義（DoD・全項目必須）
 

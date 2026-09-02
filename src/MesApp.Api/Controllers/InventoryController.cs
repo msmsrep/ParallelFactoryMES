@@ -161,7 +161,7 @@ public class InventoryController(
 
     /// <summary>在庫移動（D-10-30-02）</summary>
     [HttpPost("move")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<IActionResult> Move(MoveRequest request, CancellationToken ct)
     {
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
@@ -190,7 +190,7 @@ public class InventoryController(
 
     /// <summary>数量調整（実在庫との差異訂正 D-10-30-04。理由必須・監査ログ記録）</summary>
     [HttpPost("adjust")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<IActionResult> Adjust(AdjustRequest request, CancellationToken ct)
     {
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
@@ -239,7 +239,7 @@ public class InventoryController(
 
     /// <summary>在庫ステータス変更（保留・検査待ち・不良・廃棄予定等。D-10-30-08。ロット単位）</summary>
     [HttpPost("status")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<IActionResult> ChangeStatus(LotStatusRequest request, CancellationToken ct)
     {
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
@@ -264,7 +264,7 @@ public class InventoryController(
 
     /// <summary>ロット分割（D-10-30-05。新ロットは親ロットの系譜・期限を引き継ぐ）</summary>
     [HttpPost("split")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<LotResponse>> Split(SplitRequest request, CancellationToken ct)
     {
         var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
@@ -325,7 +325,7 @@ public class InventoryController(
 
     /// <summary>ロット統合（D-10-30-05。同一品目・同一ロケーションの在庫を統合先ロットへ移す）</summary>
     [HttpPost("merge")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<IActionResult> Merge(MergeRequest request, CancellationToken ct)
     {
         var source = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.SourceLotId, ct);
@@ -372,7 +372,7 @@ public class InventoryController(
 
     /// <summary>品目振替・ロット振替（D-10-30-06〜07。新しいロットを生成して数量を移す）</summary>
     [HttpPost("transfer")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<LotResponse>> Transfer(LotTransferRequest request, CancellationToken ct)
     {
         if (request.NewProductId is null && string.IsNullOrWhiteSpace(request.NewLotNumber))
@@ -453,7 +453,7 @@ public class InventoryController(
 
     /// <summary>在庫廃棄（D-50-30-01）</summary>
     [HttpPost("discard")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<IActionResult> Discard(DiscardRequest request, CancellationToken ct)
     {
         return await RemoveSimpleAsync(request.LotId, request.LocationId, request.Quantity,
@@ -462,7 +462,7 @@ public class InventoryController(
 
     /// <summary>返品（D-10-10-05。サプライヤーへの返品による在庫引落し）</summary>
     [HttpPost("return")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<IActionResult> Return(ReturnRequest request, CancellationToken ct)
     {
         return await RemoveSimpleAsync(request.LotId, request.LocationId, request.Quantity,
@@ -471,7 +471,7 @@ public class InventoryController(
 
     /// <summary>払出戻し（D-20-20-03。工程に払い出した部材の在庫戻し）</summary>
     [HttpPost("issue-return")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<IActionResult> IssueReturn(IssueReturnRequest request, CancellationToken ct)
     {
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);

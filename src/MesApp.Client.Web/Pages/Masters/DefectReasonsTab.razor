@@ -3,7 +3,7 @@
 @* 不良理由マスタ（Spec.md 5.1 DefectReason。C-40-10-01 不良項目別分析） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "不良理由の登録" : $"不良理由の編集（{_code}）")</h2>
         <p class="text-muted">
@@ -59,7 +59,7 @@
                         <td>@Labels.DefectCategory(item.Category)</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
                                 @if (item.IsActive)
                                 {

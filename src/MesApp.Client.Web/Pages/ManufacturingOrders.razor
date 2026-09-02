@@ -6,7 +6,7 @@
 
 <h1>製造指図管理</h1>
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.ProductionManage">
     <div class="card">
         <h2 style="margin-top:0;">指図登録（A-20-10-01）</h2>
         @if (_error is not null)

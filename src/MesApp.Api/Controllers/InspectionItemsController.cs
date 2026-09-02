@@ -48,7 +48,7 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<InspectionItemResponse>> Create(InspectionItemRequest request, CancellationToken ct)
     {
         if (await db.InspectionItems.AnyAsync(i => i.Code == request.Code, ct))
@@ -83,7 +83,7 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<InspectionItemResponse>> Update(int id, InspectionItemRequest request, CancellationToken ct)
     {
         var i = await db.InspectionItems.FindAsync([id], ct);
@@ -119,7 +119,7 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var i = await db.InspectionItems.FindAsync([id], ct);

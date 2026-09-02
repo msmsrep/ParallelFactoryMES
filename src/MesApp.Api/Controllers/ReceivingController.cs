@@ -15,7 +15,7 @@ namespace MesApp.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/receiving")]
-[Authorize(Roles = RoleGroups.InventoryManage)]
+[Authorize(Roles = MesRoleGroups.InventoryManage)]
 public class ReceivingController(
     MesAppDbContext db,
     InventoryService inventory,

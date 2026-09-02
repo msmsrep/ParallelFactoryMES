@@ -66,7 +66,7 @@ public class InspectionOrdersController(
     /// 合致する有効な検査基準を自動選択する。対象ロットは検査待ちになる（サンプル検査を除く）。
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = RoleGroups.QualityManage)]
+    [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<InspectionOrderResponse>> Create(
         InspectionOrderCreateRequest request, CancellationToken ct)
     {
@@ -186,7 +186,7 @@ public class InspectionOrdersController(
     /// 検査実績の登録（C-20-10-03 ほか）。測定値があり規格値が定義されていれば自動判定する。
     /// </summary>
     [HttpPost("{id:int}/results")]
-    [Authorize(Roles = RoleGroups.QualityManage)]
+    [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<InspectionOrderResponse>> AddResults(
         int id, List<InspectionResultRequest> requests, CancellationToken ct)
     {
@@ -244,7 +244,7 @@ public class InspectionOrdersController(
     /// 検査実績の訂正（C-20-50-07。理由必須。判定済みの指示は実施中へ戻し再判定を要求する）
     /// </summary>
     [HttpPut("{id:int}/results/{resultId:int}")]
-    [Authorize(Roles = RoleGroups.QualityManage)]
+    [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<InspectionOrderResponse>> CorrectResult(
         int id, int resultId, InspectionResultCorrectionRequest request, CancellationToken ct)
     {
@@ -327,7 +327,7 @@ public class InspectionOrdersController(
     /// 対象ロットの在庫ステータス（検査待ち→正常/不良）へ反映し、不合格時は不適合を自動起票する。
     /// </summary>
     [HttpPost("{id:int}/judge")]
-    [Authorize(Roles = RoleGroups.QualityManage)]
+    [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<InspectionOrderResponse>> Judge(
         int id, InspectionJudgeRequest request, CancellationToken ct)
     {
@@ -399,7 +399,7 @@ public class InspectionOrdersController(
 
     /// <summary>検査承認（C-20-10-06）</summary>
     [HttpPost("{id:int}/approve")]
-    [Authorize(Roles = RoleGroups.QualityManage)]
+    [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<InspectionOrderResponse>> Approve(int id, CancellationToken ct)
     {
         var order = await db.InspectionOrders.FirstOrDefaultAsync(o => o.Id == id, ct);
@@ -422,7 +422,7 @@ public class InspectionOrdersController(
     }
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleGroups.QualityManage)]
+    [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<InspectionOrderResponse>> Cancel(int id, CancellationToken ct)
     {
         var order = await db.InspectionOrders.Include(o => o.TargetLot)

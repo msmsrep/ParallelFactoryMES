@@ -99,7 +99,7 @@
                 <Pager TItem="NonconformanceResponse" Result="_reports" OnPageChanged="LoadPageAsync" />
 
                 <div class="actions mt-2">
-                    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")" Context="qc">
+                    <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="qc">
                         @if (report.Status != NonconformanceStatus.Closed)
                         {
                             <select value="@GetForm(report.Id).Action"
@@ -123,7 +123,7 @@
                                 @onclick="() => RecordActionAsync(report)">対応記録</button>
                     }
 
-                    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")" Context="qcApprove">
+                    <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="qcApprove">
                         @if (report.Status is NonconformanceStatus.ActionInstructed or NonconformanceStatus.ActionCompleted)
                         {
                             <button class="btn btn-sm" disabled="@_busy" @onclick="() => ApproveAsync(report)">

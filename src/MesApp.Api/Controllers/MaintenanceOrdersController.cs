@@ -183,7 +183,7 @@ public class MaintenanceOrdersController(
     }
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenanceOrderResponse>> Cancel(int id, CancellationToken ct)
     {
         var order = await db.MaintenanceOrders.Include(o => o.MaintenancePlan)

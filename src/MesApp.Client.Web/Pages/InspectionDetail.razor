@@ -25,7 +25,7 @@ else
 
     <Notice Error="@_error" Message="@_message" />
 
-    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")">
+    <AuthorizeView Roles="@MesRoleGroups.QualityManage">
         @if (_order.Status is InspectionOrderStatus.Instructed or InspectionOrderStatus.InProgress)
         {
             <div class="card">

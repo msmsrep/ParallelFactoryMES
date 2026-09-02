@@ -36,7 +36,7 @@ public class DefectReasonsController(MesAppDbContext db, IAuditLogger auditLogge
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<DefectReasonResponse>> Create(DefectReasonRequest request, CancellationToken ct)
     {
         if (await db.DefectReasons.AnyAsync(r => r.Code == request.Code, ct))
@@ -53,7 +53,7 @@ public class DefectReasonsController(MesAppDbContext db, IAuditLogger auditLogge
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<DefectReasonResponse>> Update(
         int id, DefectReasonRequest request, CancellationToken ct)
     {
@@ -76,7 +76,7 @@ public class DefectReasonsController(MesAppDbContext db, IAuditLogger auditLogge
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var r = await db.DefectReasons.FindAsync([id], ct);

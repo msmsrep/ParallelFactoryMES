@@ -9,7 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityAssurance}")">
+<AuthorizeView Roles="@MesRoleGroups.QaManage">
     <div class="card">
         <h2 style="margin-top:0;">出荷判定の登録</h2>
         <div class="form-grid">
@@ -73,7 +73,7 @@
                         <td>@judgment.JudgedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
                         <td>@(judgment.ApprovedAt is null ? "未承認" : "承認済")</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityAssurance}")" Context="qa">
+                            <AuthorizeView Roles="@MesRoleGroups.QaManage" Context="qa">
                                 @if (judgment.ApprovedAt is null)
                                 {
                                     <button class="btn btn-sm" disabled="@_busy"

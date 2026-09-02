@@ -93,7 +93,7 @@ public class ManufacturingOrdersController(
 
     /// <summary>指図登録（A-20-10-01 手動登録、B-10-10-04 突発、B-70-10-01 リワーク）</summary>
     [HttpPost]
-    [Authorize(Roles = RoleGroups.ProductionManage)]
+    [Authorize(Roles = MesRoleGroups.ProductionManage)]
     public async Task<ActionResult<ManufacturingOrderResponse>> Create(
         CreateManufacturingOrderRequest request, CancellationToken ct)
     {
@@ -142,7 +142,7 @@ public class ManufacturingOrdersController(
 
     /// <summary>指図変更（A-20-20-02。承認済みの指図を変更すると未承認に戻り再承認が必要）</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.ProductionManage)]
+    [Authorize(Roles = MesRoleGroups.ProductionManage)]
     public async Task<ActionResult<ManufacturingOrderResponse>> Update(
         int id, UpdateManufacturingOrderRequest request, CancellationToken ct)
     {
@@ -179,7 +179,7 @@ public class ManufacturingOrdersController(
 
     /// <summary>指図承認（A-20-20-01。単段階承認：Spec.md 3.9）</summary>
     [HttpPost("{id:int}/approve")]
-    [Authorize(Roles = RoleGroups.ProductionManage)]
+    [Authorize(Roles = MesRoleGroups.ProductionManage)]
     public async Task<ActionResult<ManufacturingOrderResponse>> Approve(int id, CancellationToken ct)
     {
         var order = await db.ManufacturingOrders.Include(o => o.Product).Include(o => o.OutputLot)
@@ -205,7 +205,7 @@ public class ManufacturingOrdersController(
 
     /// <summary>指図取消（A-20-20-02。取消時は未完了の作業指示も取消する）</summary>
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleGroups.ProductionManage)]
+    [Authorize(Roles = MesRoleGroups.ProductionManage)]
     public async Task<ActionResult<ManufacturingOrderResponse>> Cancel(int id, CancellationToken ct)
     {
         var order = await db.ManufacturingOrders
@@ -240,7 +240,7 @@ public class ManufacturingOrdersController(
     /// 自動＝品目コード-日付-連番、または手入力）。承認済みの指図のみ展開できる。
     /// </summary>
     [HttpPost("{id:int}/expand")]
-    [Authorize(Roles = RoleGroups.ProductionManage)]
+    [Authorize(Roles = MesRoleGroups.ProductionManage)]
     public async Task<ActionResult<ManufacturingOrderDetailResponse>> Expand(
         int id, ExpandRequest request, CancellationToken ct)
     {

@@ -48,7 +48,7 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenanceProcedureResponse>> Create(
         MaintenanceProcedureRequest request, CancellationToken ct)
     {
@@ -78,7 +78,7 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenanceProcedureResponse>> Update(
         int id, MaintenanceProcedureRequest request, CancellationToken ct)
     {
@@ -110,7 +110,7 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var procedure = await db.MaintenanceProcedures.FindAsync([id], ct);

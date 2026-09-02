@@ -36,7 +36,7 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<LocationResponse>> Create(LocationRequest request, CancellationToken ct)
     {
         if (await db.Locations.AnyAsync(l => l.Code == request.Code, ct))
@@ -53,7 +53,7 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<LocationResponse>> Update(int id, LocationRequest request, CancellationToken ct)
     {
         var l = await db.Locations.FindAsync([id], ct);
@@ -75,7 +75,7 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var l = await db.Locations.FindAsync([id], ct);

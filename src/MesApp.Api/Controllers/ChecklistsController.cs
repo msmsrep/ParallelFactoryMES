@@ -35,7 +35,7 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ChecklistResponse>> Create(ChecklistRequest request, CancellationToken ct)
     {
         if (await db.Checklists.AnyAsync(c => c.Code == request.Code, ct))
@@ -65,7 +65,7 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
 
     /// <summary>チェックリストの更新（項目は一括置換）</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ChecklistResponse>> Update(int id, ChecklistRequest request, CancellationToken ct)
     {
         var c = await db.Checklists.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -95,7 +95,7 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var c = await db.Checklists.FindAsync([id], ct);

@@ -23,7 +23,7 @@ public class ProductionRecordsController(
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.ProductionManage)]
+    [Authorize(Roles = MesRoleGroups.ProductionManage)]
     public async Task<ActionResult<ProductionRecordResponse>> Correct(
         int id, ProductionRecordCorrectionRequest request, CancellationToken ct)
     {

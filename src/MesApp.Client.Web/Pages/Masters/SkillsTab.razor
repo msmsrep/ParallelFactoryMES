@@ -3,7 +3,7 @@
 @* スキル・資格マスタ（Spec.md 5.1 SkillMaster。F-20-10-01） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@MesRoles.SystemAdmin">
+<AuthorizeView Roles="@MesRoleGroups.UserAdmin">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "スキル・資格の登録" : $"編集（{_code}）")</h2>
         <div class="form-grid">
@@ -60,7 +60,7 @@
                         <td>@(item.RequiresExpiry ? "要" : "不要")</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@MesRoles.SystemAdmin" Context="admin">
+                            <AuthorizeView Roles="@MesRoleGroups.UserAdmin" Context="admin">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
                                 @if (item.IsActive)
                                 {

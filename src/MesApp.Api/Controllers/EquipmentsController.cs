@@ -34,7 +34,7 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<EquipmentResponse>> Create(EquipmentRequest request, CancellationToken ct)
     {
         if (await db.Equipments.AnyAsync(e => e.AssetNo == request.AssetNo, ct))
@@ -59,7 +59,7 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<EquipmentResponse>> Update(int id, EquipmentRequest request, CancellationToken ct)
     {
         var e = await db.Equipments.FindAsync([id], ct);
@@ -85,7 +85,7 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var e = await db.Equipments.FindAsync([id], ct);

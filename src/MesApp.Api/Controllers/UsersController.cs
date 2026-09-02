@@ -18,7 +18,7 @@ namespace MesApp.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/users")]
-[Authorize(Roles = RoleGroups.UserAdmin)]
+[Authorize(Roles = MesRoleGroups.UserAdmin)]
 public class UsersController(
     UserManager<AppUser> userManager,
     MesAppDbContext db,

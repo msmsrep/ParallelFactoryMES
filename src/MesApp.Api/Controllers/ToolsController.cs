@@ -34,7 +34,7 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ToolResponse>> Create(ToolRequest request, CancellationToken ct)
     {
         if (await db.Tools.AnyAsync(t => t.Code == request.Code, ct))
@@ -58,7 +58,7 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ToolResponse>> Update(int id, ToolRequest request, CancellationToken ct)
     {
         var t = await db.Tools.FindAsync([id], ct);
@@ -83,7 +83,7 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var t = await db.Tools.FindAsync([id], ct);

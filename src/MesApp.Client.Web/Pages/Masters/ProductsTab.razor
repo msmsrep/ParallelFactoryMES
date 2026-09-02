@@ -3,7 +3,7 @@
 @* 品目マスタ＋MBOM＋工順（BOP）（Spec.md 5.1、A-40-10／A-40-20） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "品目の登録" : $"品目の編集（{_code}）")</h2>
         <div class="form-grid">
@@ -71,7 +71,7 @@
                         <td>@(product.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
                             <button class="btn btn-secondary btn-sm" @onclick="() => SelectAsync(product)">MBOM・工順</button>
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(product)">編集</button>
                                 @if (product.IsActive)
                                 {
@@ -107,7 +107,7 @@
                 }
             </tbody>
         </table>
-        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="bom">
+        <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="bom">
             <div class="form-grid">
                 <div class="form-field">
                     <label>子品目</label>
@@ -173,7 +173,7 @@
                 }
             </tbody>
         </table>
-        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="routing">
+        <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="routing">
             <div class="form-grid">
                 <div class="form-field">
                     <label>工程順序</label>

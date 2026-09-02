@@ -43,7 +43,7 @@ public class StocktakesController(
 
     /// <summary>棚卸指示の作成（D-50-10-01。現在庫（数量>0）のスナップショットを明細化）</summary>
     [HttpPost]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<StocktakeResponse>> Create(StocktakeCreateRequest request, CancellationToken ct)
     {
         if (request.TargetLocationId is int locationId
@@ -86,7 +86,7 @@ public class StocktakesController(
 
     /// <summary>実棚数の登録（D-50-10-02。部分登録可・上書き可）</summary>
     [HttpPut("{id:int}/counts")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<StocktakeResponse>> RegisterCounts(
         int id, StocktakeCountRequest request, CancellationToken ct)
     {
@@ -119,7 +119,7 @@ public class StocktakesController(
     /// 棚卸確定（D-50-10-05）。実棚入力済みの明細について現在庫との差異を棚卸調整で反映する（D-50-10-04）。
     /// </summary>
     [HttpPost("{id:int}/finalize")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<StocktakeResponse>> Finalize(int id, CancellationToken ct)
     {
         var stocktake = await db.Stocktakes
@@ -177,7 +177,7 @@ public class StocktakesController(
     }
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<StocktakeResponse>> Cancel(int id, CancellationToken ct)
     {
         var stocktake = await db.Stocktakes.FindAsync([id], ct);

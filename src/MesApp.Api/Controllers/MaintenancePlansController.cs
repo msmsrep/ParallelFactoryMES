@@ -52,7 +52,7 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenancePlanResponse>> Create(
         MaintenancePlanRequest request, CancellationToken ct)
     {
@@ -81,7 +81,7 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
 
     /// <summary>計画の変更（E-30-10-03。指示発行前のみ）</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenancePlanResponse>> Update(
         int id, MaintenancePlanRequest request, CancellationToken ct)
     {
@@ -111,7 +111,7 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
     }
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenancePlanResponse>> Cancel(int id, CancellationToken ct)
     {
         var plan = await db.MaintenancePlans.FindAsync([id], ct);

@@ -37,7 +37,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.UserAdmin)]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<SkillResponse>> Create(SkillRequest request, CancellationToken ct)
     {
         if (await db.Skills.AnyAsync(s => s.Code == request.Code, ct))
@@ -60,7 +60,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.UserAdmin)]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<SkillResponse>> Update(int id, SkillRequest request, CancellationToken ct)
     {
         var s = await db.Skills.FindAsync([id], ct);
@@ -83,7 +83,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.UserAdmin)]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var s = await db.Skills.FindAsync([id], ct);

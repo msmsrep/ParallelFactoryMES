@@ -3,7 +3,7 @@
 @* チェックリストマスタ（Spec.md 5.1 Checklist。B-30-10。HSE項目はカテゴリHseで登録 G-20/G-30） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "チェックリストの登録" : $"編集（{_code}）")</h2>
         <div class="form-grid">
@@ -91,7 +91,7 @@
                         <td>@checklist.Items.Count</td>
                         <td>@(checklist.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(checklist)">編集</button>
                                 @if (checklist.IsActive)
                                 {

@@ -1,7 +1,7 @@
 @inject HttpClient Http
 
 @* ユーザー/工場従業員管理（F-10-10）とスキル・資格の割当（F-20-10-02〜05）。システム管理者専用 *@
-<AuthorizeView Roles="@MesRoles.SystemAdmin">
+<AuthorizeView Roles="@MesRoleGroups.UserAdmin">
     <NotAuthorized>
         <div class="card">
             <p class="text-muted">ユーザー管理はシステム管理者のみ利用できます。</p>
@@ -63,9 +63,9 @@
         </div>
 
         <CsvIoPanel Kind="users" Label="ユーザー" KeyLabel="ユーザー名"
-                    Roles="@MesRoles.SystemAdmin" OnImported="LoadAsync" />
+                    Roles="@MesRoleGroups.UserAdmin" OnImported="LoadAsync" />
         <CsvIoPanel Kind="user-skills" Label="ユーザーのスキル・資格" KeyLabel="ユーザー名＋スキル・資格コード"
-                    Roles="@MesRoles.SystemAdmin" OnImported="ReloadSkillsAsync" />
+                    Roles="@MesRoleGroups.UserAdmin" OnImported="ReloadSkillsAsync" />
 
         <div class="card">
             @if (_users is null)

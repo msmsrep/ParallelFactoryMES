@@ -56,7 +56,7 @@ public class PickingOrdersController(
 
     /// <summary>ピッキング指示の作成（払出先＝作業指示または出荷指示。FEFOで自動引当）</summary>
     [HttpPost]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<PickingOrderResponse>> Create(
         PickingOrderCreateRequest request, CancellationToken ct)
     {
@@ -116,7 +116,7 @@ public class PickingOrdersController(
 
     /// <summary>ピッキング実行・払出（D-20-20-01〜02。在庫を引き落として完了にする）</summary>
     [HttpPost("{id:int}/execute")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<PickingOrderResponse>> Execute(int id, CancellationToken ct)
     {
         var order = await db.PickingOrders
@@ -161,7 +161,7 @@ public class PickingOrdersController(
     }
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleGroups.InventoryManage)]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<PickingOrderResponse>> Cancel(int id, CancellationToken ct)
     {
         var order = await db.PickingOrders.FindAsync([id], ct);

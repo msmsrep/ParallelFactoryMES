@@ -1,17 +1,18 @@
 using System.Security.Claims;
-using MesApp.Core.Constants;
 
-namespace MesApp.Api;
+namespace MesApp.Core.Constants;
 
 /// <summary>
 /// エンドポイント用のロールグループ（Spec.md 7.4：RBACはAPI側で一元判定）。
-/// 参照系は認証済みユーザー全員に開放し、更新系のみロールで絞る。
+/// APIの<c>[Authorize(Roles = ...)]</c>と画面の<c>&lt;AuthorizeView Roles="..."&gt;</c>で同じ定義を使うためCoreに置く
+/// （別々に書くと、片方だけ直したときに画面と実際の権限がずれる）。
+/// <para>参照系は認証済みユーザー全員に開放し、更新系のみロールで絞る。</para>
 /// <para>
 /// 例外として、<b>異常や使用実績の記録は絞らない</b>（設備稼働報告・治工具使用実績・保全依頼・不適合報告）。
 /// 気づいた人がその場で上げられることを優先する。絞ると報告が落ち、記録が残らないほうが害が大きい。
 /// </para>
 /// </summary>
-public static class RoleGroups
+public static class MesRoleGroups
 {
     /// <summary>マスタ更新（マスタ管理は生産管理担当者とシステム管理者）</summary>
     public const string MasterWrite = $"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}";

@@ -9,7 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")">
+<AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
     <h2 style="margin-top:0;">出荷指示の作成</h2>
     <div class="form-grid">
@@ -83,7 +83,7 @@
                         <a class="btn btn-secondary btn-sm" href="print/shipping/@order.Id" target="_blank">出荷伝票</a>
                         @if (order.Status == ShippingOrderStatus.Instructed)
                         {
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")" Context="inventoryWrite">
+                            <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="inventoryWrite">
                                 <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
                             </AuthorizeView>
                         }
@@ -105,7 +105,7 @@
                 </table>
                 <Pager TItem="ShippingOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
 
-                <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")" Context="shipWrite">
+                <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="shipWrite">
                 @if (order.Status == ShippingOrderStatus.Instructed)
                 {
                     <h2>出荷実行（ロット指定）</h2>

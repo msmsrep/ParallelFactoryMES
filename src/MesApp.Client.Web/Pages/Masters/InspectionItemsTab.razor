@@ -3,7 +3,7 @@
 @* 検査項目・基準マスタ（Spec.md 5.1 InspectionItem。C-10-10。更新で版数が上がる） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "検査項目・基準の登録" : $"編集（{_code}）")</h2>
         <div class="form-grid">
@@ -101,7 +101,7 @@
                         <td>@(item.SamplingCount?.ToString() ?? "-")</td>
                         <td>v@(item.Version)</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
                                 @if (item.IsActive)
                                 {

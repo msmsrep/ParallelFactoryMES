@@ -3,7 +3,7 @@
 @* 設備台帳/BOE（Spec.md 5.1 Equipment。E-10-10、I-10-20：保全タイプ・閾値・保全部品を含む） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "設備の登録" : $"設備の編集（{_assetNo}）")</h2>
         <div class="form-grid">
@@ -81,7 +81,7 @@
                         <td>@(item.MaintenanceThreshold?.ToString() ?? "-")</td>
                         <td>@(item.MaintenanceParts ?? "-")</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
                                 @if (item.IsActive)
                                 {

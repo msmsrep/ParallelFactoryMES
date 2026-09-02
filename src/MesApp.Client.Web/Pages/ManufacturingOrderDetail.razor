@@ -44,7 +44,7 @@ else
             </tbody>
         </table>
 
-        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+        <AuthorizeView Roles="@MesRoleGroups.ProductionManage">
             <div class="actions mt-2">
                 @if (order.Status == ManufacturingOrderStatus.Draft)
                 {

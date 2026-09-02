@@ -106,7 +106,7 @@
     [Parameter] public string KeyLabel { get; set; } = "コード";
 
     /// <summary>取込を実行できるロール</summary>
-    [Parameter] public string Roles { get; set; } = $"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}";
+    [Parameter] public string Roles { get; set; } = MesRoleGroups.MasterWrite;
 
     /// <summary>取込成功後に一覧を再読み込みするためのコールバック</summary>
     [Parameter] public EventCallback OnImported { get; set; }

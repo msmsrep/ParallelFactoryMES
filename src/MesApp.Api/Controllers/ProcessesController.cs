@@ -36,7 +36,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ProcessResponse>> Create(ProcessRequest request, CancellationToken ct)
     {
         if (await db.Processes.AnyAsync(p => p.Code == request.Code, ct))
@@ -53,7 +53,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ProcessResponse>> Update(int id, ProcessRequest request, CancellationToken ct)
     {
         var p = await db.Processes.FindAsync([id], ct);
@@ -75,7 +75,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var p = await db.Processes.FindAsync([id], ct);

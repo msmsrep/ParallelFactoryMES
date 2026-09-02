@@ -9,7 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")">
+<AuthorizeView Roles="@MesRoleGroups.QualityManage">
     <div class="card">
         <h2 style="margin-top:0;">検査指示の発行（C-20-10-02）</h2>
         <div class="form-grid">

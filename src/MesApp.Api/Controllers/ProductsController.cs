@@ -60,7 +60,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ProductResponse>> Create(ProductRequest request, CancellationToken ct)
     {
         if (await db.Products.AnyAsync(p => p.Code == request.Code, ct))
@@ -85,7 +85,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ProductResponse>> Update(int id, ProductRequest request, CancellationToken ct)
     {
         var product = await db.Products.FindAsync([id], ct);
@@ -112,7 +112,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var product = await db.Products.FindAsync([id], ct);
@@ -148,7 +148,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
 
     /// <summary>MBOM明細の一括置換（設計変更 A-40-10-05 も本APIで反映）</summary>
     [HttpPut("{id:int}/bom")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<List<BomItemResponse>>> ReplaceBom(
         int id, List<BomItemRequest> items, CancellationToken ct)
     {
@@ -212,7 +212,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
 
     /// <summary>工順（BOP）の一括置換（工程変更 A-40-20-03、I-50-30 も本APIで反映）</summary>
     [HttpPut("{id:int}/routing")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<List<RoutingStepResponse>>> ReplaceRouting(
         int id, List<RoutingStepRequest> steps, CancellationToken ct)
     {

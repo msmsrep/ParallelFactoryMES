@@ -104,7 +104,7 @@ public class NonconformanceController(
     /// リワーク→リワーク指図の自動起票（対象ロットの由来指図が特定できる場合）、特採→承認待ち。
     /// </summary>
     [HttpPost("{id:int}/instruct")]
-    [Authorize(Roles = RoleGroups.QualityManage)]
+    [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<NonconformanceResponse>> InstructAction(
         int id, NonconformanceActionRequest request, CancellationToken ct)
     {
@@ -199,7 +199,7 @@ public class NonconformanceController(
     /// 逸脱承認・特別採用の承認（C-30-20-03）。特採の場合は対象ロットを正常へ戻し次工程進行を許可する。
     /// </summary>
     [HttpPost("{id:int}/approve")]
-    [Authorize(Roles = RoleGroups.QualityManage)]
+    [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<NonconformanceResponse>> Approve(int id, CancellationToken ct)
     {
         var report = await db.NonconformanceReports.Include(n => n.Lot)

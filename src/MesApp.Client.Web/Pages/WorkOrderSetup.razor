@@ -41,7 +41,7 @@ else
                 <input @bind="_abnormality" placeholder="異常があれば記入" />
             </div>
         </div>
-        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Operator}")">
+        <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord">
             <button class="btn" disabled="@_busy" @onclick="AddSetupAsync">段取り実績を記録</button>
         </AuthorizeView>
 
@@ -104,7 +104,7 @@ else
                     }
                 </tbody>
             </table>
-            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Operator}")" Context="checklistWrite">
+            <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="checklistWrite">
                 <button class="btn mt-2" disabled="@_busy" @onclick="SubmitChecklistAsync">チェックリストを記録</button>
             </AuthorizeView>
         }

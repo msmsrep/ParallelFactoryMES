@@ -48,7 +48,7 @@ public class WorkTimeRecordsController(MesAppDbContext db) : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.ShopFloorRecord)]
+    [Authorize(Roles = MesRoleGroups.ShopFloorRecord)]
     public async Task<ActionResult<WorkTimeResponse>> Create(WorkTimeRequest request, CancellationToken ct)
     {
         if (request.Type == WorkTimeType.Direct && request.WorkOrderId is null)

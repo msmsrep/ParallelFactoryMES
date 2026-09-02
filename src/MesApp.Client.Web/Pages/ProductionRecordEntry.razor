@@ -159,7 +159,7 @@ else
         </table>
     }
 
-    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+    <AuthorizeView Roles="@MesRoleGroups.ProductionManage">
         @if (_workOrder.Status == WorkOrderStatus.Completed)
         {
             <div class="card">

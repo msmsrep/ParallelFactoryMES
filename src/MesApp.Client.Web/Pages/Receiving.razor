@@ -9,7 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")">
+<AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
     <h2 style="margin-top:0;">受入登録</h2>
     <div class="form-grid">
@@ -80,7 +80,7 @@
                         <td>@(stock.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
                         <td class="actions">
                             <a class="btn btn-secondary btn-sm" href="print/lot/@stock.LotId" target="_blank">現品票</a>
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager},{MesRoles.Logistics}")" Context="inventoryWrite">
+                            <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="inventoryWrite">
                                 <button class="btn btn-danger btn-sm" disabled="@_busy"
                                         @onclick="() => CancelAsync(stock.LotId)">受入取消</button>
                             </AuthorizeView>

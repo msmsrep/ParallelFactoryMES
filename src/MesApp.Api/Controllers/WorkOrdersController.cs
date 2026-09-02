@@ -136,7 +136,7 @@ public class WorkOrdersController(
     /// スキル未保有・期限切れなら割当を拒否する（F-20-30-01）。着手済み以降は変更不可。
     /// </summary>
     [HttpPut("{id:int}/dispatch")]
-    [Authorize(Roles = RoleGroups.ProductionManage)]
+    [Authorize(Roles = MesRoleGroups.ProductionManage)]
     public async Task<ActionResult<WorkOrderResponse>> Dispatch(int id, DispatchRequest request, CancellationToken ct)
     {
         var workOrder = await BaseQuery(track: true).FirstOrDefaultAsync(w => w.Id == id, ct);

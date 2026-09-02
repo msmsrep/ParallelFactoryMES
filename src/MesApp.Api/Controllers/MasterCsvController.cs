@@ -31,7 +31,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         {
             return NotFound(new ProblemDetails { Title = $"CSV出力に対応していないマスタです：{kind}" });
         }
-        if (info.UserAdminOnly && !RoleGroups.IsInGroup(User, RoleGroups.UserAdmin))
+        if (info.UserAdminOnly && !MesRoleGroups.IsInGroup(User, MesRoleGroups.UserAdmin))
         {
             return Forbid();
         }
@@ -101,7 +101,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
 
     /// <summary>ユーザー系はユーザー管理権限、それ以外はマスタ更新権限（組み合わせはRoleGroupsが持つ）</summary>
     private bool CanWrite(CsvKindInfo kind) =>
-        RoleGroups.IsInGroup(User, kind.UserAdminOnly ? RoleGroups.UserAdmin : RoleGroups.MasterWrite);
+        MesRoleGroups.IsInGroup(User, kind.UserAdminOnly ? MesRoleGroups.UserAdmin : MesRoleGroups.MasterWrite);
 
     /// <summary>Excelでそのまま開けるようUTF-8 BOM付きで返す</summary>
     private FileContentResult CsvFileResult(string csv, string fileName) =>

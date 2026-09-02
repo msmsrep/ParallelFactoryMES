@@ -69,7 +69,7 @@
                         </td>
                         <td><StatusBadge Status="@workOrder.Status.ToString()" /></td>
                         <td>
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+                            <AuthorizeView Roles="@MesRoleGroups.ProductionManage">
                                 <button class="btn btn-sm" disabled="@_busy"
                                         @onclick="() => DispatchAsync(workOrder)">割当</button>
                             </AuthorizeView>
