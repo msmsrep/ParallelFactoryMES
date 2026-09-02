@@ -291,6 +291,39 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task 実績は分割して報告でき産出数と部材消費が積み上がる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var materialLot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var finalWo = order.WorkOrders[1];
+
+        // 1回目：良品4 → 部材消費 2 × 4 = 8
+        var first = await admin.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(4m, 0m, DateTimeOffset.Now.AddHours(-2), DateTimeOffset.Now.AddHours(-1),
+                ctx.ProductLocationId, Backflush: true));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        // 2回目：完了状態でも受け付ける（分割報告）。部材消費 2 × 6 = 12 が追加で走る
+        var second = await admin.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(6m, 0m, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now,
+                ctx.ProductLocationId, Backflush: true));
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        var records = await admin.GetFromJsonAsync<List<ProductionRecordResponse>>(
+            $"/api/work-orders/{finalWo.Id}/production-records");
+        Assert.Equal(2, records!.Count);
+        Assert.Equal(10m, records.Sum(r => r.GoodQuantity));
+
+        // 部材は合計20消費され、完成品は10計上される
+        Assert.Equal(80m, await Phase3TestData.GetStockQuantityAsync(admin, materialLot.Id));
+        var outputLotId = records.Select(r => r.OutputLotId).First(id => id is not null)!.Value;
+        Assert.Equal(10m, await Phase3TestData.GetStockQuantityAsync(admin, outputLotId));
+    }
+
+    [Fact]
     public async Task 部材在庫が不足するとバックフラッシュは失敗する()
     {
         using var factory = new ApiFactory();

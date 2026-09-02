@@ -304,6 +304,12 @@ public class WorkOrderExecutionController(
     /// <summary>
     /// 実績入力。作業指示は完了状態になる（B-30-30-06）。最終工程の実績では産出ロットへ在庫計上
     /// （outputLocationId必須）。backflush=trueでMBOM×(良品+不良)の部材を先入れ先出しで自動消費。
+    /// <para>
+    /// <b>同じ作業指示に対して複数回呼べる（分割報告）。</b>1回の指示を数回に分けて報告する運用を想定しており、
+    /// 完了状態でも受け付ける（拒否するのは承認済み・取消のみ）。呼ぶたびに実績が1件増え、
+    /// 産出ロットの数量はその都度加算される。<b>backflushも呼ぶたびに走る</b>ため、
+    /// 報告した数量ぶんの部材が都度消費される（同じ数量を二重に報告すれば部材も二重に減る）。
+    /// </para>
     /// </summary>
     [HttpPost("production-records")]
     public async Task<ActionResult<ProductionRecordResponse>> AddProductionRecord(

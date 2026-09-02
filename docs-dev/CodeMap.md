@@ -110,4 +110,4 @@
 | 静的配信（WASMをAPIが配信） | `Api/MesAppHost.cs`（`UseStaticWebAssets` / `UseBlazorFrameworkFiles`） | Spec.md 2.1。`Tests/StaticHostingTests.cs` |
 | データ保存先（DB・署名鍵） | `Infra/MesAppDataDirectory.cs` | Spec.md 4章。相対パスは `%LOCALAPPDATA%\ParallelFactoryMES` 基準に解決。環境変数 `MESAPP_DATA_DIR` で変更可 |
 | デスクトップ配布（MSIX） | `src/MesApp.Desktop/`（`Program.cs` / `MainForm.cs` / `Package.appxmanifest` / `Assets/`）<br>`build/Pack-Msix.ps1` / `New-MsixAssets.ps1` / `msix-identity.json` | Spec.md 7.8。手順は `docs-dev/MsixRelease.md`。業務ロジックは持たない（Kestrel起動＋WebView2表示のみ） |
-| テスト基盤 | `Tests/ApiFactory.cs`（一時SQLite）/ `TestAuth.cs` / `Phase3TestData.cs` | 新しいテスト基盤は作らない |
+| テスト基盤 | `Tests/ApiFactory.cs`（一時SQLite）/ `TestAuth.cs` / `Phase3TestData.cs`<br>`tests/MesApp.Client.Web.Tests/`（bUnit。`LayoutTests.cs`） | APIテストの基盤は増やさない。bUnit側は**全画面に効く横断的な振る舞いだけ**（`MainLayout` の初期パスワード誘導・`ErrorBoundary`）。画面ごとのテストは作らない |

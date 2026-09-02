@@ -14,7 +14,7 @@ dotnet build ParallelFactoryMES.slnx -v q --nologo 2>&1 | Select-String -Pattern
 
 テスト:
 ```powershell
-dotnet test tests/MesApp.Api.Tests -v q --nologo 2>&1 | Select-String -Pattern "error|Failed|Passed!|成功!|失敗|合計" | Select-Object -First 40
+dotnet test ParallelFactoryMES.slnx -v q --nologo 2>&1 | Select-String -Pattern "error|Failed|Passed!|成功!|失敗|合計" | Select-Object -First 40
 ```
 
 失敗時のみ該当クラスを単体で再実行して詳細を取る:
@@ -38,6 +38,7 @@ dotnet ef migrations add <Name> --project src/MesApp.Infrastructure --startup-pr
 | `src/MesApp.Api` | Controllers、業務サービス（`Services/`）、`RoleGroups.cs`、JWT 認証、Blazor WASM の静的配信 |
 | `src/MesApp.Client.Web` | Blazor WASM。`Pages/`、`Pages/Masters/*Tab.razor`、`Shared/` 共通コンポーネント、`Auth/` |
 | `tests/MesApp.Api.Tests` | xUnit + `WebApplicationFactory`。テストごとに一時 SQLite |
+| `tests/MesApp.Client.Web.Tests` | xUnit + bUnit。全画面に効く横断的な振る舞い（`MainLayout` 等）だけを対象にする |
 
 DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用される。
 
@@ -81,6 +82,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 
 - `ApiFactory`（一時ディレクトリ + 一時 SQLite）を使う。既存の `TestAuth` / `Phase3TestData` を再利用する
 - 領域ごとに既存クラス（`MasterTests` / `ProductionTests` / `InventoryTests` / `QualityTests` / `MaintenanceTests` / `ExecutionTests` / `MasterCsvTests`）へ追加。新しいテスト基盤は作らない
+- **画面のテストは `tests/MesApp.Client.Web.Tests`（bUnit）に置くが、対象は全画面に効く横断的な振る舞いに限る**（`MainLayout` の初期パスワード誘導・`ErrorBoundary` 等）。個別画面の表示・入力はAPIテストと手動確認でカバーし、画面ごとのテストは増やさない
 
 ## 新機能を追加する順序
 
