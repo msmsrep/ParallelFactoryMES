@@ -16,7 +16,10 @@ jwt-signing.key
 # Test results
 TestResults/
 
-.claude
+# Claude Code の設定のうち、端末ごとに増える許可リストだけ除外する
+# （launch.json・settings.json・commands/ は CLAUDE.md が前提にしているのでコミットする）
+.claude/settings.local.json
+
 
 # 第三者著作物（一財）エンジニアリング協会『MES/MOM導入のための標準業務一覧』
 # 著作権はENAAに帰属するため公開リポジトリには含めない
