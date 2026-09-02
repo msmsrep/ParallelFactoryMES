@@ -14,13 +14,11 @@
     <div class="form-grid">
         <div class="form-field">
             <label>品目</label>
-            <select @bind="_form.ProductId">
-                <option value="0">選択してください</option>
-                @foreach (var product in _products)
-                {
-                    <option value="@product.Id">@product.Code @product.Name</option>
-                }
-            </select>
+            <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                          @bind-Value="_form.ProductId"
+                          EmptyLabel="選択してください"
+                          ValueOf="p => p.Id"
+                          LabelOf='@(p => $"{p.Code} {p.Name}")' />
         </div>
         <div class="form-field">
             <label>数量</label>
@@ -103,7 +101,6 @@
     }
 
     private readonly ReceivingForm _form = new();
-    private List<ProductResponse> _products = [];
     private List<LocationResponse> _locations = [];
     private PagedResult<StockResponse>? _stocks;
     private string? _error;
@@ -112,7 +109,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
         _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
         await LoadAsync();
     }

@@ -142,13 +142,11 @@ else if (_tab == "ops")
             </div>
             <div class="form-field">
                 <label>振替先品目（品目振替時）</label>
-                <select @bind="_op.NewProductId">
-                    <option value="0">同一品目</option>
-                    @foreach (var product in _products)
-                    {
-                        <option value="@product.Id">@product.Code @product.Name</option>
-                    }
-                </select>
+                <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                              @bind-Value="_op.NewProductId"
+                              EmptyLabel="同一品目"
+                              ValueOf="p => p.Id"
+                              LabelOf='@(p => $"{p.Code} {p.Name}")' />
             </div>
             <div class="form-field">
                 <label>統合先ロット（統合時）</label>
@@ -292,7 +290,6 @@ else
     private List<StockResponse>? _expiring;
     private PagedResult<TransactionResponse>? _transactions;
     private List<LocationResponse> _locations = [];
-    private List<ProductResponse> _products = [];
     private readonly OpForm _op = new();
     private string? _searchLot;
     private int _filterLocationId;
@@ -304,7 +301,6 @@ else
     protected override async Task OnInitializedAsync()
     {
         _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
-        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
         await LoadStocksAsync();
     }
 
