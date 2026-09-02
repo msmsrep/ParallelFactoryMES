@@ -88,9 +88,12 @@ internal sealed class MainForm : Form
             if (initialCredentials is not null)
             {
                 StartupLog.Write("初期管理者が未ログインのため資格情報を画面に案内します");
+                var note = initialCredentials.RegeneratesOnRestart
+                    ? "（ログイン後にパスワードの変更を求められます。変更するまでは、起動のたびに新しいパスワードになります）"
+                    : "（ログイン後にパスワードの変更を求められます）";
                 _initialCredentials.Text =
                     $"初回ログイン　ユーザー名: {initialCredentials.UserName}　パスワード: {initialCredentials.Password}"
-                    + "\n（ログイン後にパスワードの変更を求められます。変更するとこの案内は消えます）";
+                    + "\n" + note;
                 _initialCredentials.Visible = true;
             }
 
@@ -167,11 +170,43 @@ internal sealed class MainForm : Form
             OpenInDefaultBrowser(e.Uri);
         };
 
+        // パスワード変更が済んだら案内を消す。変更後はログイン画面へ遷移する（SPA内の遷移）ため、
+        // 画面遷移のたびに変更済みかを確認し、不要になった時点で購読をやめる
+        if (_initialCredentials.Visible)
+        {
+            _webView.CoreWebView2.HistoryChanged += OnHistoryChanged;
+        }
+
         _webView.CoreWebView2.Navigate(address);
 
         _status.Visible = false;
         _webView.Visible = true;
         _webView.Focus();
+    }
+
+    /// <summary>初回ログイン案内の要否を確認し、不要になっていれば消す</summary>
+    private async void OnHistoryChanged(object? sender, object e)
+    {
+        if (!_initialCredentials.Visible || _app is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (await IdentitySeeder.IsInitialPasswordPendingAsync(_app.Services, _app.Configuration))
+            {
+                return;
+            }
+            StartupLog.Write("初期パスワードが変更されたため案内を消します");
+            _initialCredentials.Visible = false;
+            _webView.CoreWebView2.HistoryChanged -= OnHistoryChanged;
+        }
+        catch (Exception ex)
+        {
+            // 案内の表示制御でアプリを落とさない
+            StartupLog.WriteException("初回ログイン案内の更新に失敗", ex);
+        }
     }
 
     private void SetStatus(string message)

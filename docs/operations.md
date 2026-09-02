@@ -57,6 +57,7 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 | リフレッシュトークン有効期限（時間） | `Jwt__RefreshTokenLifetimeHours` | `12` |
 | JWT署名鍵ファイル | `Jwt__SigningKeyFile` | `jwt-signing.key`（未存在なら自動生成） |
 | 初期管理者の自動作成 | `MesAdmin__UserName` / `MesAdmin__Password` / `MesAdmin__DisplayName` | 未設定 |
+| 初期パスワードの自動生成 | `MesAdmin__GeneratePassword` | `false`（デスクトップ版のみ `true`） |
 
 ### 業務日付の境界時刻
 
@@ -67,11 +68,15 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 ### 無人セットアップ
 
 初期管理者を画面操作なしで作成する場合の例です。**ユーザーが0件のときのみ適用され**、
-初回ログイン時にパスワード変更が強制されます。
+初回ログイン時にパスワード変更が強制されます（変更するまで、パスワード変更以外のAPIは使えません）。
 
 ```powershell
 $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet publish/MesApp.Api.dll
 ```
+
+`MesAdmin__Password` を指定しない場合、初期管理者は作成されません（値を誰も知らない
+アカウントを残さないため）。パスワードを画面に表示できるデスクトップ版のみ、
+`MesAdmin__GeneratePassword=true` による自動生成を使います。
 
 ## セキュリティ
 

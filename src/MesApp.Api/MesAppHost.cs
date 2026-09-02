@@ -138,7 +138,6 @@ public static class MesAppHost
     public static async Task<InitialCredentials?> InitializeAsync(WebApplication app)
     {
         await app.Services.InitializeDatabaseAsync();
-        await IdentitySeeder.SeedAsync(app.Services, app.Configuration);
-        return await IdentitySeeder.GetPendingInitialCredentialsAsync(app.Services, app.Configuration);
+        return await IdentitySeeder.SeedAsync(app.Services, app.Configuration);
     }
 }
