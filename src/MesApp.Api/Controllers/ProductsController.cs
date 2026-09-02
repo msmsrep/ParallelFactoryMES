@@ -1,5 +1,6 @@
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
@@ -32,6 +33,23 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             query = query.Where(p => p.Code.Contains(search) || p.Name.Contains(search));
         }
         return await query.OrderBy(p => p.Code).Select(p => ToResponse(p)).ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// 品目の選択肢（Spec.md 7.5）。品目は他のマスタと違って件数が有界とは言えず、
+    /// 全画面のドロップダウンで全件を読むと初期表示が重くなるため、検索付きの選択肢APIを分ける
+    /// </summary>
+    [HttpGet("options")]
+    public async Task<ActionResult<OptionsResult<ProductResponse>>> Options(
+        [FromQuery] OptionQuery options, CancellationToken ct = default)
+    {
+        var query = db.Products.AsNoTracking().Where(p => p.IsActive);
+        if (options.Keyword is { } keyword)
+        {
+            query = query.Where(p => p.Code.Contains(keyword) || p.Name.Contains(keyword));
+        }
+        return await query.OrderBy(p => p.Code).Select(p => ToResponse(p))
+            .ToOptionsResultAsync(options, ct);
     }
 
     [HttpGet("{id:int}")]

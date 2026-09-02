@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
 
@@ -267,5 +268,45 @@ public class MasterTests
             new UpdateUserRequest(me.DisplayName, [MesRoles.ProductionManager], true));
 
         Assert.Equal(HttpStatusCode.OK, demote.StatusCode);
+    }
+
+    [Fact]
+    public async Task 品目の選択肢APIは検索でき上限超過を知らせる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await admin.PostAsJsonAsync("/api/products",
+                new ProductRequest($"FIND-{i:000}", $"探す品目{i}", "個", null, ProductType.Product, 0m));
+        }
+        await admin.PostAsJsonAsync("/api/products",
+            new ProductRequest("OTHER-001", "別の品目", "個", null, ProductType.Product, 0m));
+
+        var all = await admin.GetFromJsonAsync<OptionsResult<ProductResponse>>("/api/products/options");
+        Assert.Equal(4, all!.Items.Count);
+        Assert.False(all.Truncated);
+
+        // コード・名称の部分一致（スキャンした値をそのまま渡せる）
+        var byCode = await admin.GetFromJsonAsync<OptionsResult<ProductResponse>>(
+            "/api/products/options?q=FIND-");
+        Assert.Equal(3, byCode!.Items.Count);
+        var byName = await admin.GetFromJsonAsync<OptionsResult<ProductResponse>>(
+            "/api/products/options?q=別の");
+        Assert.Equal("OTHER-001", Assert.Single(byName!.Items).Code);
+
+        // 上限を超えたら黙って切らずに知らせる
+        var limited = await admin.GetFromJsonAsync<OptionsResult<ProductResponse>>(
+            "/api/products/options?limit=2");
+        Assert.Equal(2, limited!.Items.Count);
+        Assert.True(limited.Truncated);
+
+        // 無効化した品目は選択肢に出さない
+        var target = byName.Items[0];
+        await admin.DeleteAsync($"/api/products/{target.Id}");
+        var afterDelete = await admin.GetFromJsonAsync<OptionsResult<ProductResponse>>(
+            "/api/products/options?q=別の");
+        Assert.Empty(afterDelete!.Items);
     }
 }
