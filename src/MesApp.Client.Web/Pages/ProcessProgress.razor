@@ -96,7 +96,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_troubles.Count == 0)
+    else if (_troubles.Total == 0)
     {
         <p class="text-muted">該当するトラブル報告はありません。</p>
     }
@@ -107,7 +107,7 @@
                 <tr><th>発生日時</th><th>区分</th><th>対象</th><th>内容</th><th>状態</th><th>対応履歴</th><th>対応記録</th></tr>
             </thead>
             <tbody>
-                @foreach (var trouble in _troubles)
+                @foreach (var trouble in _troubles.Items)
                 {
                     <tr>
                         <td>@trouble.OccurredAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
@@ -133,6 +133,7 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="TroubleReportResponse" Result="_troubles" OnPageChanged="LoadTroublesPageAsync" />
     }
 </div>
 
@@ -153,7 +154,7 @@
 
     private List<WorkOrderResponse>? _workOrders;
     private List<EquipmentResponse> _equipments = [];
-    private List<TroubleReportResponse>? _troubles;
+    private PagedResult<TroubleReportResponse>? _troubles;
     private readonly TroubleForm _form = new();
     private readonly Dictionary<int, ResponseForm> _responses = [];
     private string _statusFilter = string.Empty;
@@ -178,14 +179,16 @@
         return form;
     }
 
-    private async Task LoadTroublesAsync()
+    private Task LoadTroublesAsync() => LoadTroublesPageAsync(1);
+
+    private async Task LoadTroublesPageAsync(int page)
     {
-        var url = "api/trouble-reports";
+        var url = $"api/trouble-reports?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _troubles = await Http.GetFromJsonAsync<List<TroubleReportResponse>>(url);
+        _troubles = await Http.GetFromJsonAsync<PagedResult<TroubleReportResponse>>(url);
     }
 
     private async Task ReportAsync()

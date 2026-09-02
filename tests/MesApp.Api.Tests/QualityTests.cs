@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Quality;
@@ -152,11 +153,11 @@ public class QualityTests
         Assert.Equal(LotStockStatus.Defective, lotInfo!.StockStatus);
 
         // 不適合が自動起票される（発生元＝検査）
-        var nonconformances = await admin.GetFromJsonAsync<List<NonconformanceResponse>>(
+        var nonconformances = await admin.GetFromJsonAsync<PagedResult<NonconformanceResponse>>(
             "/api/nonconformances");
-        Assert.Single(nonconformances!);
-        Assert.Equal(NonconformanceSource.Inspection, nonconformances![0].Source);
-        Assert.Equal(lot.Id, nonconformances[0].LotId);
+        var nonconformance = Assert.Single(nonconformances!.Items);
+        Assert.Equal(NonconformanceSource.Inspection, nonconformance.Source);
+        Assert.Equal(lot.Id, nonconformance.LotId);
     }
 
     [Fact]

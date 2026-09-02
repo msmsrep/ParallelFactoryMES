@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -25,7 +26,8 @@ public class ManufacturingOrdersController(
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<ManufacturingOrderResponse>>> List(
+    public async Task<ActionResult<PagedResult<ManufacturingOrderResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] ManufacturingOrderStatus? status = null,
         [FromQuery] int? productId = null,
         CancellationToken ct = default)
@@ -41,8 +43,8 @@ public class ManufacturingOrdersController(
         {
             query = query.Where(o => o.ProductId == productId);
         }
-        var orders = await query.OrderByDescending(o => o.Id).ToListAsync(ct);
-        return orders.Select(ToResponse).ToList();
+        var orders = await query.OrderByDescending(o => o.Id).ToPagedResultAsync(paging, ct);
+        return orders.Map(ToResponse);
     }
 
     /// <summary>進捗モニタリング（A-30-10-01 指図単位の進捗、A-30-20-01 納期遅延の把握）</summary>

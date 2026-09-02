@@ -1,0 +1,31 @@
+@* 一覧のページ送り。ページング応答（PagedResult）を返すAPIを使う画面に置く *@
+@typeparam TItem
+
+@if (Result is not null && Result.Total > 0)
+{
+    <div class="actions">
+        <span class="text-muted">
+            全 @Result.Total 件中 @FirstIndex〜@LastIndex 件（@Result.Page / @Result.PageCount ページ）
+        </span>
+        <button class="btn btn-secondary" disabled="@(!Result.HasPrevious || Busy)"
+                @onclick="() => GoAsync(Result.Page - 1)">前へ</button>
+        <button class="btn btn-secondary" disabled="@(!Result.HasNext || Busy)"
+                @onclick="() => GoAsync(Result.Page + 1)">次へ</button>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public PagedResult<TItem>? Result { get; set; }
+
+    /// <summary>移動先のページ番号を受け取る（画面側で読み込み直す）</summary>
+    [Parameter, EditorRequired] public EventCallback<int> OnPageChanged { get; set; }
+
+    /// <summary>読み込み中は操作させない</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    private int FirstIndex => Result is null ? 0 : ((Result.Page - 1) * Result.PageSize) + 1;
+
+    private int LastIndex => Result is null ? 0 : Math.Min(Result.Page * Result.PageSize, Result.Total);
+
+    private Task GoAsync(int page) => OnPageChanged.InvokeAsync(page);
+}

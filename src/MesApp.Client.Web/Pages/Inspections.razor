@@ -75,7 +75,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_orders.Count == 0)
+    else if (_orders.Total == 0)
     {
         <p class="text-muted">検査指示はありません。</p>
     }
@@ -86,7 +86,7 @@
                 <tr><th>検査指示番号</th><th>種別</th><th>対象</th><th>状態</th><th>判定</th><th>発行日</th><th></th></tr>
             </thead>
             <tbody>
-                @foreach (var order in _orders)
+                @foreach (var order in _orders.Items)
                 {
                     <tr>
                         <td>@order.OrderNo</td>
@@ -111,11 +111,12 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="InspectionOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
 @code {
-    private List<InspectionOrderResponse>? _orders;
+    private PagedResult<InspectionOrderResponse>? _orders;
     private List<StockResponse> _stocks = [];
     private List<WorkOrderResponse> _workOrders = [];
 
@@ -136,14 +137,16 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        var url = "api/inspection-orders";
+        var url = $"api/inspection-orders?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _orders = await Http.GetFromJsonAsync<List<InspectionOrderResponse>>(url);
+        _orders = await Http.GetFromJsonAsync<PagedResult<InspectionOrderResponse>>(url);
     }
 
     private async Task CreateAsync()

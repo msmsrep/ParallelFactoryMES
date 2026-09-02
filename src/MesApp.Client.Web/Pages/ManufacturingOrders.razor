@@ -80,7 +80,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var order in _orders)
+                @foreach (var order in _orders.Items)
                 {
                     <tr>
                         <td><a href="manufacturing-orders/@order.Id">@order.OrderNo</a></td>
@@ -95,6 +95,7 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="ManufacturingOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
@@ -108,7 +109,7 @@
         public string? Note { get; set; }
     }
 
-    private List<ManufacturingOrderResponse>? _orders;
+    private PagedResult<ManufacturingOrderResponse>? _orders;
     private List<ProductResponse> _products = [];
     private readonly OrderForm _form = new();
     private string _statusFilter = string.Empty;
@@ -121,14 +122,16 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        var url = "api/manufacturing-orders";
+        var url = $"api/manufacturing-orders?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _orders = await Http.GetFromJsonAsync<List<ManufacturingOrderResponse>>(url);
+        _orders = await Http.GetFromJsonAsync<PagedResult<ManufacturingOrderResponse>>(url);
     }
 
     private async Task CreateAsync()

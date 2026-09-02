@@ -111,7 +111,7 @@
 
 <div class="card">
     <h2 style="margin-top:0;">利用実績履歴</h2>
-    @if (_usages is null || _usages.Count == 0)
+    @if (_usages is null || _usages.Total == 0)
     {
         <p class="text-muted">利用実績はありません。</p>
     }
@@ -120,7 +120,7 @@
         <table class="table">
             <thead><tr><th>記録日時</th><th>治工具</th><th>作業指示</th><th>使用回数</th><th>使用時間</th></tr></thead>
             <tbody>
-                @foreach (var usage in _usages)
+                @foreach (var usage in _usages.Items)
                 {
                     <tr>
                         <td>@usage.RecordedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
@@ -132,6 +132,7 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="ToolUsageResponse" Result="_usages" OnPageChanged="LoadUsagesAsync" Busy="@_busy" />
     }
 </div>
 
@@ -139,7 +140,7 @@
     private List<ToolResponse> _tools = [];
     private List<WorkOrderResponse> _workOrders = [];
     private List<ToolLifeStatusRow>? _lifeStatus;
-    private List<ToolUsageResponse>? _usages;
+    private PagedResult<ToolUsageResponse>? _usages;
 
     private int _toolId;
     private int _workOrderId;
@@ -161,8 +162,11 @@
     {
         _lifeStatus = await Http.GetFromJsonAsync<List<ToolLifeStatusRow>>(
             $"api/tool-usages/life-status?alertOnly={_alertOnly.ToString().ToLowerInvariant()}");
-        _usages = await Http.GetFromJsonAsync<List<ToolUsageResponse>>("api/tool-usages");
+        await LoadUsagesAsync(1);
     }
+
+    private async Task LoadUsagesAsync(int page) =>
+        _usages = await Http.GetFromJsonAsync<PagedResult<ToolUsageResponse>>($"api/tool-usages?page={page}");
 
     private async Task RecordUsageAsync()
     {

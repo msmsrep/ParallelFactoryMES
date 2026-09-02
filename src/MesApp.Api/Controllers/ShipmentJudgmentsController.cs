@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -24,7 +25,8 @@ public class ShipmentJudgmentsController(
 {
     /// <summary>出荷判定一覧（H-10-10-01）</summary>
     [HttpGet]
-    public async Task<ActionResult<List<ShipmentJudgmentResponse>>> List(
+    public async Task<ActionResult<PagedResult<ShipmentJudgmentResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] int? shippingOrderId = null, CancellationToken ct = default)
     {
         var query = BaseQuery();
@@ -32,8 +34,8 @@ public class ShipmentJudgmentsController(
         {
             query = query.Where(j => j.ShippingOrderId == shippingOrderId);
         }
-        var judgments = await query.OrderByDescending(j => j.Id).ToListAsync(ct);
-        return judgments.Select(ToResponse).ToList();
+        var judgments = await query.OrderByDescending(j => j.Id).ToPagedResultAsync(paging, ct);
+        return judgments.Map(ToResponse);
     }
 
     /// <summary>出荷判定書データ（H-10-10-04。帳票出力はPhase 7）</summary>

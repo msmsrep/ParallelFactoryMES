@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -24,10 +25,11 @@ public class StocktakesController(
 {
     [HttpGet]
     [Authorize]
-    public async Task<ActionResult<List<StocktakeResponse>>> List(CancellationToken ct)
+    public async Task<ActionResult<PagedResult<StocktakeResponse>>> List(
+        [FromQuery] PageQuery paging, CancellationToken ct = default)
     {
-        var stocktakes = await BaseQuery().OrderByDescending(s => s.Id).ToListAsync(ct);
-        return stocktakes.Select(ToResponse).ToList();
+        var stocktakes = await BaseQuery().OrderByDescending(s => s.Id).ToPagedResultAsync(paging, ct);
+        return stocktakes.Map(ToResponse);
     }
 
     [HttpGet("{id:int}")]

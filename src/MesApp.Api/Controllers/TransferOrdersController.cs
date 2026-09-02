@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -27,7 +28,8 @@ public class TransferOrdersController(
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<TransferOrderResponse>>> List(
+    public async Task<ActionResult<PagedResult<TransferOrderResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] TransferOrderStatus? status = null, CancellationToken ct = default)
     {
         var query = db.TransferOrders.AsNoTracking().AsQueryable();
@@ -37,7 +39,7 @@ public class TransferOrdersController(
         }
         return await query.OrderByDescending(t => t.Id)
             .Select(Projection)
-            .ToListAsync(ct);
+            .ToPagedResultAsync(paging, ct);
     }
 
     [HttpGet("{id:int}")]

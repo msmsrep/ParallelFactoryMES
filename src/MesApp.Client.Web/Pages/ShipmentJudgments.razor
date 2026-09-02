@@ -57,7 +57,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_judgments.Count == 0)
+    else if (_judgments.Total == 0)
     {
         <p class="text-muted">出荷判定はありません。</p>
     }
@@ -68,7 +68,7 @@
                 <tr><th>判定書番号</th><th>対象出荷</th><th>対象ロット</th><th>判定</th><th>判定者</th><th>判定日</th><th>承認</th><th></th></tr>
             </thead>
             <tbody>
-                @foreach (var judgment in _judgments)
+                @foreach (var judgment in _judgments.Items)
                 {
                     <tr>
                         <td>@judgment.JudgmentNo</td>
@@ -92,11 +92,12 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="ShipmentJudgmentResponse" Result="_judgments" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
 @code {
-    private List<ShipmentJudgmentResponse>? _judgments;
+    private PagedResult<ShipmentJudgmentResponse>? _judgments;
     private List<ShippingOrderResponse> _shippingOrders = [];
     private List<StockResponse> _stocks = [];
 
@@ -115,8 +116,11 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync() =>
-        _judgments = await Http.GetFromJsonAsync<List<ShipmentJudgmentResponse>>("api/shipment-judgments");
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page) =>
+        _judgments = await Http.GetFromJsonAsync<PagedResult<ShipmentJudgmentResponse>>(
+            $"api/shipment-judgments?page={page}");
 
     private async Task CreateAsync()
     {

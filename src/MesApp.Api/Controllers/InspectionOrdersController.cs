@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -28,7 +29,8 @@ public class InspectionOrdersController(
 
     /// <summary>検査進捗・ステータス一覧（C-20-10-01 ほか）</summary>
     [HttpGet]
-    public async Task<ActionResult<List<InspectionOrderResponse>>> List(
+    public async Task<ActionResult<PagedResult<InspectionOrderResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] InspectionOrderStatus? status = null,
         [FromQuery] InspectionOrderType? type = null,
         [FromQuery] int? targetLotId = null,
@@ -47,8 +49,8 @@ public class InspectionOrdersController(
         {
             query = query.Where(o => o.TargetLotId == targetLotId);
         }
-        var orders = await query.OrderByDescending(o => o.Id).ToListAsync(ct);
-        return orders.Select(ToResponse).ToList();
+        var orders = await query.OrderByDescending(o => o.Id).ToPagedResultAsync(paging, ct);
+        return orders.Map(ToResponse);
     }
 
     /// <summary>検査指示の詳細（検査成績書 C-20-10-05 のデータソース。帳票出力はPhase 7）</summary>

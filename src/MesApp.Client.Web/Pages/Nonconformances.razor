@@ -70,13 +70,13 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_reports.Count == 0)
+    else if (_reports.Total == 0)
     {
         <p class="text-muted">不適合はありません。</p>
     }
     else
     {
-        @foreach (var report in _reports)
+        @foreach (var report in _reports.Items)
         {
             <div class="card">
                 <div>
@@ -103,6 +103,7 @@
                         <tr><th>対応実績</th><td style="white-space:normal;">@(report.ActionRecord ?? "-")</td></tr>
                     </tbody>
                 </table>
+                <Pager TItem="NonconformanceResponse" Result="_reports" OnPageChanged="LoadPageAsync" />
 
                 <div class="actions mt-2">
                     <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")" Context="qc">
@@ -161,7 +162,7 @@
         public string? Record { get; set; }
     }
 
-    private List<NonconformanceResponse>? _reports;
+    private PagedResult<NonconformanceResponse>? _reports;
     private List<StockResponse> _stocks = [];
     private List<WorkOrderResponse> _workOrders = [];
     private readonly CreateForm _form = new();
@@ -188,14 +189,16 @@
         return form;
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        var url = "api/nonconformances";
+        var url = $"api/nonconformances?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _reports = await Http.GetFromJsonAsync<List<NonconformanceResponse>>(url);
+        _reports = await Http.GetFromJsonAsync<PagedResult<NonconformanceResponse>>(url);
     }
 
     private async Task CreateAsync()

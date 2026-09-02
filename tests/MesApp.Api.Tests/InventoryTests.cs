@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
@@ -22,11 +23,11 @@ public class InventoryTests
 
         Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
 
-        // 在庫トランザクションに受入が記録される
-        var transactions = await admin.GetFromJsonAsync<List<TransactionResponse>>(
+        // 在庫トランザクションに受入が記録される（一覧はページング応答）
+        var transactions = await admin.GetFromJsonAsync<PagedResult<TransactionResponse>>(
             $"/api/inventory/transactions?lotId={lot.Id}");
-        Assert.Single(transactions!);
-        Assert.Equal(InventoryTransactionType.Receipt, transactions![0].Type);
+        Assert.Equal(1, transactions!.Total);
+        Assert.Equal(InventoryTransactionType.Receipt, Assert.Single(transactions.Items).Type);
     }
 
     [Fact]
@@ -381,5 +382,45 @@ public class InventoryTests
 
         // 少なくとも1件は成立している
         Assert.Contains(responses, r => r.IsSuccessStatusCode);
+    }
+
+    [Fact]
+    public async Task 在庫トランザクションはページングされ総件数が返る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        // 受入1件＋移動（移動元・移動先で1件）を繰り返し、5件のトランザクションを作る
+        for (var i = 0; i < 4; i++)
+        {
+            var from = i % 2 == 0 ? ctx.MaterialLocationId : ctx.ProductLocationId;
+            var to = i % 2 == 0 ? ctx.ProductLocationId : ctx.MaterialLocationId;
+            (await admin.PostAsJsonAsync("/api/inventory/move", new MoveRequest(lot.Id, from, to, 1m)))
+                .EnsureSuccessStatusCode();
+        }
+
+        var first = await admin.GetFromJsonAsync<PagedResult<TransactionResponse>>(
+            $"/api/inventory/transactions?lotId={lot.Id}&page=1&pageSize=2");
+        Assert.Equal(5, first!.Total);
+        Assert.Equal(2, first.Items.Count);
+        Assert.True(first.HasNext);
+        Assert.False(first.HasPrevious);
+        Assert.Equal(3, first.PageCount);
+
+        var last = await admin.GetFromJsonAsync<PagedResult<TransactionResponse>>(
+            $"/api/inventory/transactions?lotId={lot.Id}&page=3&pageSize=2");
+        Assert.Single(last!.Items);
+        Assert.False(last.HasNext);
+        Assert.True(last.HasPrevious);
+
+        // ページ間で内容が重複しない（並べ替えが確定している）
+        Assert.Empty(first.Items.Select(t => t.Id).Intersect(last.Items.Select(t => t.Id)));
+
+        // pageSizeの指定は上限で頭打ちにする
+        var capped = await admin.GetFromJsonAsync<PagedResult<TransactionResponse>>(
+            $"/api/inventory/transactions?lotId={lot.Id}&pageSize=9999");
+        Assert.Equal(PageQuery.MaxPageSize, capped!.PageSize);
     }
 }

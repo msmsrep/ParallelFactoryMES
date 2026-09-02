@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -18,7 +19,8 @@ namespace MesApp.Api.Controllers;
 public class EquipmentLogsController(MesAppDbContext db) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<EquipmentLogResponse>>> List(
+    public async Task<ActionResult<PagedResult<EquipmentLogResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] int? equipmentId = null,
         [FromQuery] EquipmentLogStatus? status = null,
         CancellationToken ct = default)
@@ -32,11 +34,11 @@ public class EquipmentLogsController(MesAppDbContext db) : ControllerBase
         {
             query = query.Where(l => l.Status == status);
         }
-        return await query.OrderByDescending(l => l.Id).Take(500)
+        return await query.OrderByDescending(l => l.Id)
             .Select(l => new EquipmentLogResponse(
                 l.Id, l.EquipmentId, l.Equipment!.Name, l.Status,
                 l.StartedAt, l.EndedAt, l.StopCause, l.Note))
-            .ToListAsync(ct);
+            .ToPagedResultAsync(paging, ct);
     }
 
     [HttpPost]

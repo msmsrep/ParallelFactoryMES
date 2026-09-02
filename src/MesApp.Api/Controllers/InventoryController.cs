@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -80,7 +81,8 @@ public class InventoryController(
     }
 
     [HttpGet("transactions")]
-    public async Task<ActionResult<List<TransactionResponse>>> Transactions(
+    public async Task<ActionResult<PagedResult<TransactionResponse>>> Transactions(
+        [FromQuery] PageQuery paging,
         [FromQuery] int? lotId = null,
         [FromQuery] int? productId = null,
         [FromQuery] int? workOrderId = null,
@@ -99,13 +101,13 @@ public class InventoryController(
         {
             query = query.Where(t => t.WorkOrderId == workOrderId);
         }
-        return await query.OrderByDescending(t => t.Id).Take(500)
+        return await query.OrderByDescending(t => t.Id)
             .Select(t => new TransactionResponse(
                 t.Id, t.Type, t.ProductId, t.Product!.Code,
                 t.LotId, t.Lot!.LotNumber, t.Quantity,
                 t.FromLocationId, t.FromLocation!.Code, t.ToLocationId, t.ToLocation!.Code,
                 t.WorkOrderId, t.Timestamp, t.Note))
-            .ToListAsync(ct);
+            .ToPagedResultAsync(paging, ct);
     }
 
     [HttpGet("lots/{id:int}")]

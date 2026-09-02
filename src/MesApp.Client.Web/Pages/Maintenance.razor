@@ -95,12 +95,12 @@
 
     <div class="card">
         <h2 style="margin-top:0;">稼働履歴</h2>
-        @if (_logs is not null && _logs.Count > 0)
+        @if (_logs is not null && _logs.Total > 0)
         {
             <table class="table">
                 <thead><tr><th>設備</th><th>状態</th><th>開始</th><th>終了</th><th>停止原因</th></tr></thead>
                 <tbody>
-                    @foreach (var log in _logs)
+                    @foreach (var log in _logs.Items)
                     {
                         <tr>
                             <td>@log.EquipmentName</td>
@@ -112,6 +112,8 @@
                     }
                 </tbody>
             </table>
+            <Pager TItem="EquipmentLogResponse" Result="_logs"
+                   OnPageChanged="LoadEquipmentLogsAsync" Busy="@_busy" />
         }
         else
         {
@@ -264,13 +266,13 @@ else if (_tab == "orders")
         {
             <p class="text-muted">読み込み中...</p>
         }
-        else if (_orders.Count == 0)
+        else if (_orders.Total == 0)
         {
             <p class="text-muted">保全指示はありません。</p>
         }
         else
         {
-            @foreach (var order in _orders)
+            @foreach (var order in _orders.Items)
             {
                 <div class="card">
                     <div>
@@ -306,6 +308,7 @@ else if (_tab == "orders")
                                 }
                             </tbody>
                         </table>
+                        <Pager TItem="MaintenanceOrderResponse" Result="_orders" OnPageChanged="LoadMaintenanceOrdersAsync" />
                     }
 
                     @if (order.Status == MaintenanceOrderStatus.Instructed)
@@ -473,10 +476,10 @@ else
     private string _tab = "logs";
     private List<EquipmentResponse> _equipments = [];
     private List<ToolResponse> _tools = [];
-    private List<EquipmentLogResponse>? _logs;
+    private PagedResult<EquipmentLogResponse>? _logs;
     private List<EquipmentUtilizationRow>? _utilization;
     private List<MaintenancePlanResponse>? _plans;
-    private List<MaintenanceOrderResponse>? _orders;
+    private PagedResult<MaintenanceOrderResponse>? _orders;
     private List<MaintenanceProcedureResponse> _procedures = [];
 
     private readonly LogForm _log = new();
@@ -527,7 +530,7 @@ else
                 _plans = await Http.GetFromJsonAsync<List<MaintenancePlanResponse>>("api/maintenance-plans");
                 break;
             case "orders":
-                _orders = await Http.GetFromJsonAsync<List<MaintenanceOrderResponse>>("api/maintenance-orders");
+                await LoadMaintenanceOrdersAsync(1);
                 break;
             case "procedures":
                 _procedures = await Http.GetFromJsonAsync<List<MaintenanceProcedureResponse>>(
@@ -536,9 +539,16 @@ else
         }
     }
 
+    private async Task LoadMaintenanceOrdersAsync(int page) =>
+        _orders = await Http.GetFromJsonAsync<PagedResult<MaintenanceOrderResponse>>(
+            $"api/maintenance-orders?page={page}");
+
+    private async Task LoadEquipmentLogsAsync(int page) =>
+        _logs = await Http.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>($"api/equipment-logs?page={page}");
+
     private async Task LoadLogsAsync()
     {
-        _logs = await Http.GetFromJsonAsync<List<EquipmentLogResponse>>("api/equipment-logs");
+        await LoadEquipmentLogsAsync(1);
         _utilization = await Http.GetFromJsonAsync<List<EquipmentUtilizationRow>>("api/equipment-logs/summary");
     }
 
@@ -649,7 +659,7 @@ else
             }
             _message = "保全指示を作成しました。";
             _order.Note = null;
-            _orders = await Http.GetFromJsonAsync<List<MaintenanceOrderResponse>>("api/maintenance-orders");
+            await LoadMaintenanceOrdersAsync(1);
         }
         finally
         {
@@ -676,7 +686,7 @@ else
             }
             _message = "保全実績を登録しました（指示は完了になります）。";
             _records.Remove(order.Id);
-            _orders = await Http.GetFromJsonAsync<List<MaintenanceOrderResponse>>("api/maintenance-orders");
+            await LoadMaintenanceOrdersAsync(1);
         }
         finally
         {
@@ -697,7 +707,7 @@ else
                 return;
             }
             _message = "保全指示を取消しました。";
-            _orders = await Http.GetFromJsonAsync<List<MaintenanceOrderResponse>>("api/maintenance-orders");
+            await LoadMaintenanceOrdersAsync(1);
         }
         finally
         {

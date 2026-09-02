@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -25,7 +26,8 @@ public class PickingOrdersController(
 {
     [HttpGet]
     [Authorize]
-    public async Task<ActionResult<List<PickingOrderResponse>>> List(
+    public async Task<ActionResult<PagedResult<PickingOrderResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] PickingOrderStatus? status = null,
         [FromQuery] int? workOrderId = null,
         CancellationToken ct = default)
@@ -39,8 +41,8 @@ public class PickingOrdersController(
         {
             query = query.Where(p => p.WorkOrderId == workOrderId);
         }
-        var orders = await query.OrderByDescending(p => p.Id).ToListAsync(ct);
-        return orders.Select(ToResponse).ToList();
+        var orders = await query.OrderByDescending(p => p.Id).ToPagedResultAsync(paging, ct);
+        return orders.Map(ToResponse);
     }
 
     [HttpGet("{id:int}")]

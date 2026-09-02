@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -28,7 +29,8 @@ public class NonconformanceController(
 
     /// <summary>一覧（C-30-10-01。状態・発生元でフィルタ可能）</summary>
     [HttpGet]
-    public async Task<ActionResult<List<NonconformanceResponse>>> List(
+    public async Task<ActionResult<PagedResult<NonconformanceResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] NonconformanceStatus? status = null,
         [FromQuery] NonconformanceSource? source = null,
         CancellationToken ct = default)
@@ -42,8 +44,8 @@ public class NonconformanceController(
         {
             query = query.Where(n => n.Source == source);
         }
-        var reports = await query.OrderByDescending(n => n.Id).ToListAsync(ct);
-        return reports.Select(ToResponse).ToList();
+        var reports = await query.OrderByDescending(n => n.Id).ToPagedResultAsync(paging, ct);
+        return reports.Map(ToResponse);
     }
 
     [HttpGet("{id:int}")]

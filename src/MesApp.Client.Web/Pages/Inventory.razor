@@ -256,7 +256,7 @@ else
                     <tr><th>日時</th><th>区分</th><th>ロット</th><th>品目</th><th>数量</th><th>移動元</th><th>移動先</th><th>備考</th></tr>
                 </thead>
                 <tbody>
-                    @foreach (var transaction in _transactions)
+                    @foreach (var transaction in _transactions.Items)
                     {
                         <tr>
                             <td>@transaction.Timestamp.ToLocalTime().ToString("MM/dd HH:mm")</td>
@@ -271,6 +271,8 @@ else
                     }
                 </tbody>
             </table>
+            <Pager TItem="TransactionResponse" Result="_transactions"
+                   OnPageChanged="LoadTransactionsAsync" Busy="@_busy" />
         }
     </div>
 }
@@ -293,7 +295,7 @@ else
     private string _tab = "stocks";
     private List<StockResponse>? _stocks;
     private List<StockResponse>? _expiring;
-    private List<TransactionResponse>? _transactions;
+    private PagedResult<TransactionResponse>? _transactions;
     private List<LocationResponse> _locations = [];
     private List<ProductResponse> _products = [];
     private readonly OpForm _op = new();
@@ -324,13 +326,17 @@ else
         }
         else if (tab == "transactions")
         {
-            _transactions = await Http.GetFromJsonAsync<List<TransactionResponse>>("api/inventory/transactions");
+            await LoadTransactionsAsync(1);
         }
         else
         {
             await LoadStocksAsync();
         }
     }
+
+    private async Task LoadTransactionsAsync(int page) =>
+        _transactions = await Http.GetFromJsonAsync<PagedResult<TransactionResponse>>(
+            $"api/inventory/transactions?page={page}");
 
     private async Task LoadStocksAsync()
     {

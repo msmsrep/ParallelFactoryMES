@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -18,7 +19,8 @@ namespace MesApp.Api.Controllers;
 public class TroubleReportsController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<TroubleReportResponse>>> List(
+    public async Task<ActionResult<PagedResult<TroubleReportResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] TroubleStatus? status = null,
         [FromQuery] TroubleCategory? category = null,
         CancellationToken ct = default)
@@ -34,7 +36,7 @@ public class TroubleReportsController(MesAppDbContext db, IAuditLogger auditLogg
         }
         return await query.OrderByDescending(t => t.Id)
             .Select(Projection)
-            .ToListAsync(ct);
+            .ToPagedResultAsync(paging, ct);
     }
 
     [HttpGet("{id:int}")]

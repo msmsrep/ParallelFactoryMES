@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -18,7 +19,8 @@ namespace MesApp.Api.Controllers;
 public class ToolUsagesController(MesAppDbContext db) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<ToolUsageResponse>>> List(
+    public async Task<ActionResult<PagedResult<ToolUsageResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] int? toolId = null,
         [FromQuery] int? workOrderId = null,
         CancellationToken ct = default)
@@ -32,11 +34,11 @@ public class ToolUsagesController(MesAppDbContext db) : ControllerBase
         {
             query = query.Where(u => u.WorkOrderId == workOrderId);
         }
-        return await query.OrderByDescending(u => u.Id).Take(500)
+        return await query.OrderByDescending(u => u.Id)
             .Select(u => new ToolUsageResponse(
                 u.Id, u.ToolId, u.Tool!.Code, u.WorkOrderId, u.WorkOrder!.WorkOrderNo,
                 u.UsageCount, u.UsageHours, u.RecordedAt))
-            .ToListAsync(ct);
+            .ToPagedResultAsync(paging, ct);
     }
 
     /// <summary>利用実績の記録（E-60-20-01。現場作業者も記録できる）</summary>

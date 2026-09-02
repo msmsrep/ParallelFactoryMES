@@ -89,13 +89,13 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_orders.Count == 0)
+    else if (_orders.Total == 0)
     {
         <p class="text-muted">ピッキング指示はありません。</p>
     }
     else
     {
-        @foreach (var order in _orders)
+        @foreach (var order in _orders.Items)
         {
             <div class="card">
                 <div class="actions" style="justify-content:space-between;">
@@ -149,13 +149,14 @@
                         }
                     </tbody>
                 </table>
+                <Pager TItem="PickingOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
             </div>
         }
     }
 </div>
 
 @code {
-    private List<PickingOrderResponse>? _orders;
+    private PagedResult<PickingOrderResponse>? _orders;
     private List<ProductResponse> _products = [];
     private List<WorkOrderResponse> _workOrders = [];
     private List<ShippingOrderResponse> _shippingOrders = [];
@@ -184,8 +185,10 @@
 
     private void SetScan(int lineId, string? value) => _scans[lineId] = value;
 
-    private async Task LoadAsync() =>
-        _orders = await Http.GetFromJsonAsync<List<PickingOrderResponse>>("api/picking-orders");
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page) =>
+        _orders = await Http.GetFromJsonAsync<PagedResult<PickingOrderResponse>>($"api/picking-orders?page={page}");
 
     private void AddLine()
     {

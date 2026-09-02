@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -26,7 +27,8 @@ public class MaintenanceOrdersController(
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
     [HttpGet]
-    public async Task<ActionResult<List<MaintenanceOrderResponse>>> List(
+    public async Task<ActionResult<PagedResult<MaintenanceOrderResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] MaintenanceOrderStatus? status = null,
         [FromQuery] int? equipmentId = null,
         [FromQuery] int? toolId = null,
@@ -45,8 +47,8 @@ public class MaintenanceOrdersController(
         {
             query = query.Where(o => o.ToolId == toolId);
         }
-        var orders = await query.OrderByDescending(o => o.Id).ToListAsync(ct);
-        return orders.Select(ToResponse).ToList();
+        var orders = await query.OrderByDescending(o => o.Id).ToPagedResultAsync(paging, ct);
+        return orders.Map(ToResponse);
     }
 
     /// <summary>保全履歴の詳細（E-20-30-01〜02：いつ・誰が・どう保全したか）</summary>
