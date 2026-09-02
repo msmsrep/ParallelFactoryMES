@@ -24,7 +24,7 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
         [FromQuery] int? targetProcessId = null,
         CancellationToken ct = default)
     {
-        var query = db.InspectionItems.AsNoTracking();
+        var query = BaseQuery();
         if (!includeInactive)
         {
             query = query.Where(i => i.IsActive);
@@ -43,8 +43,8 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
     [HttpGet("{id:int}")]
     public async Task<ActionResult<InspectionItemResponse>> Get(int id, CancellationToken ct)
     {
-        var i = await db.InspectionItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-        return i is null ? NotFound() : ToResponse(i);
+        var item = await BaseQuery().FirstOrDefaultAsync(x => x.Id == id, ct);
+        return item is null ? NotFound() : ToResponse(item);
     }
 
     [HttpPost]
@@ -78,7 +78,8 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Master", "Create", nameof(InspectionItem), i.Id.ToString(),
             detail: $"code={i.Code}", ct: ct);
-        return CreatedAtAction(nameof(Get), new { id = i.Id }, ToResponse(i));
+        return CreatedAtAction(nameof(Get), new { id = i.Id },
+            await GetResponseAsync(i.Id, ct));
     }
 
     [HttpPut("{id:int}")]
@@ -114,7 +115,7 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Master", "Update", nameof(InspectionItem), id.ToString(),
             detail: $"code={i.Code}, version={i.Version}", ct: ct);
-        return ToResponse(i);
+        return await GetResponseAsync(id, ct);
     }
 
     [HttpDelete("{id:int}")]
@@ -150,7 +151,24 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
         return null;
     }
 
+    /// <summary>
+    /// 対象品目・対象工程を読み込んだ検索元。応答にコードを載せることで、
+    /// 画面がコードを出すためにマスタを全件持たなくてよくなる
+    /// （品目は件数が有界でなく、全件取得できない：Spec.md 7.5）
+    /// </summary>
+    private IQueryable<InspectionItem> BaseQuery() =>
+        db.InspectionItems.AsNoTracking()
+            .Include(i => i.TargetProduct)
+            .Include(i => i.TargetProcess);
+
+    /// <summary>保存後の応答。対象マスタを読み込み直してコードまで返す</summary>
+    private async Task<InspectionItemResponse> GetResponseAsync(int id, CancellationToken ct) =>
+        ToResponse(await BaseQuery().FirstAsync(i => i.Id == id, ct));
+
     private static InspectionItemResponse ToResponse(InspectionItem i) =>
-        new(i.Id, i.Code, i.Name, i.TargetProductId, i.TargetProcessId, i.Type,
-            i.LowerLimit, i.UpperLimit, i.StandardValue, i.Method, i.SamplingCount, i.Version, i.IsActive);
+        new(i.Id, i.Code, i.Name,
+            i.TargetProductId, i.TargetProduct?.Code,
+            i.TargetProcessId, i.TargetProcess?.Code,
+            i.Type, i.LowerLimit, i.UpperLimit, i.StandardValue,
+            i.Method, i.SamplingCount, i.Version, i.IsActive);
 }

@@ -26,13 +26,11 @@
             </div>
             <div class="form-field">
                 <label>対象品目</label>
-                <select @bind="_productId">
-                    <option value="0">指定なし</option>
-                    @foreach (var product in _products)
-                    {
-                        <option value="@product.Id">@product.Code @product.Name</option>
-                    }
-                </select>
+                <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                              @bind-Value="_productId"
+                              EmptyLabel="指定なし"
+                              ValueOf="p => p.Id"
+                              LabelOf='@(p => $"{p.Code} {p.Name}")' />
             </div>
             <div class="form-field">
                 <label>対象工程</label>
@@ -96,13 +94,12 @@
                         <td>@item.Name</td>
                         <td>@TypeLabel(item.Type)</td>
                         <td>
-                            @(_products.FirstOrDefault(p => p.Id == item.TargetProductId)?.Code
-                              ?? _processes.FirstOrDefault(p => p.Id == item.TargetProcessId)?.Code ?? "-")
+                            @(item.TargetProductCode ?? item.TargetProcessCode ?? "-")
                         </td>
                         <td>@(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")</td>
                         <td>@(item.Method ?? "-")</td>
                         <td>@(item.SamplingCount?.ToString() ?? "-")</td>
-                        <td>v@item.Version</td>
+                        <td>v@(item.Version)</td>
                         <td class="actions">
                             <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
@@ -122,7 +119,6 @@
 
 @code {
     private List<InspectionItemResponse>? _items;
-    private List<ProductResponse> _products = [];
     private List<ProcessResponse> _processes = [];
 
     private int? _editingId;
@@ -142,7 +138,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
         _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
         await LoadAsync();
     }

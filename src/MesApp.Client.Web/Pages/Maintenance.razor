@@ -415,7 +415,7 @@ else
                             <td>@procedure.ProcedureNo</td>
                             <td>@procedure.Title</td>
                             <td>@(procedure.TargetEquipmentName ?? procedure.TargetToolName ?? "-")</td>
-                            <td>v@procedure.Version</td>
+                            <td>v@(procedure.Version)</td>
                             <td style="white-space:pre-wrap;max-width:340px;">@procedure.Steps</td>
                         </tr>
                     }

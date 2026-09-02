@@ -123,7 +123,9 @@ public record InspectionItemRequest(
     int? SamplingCount);
 
 public record InspectionItemResponse(
-    int Id, string Code, string Name, int? TargetProductId, int? TargetProcessId,
+    int Id, string Code, string Name,
+    int? TargetProductId, string? TargetProductCode,
+    int? TargetProcessId, string? TargetProcessCode,
     InspectionType Type, decimal? LowerLimit, decimal? UpperLimit, decimal? StandardValue,
     string? Method, int? SamplingCount, int Version, bool IsActive);
 

@@ -5,6 +5,12 @@
 <input type="search" placeholder="@Placeholder" value="@_keyword" @oninput="OnKeywordChangedAsync" />
 <select value="@Value" @onchange="OnSelectedAsync">
     <option value="0">@EmptyLabel</option>
+    @* 選択済みの項目が今の検索結果に入っていない場合（編集で読み込んだ値など）。
+       出さないと選ばれているのに空欄に見える *@
+    @if (Value != 0 && !Visible.Any(item => ValueOf(item) == Value))
+    {
+        <option value="@Value">@(_selectedLabel ?? "選択中（検索して絞り込むと表示されます）")</option>
+    }
     @foreach (var item in Visible)
     {
         <option value="@ValueOf(item)">@LabelOf(item)</option>
@@ -41,6 +47,9 @@
     private string _keyword = string.Empty;
     private bool _truncated;
 
+    /// <summary>選択済み項目のラベル（検索結果から外れても選択中と分かるように保持する）</summary>
+    private string? _selectedLabel;
+
     /// <summary>入力のたびに投げないための世代番号（古い応答で新しい結果を上書きしない）</summary>
     private int _generation;
 
@@ -75,11 +84,13 @@
     private async Task OnSelectedAsync(ChangeEventArgs e)
     {
         Value = int.TryParse(e.Value?.ToString(), out var parsed) ? parsed : 0;
+        var selected = _items.FirstOrDefault(item => ValueOf(item) == Value);
+        // 検索し直すと選択済みの項目が結果から外れることがあるため、ラベルだけ覚えておく
+        _selectedLabel = selected is not null ? LabelOf(selected) : null;
         await ValueChanged.InvokeAsync(Value);
         if (SelectedItemChanged.HasDelegate)
         {
-            await SelectedItemChanged.InvokeAsync(
-                _items.FirstOrDefault(item => ValueOf(item) == Value));
+            await SelectedItemChanged.InvokeAsync(selected);
         }
     }
 }

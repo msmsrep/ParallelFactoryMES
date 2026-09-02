@@ -309,4 +309,36 @@ public class MasterTests
             "/api/products/options?q=別の");
         Assert.Empty(afterDelete!.Items);
     }
+
+    [Fact]
+    public async Task 検査項目は対象品目と対象工程のコードまで返す()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var product = await (await admin.PostAsJsonAsync("/api/products",
+            new ProductRequest("INS-P-01", "検査対象品", "個", null, ProductType.Product, 0m)))
+            .Content.ReadFromJsonAsync<ProductResponse>();
+        var process = await (await admin.PostAsJsonAsync("/api/processes",
+            new ProcessRequest("INS-PR-01", "検査対象工程", MakeOrBuy.InHouse)))
+            .Content.ReadFromJsonAsync<ProcessResponse>();
+
+        // 画面が対象のコードを出すためにマスタを全件持たずに済むよう、応答にコードを載せる（Spec.md 7.5）
+        var created = await (await admin.PostAsJsonAsync("/api/inspection-items",
+            new InspectionItemRequest("INS-10", "品目基準", product!.Id, null,
+                InspectionType.FinalProduct, 1m, 2m, null, null, null)))
+            .Content.ReadFromJsonAsync<InspectionItemResponse>();
+        Assert.Equal("INS-P-01", created!.TargetProductCode);
+        Assert.Null(created.TargetProcessCode);
+
+        var updated = await (await admin.PutAsJsonAsync($"/api/inspection-items/{created.Id}",
+            new InspectionItemRequest("INS-10", "工程基準", null, process!.Id,
+                InspectionType.InProcess, 1m, 2m, null, null, null)))
+            .Content.ReadFromJsonAsync<InspectionItemResponse>();
+        Assert.Null(updated!.TargetProductCode);
+        Assert.Equal("INS-PR-01", updated.TargetProcessCode);
+
+        var list = await admin.GetFromJsonAsync<List<InspectionItemResponse>>("/api/inspection-items");
+        Assert.Equal("INS-PR-01", Assert.Single(list!).TargetProcessCode);
+    }
 }
