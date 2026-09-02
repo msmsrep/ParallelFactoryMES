@@ -96,7 +96,7 @@
 | ビルド共通設定 | `Directory.Build.props` | `TreatWarningsAsErrors` でDoD 1（新規の警告を増やさない）をビルドで担保する。`TargetFramework` は Desktop だけ `net10.0-windows` のため各csprojに残す |
 | クライアントのエラー処理 | `Web/Layout/MainLayout.razor`（`ErrorBoundary`）<br>`Web/Auth/AuthMessageHandler.cs`（401時のリフレッシュ→失敗ならログイン画面へ）<br>`Web/Auth/AuthService.cs`（`EndSession`） | 画面のGET失敗でアプリ全体が操作不能にならないようにする。書き込み系は各画面の`_error` + `<Notice>` が担当（従来どおり） |
 | 監査ログ | `Core/Abstractions/IAuditLogger.cs`<br>`Infra/Services/AuditLogger.cs`<br>`Core/Entities/AuditLog.cs` | Spec.md 7.6。**全ての書き込み系アクションで呼ぶ**。変更前後を追跡する操作は `detail:` に匿名オブジェクト（`{ before, after, reason }`）を渡す＝JSON保存。要約でよい操作は文字列のまま |
-| 採番（指図番号・ロット番号等） | `Api/Services/NumberingService.cs` | 新しい採番区分はここに追加 |
+| 採番（指図番号・ロット番号等） | `Api/Services/NumberingService.cs`<br>`Core/Entities/NumberSequence.cs` | Spec.md 3.9。新しい採番区分はここに追加。払い出しは採番テーブルの1行を更新してから読む（最大値+1にしない）。**変更追跡を使わない**（呼び出し側の未確定の変更を書き込まないため`ExecuteUpdate`と生SQL）。`Tests/InventoryTests.cs` |
 | ロット使用可否（投入・引当・出荷の共通判定） | `Api/Policies/LotUsabilityPolicy.cs` | Spec.md 3.9。ステータス・有効期限の条件は**ここだけ**に置く。呼び先は `WorkOrderExecutionController`（投入）／`InventoryService.AllocateFefoAsync`（FEFO）／`ShippingOrdersController`（出荷） |
 | 部材投入の照合（予定材料） | `Api/Policies/MaterialIssuePolicy.cs` | Spec.md 3.9・5.7。基準はMBOMの現在値ではなく**指図の予定材料**。呼び先は `WorkOrderExecutionController.AddConsumption` |
 | 作業指示ステータス変更（＋状態履歴） | `Api/Services/WorkOrderStatusService.cs`<br>`Core/Entities/Production.cs`: WorkOrderStatusHistory | Spec.md 5.2。`WorkOrder.Status` を**直接代入しない**。履歴は `GET api/work-orders/{id}/status-history` |

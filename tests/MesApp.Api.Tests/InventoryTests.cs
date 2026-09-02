@@ -359,29 +359,48 @@ public class InventoryTests
     }
 
     [Fact]
-    public async Task 同時受入の競合は500ではなく409で返る()
+    public async Task 同時受入でもロット番号が重複せず全件成立する()
     {
         using var factory = new ApiFactory();
         using var admin = await TestAuth.CreateAdminClientAsync(factory);
         var ctx = await Phase3TestData.SetupAsync(admin);
 
-        // ロット番号は採番（読み取り→+1）のため同時実行で衝突しうる。
-        // MesAppExceptionFilterが一意制約違反を409へ変換するので、5xxは出てはいけない
-        var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+        // 採番はNumberSequenceの1行を更新してから読むため、同時に採番しても同じ番号にならない
+        const int concurrency = 8;
+        var responses = await Task.WhenAll(Enumerable.Range(0, concurrency).Select(_ =>
             admin.PostAsJsonAsync("/api/receiving",
                 new ReceivingRequest(ctx.MaterialId, 1m, ctx.MaterialLocationId, null, null, null))));
 
         foreach (var response in responses)
         {
-            Assert.True((int)response.StatusCode < 500,
-                $"サーバーエラーが返りました：{(int)response.StatusCode}");
-            Assert.True(
-                response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Conflict,
-                $"想定外のステータスです：{(int)response.StatusCode}");
+            Assert.True(response.IsSuccessStatusCode,
+                $"採番が衝突しました：{(int)response.StatusCode}");
         }
 
-        // 少なくとも1件は成立している
-        Assert.Contains(responses, r => r.IsSuccessStatusCode);
+        var lotNumbers = new List<string>();
+        foreach (var response in responses)
+        {
+            lotNumbers.Add((await response.Content.ReadFromJsonAsync<LotResponse>())!.LotNumber);
+        }
+        Assert.Equal(concurrency, lotNumbers.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task 採番は既存番号の続きから始まる()
+    {
+        // 業務日付の境界（既定6時）で日付がずれると番号のプレフィックスが変わるため、境界を0時にして固定する
+        using var factory = new ApiFactory(new Dictionary<string, string> { ["BusinessDay:BoundaryHour"] = "0" });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 採番テーブルが無い状態（既存DBからの移行）でも、手入力の番号と衝突しない
+        var manual = await Phase3TestData.ReceiveAsync(
+            admin, ctx.MaterialId, 1m, ctx.MaterialLocationId,
+            lotNumber: $"RM-01-{DateTime.Today:yyyyMMdd}-005");
+        Assert.EndsWith("-005", manual.LotNumber, StringComparison.Ordinal);
+
+        var next = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 1m, ctx.MaterialLocationId);
+        Assert.EndsWith("-006", next.LotNumber, StringComparison.Ordinal);
     }
 
     [Fact]

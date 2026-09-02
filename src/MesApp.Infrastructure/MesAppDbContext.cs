@@ -70,6 +70,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
     public DbSet<ToolUsage> ToolUsages => Set<ToolUsage>();
 
+    public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
         base.ConfigureConventions(builder);
@@ -121,6 +123,13 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        builder.Entity<NumberSequence>(e =>
+        {
+            // プレフィックス1つにつき1行。ここが重複すると同じ番号を二重に払い出すことになる
+            e.HasIndex(x => x.Prefix).IsUnique();
+            e.Property(x => x.Prefix).HasMaxLength(60);
+        });
 
         builder.Entity<RefreshToken>(e =>
         {
