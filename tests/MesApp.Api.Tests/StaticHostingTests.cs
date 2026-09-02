@@ -42,4 +42,21 @@ public class StaticHostingTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    [Fact]
+    public async Task 未定義のAPIパスにindexhtmlを返さない()
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+
+        // 打ち間違い・未実装のAPIパスがindex.htmlの200になると、
+        // 呼び出し側は404ではなくJSONパース失敗という無関係なエラーを受け取る
+        var unknown = await client.GetAsync("/api/does-not-exist");
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.NotEqual("text/html", unknown.Content.Headers.ContentType?.MediaType);
+
+        // GETを持たないパス（受入は登録・取消のみ）もフォールバックに吸われない
+        var noGet = await client.GetAsync("/api/receiving");
+        Assert.Equal(HttpStatusCode.NotFound, noGet.StatusCode);
+    }
 }

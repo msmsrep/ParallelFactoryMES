@@ -125,7 +125,12 @@ public static class MesAppHost
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
-        // クライアント側ルーティングのフォールバック（/manufacturing-orders 等の直接アクセス）
+        // クライアント側ルーティングのフォールバック（/manufacturing-orders 等の直接アクセス）。
+        // api/ 配下で未マッチのものは404にする。除外しないとフォールバックが拾い、
+        // 打ち間違い・未実装のAPIパスがindex.htmlの200になって、
+        // 呼び出し側は404ではなくJSONパース失敗という無関係なエラーを受け取る
+        app.MapFallback("api/{**rest}", () => Results.Problem(
+            title: "指定されたAPIは存在しません。", statusCode: StatusCodes.Status404NotFound));
         app.MapFallbackToFile("index.html");
 
         return app;
