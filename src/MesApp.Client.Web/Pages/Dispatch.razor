@@ -22,7 +22,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_workOrders.Count == 0)
+    else if (_workOrders.Total == 0)
     {
         <p class="text-muted">対象の作業指示はありません。</p>
     }
@@ -36,7 +36,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var workOrder in _workOrders)
+                @foreach (var workOrder in _workOrders.Items)
                 {
                     <tr>
                         <td>@workOrder.WorkOrderNo</td>
@@ -76,6 +76,7 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="WorkOrderResponse" Result="_workOrders" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
@@ -87,7 +88,7 @@
         public int Order { get; set; }
     }
 
-    private List<WorkOrderResponse>? _workOrders;
+    private PagedResult<WorkOrderResponse>? _workOrders;
     private List<UserSummaryResponse> _users = [];
     private List<EquipmentResponse> _equipments = [];
     private readonly Dictionary<int, DispatchForm> _forms = [];
@@ -115,7 +116,7 @@
     {
         if (!_forms.TryGetValue(workOrderId, out var form))
         {
-            var workOrder = _workOrders?.FirstOrDefault(w => w.Id == workOrderId);
+            var workOrder = _workOrders?.Items.FirstOrDefault(w => w.Id == workOrderId);
             form = new DispatchForm
             {
                 UserId = workOrder?.AssignedUserId,
@@ -130,15 +131,17 @@
     private static int ToInt(object? value) =>
         int.TryParse(value?.ToString(), out var result) ? result : 0;
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
         _forms.Clear();
-        var url = "api/work-orders";
+        var url = $"api/work-orders?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>(url);
+        _workOrders = await Http.GetFromJsonAsync<PagedResult<WorkOrderResponse>>(url);
     }
 
     private async Task DispatchAsync(WorkOrderResponse workOrder)

@@ -11,7 +11,7 @@
 
 <div class="card">
     <h2 style="margin-top:0;">工程別の進捗</h2>
-    @if (_workOrders is null)
+    @if (_progress is null)
     {
         <p class="text-muted">読み込み中...</p>
     }
@@ -22,16 +22,15 @@
                 <tr><th>工程</th><th>未配布</th><th>配布済</th><th>着手</th><th>完了</th><th>承認済</th></tr>
             </thead>
             <tbody>
-                @foreach (var group in _workOrders.Where(w => w.Status != WorkOrderStatus.Canceled)
-                    .GroupBy(w => $"{w.ProcessCode} {w.ProcessName}").OrderBy(g => g.Key))
+                @foreach (var row in _progress)
                 {
                     <tr>
-                        <td>@group.Key</td>
-                        <td>@group.Count(w => w.Status == WorkOrderStatus.Created)</td>
-                        <td>@group.Count(w => w.Status == WorkOrderStatus.Dispatched)</td>
-                        <td>@group.Count(w => w.Status == WorkOrderStatus.Started)</td>
-                        <td>@group.Count(w => w.Status == WorkOrderStatus.Completed)</td>
-                        <td>@group.Count(w => w.Status == WorkOrderStatus.Approved)</td>
+                        <td>@row.ProcessCode @row.ProcessName</td>
+                        <td>@row.Created</td>
+                        <td>@row.Dispatched</td>
+                        <td>@row.Started</td>
+                        <td>@row.Completed</td>
+                        <td>@row.Approved</td>
                     </tr>
                 }
             </tbody>
@@ -57,13 +56,9 @@
         </div>
         <div class="form-field">
             <label>対象作業指示</label>
-            <select @bind="_form.WorkOrderId">
-                <option value="0">なし</option>
-                @foreach (var workOrder in _workOrders ?? [])
-                {
-                    <option value="@workOrder.Id">@workOrder.WorkOrderNo</option>
-                }
-            </select>
+            <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
+                          @bind-Value="_form.WorkOrderId" EmptyLabel="なし"
+                          ValueOf="w => w.Id" LabelOf="w => w.WorkOrderNo" />
         </div>
         <div class="form-field">
             <label>対象設備</label>
@@ -152,7 +147,7 @@
         public string? Note { get; set; }
     }
 
-    private List<WorkOrderResponse>? _workOrders;
+    private List<ProcessProgressRow>? _progress;
     private List<EquipmentResponse> _equipments = [];
     private PagedResult<TroubleReportResponse>? _troubles;
     private readonly TroubleForm _form = new();
@@ -164,7 +159,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders");
+        _progress = await Http.GetFromJsonAsync<List<ProcessProgressRow>>("api/work-orders/process-summary");
         _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
         await LoadTroublesAsync();
     }

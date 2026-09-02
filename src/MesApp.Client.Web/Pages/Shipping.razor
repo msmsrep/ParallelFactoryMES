@@ -63,13 +63,13 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_orders.Count == 0)
+    else if (_orders.Total == 0)
     {
         <p class="text-muted">出荷指示はありません。</p>
     }
     else
     {
-        @foreach (var order in _orders)
+        @foreach (var order in _orders.Items)
         {
             <div class="card">
                 <div class="actions" style="justify-content:space-between;">
@@ -101,6 +101,7 @@
                         }
                     </tbody>
                 </table>
+                <Pager TItem="ShippingOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
 
                 @if (order.Status == ShippingOrderStatus.Instructed)
                 {
@@ -108,14 +109,13 @@
                     <div class="form-grid">
                         <div class="form-field">
                             <label>出荷ロット</label>
-                            <select value="@GetShip(order.Id).LotId"
-                                    @onchange="e => SetShipLot(order.Id, e.Value)">
-                                <option value="0">選択してください</option>
-                                @foreach (var stock in _stocks.Where(s => order.Lines.Any(l => l.ProductId == s.ProductId)))
-                                {
-                                    <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode / @stock.LocationCode / 在庫@stock.Quantity）</option>
-                                }
-                            </select>
+                            @* 指図の品目に該当するロットだけを出す。件数が増えたら検索で絞る *@
+                            <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                                          Value="GetShip(order.Id).LotId"
+                                          SelectedItemChanged="stock => SetShipLot(order.Id, stock)"
+                                          Filter="@(s => order.Lines.Any(l => l.ProductId == s.ProductId))"
+                                          ValueOf="s => s.LotId"
+                                          LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode} / {s.LocationCode} / 在庫{s.Quantity}）")' />
                         </div>
                         <div class="form-field">
                             <label>数量</label>
@@ -138,9 +138,8 @@
         public decimal Quantity { get; set; }
     }
 
-    private List<ShippingOrderResponse>? _orders;
+    private PagedResult<ShippingOrderResponse>? _orders;
     private List<ProductResponse> _products = [];
-    private List<StockResponse> _stocks = [];
     private readonly List<ShippingLineRequest> _lines = [];
     private readonly Dictionary<int, ShipForm> _shipForms = [];
 
@@ -158,10 +157,11 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        _orders = await Http.GetFromJsonAsync<List<ShippingOrderResponse>>("api/shipping-orders");
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
+        _orders = await Http.GetFromJsonAsync<PagedResult<ShippingOrderResponse>>($"api/shipping-orders?page={page}");
     }
 
     private ShipForm GetShip(int orderId)
@@ -174,12 +174,12 @@
         return form;
     }
 
-    private void SetShipLot(int orderId, object? value)
+    /// <summary>出荷ロットの選択。出庫元ロケーションは選んだ在庫から取る</summary>
+    private void SetShipLot(int orderId, StockResponse? stock)
     {
-        var lotId = int.TryParse(value?.ToString(), out var parsed) ? parsed : 0;
         var form = GetShip(orderId);
-        form.LotId = lotId;
-        form.LocationId = _stocks.FirstOrDefault(s => s.LotId == lotId)?.LocationId ?? 0;
+        form.LotId = stock?.LotId ?? 0;
+        form.LocationId = stock?.LocationId ?? 0;
     }
 
     private static decimal ToDecimal(object? value) =>

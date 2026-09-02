@@ -40,6 +40,13 @@ public record ExpandRequest(string? LotNumber);
 
 // ---- 作業指示・差立（B-10-20）----
 
+/// <summary>
+/// 工程別の進捗集計（B-60-10-01）。作業指示の状態ごとの件数をDB側で数えた結果。
+/// </summary>
+public record ProcessProgressRow(
+    int ProcessId, string ProcessCode, string ProcessName,
+    int Created, int Dispatched, int Started, int Completed, int Approved);
+
 public record WorkOrderResponse(
     int Id, string WorkOrderNo, int ManufacturingOrderId, string OrderNo,
     int ProductId, string ProductCode, string ProductName,

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -29,7 +30,8 @@ public class ShippingOrdersController(
 {
     [HttpGet]
     [Authorize]
-    public async Task<ActionResult<List<ShippingOrderResponse>>> List(
+    public async Task<ActionResult<PagedResult<ShippingOrderResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] ShippingOrderStatus? status = null, CancellationToken ct = default)
     {
         var query = BaseQuery();
@@ -37,8 +39,8 @@ public class ShippingOrdersController(
         {
             query = query.Where(s => s.Status == status);
         }
-        var orders = await query.OrderByDescending(s => s.Id).ToListAsync(ct);
-        return orders.Select(ToResponse).ToList();
+        var orders = await query.OrderByDescending(s => s.Id).ToPagedResultAsync(paging, ct);
+        return orders.Map(ToResponse);
     }
 
     [HttpGet("{id:int}")]
@@ -197,6 +199,29 @@ public class ShippingOrdersController(
         await db.SaveChangesAsync(ct);
         var saved = await BaseQuery().FirstAsync(s => s.Id == id, ct);
         return ToResponse(saved);
+    }
+
+    /// <summary>
+    /// 出荷指示選択用の選択肢（出荷判定・出荷向けピッキングの対象指定）。
+    /// 出荷番号・出荷先の部分一致で絞り込む。
+    /// </summary>
+    [HttpGet("options")]
+    public async Task<ActionResult<OptionsResult<ShippingOrderResponse>>> Options(
+        [FromQuery] OptionQuery options,
+        [FromQuery] ShippingOrderStatus? status = null,
+        CancellationToken ct = default)
+    {
+        var query = BaseQuery();
+        if (status is not null)
+        {
+            query = query.Where(s => s.Status == status);
+        }
+        if (options.Keyword is { } keyword)
+        {
+            query = query.Where(s => s.ShippingNo.Contains(keyword) || s.Destination.Contains(keyword));
+        }
+        var result = await query.OrderByDescending(s => s.Id).ToOptionsResultAsync(options, ct);
+        return new OptionsResult<ShippingOrderResponse>([.. result.Items.Select(ToResponse)], result.Truncated);
     }
 
     private IQueryable<ShippingOrder> BaseQuery() =>

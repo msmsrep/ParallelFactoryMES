@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
@@ -83,7 +84,8 @@ internal static class Phase3TestData
         {
             url += $"&locationId={locationId}";
         }
-        var stocks = await client.GetFromJsonAsync<List<StockResponse>>(url);
-        return stocks!.Sum(s => s.Quantity);
+        // 1ロット分の在庫行はページに収まる前提（テストデータの規模）
+        var stocks = await client.GetFromJsonAsync<PagedResult<StockResponse>>(url);
+        return stocks!.Items.Sum(s => s.Quantity);
     }
 }

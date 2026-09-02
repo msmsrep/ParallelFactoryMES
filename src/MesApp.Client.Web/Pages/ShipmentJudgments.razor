@@ -15,23 +15,17 @@
         <div class="form-grid">
             <div class="form-field">
                 <label>対象出荷指示</label>
-                <select @bind="_shippingOrderId">
-                    <option value="0">なし</option>
-                    @foreach (var shipping in _shippingOrders)
-                    {
-                        <option value="@shipping.Id">@shipping.ShippingNo（@shipping.Destination）</option>
-                    }
-                </select>
+                <OptionSelect TItem="ShippingOrderResponse" Endpoint="api/shipping-orders/options"
+                              @bind-Value="_shippingOrderId" EmptyLabel="なし"
+                              ValueOf="s => s.Id"
+                              LabelOf='@(s => $"{s.ShippingNo}（{s.Destination}）")' />
             </div>
             <div class="form-field">
                 <label>対象ロット</label>
-                <select @bind="_lotId">
-                    <option value="0">なし</option>
-                    @foreach (var stock in _stocks)
-                    {
-                        <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode）</option>
-                    }
-                </select>
+                <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                              @bind-Value="_lotId" EmptyLabel="なし"
+                              ValueOf="s => s.LotId"
+                              LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode}）")' />
             </div>
             <div class="form-field">
                 <label>判定</label>
@@ -98,8 +92,6 @@
 
 @code {
     private PagedResult<ShipmentJudgmentResponse>? _judgments;
-    private List<ShippingOrderResponse> _shippingOrders = [];
-    private List<StockResponse> _stocks = [];
 
     private int _shippingOrderId;
     private int _lotId;
@@ -111,8 +103,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _shippingOrders = await Http.GetFromJsonAsync<List<ShippingOrderResponse>>("api/shipping-orders") ?? [];
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
         await LoadAsync();
     }
 

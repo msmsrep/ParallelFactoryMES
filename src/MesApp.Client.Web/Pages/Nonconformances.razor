@@ -22,23 +22,16 @@
         </div>
         <div class="form-field">
             <label>対象ロット</label>
-            <select @bind="_form.LotId">
-                <option value="0">なし</option>
-                @foreach (var stock in _stocks)
-                {
-                    <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode）</option>
-                }
-            </select>
+            <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                          @bind-Value="_form.LotId" EmptyLabel="なし"
+                          ValueOf="s => s.LotId"
+                          LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode}）")' />
         </div>
         <div class="form-field">
             <label>対象作業指示</label>
-            <select @bind="_form.WorkOrderId">
-                <option value="0">なし</option>
-                @foreach (var workOrder in _workOrders)
-                {
-                    <option value="@workOrder.Id">@workOrder.WorkOrderNo</option>
-                }
-            </select>
+            <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
+                          @bind-Value="_form.WorkOrderId" EmptyLabel="なし"
+                          ValueOf="w => w.Id" LabelOf="w => w.WorkOrderNo" />
         </div>
         <div class="form-field">
             <label>原因区分（B-40-30-02）</label>
@@ -163,8 +156,6 @@
     }
 
     private PagedResult<NonconformanceResponse>? _reports;
-    private List<StockResponse> _stocks = [];
-    private List<WorkOrderResponse> _workOrders = [];
     private readonly CreateForm _form = new();
     private readonly Dictionary<int, ActionForm> _forms = [];
     private string _statusFilter = string.Empty;
@@ -174,8 +165,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders") ?? [];
         await LoadAsync();
     }
 

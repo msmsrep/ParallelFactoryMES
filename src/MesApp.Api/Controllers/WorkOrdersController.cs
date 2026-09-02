@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -23,7 +24,8 @@ public class WorkOrdersController(
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<WorkOrderResponse>>> List(
+    public async Task<ActionResult<PagedResult<WorkOrderResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] int? manufacturingOrderId = null,
         [FromQuery] WorkOrderStatus? status = null,
         [FromQuery] int? processId = null,
@@ -52,8 +54,55 @@ public class WorkOrdersController(
         var workOrders = await query
             .OrderBy(w => w.DispatchOrder == null).ThenBy(w => w.DispatchOrder)
             .ThenBy(w => w.ManufacturingOrderId).ThenBy(w => w.RoutingSequence)
+            .ToPagedResultAsync(paging, ct);
+        return workOrders.Map(w => ToResponse(w, w.ManufacturingOrder!));
+    }
+
+    /// <summary>
+    /// 作業指示選択用の選択肢（トラブル報告・検査指示・治工具利用実績などの対象指定）。
+    /// 指示番号・品目コード/名称・工程コード/名称の部分一致で絞り込む。
+    /// </summary>
+    [HttpGet("options")]
+    public async Task<ActionResult<OptionsResult<WorkOrderResponse>>> Options(
+        [FromQuery] OptionQuery options, CancellationToken ct = default)
+    {
+        var query = BaseQuery();
+        if (options.Keyword is { } keyword)
+        {
+            query = query.Where(w =>
+                w.WorkOrderNo.Contains(keyword)
+                || w.Product!.Code.Contains(keyword)
+                || w.Product!.Name.Contains(keyword)
+                || w.Process!.Code.Contains(keyword)
+                || w.Process!.Name.Contains(keyword));
+        }
+        var result = await query
+            .OrderBy(w => w.DispatchOrder == null).ThenBy(w => w.DispatchOrder)
+            .ThenBy(w => w.ManufacturingOrderId).ThenBy(w => w.RoutingSequence)
+            .ToOptionsResultAsync(options, ct);
+        return new OptionsResult<WorkOrderResponse>(
+            [.. result.Items.Select(w => ToResponse(w, w.ManufacturingOrder!))], result.Truncated);
+    }
+
+    /// <summary>
+    /// 工程別の進捗集計（B-60-10-01）。作業指示を全件取ってから画面で数えると
+    /// 件数が増えるほど重くなるため、集計はDB側で行う。取消は対象外。
+    /// </summary>
+    [HttpGet("process-summary")]
+    public async Task<ActionResult<List<ProcessProgressRow>>> ProcessSummary(CancellationToken ct)
+    {
+        return await db.WorkOrders.AsNoTracking()
+            .Where(w => w.Status != WorkOrderStatus.Canceled)
+            .GroupBy(w => new { w.ProcessId, w.Process!.Code, w.Process!.Name })
+            .OrderBy(g => g.Key.Code)
+            .Select(g => new ProcessProgressRow(
+                g.Key.ProcessId, g.Key.Code, g.Key.Name,
+                g.Count(w => w.Status == WorkOrderStatus.Created),
+                g.Count(w => w.Status == WorkOrderStatus.Dispatched),
+                g.Count(w => w.Status == WorkOrderStatus.Started),
+                g.Count(w => w.Status == WorkOrderStatus.Completed),
+                g.Count(w => w.Status == WorkOrderStatus.Approved)))
             .ToListAsync(ct);
-        return workOrders.Select(w => ToResponse(w, w.ManufacturingOrder!)).ToList();
     }
 
     [HttpGet("{id:int}")]

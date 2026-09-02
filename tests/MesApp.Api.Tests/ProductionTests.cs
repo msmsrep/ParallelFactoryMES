@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Users;
@@ -268,5 +269,52 @@ public class ProductionTests
         // 参照は可能（B-10-30-03 指示内容の閲覧）
         var read = await operator_.GetAsync("/api/work-orders");
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+    }
+
+    [Fact]
+    public async Task 作業指示の選択肢は検索で絞り込める()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        var all = await admin.GetFromJsonAsync<OptionsResult<WorkOrderResponse>>("/api/work-orders/options");
+        Assert.Equal(order.WorkOrders.Count, all!.Items.Count);
+        Assert.False(all.Truncated);
+
+        // 指示番号の部分一致
+        var byNo = await admin.GetFromJsonAsync<OptionsResult<WorkOrderResponse>>(
+            $"/api/work-orders/options?q={order.WorkOrders[0].WorkOrderNo}");
+        Assert.Equal(order.WorkOrders[0].Id, Assert.Single(byNo!.Items).Id);
+
+        // 工程コードでも引ける
+        var byProcess = await admin.GetFromJsonAsync<OptionsResult<WorkOrderResponse>>(
+            "/api/work-orders/options?q=PR-01");
+        Assert.Equal(order.WorkOrders.Count, byProcess!.Items.Count);
+
+        var limited = await admin.GetFromJsonAsync<OptionsResult<WorkOrderResponse>>(
+            "/api/work-orders/options?limit=1");
+        Assert.Single(limited!.Items);
+        Assert.True(limited.Truncated);
+    }
+
+    [Fact]
+    public async Task 工程別サマリは状態ごとの件数をDB側で数える()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        var summary = await admin.GetFromJsonAsync<List<ProcessProgressRow>>("/api/work-orders/process-summary");
+        var row = Assert.Single(summary!);
+        Assert.Equal("PR-01", row.ProcessCode);
+        Assert.Equal(order.WorkOrders.Count, row.Created + row.Dispatched + row.Started + row.Completed + row.Approved);
+
+        // 1件着手すると内訳が動く
+        (await admin.PostAsync($"/api/work-orders/{order.WorkOrders[0].Id}/start", null)).EnsureSuccessStatusCode();
+        var after = await admin.GetFromJsonAsync<List<ProcessProgressRow>>("/api/work-orders/process-summary");
+        Assert.Equal(1, Assert.Single(after!).Started);
     }
 }

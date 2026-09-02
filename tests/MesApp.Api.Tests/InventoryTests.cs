@@ -423,4 +423,41 @@ public class InventoryTests
             $"/api/inventory/transactions?lotId={lot.Id}&pageSize=9999");
         Assert.Equal(PageQuery.MaxPageSize, capped!.PageSize);
     }
+
+    [Fact]
+    public async Task ロット選択肢は検索で絞り込め上限超過を知らせる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        var target = await Phase3TestData.ReceiveAsync(
+            admin, ctx.MaterialId, 10m, ctx.MaterialLocationId, lotNumber: "FIND-ME-001");
+        for (var i = 0; i < 3; i++)
+        {
+            await Phase3TestData.ReceiveAsync(
+                admin, ctx.MaterialId, 10m, ctx.MaterialLocationId, lotNumber: $"OTHER-{i:000}");
+        }
+
+        // 絞り込みなしなら全件（上限内なので truncated は false）
+        var all = await admin.GetFromJsonAsync<OptionsResult<StockResponse>>("/api/inventory/stocks/options");
+        Assert.Equal(4, all!.Items.Count);
+        Assert.False(all.Truncated);
+
+        // ロット番号の部分一致（スキャンした値をそのまま渡せる）
+        var found = await admin.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            "/api/inventory/stocks/options?q=FIND-ME");
+        Assert.Equal(target.Id, Assert.Single(found!.Items).LotId);
+
+        // 品目コードでも引ける
+        var byProduct = await admin.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            "/api/inventory/stocks/options?q=RM-01");
+        Assert.Equal(4, byProduct!.Items.Count);
+
+        // 上限を超えたら黙って切らずに知らせる
+        var limited = await admin.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            "/api/inventory/stocks/options?limit=2");
+        Assert.Equal(2, limited!.Items.Count);
+        Assert.True(limited.Truncated);
+    }
 }

@@ -24,13 +24,10 @@
         </div>
         <div class="form-field">
             <label>関連作業指示</label>
-            <select @bind="_workOrderId">
-                <option value="0">なし</option>
-                @foreach (var workOrder in _workOrders)
-                {
-                    <option value="@workOrder.Id">@workOrder.WorkOrderNo（@workOrder.ProductCode）</option>
-                }
-            </select>
+            <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
+                          @bind-Value="_workOrderId" EmptyLabel="なし"
+                          ValueOf="w => w.Id"
+                          LabelOf='@(w => $"{w.WorkOrderNo}（{w.ProductCode}）")' />
         </div>
         <div class="form-field">
             <label>使用回数</label>
@@ -138,7 +135,6 @@
 
 @code {
     private List<ToolResponse> _tools = [];
-    private List<WorkOrderResponse> _workOrders = [];
     private List<ToolLifeStatusRow>? _lifeStatus;
     private PagedResult<ToolUsageResponse>? _usages;
 
@@ -154,7 +150,6 @@
     protected override async Task OnInitializedAsync()
     {
         _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders") ?? [];
         await LoadAsync();
     }
 

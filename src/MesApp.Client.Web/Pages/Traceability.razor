@@ -228,11 +228,13 @@
         _forward = null;
         _history = null;
 
-        // ロット番号 → ロットIDの解決（在庫が0のロットも追跡できるよう includeEmpty で検索）
-        var stocks = await Http.GetFromJsonAsync<List<StockResponse>>(
-            "api/inventory/stocks?includeEmpty=true") ?? [];
-        var match = stocks.FirstOrDefault(s =>
-            string.Equals(s.LotNumber, lotNumber.Trim(), StringComparison.OrdinalIgnoreCase));
+        // ロット番号 → ロットIDの解決（在庫が0のロットも追跡できるよう includeEmpty で検索）。
+        // 全件を取らずに、選択肢APIへロット番号を渡して引く
+        var keyword = lotNumber.Trim();
+        var stocks = await Http.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            $"api/inventory/stocks/options?includeEmpty=true&q={Uri.EscapeDataString(keyword)}");
+        var match = stocks?.Items.FirstOrDefault(s =>
+            string.Equals(s.LotNumber, keyword, StringComparison.OrdinalIgnoreCase));
         if (match is null)
         {
             _error = $"ロット '{lotNumber}' が見つかりません。";

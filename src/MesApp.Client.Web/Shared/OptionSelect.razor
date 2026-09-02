@@ -1,0 +1,85 @@
+@* 検索して選ぶドロップダウン。選択肢API（OptionsResult）を返すエンドポイントと組み合わせて使う *@
+@typeparam TItem
+@inject HttpClient Http
+
+<input type="search" placeholder="@Placeholder" value="@_keyword" @oninput="OnKeywordChangedAsync" />
+<select value="@Value" @onchange="OnSelectedAsync">
+    <option value="0">@EmptyLabel</option>
+    @foreach (var item in Visible)
+    {
+        <option value="@ValueOf(item)">@LabelOf(item)</option>
+    }
+</select>
+@if (_truncated)
+{
+    <span class="text-muted">該当が多いため一部のみ表示しています。コードで絞り込んでください。</span>
+}
+
+@code {
+    /// <summary>選択肢APIのURL（例: api/inventory/stocks/options）。クエリは付けずに渡す</summary>
+    [Parameter, EditorRequired] public string Endpoint { get; set; } = string.Empty;
+
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+
+    /// <summary>選択された項目そのもの（ロケーション等、IDだけでは足りない情報を画面が使うため）</summary>
+    [Parameter] public EventCallback<TItem?> SelectedItemChanged { get; set; }
+
+    [Parameter, EditorRequired] public Func<TItem, int> ValueOf { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<TItem, string> LabelOf { get; set; } = default!;
+
+    [Parameter] public string EmptyLabel { get; set; } = "選択してください";
+    [Parameter] public string Placeholder { get; set; } = "コードで検索（スキャン可）";
+
+    /// <summary>
+    /// 取得した選択肢をさらに絞る条件（出荷実行で指図の品目に限る場合など）。
+    /// サーバー側の検索の上に重ねる表示フィルタなので、絞り込みは検索語で行うのが基本。
+    /// </summary>
+    [Parameter] public Func<TItem, bool>? Filter { get; set; }
+
+    private List<TItem> _items = [];
+    private string _keyword = string.Empty;
+    private bool _truncated;
+
+    /// <summary>入力のたびに投げないための世代番号（古い応答で新しい結果を上書きしない）</summary>
+    private int _generation;
+
+    private IEnumerable<TItem> Visible => Filter is null ? _items : _items.Where(Filter);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task OnKeywordChangedAsync(ChangeEventArgs e)
+    {
+        _keyword = e.Value?.ToString() ?? string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var generation = ++_generation;
+        // Endpointが既にクエリを持つ場合（状態での絞り込みなど）も連結できるようにする
+        var separator = Endpoint.Contains('?') ? '&' : '?';
+        var url = string.IsNullOrWhiteSpace(_keyword)
+            ? Endpoint
+            : $"{Endpoint}{separator}q={Uri.EscapeDataString(_keyword.Trim())}";
+        var result = await Http.GetFromJsonAsync<OptionsResult<TItem>>(url);
+        if (generation != _generation)
+        {
+            // 入力が進んでいる。古い応答は捨てる
+            return;
+        }
+        _items = [.. result?.Items ?? []];
+        _truncated = result?.Truncated ?? false;
+    }
+
+    private async Task OnSelectedAsync(ChangeEventArgs e)
+    {
+        Value = int.TryParse(e.Value?.ToString(), out var parsed) ? parsed : 0;
+        await ValueChanged.InvokeAsync(Value);
+        if (SelectedItemChanged.HasDelegate)
+        {
+            await SelectedItemChanged.InvokeAsync(
+                _items.FirstOrDefault(item => ValueOf(item) == Value));
+        }
+    }
+}

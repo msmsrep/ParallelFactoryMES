@@ -58,7 +58,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_stocks.Count == 0)
+    else if (_stocks.Total == 0)
     {
         <p class="text-muted">受入在庫はありません。</p>
     }
@@ -69,7 +69,7 @@
                 <tr><th>ロット番号</th><th>品目</th><th>ロケーション</th><th>数量</th><th>ステータス</th><th>有効期限</th><th></th></tr>
             </thead>
             <tbody>
-                @foreach (var stock in _stocks)
+                @foreach (var stock in _stocks.Items)
                 {
                     <tr>
                         <td>@stock.LotNumber</td>
@@ -87,6 +87,7 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="StockResponse" Result="_stocks" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
@@ -104,7 +105,7 @@
     private readonly ReceivingForm _form = new();
     private List<ProductResponse> _products = [];
     private List<LocationResponse> _locations = [];
-    private List<StockResponse>? _stocks;
+    private PagedResult<StockResponse>? _stocks;
     private string? _error;
     private string? _message;
     private bool _busy;
@@ -116,8 +117,10 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync() =>
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks");
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page) =>
+        _stocks = await Http.GetFromJsonAsync<PagedResult<StockResponse>>($"api/inventory/stocks?page={page}");
 
     private async Task ReceiveAsync()
     {

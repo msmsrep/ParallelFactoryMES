@@ -31,7 +31,8 @@ public class InventoryController(
     // ---- 照会（D-10-30-01：品目別・ロケーション別・ロット別）----
 
     [HttpGet("stocks")]
-    public async Task<ActionResult<List<StockResponse>>> Stocks(
+    public async Task<ActionResult<PagedResult<StockResponse>>> Stocks(
+        [FromQuery] PageQuery paging,
         [FromQuery] int? productId = null,
         [FromQuery] int? locationId = null,
         [FromQuery] int? lotId = null,
@@ -61,7 +62,40 @@ public class InventoryController(
                 s.Id, s.ProductId, s.Product!.Code, s.Product!.Name,
                 s.LotId, s.Lot!.LotNumber, s.Lot!.StockStatus, s.Lot!.ExpiresOn,
                 s.LocationId, s.Location!.Code, s.Quantity))
-            .ToListAsync(ct);
+            .ToPagedResultAsync(paging, ct);
+    }
+
+    /// <summary>
+    /// ロット選択用の選択肢（検査指示・不適合起票・出荷判定などの対象ロット指定）。
+    /// 一覧（stocks）と違いページを送らず、ロット番号・品目コード/名称の部分一致で絞り込む。
+    /// スキャンしたロット番号をそのまま q に渡せる。
+    /// </summary>
+    [HttpGet("stocks/options")]
+    public async Task<ActionResult<OptionsResult<StockResponse>>> StockOptions(
+        [FromQuery] OptionQuery options,
+        // 在庫0のロットも含める（トレーサビリティのロット番号解決で使う）
+        [FromQuery] bool includeEmpty = false,
+        CancellationToken ct = default)
+    {
+        var query = db.InventoryStocks.AsNoTracking().AsQueryable();
+        if (!includeEmpty)
+        {
+            query = query.Where(s => s.Quantity > 0);
+        }
+        if (options.Keyword is { } keyword)
+        {
+            query = query.Where(s =>
+                s.Lot!.LotNumber.Contains(keyword)
+                || s.Product!.Code.Contains(keyword)
+                || s.Product!.Name.Contains(keyword));
+        }
+        return await query
+            .OrderBy(s => s.Lot!.LotNumber).ThenBy(s => s.Location!.Code)
+            .Select(s => new StockResponse(
+                s.Id, s.ProductId, s.Product!.Code, s.Product!.Name,
+                s.LotId, s.Lot!.LotNumber, s.Lot!.StockStatus, s.Lot!.ExpiresOn,
+                s.LocationId, s.Location!.Code, s.Quantity))
+            .ToOptionsResultAsync(options, ct);
     }
 
     /// <summary>滞留在庫の期限管理・アラート（D-10-30-09。有効期限が指定日数以内または超過の在庫）</summary>

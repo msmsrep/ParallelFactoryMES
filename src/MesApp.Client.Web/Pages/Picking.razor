@@ -23,26 +23,21 @@
         {
             <div class="form-field">
                 <label>払出先 作業指示</label>
-                <select @bind="_workOrderId">
-                    <option value="0">選択してください</option>
-                    @foreach (var workOrder in _workOrders)
-                    {
-                        <option value="@workOrder.Id">@workOrder.WorkOrderNo（@workOrder.ProductCode / @workOrder.ProcessCode）</option>
-                    }
-                </select>
+                <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
+                              @bind-Value="_workOrderId"
+                              ValueOf="w => w.Id"
+                              LabelOf='@(w => $"{w.WorkOrderNo}（{w.ProductCode} / {w.ProcessCode}）")' />
             </div>
         }
         else
         {
             <div class="form-field">
                 <label>払出先 出荷指示</label>
-                <select @bind="_shippingOrderId">
-                    <option value="0">選択してください</option>
-                    @foreach (var shipping in _shippingOrders)
-                    {
-                        <option value="@shipping.Id">@shipping.ShippingNo（@shipping.Destination）</option>
-                    }
-                </select>
+                <OptionSelect TItem="ShippingOrderResponse"
+                              Endpoint="api/shipping-orders/options?status=Instructed"
+                              @bind-Value="_shippingOrderId"
+                              ValueOf="s => s.Id"
+                              LabelOf='@(s => $"{s.ShippingNo}（{s.Destination}）")' />
             </div>
         }
         <div class="form-field">
@@ -158,8 +153,6 @@
 @code {
     private PagedResult<PickingOrderResponse>? _orders;
     private List<ProductResponse> _products = [];
-    private List<WorkOrderResponse> _workOrders = [];
-    private List<ShippingOrderResponse> _shippingOrders = [];
     private readonly List<PickingRequestLine> _lines = [];
     private readonly Dictionary<int, string?> _scans = [];
 
@@ -175,9 +168,6 @@
     protected override async Task OnInitializedAsync()
     {
         _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders") ?? [];
-        _shippingOrders = await Http.GetFromJsonAsync<List<ShippingOrderResponse>>(
-            "api/shipping-orders?status=Instructed") ?? [];
         await LoadAsync();
     }
 
