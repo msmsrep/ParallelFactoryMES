@@ -90,6 +90,7 @@ public class AuthController(
 
     [HttpGet("me")]
     [Authorize]
+    [AllowPendingPasswordChange]
     public async Task<ActionResult<UserInfo>> Me()
     {
         var user = await userManager.GetUserAsync(User);
@@ -103,6 +104,7 @@ public class AuthController(
 
     [HttpPost("change-password")]
     [Authorize]
+    [AllowPendingPasswordChange]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken ct)
     {
         var user = await userManager.GetUserAsync(User);

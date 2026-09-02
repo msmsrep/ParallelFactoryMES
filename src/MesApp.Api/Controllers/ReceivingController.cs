@@ -59,6 +59,10 @@ public class ReceivingController(
             StockStatus = LotStockStatus.Normal,
         };
         db.Lots.Add(lot);
+
+        // Lot.Idの確定に一度SaveChangesが要るため保存が2回に分かれる。
+        // 途中で失敗すると「在庫のないロット」が残るので、明示的なトランザクションでまとめる
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct); // Lot.Idの確定
 
         await inventory.AddAsync(lot, request.LocationId, request.Quantity,
@@ -67,6 +71,7 @@ public class ReceivingController(
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Receive", nameof(Lot), lot.Id.ToString(),
             detail: $"lot={lotNumber}, product={product.Code}, qty={request.Quantity}", ct: ct);
+        await transaction.CommitAsync(ct);
 
         return new LotResponse(lot.Id, lot.LotNumber, product.Id, product.Code, product.Name,
             lot.InitialQuantity, lot.OriginType, lot.StockStatus,

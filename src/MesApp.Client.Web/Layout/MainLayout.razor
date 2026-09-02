@@ -24,6 +24,26 @@
 </div>
 
 @code {
+    private const string ChangePasswordPath = "change-password";
+
+    /// <summary>
+    /// 初期パスワードのままの利用者はパスワード変更画面へ誘導する。
+    /// APIも同じ状態のトークンを403で拒否する（MustChangePasswordFilter）ため、
+    /// ここで止めないとどの画面も読み込みに失敗するだけになる。
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (Tokens.User?.MustChangePassword != true)
+        {
+            return;
+        }
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?')[0].TrimStart('/');
+        if (!path.Equals(ChangePasswordPath, StringComparison.OrdinalIgnoreCase))
+        {
+            Navigation.NavigateTo(ChangePasswordPath, replace: true);
+        }
+    }
+
     private async Task LogoutAsync()
     {
         await Auth.LogoutAsync();

@@ -30,7 +30,7 @@
 | 製造履歴訂正（訂正履歴＋監査ログ） | B-70-30-01 | `ProductionRecordsController.cs` `api/production-records` | Execution.cs: ProductionRecord / **ProductionRecordCorrection**（訂正前の値。Spec.md 5.7） | `/traceability` の履歴タブに訂正履歴を表示 | `Tests/ExecutionTests.cs` / `QualityTests.cs` |
 | 作業時間記録（直接/間接） | B-30-30-02 / F-30-20-02 | `WorkTimeRecordsController.cs` `api/work-time-records` | Execution.cs: WorkTimeRecord | `ProductionRecordEntry.razor` 内 | **テストなし**（触るなら追加する） |
 | 製造トラブル報告 | B-40-10-06 / B-60-10 | `TroubleReportsController.cs` `api/trouble-reports` | Execution.cs: TroubleReport | `ProcessProgress.razor` 内 | `Tests/ExecutionTests.cs` |
-| 工程間搬送・移動指示 | B-50-10 / D-30-10-04 | `TransferOrdersController.cs` `api/transfer-orders` | Execution.cs: TransferOrder | `/inventory` `Inventory.razor` 内 | `Tests/InventoryTests.cs` |
+| 工程間搬送・移動指示 | B-50-10 / D-30-10-04 | `TransferOrdersController.cs` `api/transfer-orders`（更新系は在庫権限） | Execution.cs: TransferOrder | **画面なし**（`Inventory.razor` の「振替」は別機能の `api/inventory/transfer`） | `Tests/InventoryTests.cs` |
 | 設備稼働報告・稼働監視 | B-40-20 / E-20-10 | `EquipmentLogsController.cs` `api/equipment-logs` | `Core/Entities/Maintenance.cs`: EquipmentLog | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
 
 ## C. 品質管理
@@ -86,6 +86,8 @@
 | 関心事 | 実装 | 備考 |
 |:--|:--|:--|
 | 認証（JWT＋リフレッシュ） | `Api/Controllers/AuthController.cs` `api/auth`<br>`Api/Services/JwtTokenService.cs` / `RefreshTokenService.cs` / `SigningKeyProvider.cs` / `JwtOptions.cs`<br>`Web/Auth/AuthService.cs` / `AuthMessageHandler.cs` / `TokenStore.cs` / `ApiAuthenticationStateProvider.cs` | Spec.md 7.4。`/login` `Login.razor`、`/change-password`。`Tests/AuthTests.cs` / `TestAuth.cs` |
+| エラー応答（競合の変換） | `Api/MesAppExceptionFilter.cs`<br>`Api/MesAppHost.cs`（`AddProblemDetails` / `UseExceptionHandler`） | Spec.md 3.9「競合時の応答」。楽観ロック（`DbUpdateConcurrencyException`）・採番衝突（`DbUpdateException`）を409、`InventoryException`を400の日本語ProblemDetailsへ。**コントローラ側に例外処理を増やさない** |
+| 初回パスワード変更の強制 | `Api/MustChangePasswordFilter.cs`（＋`AllowPendingPasswordChange`属性）<br>`Core/Constants/MesClaimTypes.cs`<br>`Api/Services/JwtTokenService.cs`（クレーム付与）<br>`Web/Layout/MainLayout.razor`（画面誘導） | Spec.md 7.4。未変更のトークンは参照系も403。素通しするアクションには`[AllowPendingPasswordChange]`を付ける（現状は`api/auth/me`と`api/auth/change-password`のみ）。`Tests/AuthTests.cs` |
 | ロール定義・権限グループ | `Core/Constants/MesRoles.cs`（7ロール）<br>`Api/RoleGroups.cs`（MasterWrite / ProductionManage / UserAdmin / InventoryManage 等） | 新しい組み合わせが要るときだけ RoleGroups に追加 |
 | 初期セットアップ（初期管理者） | `Api/Controllers/SetupController.cs` `api/setup`<br>`Api/Services/IdentitySeeder.cs` | Spec.md 2.2 E。`/setup` `Setup.razor`。`Tests/SetupTests.cs` |
 | 監査ログ | `Core/Abstractions/IAuditLogger.cs`<br>`Infra/Services/AuditLogger.cs`<br>`Core/Entities/AuditLog.cs` | Spec.md 7.6。**全ての書き込み系アクションで呼ぶ**。変更前後を追跡する操作は `detail:` に匿名オブジェクト（`{ before, after, reason }`）を渡す＝JSON保存。要約でよい操作は文字列のまま |

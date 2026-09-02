@@ -346,8 +346,40 @@ public class InventoryTests
             new MoveRequest(lot.Id, ctx.MaterialLocationId, ctx.ProductLocationId, 1m));
         Assert.Equal(HttpStatusCode.Forbidden, move.StatusCode);
 
+        // 搬送指示も実在庫を動かすので在庫権限が要る
+        var transfer = await operator_.PostAsJsonAsync("/api/transfer-orders",
+            new TransferOrderRequest(lot.Id, 1m, ctx.MaterialLocationId, ctx.ProductLocationId));
+        Assert.Equal(HttpStatusCode.Forbidden, transfer.StatusCode);
+
         // 参照は可能
         var stocks = await operator_.GetAsync("/api/inventory/stocks");
         Assert.Equal(HttpStatusCode.OK, stocks.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await operator_.GetAsync("/api/transfer-orders")).StatusCode);
+    }
+
+    [Fact]
+    public async Task 同時受入の競合は500ではなく409で返る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // ロット番号は採番（読み取り→+1）のため同時実行で衝突しうる。
+        // MesAppExceptionFilterが一意制約違反を409へ変換するので、5xxは出てはいけない
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+            admin.PostAsJsonAsync("/api/receiving",
+                new ReceivingRequest(ctx.MaterialId, 1m, ctx.MaterialLocationId, null, null, null))));
+
+        foreach (var response in responses)
+        {
+            Assert.True((int)response.StatusCode < 500,
+                $"サーバーエラーが返りました：{(int)response.StatusCode}");
+            Assert.True(
+                response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Conflict,
+                $"想定外のステータスです：{(int)response.StatusCode}");
+        }
+
+        // 少なくとも1件は成立している
+        Assert.Contains(responses, r => r.IsSuccessStatusCode);
     }
 }

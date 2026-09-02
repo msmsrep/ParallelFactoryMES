@@ -1,19 +1,11 @@
 @page "/"
 @attribute [Authorize]
 @inject HttpClient Http
-@inject TokenStore Tokens
 @inject NavigationManager Navigation
 
 <PageTitle>ダッシュボード - Parallel Factory MES</PageTitle>
 
 <h1>ダッシュボード</h1>
-
-@if (Tokens.User?.MustChangePassword == true)
-{
-    <div class="alert alert-danger">
-        初期パスワードのままです。<a href="change-password">パスワードを変更</a>してください。
-    </div>
-}
 
 <h2>生産進捗（A-30-10-01）</h2>
 @if (_progress is null)

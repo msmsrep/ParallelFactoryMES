@@ -159,6 +159,10 @@ public class InspectionOrdersController(
             }).ToList(),
         };
         db.InspectionOrders.Add(order);
+
+        // 履歴に検査指示IDを残すため保存が2回に分かれる。途中で失敗すると
+        // 「検査指示はあるのに対象ロットが検査待ちにならない」状態が残るのでトランザクションでまとめる
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct);
 
         // 対象ロットを検査待ちへ（サンプル検査はロットを拘束しない）。
@@ -171,6 +175,7 @@ public class InspectionOrdersController(
         }
         await auditLogger.LogAsync("Quality", "InspectionCreate", nameof(InspectionOrder), order.Id.ToString(),
             detail: $"orderNo={order.OrderNo}, type={order.Type}", ct: ct);
+        await transaction.CommitAsync(ct);
         var saved = await BaseQuery().FirstAsync(o => o.Id == order.Id, ct);
         return CreatedAtAction(nameof(Get), new { id = order.Id }, ToResponse(saved));
     }

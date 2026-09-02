@@ -11,7 +11,12 @@ using Microsoft.EntityFrameworkCore;
 namespace MesApp.Api.Controllers;
 
 /// <summary>
-/// 搬送・移動指示（B-50-10-01〜02 半製品の搬送指示と移動実行、D-30-10-04 工程間在庫搬送）
+/// 搬送・移動指示（B-50-10-01〜02 半製品の搬送指示と移動実行、D-30-10-04 工程間在庫搬送）。
+/// <para>
+/// 実行は <c>InventoryService.MoveAsync</c> で実在庫を動かすため、更新系は
+/// <c>InventoryController</c> の在庫操作と同じ在庫権限（<see cref="RoleGroups.InventoryManage"/>）で揃える。
+/// 参照は認証済みユーザー全員に開放する。
+/// </para>
 /// </summary>
 [ApiController]
 [Route("api/transfer-orders")]
@@ -45,6 +50,7 @@ public class TransferOrdersController(
 
     /// <summary>搬送指示の作成（B-50-10-01）</summary>
     [HttpPost]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<TransferOrderResponse>> Create(TransferOrderRequest request, CancellationToken ct)
     {
         if (!await db.Lots.AnyAsync(l => l.Id == request.LotId, ct))
@@ -76,6 +82,7 @@ public class TransferOrdersController(
 
     /// <summary>移動実行（B-50-10-02。在庫を移動して完了にする）</summary>
     [HttpPost("{id:int}/execute")]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<TransferOrderResponse>> Execute(int id, CancellationToken ct)
     {
         var order = await db.TransferOrders.Include(t => t.Lot).FirstOrDefaultAsync(t => t.Id == id, ct);
@@ -108,6 +115,7 @@ public class TransferOrdersController(
     }
 
     [HttpPost("{id:int}/cancel")]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<TransferOrderResponse>> Cancel(int id, CancellationToken ct)
     {
         var order = await db.TransferOrders.FindAsync([id], ct);

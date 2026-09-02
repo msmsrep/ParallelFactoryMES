@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using MesApp.Core.Constants;
 using MesApp.Core.Entities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -20,8 +21,13 @@ public class JwtTokenService(SigningKeyProvider keyProvider, IOptions<JwtOptions
             new(JwtRegisteredClaimNames.Sub, user.Id),
             new(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
-            new("display_name", user.DisplayName),
+            new(MesClaimTypes.DisplayName, user.DisplayName),
         };
+        // 初期パスワードのままのトークンには印を付ける（MustChangePasswordFilterが業務APIを止める）
+        if (user.MustChangePassword)
+        {
+            claims.Add(new Claim(MesClaimTypes.MustChangePassword, "true"));
+        }
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
         var token = new JwtSecurityToken(

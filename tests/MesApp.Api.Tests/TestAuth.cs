@@ -32,7 +32,11 @@ public static class TestAuth
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token!.AccessToken);
     }
 
-    /// <summary>管理者クライアントで別ロールのユーザーを作成し、そのユーザーの認証済みクライアントを返す</summary>
+    /// <summary>
+    /// 管理者クライアントで別ロールのユーザーを作成し、そのユーザーの認証済みクライアントを返す。
+    /// 作成直後は MustChangePassword が立っていて業務APIを呼べないため、
+    /// 初回パスワード変更まで済ませた状態にしてから返す。
+    /// </summary>
     public static async Task<HttpClient> CreateUserClientAsync(
         ApiFactory factory, HttpClient adminClient, string userName, string password, params string[] roles)
     {
@@ -41,6 +45,12 @@ public static class TestAuth
         created.EnsureSuccessStatusCode();
 
         var client = factory.CreateClient();
+        await LoginAsync(client, userName, password);
+
+        // 同じパスワードへの変更でも初回変更の要求は解ける（テストの呼び出し側がパスワードを持ち回れるようにする）
+        var changed = await client.PostAsJsonAsync(
+            "/api/auth/change-password", new ChangePasswordRequest(password, password));
+        changed.EnsureSuccessStatusCode();
         await LoginAsync(client, userName, password);
         return client;
     }

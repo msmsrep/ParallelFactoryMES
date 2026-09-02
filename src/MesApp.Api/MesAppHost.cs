@@ -29,7 +29,11 @@ public static class MesAppHost
 
         // MesApp.Desktopから起動するとエントリアセンブリがAPIではなくなり、コントローラの自動探索が働かない。
         // このアセンブリを明示登録する（重複登録するとルートが二重になるため存在チェックを挟む）。
-        builder.Services.AddControllers()
+        builder.Services.AddControllers(options =>
+            {
+                options.Filters.Add<MustChangePasswordFilter>();
+                options.Filters.Add<MesAppExceptionFilter>();
+            })
             .ConfigureApplicationPartManager(manager =>
             {
                 var apiAssembly = typeof(MesAppHost).Assembly;
@@ -40,6 +44,8 @@ public static class MesAppHost
             });
         builder.Services.AddOpenApi();
         builder.Services.AddHttpContextAccessor();
+        // MesAppExceptionFilterで拾わない想定外の例外も、本文なしの500ではなくProblemDetailsで返す
+        builder.Services.AddProblemDetails();
 
         // DB・監査ログ（Spec.md 4章・7.6）
         builder.Services.AddMesAppInfrastructure(builder.Configuration);
@@ -97,6 +103,9 @@ public static class MesAppHost
         builder.Services.AddAuthorization();
 
         var app = builder.Build();
+
+        // 想定外の例外のフォールバック（開発環境では先に開発者例外ページが処理する）
+        app.UseExceptionHandler();
 
         if (app.Environment.IsDevelopment())
         {

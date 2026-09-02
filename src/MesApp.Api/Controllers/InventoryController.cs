@@ -261,6 +261,9 @@ public class InventoryController(
         };
         db.Lots.Add(newLot);
 
+        // newLot.Idの確定に一度SaveChangesが要るため保存が2回に分かれる。
+        // 途中で失敗すると分割元から減った在庫が分割先に入らず消えるので、トランザクションでまとめる
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         try
         {
             await inventory.RemoveAsync(lot, request.LocationId, request.Quantity,
@@ -277,6 +280,7 @@ public class InventoryController(
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Split", nameof(Lot), lot.Id.ToString(),
             detail: new { from = lot.LotNumber, to = newLotNumber, quantity = request.Quantity }, ct: ct);
+        await transaction.CommitAsync(ct);
 
         return new LotResponse(newLot.Id, newLot.LotNumber, lot.ProductId, lot.Product!.Code, lot.Product!.Name,
             newLot.InitialQuantity, newLot.OriginType, newLot.StockStatus,
@@ -380,6 +384,9 @@ public class InventoryController(
         };
         db.Lots.Add(newLot);
 
+        // 分割と同じく、newLot.Idの確定で保存が2回に分かれる。振替元から減らした在庫が
+        // 振替先に入らないまま確定しないよう、トランザクションでまとめる
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         try
         {
             await inventory.RemoveAsync(lot, request.LocationId, request.Quantity,
@@ -401,6 +408,7 @@ public class InventoryController(
                 to = new { lot = newLotNumber, product = newProduct.Code },
                 quantity = request.Quantity,
             }, ct: ct);
+        await transaction.CommitAsync(ct);
 
         return new LotResponse(newLot.Id, newLot.LotNumber, newProduct.Id, newProduct.Code, newProduct.Name,
             newLot.InitialQuantity, newLot.OriginType, newLot.StockStatus,
