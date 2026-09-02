@@ -14,10 +14,13 @@ namespace MesApp.Api.Controllers;
 /// <summary>
 /// 出庫・ピッキング指示（D-20-10 出庫指示・ピッキング指示、D-20-20 ピッキング実行・払出）。
 /// 明細のロット・ロケーションは作成時に先入れ先出し（有効期限優先）で自動引当する（D-20-10-02）。
+/// 参照系は認証済みユーザー全員に開放し、更新系のみ在庫権限に絞る（Spec.md 7.4）。
+/// <b>クラスへ <c>[Authorize(Roles = ...)]</c> を付けてはならない</b>：認可属性はクラスとアクションで
+/// 合成されるため、アクション側の <c>[Authorize]</c> では開放できず、参照系まで在庫ロール限定になる。
 /// </summary>
 [ApiController]
 [Route("api/picking-orders")]
-[Authorize(Roles = RoleGroups.InventoryManage)]
+[Authorize]
 public class PickingOrdersController(
     MesAppDbContext db,
     InventoryService inventory,
@@ -25,7 +28,6 @@ public class PickingOrdersController(
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
-    [Authorize]
     public async Task<ActionResult<PagedResult<PickingOrderResponse>>> List(
         [FromQuery] PageQuery paging,
         [FromQuery] PickingOrderStatus? status = null,
@@ -46,7 +48,6 @@ public class PickingOrdersController(
     }
 
     [HttpGet("{id:int}")]
-    [Authorize]
     public async Task<ActionResult<PickingOrderResponse>> Get(int id, CancellationToken ct)
     {
         var order = await BaseQuery().FirstOrDefaultAsync(p => p.Id == id, ct);
@@ -55,6 +56,7 @@ public class PickingOrdersController(
 
     /// <summary>ピッキング指示の作成（払出先＝作業指示または出荷指示。FEFOで自動引当）</summary>
     [HttpPost]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<PickingOrderResponse>> Create(
         PickingOrderCreateRequest request, CancellationToken ct)
     {
@@ -114,6 +116,7 @@ public class PickingOrdersController(
 
     /// <summary>ピッキング実行・払出（D-20-20-01〜02。在庫を引き落として完了にする）</summary>
     [HttpPost("{id:int}/execute")]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<PickingOrderResponse>> Execute(int id, CancellationToken ct)
     {
         var order = await db.PickingOrders
@@ -158,6 +161,7 @@ public class PickingOrdersController(
     }
 
     [HttpPost("{id:int}/cancel")]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<PickingOrderResponse>> Cancel(int id, CancellationToken ct)
     {
         var order = await db.PickingOrders.FindAsync([id], ct);

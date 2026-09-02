@@ -17,10 +17,13 @@ namespace MesApp.Api.Controllers;
 /// 出荷実行はロット・ロケーション指定で在庫を引き落とす。部分出荷可能で、
 /// 全明細が出荷済みになると完了になる。出荷には承認済みの出荷判定（H-10-10）が必要で、
 /// 併せてロットの使用可否（Spec.md 3.9。LotUsabilityPolicy）を満たす必要がある。
+/// 参照系は認証済みユーザー全員に開放し、更新系のみ在庫権限に絞る（Spec.md 7.4）。
+/// <b>クラスへ <c>[Authorize(Roles = ...)]</c> を付けてはならない</b>：認可属性はクラスとアクションで
+/// 合成されるため、アクション側の <c>[Authorize]</c> では開放できず、参照系まで在庫ロール限定になる。
 /// </summary>
 [ApiController]
 [Route("api/shipping-orders")]
-[Authorize(Roles = RoleGroups.InventoryManage)]
+[Authorize]
 public class ShippingOrdersController(
     MesAppDbContext db,
     InventoryService inventory,
@@ -29,7 +32,6 @@ public class ShippingOrdersController(
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
-    [Authorize]
     public async Task<ActionResult<PagedResult<ShippingOrderResponse>>> List(
         [FromQuery] PageQuery paging,
         [FromQuery] ShippingOrderStatus? status = null, CancellationToken ct = default)
@@ -44,7 +46,6 @@ public class ShippingOrdersController(
     }
 
     [HttpGet("{id:int}")]
-    [Authorize]
     public async Task<ActionResult<ShippingOrderResponse>> Get(int id, CancellationToken ct)
     {
         var order = await BaseQuery().FirstOrDefaultAsync(s => s.Id == id, ct);
@@ -53,6 +54,7 @@ public class ShippingOrdersController(
 
     /// <summary>出荷指示の作成（D-40-20-01）</summary>
     [HttpPost]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<ShippingOrderResponse>> Create(
         ShippingOrderCreateRequest request, CancellationToken ct)
     {
@@ -89,6 +91,7 @@ public class ShippingOrdersController(
     /// 部分出荷可。全明細が満たされると完了（D-40-30-05））
     /// </summary>
     [HttpPost("{id:int}/ship")]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<ShippingOrderResponse>> Ship(
         int id, ShipExecuteRequest request, CancellationToken ct)
     {
@@ -184,6 +187,7 @@ public class ShippingOrdersController(
     }
 
     [HttpPost("{id:int}/cancel")]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<ShippingOrderResponse>> Cancel(int id, CancellationToken ct)
     {
         var order = await db.ShippingOrders.FindAsync([id], ct);

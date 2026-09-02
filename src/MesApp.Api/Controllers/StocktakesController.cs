@@ -13,10 +13,13 @@ namespace MesApp.Api.Controllers;
 
 /// <summary>
 /// 棚卸（D-50-10）：指示作成（理論在庫のスナップショット）→実棚数登録→差異一覧→確定（差異調整）
+/// 参照系は認証済みユーザー全員に開放し、更新系のみ在庫権限に絞る（Spec.md 7.4）。
+/// <b>クラスへ <c>[Authorize(Roles = ...)]</c> を付けてはならない</b>：認可属性はクラスとアクションで
+/// 合成されるため、アクション側の <c>[Authorize]</c> では開放できず、参照系まで在庫ロール限定になる。
 /// </summary>
 [ApiController]
 [Route("api/stocktakes")]
-[Authorize(Roles = RoleGroups.InventoryManage)]
+[Authorize]
 public class StocktakesController(
     MesAppDbContext db,
     InventoryService inventory,
@@ -24,7 +27,6 @@ public class StocktakesController(
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
-    [Authorize]
     public async Task<ActionResult<PagedResult<StocktakeResponse>>> List(
         [FromQuery] PageQuery paging, CancellationToken ct = default)
     {
@@ -33,7 +35,6 @@ public class StocktakesController(
     }
 
     [HttpGet("{id:int}")]
-    [Authorize]
     public async Task<ActionResult<StocktakeResponse>> Get(int id, CancellationToken ct)
     {
         var stocktake = await BaseQuery().FirstOrDefaultAsync(s => s.Id == id, ct);
@@ -42,6 +43,7 @@ public class StocktakesController(
 
     /// <summary>棚卸指示の作成（D-50-10-01。現在庫（数量>0）のスナップショットを明細化）</summary>
     [HttpPost]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<StocktakeResponse>> Create(StocktakeCreateRequest request, CancellationToken ct)
     {
         if (request.TargetLocationId is int locationId
@@ -84,6 +86,7 @@ public class StocktakesController(
 
     /// <summary>実棚数の登録（D-50-10-02。部分登録可・上書き可）</summary>
     [HttpPut("{id:int}/counts")]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<StocktakeResponse>> RegisterCounts(
         int id, StocktakeCountRequest request, CancellationToken ct)
     {
@@ -116,6 +119,7 @@ public class StocktakesController(
     /// 棚卸確定（D-50-10-05）。実棚入力済みの明細について現在庫との差異を棚卸調整で反映する（D-50-10-04）。
     /// </summary>
     [HttpPost("{id:int}/finalize")]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<StocktakeResponse>> Finalize(int id, CancellationToken ct)
     {
         var stocktake = await db.Stocktakes
@@ -173,6 +177,7 @@ public class StocktakesController(
     }
 
     [HttpPost("{id:int}/cancel")]
+    [Authorize(Roles = RoleGroups.InventoryManage)]
     public async Task<ActionResult<StocktakeResponse>> Cancel(int id, CancellationToken ct)
     {
         var stocktake = await db.Stocktakes.FindAsync([id], ct);

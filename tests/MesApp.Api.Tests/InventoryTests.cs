@@ -479,4 +479,34 @@ public class InventoryTests
         Assert.Equal(2, limited!.Items.Count);
         Assert.True(limited.Truncated);
     }
+
+    [Fact]
+    public async Task 品質保証ロールは出荷_出庫_棚卸を参照できるが更新はできない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        using var qa = await TestAuth.CreateUserClientAsync(
+            factory, admin, "qa1", "Passw0rd123", MesRoles.QualityAssurance);
+
+        // 参照：出荷判定（H-10-10）は対象の出荷指示を選ぶところから始まるため、
+        // 参照できないと品質保証ロール単独では判定を作成できない
+        Assert.Equal(HttpStatusCode.OK, (await qa.GetAsync("/api/shipping-orders")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await qa.GetAsync("/api/shipping-orders/options")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await qa.GetAsync("/api/picking-orders")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await qa.GetAsync("/api/stocktakes")).StatusCode);
+
+        // 更新：実在庫を動かす操作は在庫権限のまま
+        var shipping = await qa.PostAsJsonAsync("/api/shipping-orders",
+            new ShippingOrderCreateRequest("出荷先A", null, [new(ctx.ProductId, 1m)]));
+        Assert.Equal(HttpStatusCode.Forbidden, shipping.StatusCode);
+
+        var stocktake = await qa.PostAsJsonAsync("/api/stocktakes",
+            new StocktakeCreateRequest(ctx.MaterialLocationId));
+        Assert.Equal(HttpStatusCode.Forbidden, stocktake.StatusCode);
+
+        var picking = await qa.PostAsJsonAsync("/api/picking-orders",
+            new PickingOrderCreateRequest(PickingOrderType.ProcessIssue, null, null, []));
+        Assert.Equal(HttpStatusCode.Forbidden, picking.StatusCode);
+    }
 }
