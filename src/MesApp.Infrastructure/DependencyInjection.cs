@@ -70,6 +70,19 @@ public static class DependencyInjection
         {
             // WALは一度設定するとDBファイルに永続化される。busy_timeoutは接続ごとのためEF側のCommandTimeoutと併用
             await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
+            await BackfillAuditRecordedOnAsync(db);
         }
     }
+
+    /// <summary>
+    /// <c>AuditLog.RecordedOn</c>（期間絞り込み用の記録日）を、列の追加前からある行へ埋める。
+    /// 埋めないと「先月の監査ログ」に古い行が出てこない／既定値のまま混ざる（Spec.md 7.6）。
+    /// </summary>
+    /// <remarks>
+    /// <c>Timestamp</c> はISO形式のTEXTで保存されるため、先頭10文字がそのまま記録日になる。
+    /// 既定値の行だけを対象にするので、2回目以降は索引で即座に0件になる。
+    /// </remarks>
+    private static async Task BackfillAuditRecordedOnAsync(MesAppDbContext db) =>
+        await db.Database.ExecuteSqlRawAsync(
+            "UPDATE AuditLogs SET RecordedOn = substr(Timestamp, 1, 10) WHERE RecordedOn = '0001-01-01'");
 }

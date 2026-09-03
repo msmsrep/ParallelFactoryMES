@@ -145,7 +145,11 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Entity<AuditLog>(e =>
         {
             e.HasIndex(x => x.Timestamp);
+            e.HasIndex(x => x.RecordedOn);
             e.HasIndex(x => new { x.Category, x.Action });
+            // 「この指図の履歴」「このユーザーの操作」を引くための索引（Spec.md 7.6の参照API）
+            e.HasIndex(x => new { x.TargetType, x.TargetId });
+            e.HasIndex(x => x.UserId);
             e.Property(x => x.Category).HasMaxLength(50);
             e.Property(x => x.Action).HasMaxLength(50);
             e.Property(x => x.TargetType).HasMaxLength(100);

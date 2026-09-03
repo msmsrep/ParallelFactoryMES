@@ -28,12 +28,14 @@ public class AuditLogger(MesAppDbContext db, IHttpContextAccessor httpContextAcc
         object? detail = null,
         CancellationToken ct = default)
     {
+        var timestamp = DateTimeOffset.UtcNow;
         var http = httpContextAccessor.HttpContext;
         var user = http?.User;
 
         db.AuditLogs.Add(new AuditLog
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = timestamp,
+            RecordedOn = DateOnly.FromDateTime(timestamp.UtcDateTime),
             UserId = user?.FindFirstValue(ClaimTypes.NameIdentifier),
             UserName = user?.Identity?.Name,
             Category = category,
