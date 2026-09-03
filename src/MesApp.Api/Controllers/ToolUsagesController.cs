@@ -1,3 +1,4 @@
+using MesApp.Core.Abstractions;
 using System.Security.Claims;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
@@ -20,7 +21,7 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/tool-usages")]
 [Authorize]
-public class ToolUsagesController(MesAppDbContext db) : ControllerBase
+public class ToolUsagesController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ToolUsageResponse>>> List(
@@ -74,6 +75,8 @@ public class ToolUsagesController(MesAppDbContext db) : ControllerBase
         };
         db.ToolUsages.Add(usage);
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Equipment", "ToolUsage", nameof(ToolUsage), usage.Id.ToString(),
+            detail: new { toolId = usage.ToolId, count = usage.UsageCount, hours = usage.UsageHours }, ct: ct);
 
         return await db.ToolUsages.AsNoTracking()
             .Where(u => u.Id == usage.Id)

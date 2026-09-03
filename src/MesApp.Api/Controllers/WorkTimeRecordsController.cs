@@ -1,3 +1,4 @@
+using MesApp.Core.Abstractions;
 using System.Security.Claims;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Entities;
@@ -15,7 +16,7 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/work-time-records")]
 [Authorize]
-public class WorkTimeRecordsController(MesAppDbContext db) : ControllerBase
+public class WorkTimeRecordsController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
 {
     private string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
@@ -73,6 +74,8 @@ public class WorkTimeRecordsController(MesAppDbContext db) : ControllerBase
         };
         db.WorkTimeRecords.Add(record);
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Execution", "WorkTime", nameof(WorkTimeRecord), record.Id.ToString(),
+            detail: new { type = record.Type, workOrderId = record.WorkOrderId }, ct: ct);
 
         var saved = await db.WorkTimeRecords.AsNoTracking()
             .Where(r => r.Id == record.Id)

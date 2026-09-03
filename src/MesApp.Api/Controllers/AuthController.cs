@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Auth;
@@ -97,6 +98,9 @@ public class AuthController(
             await refreshTokenService.RevokeAsync(plainToken, ct);
         }
         DeleteRefreshCookie();
+        // ログインを記録して終了を記録しないと、いつまで操作できる状態だったかを追えない
+        await auditLogger.LogAsync("Auth", "Logout", "User",
+            User.FindFirstValue(ClaimTypes.NameIdentifier), ct: ct);
         return NoContent();
     }
 

@@ -1,3 +1,4 @@
+using MesApp.Core.Abstractions;
 using System.Security.Claims;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
@@ -20,7 +21,7 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/equipment-logs")]
 [Authorize]
-public class EquipmentLogsController(MesAppDbContext db) : ControllerBase
+public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<EquipmentLogResponse>>> List(
@@ -75,6 +76,8 @@ public class EquipmentLogsController(MesAppDbContext db) : ControllerBase
         };
         db.EquipmentLogs.Add(log);
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Equipment", "Log", nameof(EquipmentLog), log.Id.ToString(),
+            detail: new { equipmentId = log.EquipmentId, status = log.Status, stopCause = log.StopCause }, ct: ct);
         return new EquipmentLogResponse(log.Id, log.EquipmentId, equipment.Name, log.Status,
             log.StartedAt, log.EndedAt, log.StopCause, log.Note);
     }

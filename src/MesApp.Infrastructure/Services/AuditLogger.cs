@@ -13,11 +13,16 @@ namespace MesApp.Infrastructure.Services;
 /// </summary>
 public class AuditLogger(MesAppDbContext db, IHttpContextAccessor httpContextAccessor) : IAuditLogger
 {
-    /// <summary>日本語をエスケープせずそのまま出力する（監査ログは人が読む前提のため）</summary>
+    /// <summary>
+    /// 日本語をエスケープせずそのまま出力する（監査ログは人が読む前提のため）。
+    /// enumも名前で出す：数値のままだと読めないうえ、あとから列挙子を並べ替えると
+    /// 過去のログの意味が変わってしまう（DBの他の列も文字列で保存している）。
+    /// </summary>
     private static readonly JsonSerializerOptions DetailJsonOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new JsonStringEnumConverter() },
     };
 
     public async Task LogAsync(

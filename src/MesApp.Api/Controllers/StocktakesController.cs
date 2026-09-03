@@ -102,15 +102,26 @@ public class StocktakesController(
         }
 
         var lineById = stocktake.Lines.ToDictionary(l => l.Id);
+        // 実棚数は差異調整（＝在庫の増減）の根拠になるので、上書き前の値も残す（Spec.md 7.6）
+        var changes = new List<object>();
         foreach (var count in request.Counts)
         {
             if (!lineById.TryGetValue(count.LineId, out var line))
             {
                 return BadRequest(new ProblemDetails { Title = $"存在しない明細ID {count.LineId} が含まれています。" });
             }
+            changes.Add(new
+            {
+                lineId = line.Id,
+                theoretical = line.TheoreticalQuantity,
+                before = line.CountedQuantity,
+                after = count.CountedQuantity,
+            });
             line.CountedQuantity = count.CountedQuantity;
         }
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "StocktakeCount", nameof(Stocktake), id.ToString(),
+            detail: new { stocktakeNo = stocktake.StocktakeNo, counts = changes }, ct: ct);
         var saved = await BaseQuery().FirstAsync(s => s.Id == id, ct);
         return ToResponse(saved);
     }
@@ -189,8 +200,11 @@ public class StocktakesController(
         {
             return Conflict(new ProblemDetails { Title = $"状態 '{stocktake.Status}' の棚卸は取消できません。" });
         }
+        var before = stocktake.Status;
         stocktake.Status = StocktakeStatus.Canceled;
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "StocktakeCancel", nameof(Stocktake), id.ToString(),
+            detail: new { stocktakeNo = stocktake.StocktakeNo, before, after = stocktake.Status }, ct: ct);
         var saved = await BaseQuery().FirstAsync(s => s.Id == id, ct);
         return ToResponse(saved);
     }

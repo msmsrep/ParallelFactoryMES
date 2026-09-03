@@ -572,6 +572,8 @@ public class WorkOrderExecutionController(
             RecordedByUserId = CurrentUserId,
         }));
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Execution", "DataRecord", nameof(WorkOrder), id.ToString(),
+            detail: new { items = requests.Select(r => r.Item).ToList() }, ct: ct);
         return await GetDataRecords(id, ct);
     }
 

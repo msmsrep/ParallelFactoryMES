@@ -199,8 +199,11 @@ public class ShippingOrdersController(
         {
             return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の出荷指示は取消できません。" });
         }
+        var before = order.Status;
         order.Status = ShippingOrderStatus.Canceled;
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "ShippingCancel", nameof(ShippingOrder), id.ToString(),
+            detail: new { shippingNo = order.ShippingNo, before, after = order.Status }, ct: ct);
         var saved = await BaseQuery().FirstAsync(s => s.Id == id, ct);
         return ToResponse(saved);
     }

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Common;
+using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 
@@ -100,5 +101,54 @@ public class AuditLogTests
         var master = Assert.Single(options!, o => o is { Category: "Master", Action: "Create" });
         Assert.Equal(1, master.Count);
         Assert.Contains(options!, o => o.Category == "Auth");
+    }
+
+    [Fact]
+    public async Task 取消は誰が何を取り消したか監査ログに残る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        var shipping = await (await admin.PostAsJsonAsync("/api/shipping-orders",
+            new ShippingOrderCreateRequest("出荷先A", null, [new(ctx.ProductId, 1m)])))
+            .Content.ReadFromJsonAsync<ShippingOrderResponse>();
+        var canceled = await admin.PostAsync($"/api/shipping-orders/{shipping!.Id}/cancel", null);
+        canceled.EnsureSuccessStatusCode();
+
+        // 取消は「誰がなぜ消したか」を後から説明する必要がある操作（Spec.md 7.6）
+        var logs = await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>(
+            $"/api/audit-logs?targetType={nameof(ShippingOrder)}&targetId={shipping.Id}&action=ShippingCancel");
+        var log = Assert.Single(logs!.Items);
+        Assert.Equal(TestAuth.AdminUser, log.UserName);
+        Assert.Contains(shipping.ShippingNo, log.Detail);
+        Assert.Contains("Instructed", log.Detail);
+        Assert.Contains("Canceled", log.Detail);
+    }
+
+    [Fact]
+    public async Task 棚卸の実棚数登録は上書き前の値も残る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        var stocktake = await (await admin.PostAsJsonAsync("/api/stocktakes",
+            new StocktakeCreateRequest(ctx.MaterialLocationId)))
+            .Content.ReadFromJsonAsync<StocktakeResponse>();
+        var lineId = stocktake!.Lines[0].Id;
+
+        await admin.PutAsJsonAsync($"/api/stocktakes/{stocktake.Id}/counts",
+            new StocktakeCountRequest([new(lineId, 95m)]));
+        await admin.PutAsJsonAsync($"/api/stocktakes/{stocktake.Id}/counts",
+            new StocktakeCountRequest([new(lineId, 90m)]));
+
+        // 実棚数は差異調整（＝在庫の増減）の根拠なので、書き換えの経緯が追えること
+        var logs = await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>(
+            $"/api/audit-logs?targetType={nameof(Stocktake)}&targetId={stocktake.Id}&action=StocktakeCount");
+        Assert.Equal(2, logs!.Total);
+        Assert.Contains("95", logs.Items[0].Detail);  // 新しい順：2回目の記録に上書き前の95が入る
+        Assert.Contains("90", logs.Items[0].Detail);
     }
 }

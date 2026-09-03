@@ -79,6 +79,9 @@ public class TransferOrdersController(
         };
         db.TransferOrders.Add(order);
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "TransferCreate", nameof(TransferOrder), order.Id.ToString(),
+            detail: new { lotId = order.LotId, quantity = order.Quantity,
+                from = order.FromLocationId, to = order.ToLocationId }, ct: ct);
         return CreatedAtAction(nameof(Get), new { id = order.Id }, await GetResponseAsync(order.Id, ct));
     }
 
@@ -129,8 +132,11 @@ public class TransferOrdersController(
         {
             return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の搬送指示は取消できません。" });
         }
+        var before = order.Status;
         order.Status = TransferOrderStatus.Canceled;
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "TransferCancel", nameof(TransferOrder), id.ToString(),
+            detail: new { before, after = order.Status }, ct: ct);
         return await GetResponseAsync(id, ct);
     }
 

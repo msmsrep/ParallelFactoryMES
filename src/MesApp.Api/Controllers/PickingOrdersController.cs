@@ -173,8 +173,11 @@ public class PickingOrdersController(
         {
             return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' のピッキング指示は取消できません。" });
         }
+        var before = order.Status;
         order.Status = PickingOrderStatus.Canceled;
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "PickingCancel", nameof(PickingOrder), id.ToString(),
+            detail: new { orderNo = order.OrderNo, before, after = order.Status }, ct: ct);
         var saved = await BaseQuery().FirstAsync(p => p.Id == id, ct);
         return ToResponse(saved);
     }
