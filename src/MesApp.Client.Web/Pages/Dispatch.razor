@@ -9,6 +9,11 @@
 
 <Notice Error="@_error" Message="@_message" />
 
+@if (_usersTruncated)
+{
+    <p class="text-muted">作業者の選択肢は@(UserLimit)件までです。表示されない作業者がいる場合はシステム管理者に連絡してください。</p>
+}
+
 <div class="card">
     <div class="actions" style="margin-bottom:8px;">
         <select @bind="_statusFilter" @bind:after="LoadAsync">
@@ -90,8 +95,12 @@
         public int Order { get; set; }
     }
 
+    /// <summary>作業者の選択肢の取得件数（工場の従業員数を想定した上限）</summary>
+    private const int UserLimit = OptionQuery.MaxLimit;
+
     private PagedResult<WorkOrderResponse>? _workOrders;
-    private List<UserSummaryResponse> _users = [];
+    private List<UserOptionResponse> _users = [];
+    private bool _usersTruncated;
     private List<EquipmentResponse> _equipments = [];
     private readonly Dictionary<int, DispatchForm> _forms = [];
     private string _statusFilter = "Created";
@@ -101,15 +110,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // ユーザー一覧はシステム管理者のみ取得可能。取得できない場合は設備・着手順のみ割当可能とする
-        try
-        {
-            _users = await Http.GetFromJsonAsync<List<UserSummaryResponse>>("api/users") ?? [];
-        }
-        catch (HttpRequestException)
-        {
-            _users = [];
-        }
+        // 作業者は選択肢API（有効なユーザーのみ）。ユーザー管理の一覧は管理者専用のため使わない
+        var users = await Http.GetFromJsonAsync<OptionsResult<UserOptionResponse>>(
+            $"api/users/options?limit={UserLimit}");
+        _users = users?.Items.ToList() ?? [];
+        _usersTruncated = users?.Truncated ?? false;
         _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
         await LoadAsync();
     }

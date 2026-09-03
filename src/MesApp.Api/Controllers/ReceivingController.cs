@@ -15,7 +15,7 @@ namespace MesApp.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/receiving")]
-[Authorize(Roles = MesRoleGroups.InventoryManage)]
+[Authorize]
 public class ReceivingController(
     MesAppDbContext db,
     InventoryService inventory,
@@ -26,6 +26,7 @@ public class ReceivingController(
 {
     /// <summary>受入登録（D-10-10-02。ロット生成＋在庫計上）</summary>
     [HttpPost]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<LotResponse>> Receive(ReceivingRequest request, CancellationToken ct)
     {
         var product = await db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, ct);
@@ -83,6 +84,7 @@ public class ReceivingController(
     /// 在庫数量が受入数量と一致）場合のみ取消できる。
     /// </summary>
     [HttpPost("{lotId:int}/cancel")]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<IActionResult> Cancel(int lotId, CancellationToken ct)
     {
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);

@@ -2,6 +2,7 @@ using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -14,11 +15,15 @@ namespace MesApp.Api.Controllers;
 
 /// <summary>
 /// ユーザー/工場従業員管理（F-10-10）とスキル・資格の割当（F-20-10-02〜05）。
-/// システム管理者専用。削除は論理削除（IsActive=false。退職時は無効化しログイン不可にする）。
+/// 管理はシステム管理者専用。削除は論理削除（IsActive=false。退職時は無効化しログイン不可にする）。
+/// <para>
+/// クラスではロールを絞らない（Spec.md 7.4）。絞ると差立（B-10-20）で作業者を選ぶための
+/// <see cref="Options"/> まで管理者専用になり、生産管理担当者が作業者を割り当てられなくなる。
+/// </para>
 /// </summary>
 [ApiController]
 [Route("api/users")]
-[Authorize(Roles = MesRoleGroups.UserAdmin)]
+[Authorize]
 public class UsersController(
     UserManager<AppUser> userManager,
     MesAppDbContext db,
@@ -26,7 +31,27 @@ public class UsersController(
     IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
 {
+    /// <summary>
+    /// 作業者の選択肢（Spec.md 7.5）。差立で作業者を選ばせるために全ロールへ開く。
+    /// 有効なユーザーだけを、氏名の分かる最小限の項目で返す
+    /// </summary>
+    [HttpGet("options")]
+    public async Task<ActionResult<OptionsResult<UserOptionResponse>>> Options(
+        [FromQuery] OptionQuery options, CancellationToken ct = default)
+    {
+        var keyword = options.Keyword;
+        return await userManager.Users.AsNoTracking()
+            .Where(u => u.IsActive)
+            .Where(u => keyword == null
+                || u.DisplayName.Contains(keyword)
+                || (u.UserName != null && u.UserName.Contains(keyword)))
+            .OrderBy(u => u.DisplayName)
+            .Select(u => new UserOptionResponse(u.Id, u.UserName!, u.DisplayName))
+            .ToOptionsResultAsync(options, ct);
+    }
+
     [HttpGet]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<List<UserSummaryResponse>>> List(
         [FromQuery] bool includeInactive = false, CancellationToken ct = default)
     {
@@ -44,6 +69,7 @@ public class UsersController(
     }
 
     [HttpGet("{id}")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<UserSummaryResponse>> Get(string id)
     {
         var user = await userManager.FindByIdAsync(id);
@@ -51,6 +77,7 @@ public class UsersController(
     }
 
     [HttpPost]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<UserSummaryResponse>> Create(CreateUserRequest request, CancellationToken ct)
     {
         var invalidRoles = request.Roles.Except(MesRoles.All).ToList();
@@ -84,6 +111,7 @@ public class UsersController(
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<UserSummaryResponse>> Update(string id, UpdateUserRequest request, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(id);
@@ -125,6 +153,7 @@ public class UsersController(
 
     /// <summary>パスワードリセット（管理者操作。次回ログイン時に変更を強制）</summary>
     [HttpPost("{id}/reset-password")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<IActionResult> ResetPassword(string id, ResetPasswordRequest request, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(id);
@@ -152,6 +181,7 @@ public class UsersController(
     // ---- スキル・資格（F-20-10）----
 
     [HttpGet("{id}/skills")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<List<UserSkillResponse>>> GetSkills(string id, CancellationToken ct)
     {
         if (await userManager.FindByIdAsync(id) is null)
@@ -171,6 +201,7 @@ public class UsersController(
 
     /// <summary>スキル・資格の一括置換（登録・変更・有効期間の管理 F-20-10-02〜05）</summary>
     [HttpPut("{id}/skills")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<List<UserSkillResponse>>> ReplaceSkills(
         string id, List<UserSkillRequest> skills, CancellationToken ct)
     {

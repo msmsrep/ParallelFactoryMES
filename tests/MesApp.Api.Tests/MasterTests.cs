@@ -227,6 +227,30 @@ public class MasterTests
     }
 
     [Fact]
+    public async Task 作業者の選択肢は全ロールが取得できユーザー管理の一覧は管理者専用()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "manager1", "Passw0rd123", MesRoles.ProductionManager);
+
+        var created = await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("worker9", "Passw0rd123", "作業者9", [MesRoles.Operator]));
+        created.EnsureSuccessStatusCode();
+
+        // 差立で作業者を選べるよう、選択肢は生産管理担当者でも取得できる
+        var options = await manager.GetFromJsonAsync<OptionsResult<UserOptionResponse>>("/api/users/options");
+        Assert.Contains(options!.Items, u => u.UserName == "worker9");
+        Assert.False(options.Truncated);
+
+        // 検索と、ユーザー管理の一覧が管理者専用であることは変わらない
+        var filtered = await manager.GetFromJsonAsync<OptionsResult<UserOptionResponse>>(
+            "/api/users/options?q=作業者9");
+        Assert.Single(filtered!.Items);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync("/api/users")).StatusCode);
+    }
+
+    [Fact]
     public async Task 最後のシステム管理者は無効化も降格もできない()
     {
         using var factory = new ApiFactory();
