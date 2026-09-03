@@ -40,7 +40,7 @@ public class AuditLogger(MesAppDbContext db, IHttpContextAccessor httpContextAcc
         db.AuditLogs.Add(new AuditLog
         {
             Timestamp = timestamp,
-            RecordedOn = DateOnly.FromDateTime(timestamp.UtcDateTime),
+            RecordedOn = DateOnly.FromDateTime(timestamp.LocalDateTime),
             UserId = user?.FindFirstValue(ClaimTypes.NameIdentifier),
             UserName = user?.Identity?.Name,
             Category = category,

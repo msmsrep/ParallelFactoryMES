@@ -27,7 +27,7 @@ public class AuditLogsController(MesAppDbContext db) : ControllerBase
     {
         var query = db.AuditLogs.AsNoTracking();
 
-        // 期間は RecordedOn（記録日・UTC）で絞る。
+        // 期間は RecordedOn（記録日・サーバーのローカル日付）で絞る。画面の表示もローカル時刻。
         // SQLiteは DateTimeOffset の比較をSQLへ変換できず、Timestamp では絞り込めない
         if (filter.From is DateOnly from)
         {

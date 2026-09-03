@@ -1,3 +1,6 @@
+using MesApp.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
@@ -150,5 +153,32 @@ public class AuditLogTests
         Assert.Equal(2, logs!.Total);
         Assert.Contains("95", logs.Items[0].Detail);  // 新しい順：2回目の記録に上書き前の95が入る
         Assert.Contains("90", logs.Items[0].Detail);
+    }
+
+    [Fact]
+    public async Task 列の追加前からある記録にも記録日が埋まる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        // RecordedOn を持たなかった頃の行を再現する（既定値のまま）
+        var moment = new DateTimeOffset(2026, 9, 2, 23, 30, 0, TimeSpan.Zero);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            await db.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO AuditLogs (Timestamp, RecordedOn, Category, Action, TargetType, TargetId)
+                VALUES ({0}, '0001-01-01', 'Master', 'Legacy', 'Location', '999')
+                """.Replace("{0}", $"'{moment:yyyy-MM-dd HH:mm:ss.fffffff}+00:00'"));
+        }
+
+        await factory.Services.InitializeDatabaseAsync();
+
+        // 埋め戻した記録日で引ける（画面の表示と同じローカル日付基準）
+        var expected = DateOnly.FromDateTime(moment.LocalDateTime);
+        var logs = await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>(
+            $"/api/audit-logs?action=Legacy&from={expected:yyyy-MM-dd}&to={expected:yyyy-MM-dd}");
+        Assert.Equal(1, logs!.Total);
     }
 }

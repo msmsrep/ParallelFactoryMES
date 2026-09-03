@@ -79,10 +79,11 @@ public static class DependencyInjection
     /// 埋めないと「先月の監査ログ」に古い行が出てこない／既定値のまま混ざる（Spec.md 7.6）。
     /// </summary>
     /// <remarks>
-    /// <c>Timestamp</c> はISO形式のTEXTで保存されるため、先頭10文字がそのまま記録日になる。
+    /// <c>Timestamp</c> はオフセット付きISO形式のTEXTで保存されるため、SQLite側でローカル時刻へ
+    /// 直してから日付を取る（記録日はローカル日付。<c>AuditLog.RecordedOn</c> 参照）。
     /// 既定値の行だけを対象にするので、2回目以降は索引で即座に0件になる。
     /// </remarks>
     private static async Task BackfillAuditRecordedOnAsync(MesAppDbContext db) =>
         await db.Database.ExecuteSqlRawAsync(
-            "UPDATE AuditLogs SET RecordedOn = substr(Timestamp, 1, 10) WHERE RecordedOn = '0001-01-01'");
+            "UPDATE AuditLogs SET RecordedOn = date(Timestamp, 'localtime') WHERE RecordedOn = '0001-01-01'");
 }

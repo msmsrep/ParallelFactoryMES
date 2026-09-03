@@ -1,0 +1,158 @@
+@page "/audit-logs"
+@attribute [Authorize(Roles = MesRoles.SystemAdmin)]
+@inject HttpClient Http
+
+@* 監査ログ（Spec.md 7.6）。記録するだけでは追跡できないため、アプリから引けるようにする *@
+
+<PageTitle>監査ログ - Parallel Factory MES</PageTitle>
+
+<h1>監査ログ</h1>
+<p class="text-muted">誰が・いつ・何を変更したかの記録（Spec.md 7.6）。参照のみで、ここから記録を消したり書き換えたりはできません。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <div class="form-grid">
+        <div class="form-field">
+            <label>期間（開始）</label>
+            <input type="date" @bind="_from" />
+        </div>
+        <div class="form-field">
+            <label>期間（終了）</label>
+            <input type="date" @bind="_to" />
+        </div>
+        <div class="form-field">
+            <label>分類・操作</label>
+            <select @bind="_categoryAction">
+                <option value="">すべて</option>
+                @foreach (var option in _options)
+                {
+                    <option value="@($"{option.Category}/{option.Action}")">
+                        @option.Category / @option.Action（@option.Count 件）
+                    </option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>対象の種別</label>
+            <input @bind="_targetType" placeholder="WorkOrder / Lot など" />
+        </div>
+        <div class="form-field">
+            <label>対象のID</label>
+            <input @bind="_targetId" placeholder="対象種別と組で指定" />
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn" disabled="@_busy" @onclick="SearchAsync">検索</button>
+        <button class="btn btn-secondary" disabled="@_busy" @onclick="ResetAsync">条件をクリア</button>
+    </div>
+</div>
+
+<div class="card">
+    @if (_logs is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_logs.Total == 0)
+    {
+        <p class="text-muted">該当する記録はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>日時</th><th>ユーザー</th><th>分類</th><th>操作</th><th>対象</th><th>詳細</th><th>IP</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var log in _logs.Items)
+                {
+                    <tr>
+                        <td>@log.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@(log.UserName ?? "-")</td>
+                        <td>@log.Category</td>
+                        <td>@log.Action</td>
+                        <td>@(log.TargetType is null ? "-" : $"{log.TargetType} #{log.TargetId}")</td>
+                        @* 詳細は操作ごとに中身が違う（要約文字列 or before/after のJSON）ためそのまま出す *@
+                        <td style="white-space:pre-wrap;word-break:break-all;">@(log.Detail ?? "-")</td>
+                        <td class="text-muted">@(log.IpAddress ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager TItem="AuditLogResponse" Result="_logs" OnPageChanged="LoadPageAsync" />
+    }
+</div>
+
+@code {
+    private PagedResult<AuditLogResponse>? _logs;
+    private List<AuditCategoryOption> _options = [];
+
+    private DateTime? _from;
+    private DateTime? _to;
+    private string _categoryAction = string.Empty;
+    private string? _targetType;
+    private string? _targetId;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _options = await Http.GetFromJsonAsync<List<AuditCategoryOption>>("api/audit-logs/categories") ?? [];
+        await LoadPageAsync(1);
+    }
+
+    private Task SearchAsync() => LoadPageAsync(1);
+
+    private Task ResetAsync()
+    {
+        _from = null;
+        _to = null;
+        _categoryAction = string.Empty;
+        _targetType = null;
+        _targetId = null;
+        return LoadPageAsync(1);
+    }
+
+    private async Task LoadPageAsync(int page)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _logs = await Http.GetFromJsonAsync<PagedResult<AuditLogResponse>>(BuildUrl(page));
+            _message = _logs is null ? null : $"{_logs.Total} 件";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string BuildUrl(int page)
+    {
+        var query = new List<string> { $"page={page}" };
+        if (_from is DateTime from)
+        {
+            query.Add($"from={DateOnly.FromDateTime(from):yyyy-MM-dd}");
+        }
+        if (_to is DateTime to)
+        {
+            query.Add($"to={DateOnly.FromDateTime(to):yyyy-MM-dd}");
+        }
+        if (_categoryAction.Split('/') is [var category, var action] && category.Length > 0)
+        {
+            query.Add($"category={Uri.EscapeDataString(category)}");
+            query.Add($"action={Uri.EscapeDataString(action)}");
+        }
+        if (!string.IsNullOrWhiteSpace(_targetType))
+        {
+            query.Add($"targetType={Uri.EscapeDataString(_targetType.Trim())}");
+        }
+        if (!string.IsNullOrWhiteSpace(_targetId))
+        {
+            query.Add($"targetId={Uri.EscapeDataString(_targetId.Trim())}");
+        }
+        return $"api/audit-logs?{string.Join('&', query)}";
+    }
+}

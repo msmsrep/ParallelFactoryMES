@@ -27,5 +27,9 @@
 
     <div class="nav-group">管理</div>
     <NavLink href="masters">マスタ管理</NavLink>
+    @* 監査ログはシステム管理者専用（Spec.md 7.4・7.6）。他ロールは開いても403になるので出さない *@
+    <AuthorizeView Roles="@MesRoleGroups.UserAdmin">
+        <NavLink href="audit-logs">監査ログ</NavLink>
+    </AuthorizeView>
     <NavLink href="about">このアプリについて</NavLink>
 </nav>

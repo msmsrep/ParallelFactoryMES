@@ -10,9 +10,13 @@ public class AuditLog
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
-    /// 記録日（UTC）。<see cref="Timestamp"/> と重複するが、**期間で絞り込むために必要**。
+    /// 記録日。<see cref="Timestamp"/> と重複するが、**期間で絞り込むために必要**。
     /// SQLiteは DateTimeOffset の比較・並べ替えをSQLへ変換できず、
     /// 「この期間の監査ログ」を全件読み出さずに引くにはこの列が要る（Spec.md 7.6の参照API）。
+    /// <para>
+    /// UTCではなく<b>サーバーのローカル日付</b>で持つ。画面は記録時刻をローカル時刻で表示するため、
+    /// UTCの日付で絞ると「9月3日の朝の操作が9月2日で引っかかる」ことになり、見え方と食い違う。
+    /// </para>
     /// </summary>
     public DateOnly RecordedOn { get; set; }
 
