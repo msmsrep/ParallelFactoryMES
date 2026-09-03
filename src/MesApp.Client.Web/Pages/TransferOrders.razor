@@ -1,0 +1,230 @@
+@page "/transfer-orders"
+@attribute [Authorize]
+@inject HttpClient Http
+
+@* 工程間搬送・移動指示（MES.md B-50-10 / D-30-10-04。Spec.md 5.3）。指示してから実行するため、在庫の「移動」とは別に持つ *@
+
+<PageTitle>搬送指示 - Parallel Factory MES</PageTitle>
+
+<h1>工程間搬送・移動指示</h1>
+<p class="text-muted">
+    運ぶ前に指示を作り、運び終えてから実行して在庫を動かします（B-50-10）。
+    その場で動かすだけなら在庫照会・操作の「移動」を使ってください。
+</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@MesRoleGroups.InventoryManage">
+    <div class="card">
+        <h2 style="margin-top:0;">搬送指示の作成</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>対象ロット（スキャン可）</label>
+                <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                              @bind-Value="_lotId" SelectedItemChanged="OnStockSelected"
+                              ValueOf="stock => stock.LotId"
+                              LabelOf='@(stock => $"{stock.LotNumber}（{stock.ProductCode} / {stock.LocationCode} 残{stock.Quantity}）")' />
+            </div>
+            <div class="form-field">
+                <label>数量</label>
+                <input type="number" step="any" @bind="_quantity" min="0" />
+            </div>
+            <div class="form-field">
+                <label>移動元ロケーション</label>
+                <select @bind="_fromLocationId">
+                    <option value="0">選択してください</option>
+                    @foreach (var location in _locations)
+                    {
+                        <option value="@location.Id">@location.Code @(location.ShelfNo ?? "")</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>移動先ロケーション</label>
+                <select @bind="_toLocationId">
+                    <option value="0">選択してください</option>
+                    @foreach (var location in _locations)
+                    {
+                        <option value="@location.Id">@location.Code @(location.ShelfNo ?? "")</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">搬送指示を作成</button>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    <div class="actions" style="margin-bottom:8px;">
+        <select @bind="_statusFilter" @bind:after="LoadAsync">
+            <option value="">全状態</option>
+            <option value="Instructed">指示中</option>
+            <option value="Completed">完了</option>
+            <option value="Canceled">取消</option>
+        </select>
+    </div>
+
+    @if (_orders is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_orders.Total == 0)
+    {
+        <p class="text-muted">搬送指示はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ロット</th><th>品目</th><th>数量</th><th>移動元</th><th>移動先</th>
+                    <th>状態</th><th>作成</th><th>実行</th><th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var order in _orders.Items)
+                {
+                    <tr>
+                        <td>@order.LotNumber</td>
+                        <td>@order.ProductCode</td>
+                        <td>@order.Quantity</td>
+                        <td>@order.FromLocationCode</td>
+                        <td>@order.ToLocationCode</td>
+                        <td>@StatusLabel(order.Status)</td>
+                        <td>@order.CreatedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                        <td>@(order.ExecutedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
+                        <td>
+                            <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="transferWrite">
+                                @if (order.Status == TransferOrderStatus.Instructed)
+                                {
+                                    <button class="btn btn-sm" disabled="@_busy"
+                                            @onclick="() => ExecuteAsync(order.Id)">実行（在庫を移動）</button>
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => CancelAsync(order.Id)">取消</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager TItem="TransferOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
+    }
+</div>
+
+@code {
+    private PagedResult<TransferOrderResponse>? _orders;
+    private List<LocationResponse> _locations = [];
+    private string _statusFilter = string.Empty;
+
+    private int _lotId;
+    private decimal _quantity;
+    private int _fromLocationId;
+    private int _toLocationId;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    private static string StatusLabel(TransferOrderStatus status) => status switch
+    {
+        TransferOrderStatus.Instructed => "指示中",
+        TransferOrderStatus.Completed => "完了",
+        TransferOrderStatus.Canceled => "取消",
+        _ => status.ToString(),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
+        await LoadAsync();
+    }
+
+    /// <summary>選んだ在庫の棚を移動元の既定にする（ロットは棚ごとに在庫を持つため）</summary>
+    private void OnStockSelected(StockResponse? stock)
+    {
+        if (stock is not null)
+        {
+            _fromLocationId = stock.LocationId;
+        }
+    }
+
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
+    {
+        var url = $"api/transfer-orders?page={page}";
+        if (!string.IsNullOrEmpty(_statusFilter))
+        {
+            url += $"&status={_statusFilter}";
+        }
+        _orders = await Http.GetFromJsonAsync<PagedResult<TransferOrderResponse>>(url);
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        if (_lotId == 0 || _fromLocationId == 0 || _toLocationId == 0)
+        {
+            _error = "ロットと移動元・移動先ロケーションを指定してください。";
+            return;
+        }
+        if (_quantity <= 0)
+        {
+            _error = "数量は0より大きい必要があります。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/transfer-orders",
+                new TransferOrderRequest(_lotId, _quantity, _fromLocationId, _toLocationId));
+            if (!response.IsSuccessStatusCode)
+            {
+                // 在庫不足・同一ロケーション指定もここに出る
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                return;
+            }
+            _message = "搬送指示を作成しました。運び終えたら「実行」で在庫を移動します。";
+            _quantity = 0;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task ExecuteAsync(int id) =>
+        PostAsync($"api/transfer-orders/{id}/execute", "搬送を実行しました（在庫を移動しました）。");
+
+    private Task CancelAsync(int id) =>
+        PostAsync($"api/transfer-orders/{id}/cancel", "搬送指示を取消しました。");
+
+    private async Task PostAsync(string url, string successMessage)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsync(url, null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                return;
+            }
+            _message = successMessage;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -131,6 +131,7 @@ else
                     <th>終了</th>
                     <th>産出ロット</th>
                     <th>承認</th>
+                    <th>訂正</th>
                 </tr>
             </thead>
             <tbody>
@@ -156,6 +157,179 @@ else
                         <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
                         <td>@(record.OutputLotNumber ?? "-")</td>
                         <td>@(record.ApprovedAt is null ? "未承認" : "承認済")</td>
+                        <td>
+                            @* 実績訂正（B-70-30-01）。APIと同じ生産管理権限 *@
+                            <AuthorizeView Roles="@MesRoleGroups.ProductionManage" Context="correct">
+                                <button class="btn btn-secondary btn-sm"
+                                        @onclick="() => StartCorrection(record)">訂正</button>
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <AuthorizeView Roles="@MesRoleGroups.ProductionManage" Context="correctForm">
+    @if (_correcting is not null)
+    {
+        <div class="card">
+            <h2 style="margin-top:0;">実績の訂正（B-70-30-01。理由必須・訂正履歴と監査ログに残ります）</h2>
+            <p class="text-muted">
+                訂正前：良品 @_correcting.GoodQuantity ／ 不良 @_correcting.DefectQuantity ／
+                廃棄 @_correcting.ScrapQuantity ／ 再作業待ち @_correcting.ReworkQuantity
+            </p>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>良品数</label>
+                    <input type="number" step="any" @bind="_correctGood" min="0" />
+                </div>
+                <div class="form-field">
+                    <label>不良数</label>
+                    <input type="number" step="any" @bind="_correctDefect" min="0" />
+                </div>
+                <div class="form-field">
+                    <label>廃棄数</label>
+                    <input type="number" step="any" @bind="_correctScrap" min="0" />
+                </div>
+                <div class="form-field">
+                    <label>再作業待ち数</label>
+                    <input type="number" step="any" @bind="_correctRework" min="0" />
+                </div>
+                <div class="form-field">
+                    <label>訂正理由</label>
+                    <input @bind="_correctReason" />
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn" disabled="@_busy" @onclick="SubmitCorrectionAsync">訂正を登録</button>
+                <button class="btn btn-secondary" @onclick="() => _correcting = null">キャンセル</button>
+            </div>
+        </div>
+    }
+    </AuthorizeView>
+
+    @* 部材投入（B-30-20-01）。指図の予定材料と照合され、代替部品には理由が要る *@
+    <h2>部材投入</h2>
+    @if (_consumptions.Count == 0)
+    {
+        <p class="text-muted">投入の記録はまだありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>品目</th><th>ロット</th><th>数量</th>
+                    <th>投入日時</th><th>方法</th><th>代替理由</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var consumption in _consumptions)
+                {
+                    <tr>
+                        <td>@consumption.ProductCode @consumption.ProductName</td>
+                        <td>@consumption.LotNumber</td>
+                        <td>@consumption.Quantity</td>
+                        <td>@consumption.ConsumedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                        <td>@(consumption.Method == ConsumptionMethod.Backflush ? "バックフラッシュ" : "手動")</td>
+                        <td>@(consumption.IsSubstitute ? consumption.SubstituteReason ?? "（代替）" : "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="issue">
+        @if (_workOrder.Status is not (WorkOrderStatus.Approved or WorkOrderStatus.Canceled))
+        {
+            <div class="card">
+                <h2 style="margin-top:0;">部材を投入する（B-30-20-01）</h2>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>投入ロット（スキャン可）</label>
+                        <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                                      @bind-Value="_consumeLotId" SelectedItemChanged="OnConsumeStockSelected"
+                                      ValueOf="stock => stock.LotId"
+                                      LabelOf='@(stock => $"{stock.LotNumber}（{stock.ProductCode} / {stock.LocationCode} 残{stock.Quantity}）")' />
+                    </div>
+                    <div class="form-field">
+                        <label>数量</label>
+                        <input type="number" step="any" @bind="_consumeQuantity" min="0" />
+                    </div>
+                    <div class="form-field">
+                        <label>代替理由（代替部品を投入するときは必須）</label>
+                        <input @bind="_substituteReason" />
+                    </div>
+                </div>
+                <button class="btn" disabled="@_busy" @onclick="AddConsumptionAsync">投入を記録</button>
+            </div>
+        }
+    </AuthorizeView>
+
+    @* 製造条件データ（B-30-30-04。温度・回転数などを手入力で残す） *@
+    <h2>製造条件データ</h2>
+    @if (_dataRecords.Count == 0)
+    {
+        <p class="text-muted">記録はまだありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>項目</th><th>値</th><th>記録日時</th></tr></thead>
+            <tbody>
+                @foreach (var data in _dataRecords)
+                {
+                    <tr>
+                        <td>@data.Item</td>
+                        <td>@data.Value</td>
+                        <td>@data.RecordedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="dataWrite">
+        @if (_workOrder.Status is not (WorkOrderStatus.Approved or WorkOrderStatus.Canceled))
+        {
+            <div class="card">
+                <h2 style="margin-top:0;">製造条件を記録する（B-30-30-04）</h2>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>項目（例：加熱温度）</label>
+                        <input @bind="_dataItem" />
+                    </div>
+                    <div class="form-field">
+                        <label>値（例：180℃）</label>
+                        <input @bind="_dataValue" />
+                    </div>
+                </div>
+                <button class="btn" disabled="@_busy" @onclick="AddDataRecordAsync">条件を記録</button>
+            </div>
+        }
+    </AuthorizeView>
+
+    @* 状態の履歴（Spec.md 5.2 WorkOrderStatusHistory）。現在の状態だけでは経緯を説明できないため *@
+    <h2>状態の履歴</h2>
+    @if (_statusHistory.Count == 0)
+    {
+        <p class="text-muted">履歴はまだありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>日時</th><th>変更前</th><th>変更後</th><th>契機</th><th>備考</th><th>変更者</th></tr></thead>
+            <tbody>
+                @foreach (var history in _statusHistory)
+                {
+                    <tr>
+                        <td>@history.ChangedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                        <td><StatusBadge Status="@history.FromStatus.ToString()" /></td>
+                        <td><StatusBadge Status="@history.ToStatus.ToString()" /></td>
+                        <td>@Labels.WorkOrderStatusSource(history.Source)</td>
+                        <td>@(history.Note ?? "-")</td>
+                        <td>@(history.ChangedByName ?? "-")</td>
                     </tr>
                 }
             </tbody>
@@ -179,6 +353,27 @@ else
     private WorkOrderResponse? _workOrder;
     private List<ProductionRecordResponse> _records = [];
     private List<LocationOption> _locations = [];
+    private List<ConsumptionResponse> _consumptions = [];
+    private List<DataRecordResponse> _dataRecords = [];
+    private List<WorkOrderStatusHistoryEntry> _statusHistory = [];
+
+    // 部材投入（B-30-20-01）
+    private int _consumeLotId;
+    private int _consumeLocationId;
+    private decimal _consumeQuantity;
+    private string? _substituteReason;
+
+    // 製造条件データ（B-30-30-04）
+    private string _dataItem = string.Empty;
+    private string _dataValue = string.Empty;
+
+    // 実績訂正（B-70-30-01）
+    private ProductionRecordResponse? _correcting;
+    private decimal _correctGood;
+    private decimal _correctDefect;
+    private decimal _correctScrap;
+    private decimal _correctRework;
+    private string _correctReason = string.Empty;
 
     private decimal _good;
     private decimal _defect;
@@ -225,6 +420,144 @@ else
         _workOrder = await Http.GetFromJsonAsync<WorkOrderResponse>($"api/work-orders/{Id}");
         _records = await Http.GetFromJsonAsync<List<ProductionRecordResponse>>(
             $"api/work-orders/{Id}/production-records") ?? [];
+        _consumptions = await Http.GetFromJsonAsync<List<ConsumptionResponse>>(
+            $"api/work-orders/{Id}/consumptions") ?? [];
+        _dataRecords = await Http.GetFromJsonAsync<List<DataRecordResponse>>(
+            $"api/work-orders/{Id}/data-records") ?? [];
+        _statusHistory = await Http.GetFromJsonAsync<List<WorkOrderStatusHistoryEntry>>(
+            $"api/work-orders/{Id}/status-history") ?? [];
+    }
+
+    /// <summary>投入ロットの選択に合わせて、引き落とすロケーションも決める（在庫はロット×棚で持つため）</summary>
+    private void OnConsumeStockSelected(StockResponse? stock) =>
+        _consumeLocationId = stock?.LocationId ?? 0;
+
+    private async Task AddConsumptionAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        if (_consumeLotId == 0 || _consumeLocationId == 0)
+        {
+            _error = "投入するロットを選択してください。";
+            return;
+        }
+        if (_consumeQuantity <= 0)
+        {
+            _error = "投入数量は0より大きい必要があります。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/consumptions",
+                new ConsumptionRequest(_consumeLotId, _consumeLocationId, _consumeQuantity,
+                    string.IsNullOrWhiteSpace(_substituteReason) ? null : _substituteReason));
+            if (!response.IsSuccessStatusCode)
+            {
+                // 予定材料との照合エラー（代替理由の未入力を含む）もここに出る
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "部材投入に失敗しました。";
+                return;
+            }
+            _message = "部材投入を記録しました。";
+            _consumeLotId = 0;
+            _consumeLocationId = 0;
+            _consumeQuantity = 0;
+            _substituteReason = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task AddDataRecordAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_dataItem) || string.IsNullOrWhiteSpace(_dataValue))
+        {
+            _error = "項目と値を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/data-records",
+                new List<DataRecordRequest> { new(_dataItem, _dataValue) });
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "製造条件の記録に失敗しました。";
+                return;
+            }
+            _message = "製造条件を記録しました。";
+            _dataItem = string.Empty;
+            _dataValue = string.Empty;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void StartCorrection(ProductionRecordResponse record)
+    {
+        _correcting = record;
+        _correctGood = record.GoodQuantity;
+        _correctDefect = record.DefectQuantity;
+        _correctScrap = record.ScrapQuantity;
+        _correctRework = record.ReworkQuantity;
+        _correctReason = string.Empty;
+        _error = null;
+        _message = null;
+    }
+
+    private async Task SubmitCorrectionAsync()
+    {
+        if (_busy || _correcting is null)
+        {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_correctReason))
+        {
+            _error = "訂正理由を入力してください。";
+            return;
+        }
+        if (_correctScrap + _correctRework > _correctDefect)
+        {
+            _error = "廃棄数と再作業待ち数の合計は不良数を超えられません。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/production-records/{_correcting.Id}",
+                new ProductionRecordCorrectionRequest(
+                    _correctGood, _correctDefect, _correctReason, _correctScrap, _correctRework));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "訂正に失敗しました。";
+                return;
+            }
+            _message = "実績を訂正しました（訂正前の値は訂正履歴に残ります）。";
+            _correcting = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 
     private async Task StartAsync()

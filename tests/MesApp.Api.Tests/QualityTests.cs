@@ -23,6 +23,44 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 検査指示を取消すと検査待ちのロットが解放され承認済みは取消せない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+        var order = await created.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+
+        // 取消すと指示は取消状態になり、検査待ちで拘束していたロットは正常へ戻る
+        var canceled = await admin.PostAsync($"/api/inspection-orders/{order!.Id}/cancel", null);
+        Assert.Equal(HttpStatusCode.OK, canceled.StatusCode);
+        var afterCancel = await canceled.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        Assert.Equal(InspectionOrderStatus.Canceled, afterCancel!.Status);
+        var lotAfterCancel = await admin.GetFromJsonAsync<Core.Contracts.Inventory.LotResponse>(
+            $"/api/inventory/lots/{lot.Id}");
+        Assert.Equal(LotStockStatus.Normal, lotAfterCancel!.StockStatus);
+
+        // 取消済みは再度取消せない
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await admin.PostAsync($"/api/inspection-orders/{order.Id}/cancel", null)).StatusCode);
+
+        // 承認済みも取消せない
+        var second = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+        var order2 = await second.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        await admin.PostAsJsonAsync($"/api/inspection-orders/{order2!.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.0m, null, null) });
+        await admin.PostAsJsonAsync($"/api/inspection-orders/{order2.Id}/judge", new InspectionJudgeRequest(null));
+        (await admin.PostAsync($"/api/inspection-orders/{order2.Id}/approve", null)).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await admin.PostAsync($"/api/inspection-orders/{order2.Id}/cancel", null)).StatusCode);
+    }
+
+    [Fact]
     public async Task 検査指示から実績登録判定承認まで通しで動作しロットステータスへ反映される()
     {
         using var factory = new ApiFactory();

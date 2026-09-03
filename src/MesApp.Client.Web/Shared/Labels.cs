@@ -33,6 +33,16 @@ public static class Labels
         _ => relation.ToString(),
     };
 
+    public static string WorkOrderStatusSource(WorkOrderStatusChangeSource source) => source switch
+    {
+        WorkOrderStatusChangeSource.Dispatch => "差立",
+        WorkOrderStatusChangeSource.Start => "着手",
+        WorkOrderStatusChangeSource.ProductionRecord => "実績入力",
+        WorkOrderStatusChangeSource.Approval => "承認",
+        WorkOrderStatusChangeSource.OrderCancel => "指図取消",
+        _ => source.ToString(),
+    };
+
     public static string LotStatusSource(LotStatusChangeSource source) => source switch
     {
         LotStatusChangeSource.Manual => "在庫操作",

@@ -73,7 +73,6 @@ next_title: 導入と初期設定
 - シート・端末管理（ライセンス機能）。このため**アクティベーション不要で、全端末から利用できます**。
 - WPFライセンスアプリ
 - PostgreSQL / SQL Server への接続（現在はSQLiteのみ）
-- 一部の機能はAPIのみの提供で、画面が用意されていません（[リファレンス](reference.html#api-only)を参照）
 
 <div class="note">
 <p><strong>用語やステータスの意味を調べたいとき</strong>は<a href="reference.html">リファレンス</a>を、

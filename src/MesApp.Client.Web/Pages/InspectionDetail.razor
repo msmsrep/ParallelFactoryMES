@@ -90,6 +90,16 @@ else
                 <button class="btn" disabled="@_busy" @onclick="ApproveAsync">検査承認（C-20-10-06）</button>
             </div>
         }
+
+        @* 誤発行の取消。検査待ちで拘束していたロットは解放される（承認済み・取消済みは不可） *@
+        @if (_order.Status is not (InspectionOrderStatus.Approved or InspectionOrderStatus.Canceled))
+        {
+            <div class="card">
+                <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">
+                    検査指示を取消（対象ロットの検査待ちを解除）
+                </button>
+            </div>
+        }
     </AuthorizeView>
 
     <div class="card">
@@ -303,6 +313,33 @@ else
             _message = _order?.OverallJudgment == InspectionJudgment.Fail
                 ? "不合格と判定しました。ロットは不良となり、不適合が自動起票されました。"
                 : "合格と判定しました。ロットは正常になりました。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>検査指示の取消。検査待ちで拘束していたロットはAPI側で解放される</summary>
+    private async Task CancelAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsync($"api/inspection-orders/{Id}/cancel", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取消に失敗しました。";
+                return;
+            }
+            _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+            _message = "検査指示を取消しました。";
         }
         finally
         {
