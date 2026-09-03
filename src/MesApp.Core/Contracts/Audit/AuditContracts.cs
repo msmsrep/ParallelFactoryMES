@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace MesApp.Core.Contracts.Audit;
 
 /// <summary>
@@ -53,3 +55,21 @@ public record AuditLogQuery
 /// 記録がある組み合わせだけを件数付きで返す（定数を並べても、その環境で実際に出る値とは限らないため）。
 /// </summary>
 public record AuditCategoryOption(string Category, string Action, int Count);
+
+/// <summary>
+/// 監査ログの一括削除（Spec.md 7.6 の保持期間）。<paramref name="To"/> の日を含めて、それ以前を削除する。
+/// </summary>
+/// <remarks>
+/// <paramref name="Reason"/> は必須。削除そのものが監査ログに残り、
+/// 「誰がいつ何年ぶんをなぜ消したか」を後から説明できるようにするため。
+/// </remarks>
+public record AuditLogPurgeRequest(
+    DateOnly To,
+    [Required, MaxLength(500)] string Reason);
+
+/// <summary>
+/// 一括削除の結果。<paramref name="RetentionCutoff"/> はこの日より後を削除できない境界
+/// （保持期間の内側は消せない）。
+/// </summary>
+public record AuditLogPurgeResult(
+    DateOnly To, int DeletedCount, DateOnly RetentionCutoff, bool DryRun);

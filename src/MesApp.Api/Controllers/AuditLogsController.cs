@@ -1,5 +1,7 @@
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Common;
+using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,16 +13,21 @@ namespace MesApp.Api.Controllers;
 /// 監査ログの参照（Spec.md 7.6）。記録するだけでは「追跡可能にする」を満たさないため、
 /// 誰が・いつ・何を変更したかをアプリから引けるようにする。
 /// <para>
-/// <b>参照専用</b>：監査ログを書き換えられると記録の意味がなくなるので、
-/// 作成・更新・削除のエンドポイントは置かない（記録は <c>IAuditLogger</c> 経由でのみ増える）。
+/// <b>個々の記録は書き換えられない</b>：作成・更新・1件削除のエンドポイントは置かない
+/// （記録は <c>IAuditLogger</c> 経由でのみ増える）。唯一の削除は保持期間を過ぎた分の
+/// 一括削除（<see cref="Purge"/>）で、これも削除したこと自体が監査ログに残る。
 /// システム管理者専用（Spec.md 7.4）。
 /// </para>
 /// </summary>
 [ApiController]
 [Route("api/audit-logs")]
 [Authorize(Roles = MesRoleGroups.UserAdmin)]
-public class AuditLogsController(MesAppDbContext db) : ControllerBase
+public class AuditLogsController(
+    MesAppDbContext db, IAuditLogger auditLogger, IConfiguration configuration) : ControllerBase
 {
+    /// <summary>保持期間の既定（年）。Spec.md 7.6</summary>
+    private const int DefaultRetentionYears = 5;
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<AuditLogResponse>>> List(
         [FromQuery] PageQuery paging, [FromQuery] AuditLogQuery filter, CancellationToken ct = default)
@@ -79,4 +86,49 @@ public class AuditLogsController(MesAppDbContext db) : ControllerBase
             .OrderBy(g => g.Key.Category).ThenBy(g => g.Key.Action)
             .Select(g => new AuditCategoryOption(g.Key.Category, g.Key.Action, g.Count()))
             .ToListAsync(ct);
+
+    /// <summary>
+    /// 保持期間を過ぎた監査ログの一括削除（Spec.md 7.6）。指定日を含めてそれ以前を削除する。
+    /// <c>?dryRun=true</c> で件数だけ確認できる（DBには触らない）。
+    /// </summary>
+    /// <remarks>
+    /// <b>保持期間の内側は削除できない</b>：任意の期間を消せると、直前の操作の記録を消して
+    /// 隠せてしまい、監査ログが証跡として成り立たなくなる。保持期間より古い分の整理だけを許す。
+    /// 削除したこと自体（期間・件数・理由・実行者）は監査ログに残る。
+    /// </remarks>
+    [HttpPost("purge")]
+    public async Task<ActionResult<AuditLogPurgeResult>> Purge(
+        AuditLogPurgeRequest request, [FromQuery] bool dryRun = false, CancellationToken ct = default)
+    {
+        var cutoff = RetentionCutoff();
+        if (request.To > cutoff)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = $"保持期間内の監査ログは削除できません（{cutoff:yyyy-MM-dd} 以前が対象です）。",
+            });
+        }
+
+        var target = db.AuditLogs.Where(a => a.RecordedOn <= request.To);
+        var count = await target.CountAsync(ct);
+        if (dryRun)
+        {
+            return new AuditLogPurgeResult(request.To, count, cutoff, DryRun: true);
+        }
+
+        await target.ExecuteDeleteAsync(ct);
+        // 記録は削除のあとに残す（同じ削除で消えないように）
+        await auditLogger.LogAsync("Audit", "Purge", nameof(AuditLog), null,
+            detail: new { to = request.To, deleted = count, retentionCutoff = cutoff, reason = request.Reason },
+            ct: ct);
+        return new AuditLogPurgeResult(request.To, count, cutoff, DryRun: false);
+    }
+
+    /// <summary>この日以前なら削除してよい、という境界（今日から保持期間ぶん遡った日の前日）</summary>
+    private DateOnly RetentionCutoff()
+    {
+        var years = configuration.GetValue("Audit:RetentionYears", DefaultRetentionYears);
+        // 記録日はサーバーのローカル日付なので、境界も同じ基準で求める
+        return DateOnly.FromDateTime(DateTime.Now).AddYears(-years).AddDays(-1);
+    }
 }

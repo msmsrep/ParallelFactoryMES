@@ -181,4 +181,88 @@ public class AuditLogTests
             $"/api/audit-logs?action=Legacy&from={expected:yyyy-MM-dd}&to={expected:yyyy-MM-dd}");
         Assert.Equal(1, logs!.Total);
     }
+
+    [Fact]
+    public async Task 保持期間を過ぎた監査ログだけ一括削除できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        // 保持期間（既定5年）より古い記録を用意する
+        var old = DateOnly.FromDateTime(DateTime.Now).AddYears(-6);
+        await InsertLegacyLogAsync(factory, old, "Old1");
+        await InsertLegacyLogAsync(factory, old, "Old2");
+        var beforeTotal = (await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>("/api/audit-logs"))!.Total;
+
+        // dryRun：件数だけ確認し、DBには触らない
+        var preview = await (await admin.PostAsJsonAsync("/api/audit-logs/purge?dryRun=true",
+            new AuditLogPurgeRequest(old, "容量削減のため")))
+            .Content.ReadFromJsonAsync<AuditLogPurgeResult>();
+        Assert.Equal(2, preview!.DeletedCount);
+        Assert.True(preview.DryRun);
+        Assert.Equal(beforeTotal,
+            (await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>("/api/audit-logs"))!.Total);
+
+        // 実行
+        var purged = await (await admin.PostAsJsonAsync("/api/audit-logs/purge",
+            new AuditLogPurgeRequest(old, "容量削減のため")))
+            .Content.ReadFromJsonAsync<AuditLogPurgeResult>();
+        Assert.Equal(2, purged!.DeletedCount);
+        Assert.False(purged.DryRun);
+
+        // 古い分だけ消え、新しい分は残る。削除したこと自体は記録に残る（＝差引で1件増える）
+        var after = await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>("/api/audit-logs");
+        Assert.Equal(beforeTotal - 2 + 1, after!.Total);
+        var purgeLog = Assert.Single(after.Items, a => a is { Category: "Audit", Action: "Purge" });
+        Assert.Contains("容量削減のため", purgeLog.Detail);
+        Assert.Contains("\"deleted\":2", purgeLog.Detail);
+        Assert.Equal(TestAuth.AdminUser, purgeLog.UserName);
+    }
+
+    [Fact]
+    public async Task 保持期間内の監査ログは削除できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var before = (await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>("/api/audit-logs"))!.Total;
+
+        // 直前の操作の記録を消して隠せてしまうため、保持期間の内側は消させない
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var refused = await admin.PostAsJsonAsync("/api/audit-logs/purge",
+            new AuditLogPurgeRequest(today, "都合が悪いので"));
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+
+        // 理由なしも受け付けない
+        var noReason = await admin.PostAsJsonAsync("/api/audit-logs/purge",
+            new AuditLogPurgeRequest(today.AddYears(-6), ""));
+        Assert.Equal(HttpStatusCode.BadRequest, noReason.StatusCode);
+
+        Assert.Equal(before,
+            (await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>("/api/audit-logs"))!.Total);
+    }
+
+    [Fact]
+    public async Task 一括削除はシステム管理者だけができる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "pm2", "Passw0rd123", MesRoles.ProductionManager);
+
+        var response = await manager.PostAsJsonAsync("/api/audit-logs/purge",
+            new AuditLogPurgeRequest(DateOnly.FromDateTime(DateTime.Now).AddYears(-6), "試し"));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    /// <summary>保持期間より古い監査ログを直接入れる（時間を巻き戻せないため）</summary>
+    private static async Task InsertLegacyLogAsync(ApiFactory factory, DateOnly recordedOn, string action)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+        await db.Database.ExecuteSqlAsync(
+            $"""
+            INSERT INTO AuditLogs (Timestamp, RecordedOn, Category, Action)
+            VALUES ({recordedOn.ToDateTime(TimeOnly.MinValue)}, {recordedOn}, 'Master', {action})
+            """);
+    }
 }
