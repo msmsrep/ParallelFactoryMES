@@ -353,6 +353,13 @@ public class MasterCsvTests
         Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync("/api/masters/csv/users")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,
             (await PostCsvAsync(manager, "users", "UserName,DisplayName\nu1,ユーザー1\n")).StatusCode);
+
+        // スキル・資格は単票APIが管理者専用のため、CSV取込も管理者専用（参照は可）
+        Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync("/api/masters/csv/skills")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await PostCsvAsync(manager, "skills", "Code,Name\nS-1,溶接\n")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,
+            (await PostCsvAsync(admin, "skills", "Code,Name\nS-1,溶接\n")).StatusCode);
     }
 
     [Fact]

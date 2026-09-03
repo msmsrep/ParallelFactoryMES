@@ -120,10 +120,13 @@ else
                             <td>@result.InspectedByName</td>
                             <td>@result.InspectedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                             <td>
-                                @if (_order.Status != InspectionOrderStatus.Approved)
-                                {
-                                    <button class="btn btn-secondary btn-sm" @onclick="() => StartCorrection(result)">訂正</button>
-                                }
+                                @* 訂正はAPIと同じ品質管理権限（api/inspection-orders/{id}/results/{resultId}） *@
+                                <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="correct">
+                                    @if (_order.Status != InspectionOrderStatus.Approved)
+                                    {
+                                        <button class="btn btn-secondary btn-sm" @onclick="() => StartCorrection(result)">訂正</button>
+                                    }
+                                </AuthorizeView>
                                 @if (result.CorrectionNote is { Length: > 0 })
                                 {
                                     <div class="text-muted" style="white-space:pre-wrap;">@result.CorrectionNote</div>
@@ -161,6 +164,7 @@ else
         }
     </div>
 
+    <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="correctForm">
     @if (_correcting is not null)
     {
         <div class="card">
@@ -188,6 +192,7 @@ else
             </div>
         </div>
     }
+    </AuthorizeView>
 }
 
 @code {

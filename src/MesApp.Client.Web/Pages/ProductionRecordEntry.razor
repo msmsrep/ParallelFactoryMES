@@ -25,6 +25,8 @@ else
         <div class="alert alert-success">@_message</div>
     }
 
+    @* 着手・実績登録はAPIと同じ製造実行の記録権限（Spec.md 7.4。段取り画面と揃える） *@
+    <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="record">
     @if (_workOrder.Status is WorkOrderStatus.Created or WorkOrderStatus.Dispatched)
     {
         <div class="card">
@@ -107,6 +109,7 @@ else
             <button class="btn" disabled="@_busy" @onclick="SubmitAsync">実績を登録（作業完了報告）</button>
         </div>
     }
+    </AuthorizeView>
 
     <h2>登録済みの実績</h2>
     @if (_records.Count == 0)

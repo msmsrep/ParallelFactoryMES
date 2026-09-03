@@ -39,7 +39,9 @@
     </div>
 </AuthorizeView>
 
-<CsvIoPanel Kind="skills" Label="スキル・資格" KeyLabel="スキル・資格コード" OnImported="LoadAsync" />
+@* 取込はAPIと同じシステム管理者権限（api/skills と api/masters/csv/skills） *@
+<CsvIoPanel Kind="skills" Label="スキル・資格" KeyLabel="スキル・資格コード"
+            Roles="@MesRoleGroups.UserAdmin" OnImported="LoadAsync" />
 
 <div class="card">
     @if (_items is null)

@@ -110,7 +110,11 @@ public static class MasterCsvKinds
             new("Type", "種別", false, "Skill（スキル）/ Certification（資格）"),
             new("RequiresExpiry", "有効期限管理", false, "true / false"),
             new("IsActive", "有効", false, "true / false"),
-        ]),
+        ])
+        {
+            // 単票の api/skills がシステム管理者専用（SkillsController）。CSVも同じ権限で絞る
+            UserAdminWrite = true,
+        },
         new(Bom, "MBOM（部品構成）", false,
         [
             new("ParentProductCode", "親品目コード", true, "同じ親の明細を一括置換する"),

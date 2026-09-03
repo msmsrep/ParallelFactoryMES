@@ -99,9 +99,14 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         return await service.ImportAsync(info, csv, dryRun, ct);
     }
 
-    /// <summary>ユーザー系はユーザー管理権限、それ以外はマスタ更新権限（組み合わせはRoleGroupsが持つ）</summary>
+    /// <summary>
+    /// ユーザー系とスキル・資格はユーザー管理権限、それ以外はマスタ更新権限
+    /// （組み合わせはRoleGroupsが持つ）。単票のAPIと同じ権限になるようkind側に持たせる
+    /// </summary>
     private bool CanWrite(CsvKindInfo kind) =>
-        MesRoleGroups.IsInGroup(User, kind.UserAdminOnly ? MesRoleGroups.UserAdmin : MesRoleGroups.MasterWrite);
+        MesRoleGroups.IsInGroup(User, kind.UserAdminOnly || kind.UserAdminWrite
+            ? MesRoleGroups.UserAdmin
+            : MesRoleGroups.MasterWrite);
 
     /// <summary>Excelでそのまま開けるようUTF-8 BOM付きで返す</summary>
     private FileContentResult CsvFileResult(string csv, string fileName) =>
