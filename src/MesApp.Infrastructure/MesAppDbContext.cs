@@ -212,6 +212,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.Site).HasMaxLength(200);
             e.Property(x => x.MaintenanceParts).HasMaxLength(1000);
+            e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Tool>(e =>
@@ -237,6 +239,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.HasIndex(x => x.Code).IsUnique();
             e.Property(x => x.Code).HasMaxLength(50);
             e.Property(x => x.ShelfNo).HasMaxLength(50);
+            e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<InspectionItem>(e =>

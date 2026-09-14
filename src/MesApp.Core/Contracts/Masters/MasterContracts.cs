@@ -69,11 +69,14 @@ public record EquipmentRequest(
     EquipmentStatus Status,
     MaintenanceType MaintenanceType,
     decimal? MaintenanceThreshold,
-    string? MaintenanceParts);
+    string? MaintenanceParts,
+    int? WorkCenterId = null);
 
+/// <summary>WorkCenterCode・WorkCenterName は画面表示用の付随情報（更新は WorkCenterId で行う）</summary>
 public record EquipmentResponse(
     int Id, string AssetNo, string Name, string? Site, EquipmentStatus Status,
-    MaintenanceType MaintenanceType, decimal? MaintenanceThreshold, string? MaintenanceParts, bool IsActive);
+    MaintenanceType MaintenanceType, decimal? MaintenanceThreshold, string? MaintenanceParts, bool IsActive,
+    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null);
 
 // ---- 治工具（Tool）----
 
@@ -107,9 +110,13 @@ public record WorkCenterResponse(
 public record LocationRequest(
     [Required, MaxLength(50)] string Code,
     LocationAreaType AreaType,
-    string? ShelfNo);
+    string? ShelfNo,
+    int? WorkCenterId = null);
 
-public record LocationResponse(int Id, string Code, LocationAreaType AreaType, string? ShelfNo, bool IsActive);
+/// <summary>WorkCenterCode・WorkCenterName は画面表示用の付随情報（更新は WorkCenterId で行う）</summary>
+public record LocationResponse(
+    int Id, string Code, LocationAreaType AreaType, string? ShelfNo, bool IsActive,
+    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null);
 
 // ---- 不良理由（DefectReason）----
 

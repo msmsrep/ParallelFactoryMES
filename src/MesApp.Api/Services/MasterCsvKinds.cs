@@ -47,7 +47,8 @@ public static class MasterCsvKinds
         [
             new("AssetNo", "資産番号", true, null),
             new("Name", "設備名", true, null),
-            new("Site", "設置場所", false, null),
+            new("WorkCenterCode", "作業区コード", false, "登録済みの作業区コード（段が作業区のもの）"),
+            new("Site", "設置場所（旧項目）", false, "作業区を整備するまでの自由記述。設置場所の正は WorkCenterCode"),
             new("Status", "状態", false, "Available / Stopped / UnderMaintenance / Retired"),
             new("MaintenanceType", "保全タイプ", false, "None / Calendar（日数）/ RunTime（時間）/ Count（回数）"),
             new("MaintenanceThreshold", "保全閾値", false, "保全タイプに応じた日数・時間・回数"),
@@ -76,6 +77,7 @@ public static class MasterCsvKinds
         new(Locations, "ロケーション", false,
         [
             new("Code", "ロケーションコード", true, null),
+            new("WorkCenterCode", "所属する作業区コード", false, "登録済みの作業区コード（段は問わない）"),
             new("AreaType", "区分", false,
                 "MaterialWarehouse（部材倉庫）/ InProcess（工程内）/ ProductWarehouse（製品倉庫）/ ShippingArea（出荷場）"),
             new("ShelfNo", "棚番", false, null),

@@ -67,12 +67,12 @@ public sealed partial class MasterCsvService(
 
     private async Task<List<string?[]>> ExportEquipmentsAsync(bool includeInactive, CancellationToken ct)
     {
-        var items = await db.Equipments.AsNoTracking()
+        var items = await db.Equipments.AsNoTracking().Include(e => e.WorkCenter)
             .Where(e => includeInactive || e.IsActive)
             .OrderBy(e => e.AssetNo).ToListAsync(ct);
         return [.. items.Select(e => new string?[]
         {
-            e.AssetNo, e.Name, e.Site, e.Status.ToString(), e.MaintenanceType.ToString(),
+            e.AssetNo, e.Name, e.WorkCenter?.Code, e.Site, e.Status.ToString(), e.MaintenanceType.ToString(),
             Num(e.MaintenanceThreshold), e.MaintenanceParts, Bool(e.IsActive),
         })];
     }
@@ -105,12 +105,12 @@ public sealed partial class MasterCsvService(
 
     private async Task<List<string?[]>> ExportLocationsAsync(bool includeInactive, CancellationToken ct)
     {
-        var items = await db.Locations.AsNoTracking()
+        var items = await db.Locations.AsNoTracking().Include(l => l.WorkCenter)
             .Where(l => includeInactive || l.IsActive)
             .OrderBy(l => l.Code).ToListAsync(ct);
         return [.. items.Select(l => new string?[]
         {
-            l.Code, l.AreaType.ToString(), l.ShelfNo, Bool(l.IsActive),
+            l.Code, l.WorkCenter?.Code, l.AreaType.ToString(), l.ShelfNo, Bool(l.IsActive),
         })];
     }
 

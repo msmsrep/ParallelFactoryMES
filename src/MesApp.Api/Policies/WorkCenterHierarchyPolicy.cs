@@ -73,6 +73,46 @@ public static class WorkCenterHierarchyPolicy
         return null;
     }
 
+    /// <summary>
+    /// 設備の設置場所として指定できる資源か（Spec.md 5.1 Equipment）。指定できない場合は日本語の理由を返す。
+    /// <para>
+    /// 設備は最下段の作業区にだけ紐付ける。作業区が「作業の管理単位」であり、ここを一意に決めておかないと
+    /// 同じ設備群がラインに付いたり作業区に付いたりして、工程別・作業区別の集計軸が定まらなくなるため。
+    /// 上位（エリア・ライン・工場）は作業区から辿れば得られる。
+    /// </para>
+    /// </summary>
+    public static string? CheckEquipmentPlacement(WorkCenter? workCenter)
+    {
+        if (workCenter is null)
+        {
+            return null;
+        }
+        if (workCenter.Level != WorkCenterLevel.WorkCenter)
+        {
+            return $"設備の設置場所には作業区を指定してください（'{workCenter.Code}' は{LevelName(workCenter.Level)}です）。";
+        }
+        return workCenter.IsActive
+            ? null
+            : $"作業区 '{workCenter.Code}' は無効のため、設置場所に指定できません。";
+    }
+
+    /// <summary>
+    /// 在庫ロケーションの所属先として指定できる資源か（Spec.md 5.1 Location）。
+    /// <para>
+    /// 部材倉庫・製品倉庫は工場直下に置かれることが実際に多いため、段は問わない。有効であることだけを求める。
+    /// </para>
+    /// </summary>
+    public static string? CheckLocationPlacement(WorkCenter? workCenter)
+    {
+        if (workCenter is null)
+        {
+            return null;
+        }
+        return workCenter.IsActive
+            ? null
+            : $"作業区 '{workCenter.Code}' は無効のため、所属先に指定できません。";
+    }
+
     /// <summary><paramref name="node"/> が <paramref name="ancestorId"/> の配下にあるか</summary>
     private static bool IsDescendantOf(WorkCenter node, int ancestorId, IReadOnlyCollection<WorkCenter> all)
     {

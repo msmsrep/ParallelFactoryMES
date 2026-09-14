@@ -281,6 +281,51 @@ public class MasterTests
         Assert.Equal(HttpStatusCode.OK, list.StatusCode);
     }
 
+    [Fact]
+    public async Task 設備は作業区にだけ紐付きロケーションはどの段でも紐付く()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        var plant = await CreateWorkCenterAsync(client, "P1", "第一工場", WorkCenterLevel.Plant, null);
+        var line = await CreateWorkCenterAsync(client, "L1", "組立1ライン", WorkCenterLevel.Line, plant.Id);
+        var area = await CreateWorkCenterAsync(client, "A1", "前工程エリア", WorkCenterLevel.Area, line.Id);
+        var wc = await CreateWorkCenterAsync(client, "WC01", "溶接作業区", WorkCenterLevel.WorkCenter, area.Id);
+
+        // 設備は作業区に紐付く
+        var equipment = await client.PostAsJsonAsync("/api/equipments",
+            new EquipmentRequest("EQ-01", "プレス機", null, EquipmentStatus.Available,
+                MaintenanceType.None, null, null, wc.Id));
+        Assert.Equal(HttpStatusCode.Created, equipment.StatusCode);
+        var equipmentBody = await equipment.Content.ReadFromJsonAsync<EquipmentResponse>();
+        Assert.Equal("WC01", equipmentBody!.WorkCenterCode);
+
+        // 作業区以外の段は400（集計軸を一意にするため）
+        var wrongLevel = await client.PostAsJsonAsync("/api/equipments",
+            new EquipmentRequest("EQ-02", "旋盤", null, EquipmentStatus.Available,
+                MaintenanceType.None, null, null, line.Id));
+        Assert.Equal(HttpStatusCode.BadRequest, wrongLevel.StatusCode);
+
+        // 未設定でも登録できる（作業区の整備前でも設備台帳を作れる）
+        var noWorkCenter = await client.PostAsJsonAsync("/api/equipments",
+            new EquipmentRequest("EQ-03", "研磨機", "第1工場", EquipmentStatus.Available,
+                MaintenanceType.None, null, null));
+        Assert.Equal(HttpStatusCode.Created, noWorkCenter.StatusCode);
+
+        // ロケーションは工場にも紐付く（倉庫は工場直下にあることが多い）
+        var warehouse = await client.PostAsJsonAsync("/api/locations",
+            new LocationRequest("WH-01", LocationAreaType.MaterialWarehouse, "A-1", plant.Id));
+        Assert.Equal(HttpStatusCode.Created, warehouse.StatusCode);
+        var warehouseBody = await warehouse.Content.ReadFromJsonAsync<LocationResponse>();
+        Assert.Equal("P1", warehouseBody!.WorkCenterCode);
+
+        // 無効な作業区は指定できない
+        await client.DeleteAsync($"/api/work-centers/{wc.Id}");
+        var toInactive = await client.PostAsJsonAsync("/api/locations",
+            new LocationRequest("IP-01", LocationAreaType.InProcess, null, wc.Id));
+        Assert.Equal(HttpStatusCode.BadRequest, toInactive.StatusCode);
+    }
+
     internal static async Task<WorkCenterResponse> CreateWorkCenterAsync(
         HttpClient client, string code, string name, WorkCenterLevel level, int? parentId)
     {

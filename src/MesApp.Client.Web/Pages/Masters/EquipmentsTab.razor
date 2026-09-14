@@ -16,7 +16,17 @@
                 <input @bind="_name" />
             </div>
             <div class="form-field">
-                <label>設置場所</label>
+                <label>設置場所（作業区）</label>
+                <select @bind="_workCenterId">
+                    <option value="0">なし</option>
+                    @foreach (var wc in _workCenters ?? [])
+                    {
+                        <option value="@wc.Id">@wc.Code @wc.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>設置場所（旧項目）</label>
                 <input @bind="_site" />
             </div>
             <div class="form-field">
@@ -67,7 +77,7 @@
     {
         <table class="table">
             <thead>
-                <tr><th>資産番号</th><th>設備名</th><th>設置場所</th><th>状態</th><th>保全タイプ</th><th>閾値</th><th>保全部品</th><th></th></tr>
+                <tr><th>資産番号</th><th>設備名</th><th>作業区</th><th>設置場所（旧）</th><th>状態</th><th>保全タイプ</th><th>閾値</th><th>保全部品</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var item in _items)
@@ -75,6 +85,7 @@
                     <tr>
                         <td>@item.AssetNo</td>
                         <td>@item.Name</td>
+                        <td>@(item.WorkCenterCode is null ? "-" : $"{item.WorkCenterCode} {item.WorkCenterName}")</td>
                         <td>@(item.Site ?? "-")</td>
                         <td>@StatusLabel(item.Status)</td>
                         <td>@MaintenanceTypeLabel(item.MaintenanceType)</td>
@@ -103,6 +114,9 @@
     private string _assetNo = string.Empty;
     private string _name = string.Empty;
     private string? _site;
+    private int _workCenterId;
+    /// <summary>設備は最下段の作業区にだけ紐付ける（Spec.md 5.1 Equipment）</summary>
+    private List<WorkCenterResponse>? _workCenters;
     private EquipmentStatus _status = EquipmentStatus.Available;
     private MaintenanceType _maintenanceType = MaintenanceType.None;
     private decimal? _threshold;
@@ -113,8 +127,12 @@
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private async Task LoadAsync() =>
+    private async Task LoadAsync()
+    {
         _items = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments?includeInactive=true");
+        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>(
+            $"api/work-centers?level={WorkCenterLevel.WorkCenter}");
+    }
 
     private void Edit(EquipmentResponse item)
     {
@@ -122,6 +140,7 @@
         _assetNo = item.AssetNo;
         _name = item.Name;
         _site = item.Site;
+        _workCenterId = item.WorkCenterId ?? 0;
         _status = item.Status;
         _maintenanceType = item.MaintenanceType;
         _threshold = item.MaintenanceThreshold;
@@ -134,6 +153,7 @@
         _assetNo = string.Empty;
         _name = string.Empty;
         _site = null;
+        _workCenterId = 0;
         _status = EquipmentStatus.Available;
         _maintenanceType = MaintenanceType.None;
         _threshold = null;
@@ -153,7 +173,7 @@
         try
         {
             var request = new EquipmentRequest(_assetNo, _name, _site, _status,
-                _maintenanceType, _threshold, _parts);
+                _maintenanceType, _threshold, _parts, _workCenterId == 0 ? null : _workCenterId);
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/equipments", request)
                 : await Http.PutAsJsonAsync($"api/equipments/{_editingId}", request);

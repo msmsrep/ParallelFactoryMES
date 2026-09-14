@@ -242,6 +242,8 @@ public sealed partial class MasterCsvService
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var byAssetNo = await db.Equipments.ToDictionaryAsync(e => e.AssetNo, StringComparer.Ordinal, ct);
+        var workCenters = await db.WorkCenters.AsNoTracking()
+            .ToDictionaryAsync(w => w.Code, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var row in table.Rows)
@@ -258,6 +260,8 @@ public sealed partial class MasterCsvService
 
             var name = reader.RequiredText("Name", 200);
             var site = reader.Text("Site", equipment.Site, 200);
+            var workCenter = ResolveWorkCenter(
+                reader, table, "WorkCenterCode", equipment.WorkCenterId, workCenters, out var workCenterKept);
             var status = reader.Enum("Status", equipment.Status, CsvEnumLabels.EquipmentStatuses);
             var maintenanceType = reader.Enum("MaintenanceType", equipment.MaintenanceType, CsvEnumLabels.MaintenanceTypes);
             var threshold = reader.NumberOrNull("MaintenanceThreshold", equipment.MaintenanceThreshold, 0);
@@ -268,8 +272,19 @@ public sealed partial class MasterCsvService
                 continue;
             }
 
+            // 設備は作業区（最下段）にだけ紐付ける。判定は単票APIと同じ（Spec.md 5.1 Equipment）
+            if (!workCenterKept && WorkCenterHierarchyPolicy.CheckEquipmentPlacement(workCenter) is { } placement)
+            {
+                reader.Fail(placement);
+                continue;
+            }
+
             equipment.Name = name;
             equipment.Site = site;
+            if (!workCenterKept)
+            {
+                equipment.WorkCenterId = workCenter?.Id;
+            }
             equipment.Status = status;
             equipment.MaintenanceType = maintenanceType;
             equipment.MaintenanceThreshold = threshold;
@@ -387,6 +402,33 @@ public sealed partial class MasterCsvService
     /// 2周目で上位を結び付けて階層の妥当性を <see cref="WorkCenterHierarchyPolicy"/> で検証する。
     /// 判定を単票APIと共有するので、フォームからは作れない階層がCSVからだけ通ることがない。
     /// </summary>
+    /// <summary>
+    /// CSVの作業区コード列を解決する。列が無いときは現在値を保つ（<paramref name="kept"/> が true）。
+    /// 列があって空欄なら「紐付けを外す」意味になるため null を返す。
+    /// </summary>
+    private static WorkCenter? ResolveWorkCenter(
+        CsvRowReader reader, CsvTable table, string column, int? currentId,
+        IReadOnlyDictionary<string, WorkCenter> byCode, out bool kept)
+    {
+        if (!table.HasColumn(column))
+        {
+            kept = true;
+            return currentId is null ? null : byCode.Values.FirstOrDefault(w => w.Id == currentId);
+        }
+        kept = false;
+        var code = reader.Text(column, null, 50);
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return null;
+        }
+        if (byCode.TryGetValue(code, out var found))
+        {
+            return found;
+        }
+        reader.Fail($"作業区 '{code}' は登録されていません（{column}）。");
+        return null;
+    }
+
     private async Task ImportWorkCentersAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
@@ -478,6 +520,8 @@ public sealed partial class MasterCsvService
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var byCode = await db.Locations.ToDictionaryAsync(l => l.Code, StringComparer.Ordinal, ct);
+        var workCenters = await db.WorkCenters.AsNoTracking()
+            .ToDictionaryAsync(w => w.Code, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var row in table.Rows)
@@ -493,6 +537,8 @@ public sealed partial class MasterCsvService
             location ??= new Location { Code = code };
 
             var areaType = reader.Enum("AreaType", location.AreaType, CsvEnumLabels.LocationAreaTypes);
+            var workCenter = ResolveWorkCenter(
+                reader, table, "WorkCenterCode", location.WorkCenterId, workCenters, out var workCenterKept);
             var shelfNo = reader.Text("ShelfNo", location.ShelfNo, 50);
             var isActive = reader.Bool("IsActive", location.IsActive);
             if (reader.Failed)
@@ -500,8 +546,19 @@ public sealed partial class MasterCsvService
                 continue;
             }
 
+            // 倉庫は工場直下に置かれることがあるため段は問わない（Spec.md 5.1 Location）
+            if (!workCenterKept && WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } placement)
+            {
+                reader.Fail(placement);
+                continue;
+            }
+
             location.AreaType = areaType;
             location.ShelfNo = shelfNo;
+            if (!workCenterKept)
+            {
+                location.WorkCenterId = workCenter?.Id;
+            }
             location.IsActive = isActive;
 
             if (isNew)

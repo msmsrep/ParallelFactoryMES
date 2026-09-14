@@ -53,14 +53,14 @@
 | 出庫・ピッキング・工程払出（FEFO自動引当） | D-20-10 / D-20-20 | `PickingOrdersController.cs` `api/picking-orders` | Inventory.cs: PickingOrder / PickingLine | `/picking` `Picking.razor` | `Tests/InventoryTests.cs` |
 | 出荷（出荷判定ゲート付き） | D-40 / H-10-10 | `ShippingOrdersController.cs` `api/shipping-orders` | Inventory.cs: ShippingOrder / ShippingLine | `/shipping` `Shipping.razor`<br>`/print/shipping/{id}` `Print/ShippingSlip.razor` | `Tests/InventoryTests.cs` |
 | 棚卸（スナップショット→実棚→差異→確定） | D-50-10 | `StocktakesController.cs` `api/stocktakes` | Inventory.cs: Stocktake / StocktakeLine | `/stocktakes` `Stocktakes.razor`<br>`/print/stocktake/{id}` `Print/StocktakeSheet.razor` | `Tests/InventoryTests.cs` |
-| ロケーション・棚番管理 | D-50-20-01 | `LocationsController.cs` `api/locations` | Masters.cs: Location | `/masters` `Masters/LocationsTab.razor` | `Tests/MasterTests.cs` |
+| ロケーション・棚番管理 | D-50-20-01 | `LocationsController.cs` `api/locations` | Masters.cs: Location（`WorkCenterId`＝所属する資源。**段は問わない**） | `/masters` `Masters/LocationsTab.razor` | `Tests/MasterTests.cs` |
 
 ## E. 設備保全
 
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
 | 作業区／資源階層（BOR。工場/ライン/エリア/作業区） | I-10-20-02 | `WorkCentersController.cs` `api/work-centers`<br>`Api/Policies/WorkCenterHierarchyPolicy.cs`（段の妥当性・循環。単票APIとCSV取込の**両方**から呼ぶ） | Masters.cs: WorkCenter（自己参照。`Level` は文字列保存のため**DB側で並べると段の順にならない**。取得後に並べ直す） | `/masters` `Masters/WorkCentersTab.razor` | `Tests/MasterTests.cs` / `MasterCsvTests.cs` |
-| 設備台帳／BOE | E-10-10 / I-10-20 | `EquipmentsController.cs` `api/equipments` | Masters.cs: Equipment | `/masters` `Masters/EquipmentsTab.razor` | `Tests/MasterTests.cs` |
+| 設備台帳／BOE | E-10-10 / I-10-20 | `EquipmentsController.cs` `api/equipments` | Masters.cs: Equipment（`WorkCenterId`＝設置場所の正。**作業区（最下段）のみ**。`Site` は移行用の旧項目） | `/masters` `Masters/EquipmentsTab.razor` | `Tests/MasterTests.cs` |
 | 保全手順書（版数管理） | E-10-20 / E-20-30 | `MaintenanceProceduresController.cs` `api/maintenance-procedures` | Maintenance.cs: MaintenanceProcedure | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
 | 保全計画（中長期・年次） | E-30-10 | `MaintenancePlansController.cs` `api/maintenance-plans` | Maintenance.cs: MaintenancePlan | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
 | 保全指示・実績・突発依頼 | E-30-20 / E-30-30 / E-40 | `MaintenanceOrdersController.cs` `api/maintenance-orders` | Maintenance.cs: MaintenanceOrder / MaintenanceRecord | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |

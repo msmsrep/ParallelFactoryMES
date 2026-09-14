@@ -21,6 +21,16 @@
                 </select>
             </div>
             <div class="form-field">
+                <label>所属する作業区</label>
+                <select @bind="_workCenterId">
+                    <option value="0">なし</option>
+                    @foreach (var wc in _workCenters ?? [])
+                    {
+                        <option value="@wc.Id">@wc.Code @wc.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
                 <label>棚番</label>
                 <input @bind="_shelfNo" />
             </div>
@@ -45,13 +55,14 @@
     else
     {
         <table class="table">
-            <thead><tr><th>コード</th><th>区分</th><th>棚番</th><th>状態</th><th></th></tr></thead>
+            <thead><tr><th>コード</th><th>区分</th><th>作業区</th><th>棚番</th><th>状態</th><th></th></tr></thead>
             <tbody>
                 @foreach (var item in _items)
                 {
                     <tr>
                         <td>@item.Code</td>
                         <td>@AreaLabel(item.AreaType)</td>
+                        <td>@(item.WorkCenterCode is null ? "-" : $"{item.WorkCenterCode} {item.WorkCenterName}")</td>
                         <td>@(item.ShelfNo ?? "-")</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
@@ -77,14 +88,20 @@
     private string _code = string.Empty;
     private LocationAreaType _areaType = LocationAreaType.MaterialWarehouse;
     private string? _shelfNo;
+    private int _workCenterId;
+    /// <summary>倉庫は工場直下に置かれることがあるため、段を問わず全件から選ばせる（Spec.md 5.1 Location）</summary>
+    private List<WorkCenterResponse>? _workCenters;
     private string? _error;
     private string? _message;
     private bool _busy;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private async Task LoadAsync() =>
+    private async Task LoadAsync()
+    {
         _items = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations?includeInactive=true");
+        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers");
+    }
 
     private void Edit(LocationResponse item)
     {
@@ -92,6 +109,7 @@
         _code = item.Code;
         _areaType = item.AreaType;
         _shelfNo = item.ShelfNo;
+        _workCenterId = item.WorkCenterId ?? 0;
     }
 
     private void ResetForm()
@@ -100,6 +118,7 @@
         _code = string.Empty;
         _areaType = LocationAreaType.MaterialWarehouse;
         _shelfNo = null;
+        _workCenterId = 0;
     }
 
     private async Task SaveAsync()
@@ -114,7 +133,7 @@
         _message = null;
         try
         {
-            var request = new LocationRequest(_code, _areaType, _shelfNo);
+            var request = new LocationRequest(_code, _areaType, _shelfNo, _workCenterId == 0 ? null : _workCenterId);
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/locations", request)
                 : await Http.PutAsJsonAsync($"api/locations/{_editingId}", request);

@@ -463,7 +463,7 @@ public class MasterCsvTests
         response.EnsureSuccessStatusCode();
         var bytes = await response.Content.ReadAsByteArrayAsync();
         var text = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
-        Assert.Equal("Code,AreaType,ShelfNo,IsActive\r\n", text);
+        Assert.Equal("Code,WorkCenterCode,AreaType,ShelfNo,IsActive\r\n", text);
     }
 
     [Fact]
@@ -587,6 +587,73 @@ public class MasterCsvTests
         // 1行でもエラーなら全件ロールバックされる
         var items = await client.GetFromJsonAsync<List<WorkCenterResponse>>("/api/work-centers");
         Assert.Empty(items!);
+    }
+
+    [Fact]
+    public async Task 設備とロケーションのCSVで作業区をコード参照できる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        Assert.True((await ImportAsync(client, "work-centers", """
+            Code,Name,Level,ParentCode,IsActive
+            P1,第一工場,Plant,,true
+            L1,組立1ライン,Line,P1,true
+            A1,前工程エリア,Area,L1,true
+            WC01,溶接作業区,WorkCenter,A1,true
+            """)).Succeeded);
+
+        var equipments = await ImportAsync(client, "equipments", """
+            AssetNo,Name,WorkCenterCode,Site,Status,MaintenanceType,MaintenanceThreshold,MaintenanceParts,IsActive
+            EQ-01,プレス機,WC01,,Available,None,,,true
+            """);
+        Assert.True(equipments.Succeeded, string.Join(" / ", equipments.Errors.Select(e => e.Message)));
+        var equipmentList = await client.GetFromJsonAsync<List<EquipmentResponse>>("/api/equipments");
+        Assert.Equal("WC01", equipmentList!.Single().WorkCenterCode);
+
+        // 設備に作業区以外の段を指定すると、単票APIと同じ理由で弾かれる
+        var wrongLevel = await ImportAsync(client, "equipments", """
+            AssetNo,Name,WorkCenterCode,Site,Status,MaintenanceType,MaintenanceThreshold,MaintenanceParts,IsActive
+            EQ-02,旋盤,L1,,Available,None,,,true
+            """);
+        Assert.False(wrongLevel.Succeeded);
+        Assert.Contains(wrongLevel.Errors, e => e.Line == 2 && e.Message.Contains("作業区を指定"));
+
+        // 未登録の作業区コードは行番号付きで拒否
+        var missing = await ImportAsync(client, "locations", """
+            Code,WorkCenterCode,AreaType,ShelfNo,IsActive
+            WH-01,WC99,MaterialWarehouse,A-1,true
+            """);
+        Assert.False(missing.Succeeded);
+        Assert.Contains(missing.Errors, e => e.Line == 2 && e.Message.Contains("WC99"));
+
+        // ロケーションは工場にも紐付けられる
+        var locations = await ImportAsync(client, "locations", """
+            Code,WorkCenterCode,AreaType,ShelfNo,IsActive
+            WH-01,P1,MaterialWarehouse,A-1,true
+            """);
+        Assert.True(locations.Succeeded, string.Join(" / ", locations.Errors.Select(e => e.Message)));
+        var locationList = await client.GetFromJsonAsync<List<LocationResponse>>("/api/locations");
+        Assert.Equal("P1", locationList!.Single().WorkCenterCode);
+
+        // 列を省くと現在の作業区が保たれる（列単位の部分更新）
+        var kept = await ImportAsync(client, "locations", """
+            Code,ShelfNo
+            WH-01,B-2
+            """);
+        Assert.True(kept.Succeeded, string.Join(" / ", kept.Errors.Select(e => e.Message)));
+        var afterKeep = await client.GetFromJsonAsync<List<LocationResponse>>("/api/locations");
+        Assert.Equal("P1", afterKeep!.Single().WorkCenterCode);
+        Assert.Equal("B-2", afterKeep!.Single().ShelfNo);
+
+        // 列があって空欄なら紐付けを外す
+        var cleared = await ImportAsync(client, "locations", """
+            Code,WorkCenterCode
+            WH-01,
+            """);
+        Assert.True(cleared.Succeeded, string.Join(" / ", cleared.Errors.Select(e => e.Message)));
+        var afterClear = await client.GetFromJsonAsync<List<LocationResponse>>("/api/locations");
+        Assert.Null(afterClear!.Single().WorkCenterId);
     }
 
     private static async Task<CsvImportResult> ImportAsync(

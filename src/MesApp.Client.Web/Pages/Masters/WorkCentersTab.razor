@@ -36,7 +36,7 @@
                 else
                 {
                     <select @bind="_parentId">
-                        <option value="">（選択してください）</option>
+                        <option value="0">（選択してください）</option>
                         @foreach (var p in ParentCandidates)
                         {
                             <option value="@p.Id">@p.Code @p.Name</option>
@@ -98,7 +98,7 @@
     private string _code = string.Empty;
     private string _name = string.Empty;
     private WorkCenterLevel _level = WorkCenterLevel.Plant;
-    private int? _parentId;
+    private int _parentId;
     private string? _error;
     private string? _message;
     private bool _busy;
@@ -131,7 +131,7 @@
         _code = item.Code;
         _name = item.Name;
         _level = item.Level;
-        _parentId = item.ParentId;
+        _parentId = item.ParentId ?? 0;
     }
 
     private void ResetForm()
@@ -140,7 +140,7 @@
         _code = string.Empty;
         _name = string.Empty;
         _level = WorkCenterLevel.Plant;
-        _parentId = null;
+        _parentId = 0;
     }
 
     private async Task SaveAsync()
@@ -161,7 +161,7 @@
         try
         {
             // 工場は上位を持たない。段を切り替えたときに前の選択が残らないようにする
-            var parentId = _level == WorkCenterLevel.Plant ? null : _parentId;
+            int? parentId = _level == WorkCenterLevel.Plant || _parentId == 0 ? null : _parentId;
             var request = new WorkCenterRequest(_code, _name, _level, parentId);
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/work-centers", request)

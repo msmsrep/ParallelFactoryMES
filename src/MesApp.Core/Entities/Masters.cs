@@ -122,7 +122,15 @@ public class Equipment
 
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>設置場所</summary>
+    /// <summary>
+    /// 設置場所（作業区。設備は最下段の作業区にだけ紐付ける。Spec.md 5.1 WorkCenter）
+    /// </summary>
+    public int? WorkCenterId { get; set; }
+    public WorkCenter? WorkCenter { get; set; }
+
+    /// <summary>
+    /// 設置場所の自由記述（作業区を整備するまでの旧項目。設置場所の正は <see cref="WorkCenterId"/>）
+    /// </summary>
     public string? Site { get; set; }
 
     public EquipmentStatus Status { get; set; } = EquipmentStatus.Available;
@@ -199,6 +207,12 @@ public class Location
     public string Code { get; set; } = string.Empty;
 
     public LocationAreaType AreaType { get; set; }
+
+    /// <summary>
+    /// 所属する資源（作業区。倉庫は工場直下に置かれることがあるため段を問わない。Spec.md 5.1 WorkCenter）
+    /// </summary>
+    public int? WorkCenterId { get; set; }
+    public WorkCenter? WorkCenter { get; set; }
 
     /// <summary>棚番</summary>
     public string? ShelfNo { get; set; }
