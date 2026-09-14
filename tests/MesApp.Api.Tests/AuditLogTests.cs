@@ -51,7 +51,9 @@ public class AuditLogTests
         Assert.Equal(1, byAction!.Total);
 
         // 期間で引く：SQLiteでも記録時刻の比較が効くこと
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        // 記録日（RecordedOn）はサーバーのローカル日付（Spec.md 7.6）。UTCの日付で組み立てると
+        // JSTの00:00〜09:00に実行したときだけ1日ずれて0件になる
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var inRange = await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>(
             $"/api/audit-logs?from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}");
         Assert.Equal(all.Total, inRange!.Total);
