@@ -1,0 +1,213 @@
+@inject HttpClient Http
+
+@* 作業区／資源階層マスタ（Spec.md 5.1 WorkCenter。I-10-20-02 設備情報の登録） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "作業区の登録" : $"作業区の編集（{_code}）")</h2>
+        <p class="text-muted">
+            工場 → ライン → エリア → 作業区 の順に登録する。上位には1つ上の段だけを指定できる。
+        </p>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>作業区コード</label>
+                <input @bind="_code" />
+            </div>
+            <div class="form-field">
+                <label>名称</label>
+                <input @bind="_name" />
+            </div>
+            <div class="form-field">
+                <label>段</label>
+                <select @bind="_level">
+                    <option value="@WorkCenterLevel.Plant">工場</option>
+                    <option value="@WorkCenterLevel.Line">ライン</option>
+                    <option value="@WorkCenterLevel.Area">エリア</option>
+                    <option value="@WorkCenterLevel.WorkCenter">作業区</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>上位の資源@(RequiredParentLabel is null ? "" : $"（{RequiredParentLabel}）")</label>
+                @if (_level == WorkCenterLevel.Plant)
+                {
+                    <span class="text-muted">工場は上位を持たない</span>
+                }
+                else
+                {
+                    <select @bind="_parentId">
+                        <option value="">（選択してください）</option>
+                        @foreach (var p in ParentCandidates)
+                        {
+                            <option value="@p.Id">@p.Code @p.Name</option>
+                        }
+                    </select>
+                }
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<CsvIoPanel Kind="work-centers" Label="作業区" KeyLabel="作業区コード" OnImported="LoadAsync" />
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>コード</th><th>名称</th><th>段</th><th>上位</th><th>状態</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.Code</td>
+                        <td>@item.Name</td>
+                        <td>@LevelLabel(item.Level)</td>
+                        <td>@(item.ParentCode is null ? "-" : $"{item.ParentCode} {item.ParentName}")</td>
+                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<WorkCenterResponse>? _items;
+    private int? _editingId;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private WorkCenterLevel _level = WorkCenterLevel.Plant;
+    private int? _parentId;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    /// <summary>選んでいる段の1つ上の段（工場ならnull）</summary>
+    private WorkCenterLevel? RequiredParent => _level switch
+    {
+        WorkCenterLevel.Plant => null,
+        WorkCenterLevel.Line => WorkCenterLevel.Plant,
+        WorkCenterLevel.Area => WorkCenterLevel.Line,
+        _ => WorkCenterLevel.Area,
+    };
+
+    private string? RequiredParentLabel => RequiredParent is { } l ? LevelLabel(l) : null;
+
+    /// <summary>上位に選べる候補。段を1つ上のものに絞り、自分自身は除く</summary>
+    private IEnumerable<WorkCenterResponse> ParentCandidates =>
+        _items is null || RequiredParent is not { } required
+            ? []
+            : _items.Where(x => x.Level == required && x.IsActive && x.Id != _editingId);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers?includeInactive=true");
+
+    private void Edit(WorkCenterResponse item)
+    {
+        _editingId = item.Id;
+        _code = item.Code;
+        _name = item.Name;
+        _level = item.Level;
+        _parentId = item.ParentId;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _name = string.Empty;
+        _level = WorkCenterLevel.Plant;
+        _parentId = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code))
+        {
+            _error = "作業区コードを入力してください。";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "名称を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            // 工場は上位を持たない。段を切り替えたときに前の選択が残らないようにする
+            var parentId = _level == WorkCenterLevel.Plant ? null : _parentId;
+            var request = new WorkCenterRequest(_code, _name, _level, parentId);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/work-centers", request)
+                : await Http.PutAsJsonAsync($"api/work-centers/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/work-centers/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string LevelLabel(WorkCenterLevel level) => level switch
+    {
+        WorkCenterLevel.Plant => "工場",
+        WorkCenterLevel.Line => "ライン",
+        WorkCenterLevel.Area => "エリア",
+        WorkCenterLevel.WorkCenter => "作業区",
+        _ => level.ToString(),
+    };
+}

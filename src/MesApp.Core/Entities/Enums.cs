@@ -59,6 +59,19 @@ public enum ToolStatus
     Retired,
 }
 
+/// <summary>資源階層の段（Spec.md 5.1 WorkCenter。上から 工場 → ライン → エリア → 作業区）</summary>
+public enum WorkCenterLevel
+{
+    /// <summary>工場</summary>
+    Plant,
+    /// <summary>ライン</summary>
+    Line,
+    /// <summary>エリア</summary>
+    Area,
+    /// <summary>作業区（作業の管理単位。最下段）</summary>
+    WorkCenter,
+}
+
 /// <summary>倉庫/エリア区分（Spec.md 5.1 Location）</summary>
 public enum LocationAreaType
 {

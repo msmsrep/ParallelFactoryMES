@@ -20,6 +20,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<Routing> Routings => Set<Routing>();
     public DbSet<Equipment> Equipments => Set<Equipment>();
     public DbSet<Tool> Tools => Set<Tool>();
+    public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<InspectionItem> InspectionItems => Set<InspectionItem>();
     public DbSet<Checklist> Checklists => Set<Checklist>();
@@ -105,6 +106,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<EquipmentStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenanceType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ToolStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<WorkCenterLevel>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<LocationAreaType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<InspectionType>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ChecklistCategory>().HaveConversion<string>().HaveMaxLength(30);
@@ -218,6 +220,16 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.Property(x => x.Code).HasMaxLength(50);
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.ToolType).HasMaxLength(100);
+        });
+
+        builder.Entity<WorkCenter>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(50);
+            e.Property(x => x.Name).HasMaxLength(200);
+            // 上位の資源は削除しない（無効化で運用する）ため、参照が残っている親を消せないようにする
+            e.HasOne(x => x.Parent).WithMany().HasForeignKey(x => x.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Location>(e =>

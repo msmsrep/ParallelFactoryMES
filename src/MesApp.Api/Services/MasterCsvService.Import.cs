@@ -72,6 +72,9 @@ public sealed partial class MasterCsvService
                 case MasterCsvKinds.Tools:
                     await ImportToolsAsync(table, errors, counter, ct);
                     break;
+                case MasterCsvKinds.WorkCenters:
+                    await ImportWorkCentersAsync(table, errors, counter, ct);
+                    break;
                 case MasterCsvKinds.Locations:
                     await ImportLocationsAsync(table, errors, counter, ct);
                     break;
@@ -369,6 +372,99 @@ public sealed partial class MasterCsvService
             {
                 db.DefectReasons.Add(reason);
                 byCode[code] = reason;
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 作業区の取込。上位をコードで参照するため2周する。
+    /// 1周目で全行の実体を用意し（同じファイル内で上位が後に書かれていても引けるようにする）、
+    /// 2周目で上位を結び付けて階層の妥当性を <see cref="WorkCenterHierarchyPolicy"/> で検証する。
+    /// 判定を単票APIと共有するので、フォームからは作れない階層がCSVからだけ通ることがない。
+    /// </summary>
+    private async Task ImportWorkCentersAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.WorkCenters.ToDictionaryAsync(w => w.Code, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var staged = new List<(CsvRowReader Reader, WorkCenter Entity, string? ParentCode, bool IsNew)>();
+
+        // 1周目：実体を用意し、上位以外の項目を埋める
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 50);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "作業区コード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var workCenter);
+            workCenter ??= new WorkCenter { Code = code };
+
+            var name = reader.Text("Name", workCenter.Name, 200) ?? workCenter.Name;
+            var level = reader.Enum("Level", workCenter.Level, CsvEnumLabels.WorkCenterLevels);
+            var parentCode = reader.Text("ParentCode", null, 50);
+            var isActive = reader.Bool("IsActive", workCenter.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                reader.Fail("Name は必須です。");
+                continue;
+            }
+
+            workCenter.Name = name;
+            workCenter.Level = level;
+            workCenter.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.WorkCenters.Add(workCenter);
+                byCode[code] = workCenter;
+            }
+            staged.Add((reader, workCenter, parentCode, isNew));
+        }
+
+        // 2周目：上位を結び付けて階層を検証する
+        var all = byCode.Values.ToList();
+        foreach (var (reader, workCenter, parentCode, isNew) in staged)
+        {
+            WorkCenter? parent = null;
+            if (!string.IsNullOrWhiteSpace(parentCode))
+            {
+                if (!byCode.TryGetValue(parentCode, out parent))
+                {
+                    reader.Fail($"上位の作業区 '{parentCode}' は登録されていません（ParentCode）。");
+                    continue;
+                }
+            }
+            // 列が無いときは現在の上位を保つ（列単位の部分更新を既存マスタと揃える）
+            else if (!table.HasColumn("ParentCode") && workCenter.ParentId is { } currentParentId)
+            {
+                parent = all.FirstOrDefault(x => x.Id == currentParentId);
+            }
+
+            var selfId = isNew ? (int?)null : workCenter.Id;
+            if (WorkCenterHierarchyPolicy.Check(workCenter.Code, workCenter.Level, parent, selfId, all) is { } reason)
+            {
+                reader.Fail(reason);
+                continue;
+            }
+
+            // 新規の上位はまだIdを持たないため、ナビゲーションで結ぶ（保存時にEFがIdを埋める）
+            workCenter.Parent = parent;
+            workCenter.ParentId = parent?.Id;
+
+            if (isNew)
+            {
                 counter.Created++;
             }
             else

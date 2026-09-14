@@ -89,6 +89,19 @@ public record ToolResponse(
     int Id, string Code, string Name, string? ToolType,
     int? LifeThresholdCount, decimal? LifeThresholdHours, ToolStatus Status, bool IsActive);
 
+// ---- 作業区／資源階層（WorkCenter）----
+
+public record WorkCenterRequest(
+    [Required, MaxLength(50)] string Code,
+    [Required, MaxLength(200)] string Name,
+    WorkCenterLevel Level,
+    int? ParentId);
+
+/// <summary>ParentCode・ParentName は画面で親を表示するための付随情報（更新は ParentId で行う）</summary>
+public record WorkCenterResponse(
+    int Id, string Code, string Name, WorkCenterLevel Level,
+    int? ParentId, string? ParentCode, string? ParentName, bool IsActive);
+
 // ---- ロケーション（Location）----
 
 public record LocationRequest(

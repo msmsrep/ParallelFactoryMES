@@ -31,6 +31,7 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.Processes => await ExportProcessesAsync(includeInactive, ct),
             MasterCsvKinds.Equipments => await ExportEquipmentsAsync(includeInactive, ct),
             MasterCsvKinds.Tools => await ExportToolsAsync(includeInactive, ct),
+            MasterCsvKinds.WorkCenters => await ExportWorkCentersAsync(includeInactive, ct),
             MasterCsvKinds.Locations => await ExportLocationsAsync(includeInactive, ct),
             MasterCsvKinds.InspectionItems => await ExportInspectionItemsAsync(includeInactive, ct),
             MasterCsvKinds.Checklists => await ExportChecklistsAsync(includeInactive, ct),
@@ -85,6 +86,20 @@ public sealed partial class MasterCsvService(
         {
             t.Code, t.Name, t.ToolType, Num(t.LifeThresholdCount), Num(t.LifeThresholdHours),
             t.Status.ToString(), Bool(t.IsActive),
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportWorkCentersAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.WorkCenters.AsNoTracking().Include(w => w.Parent)
+            .Where(w => includeInactive || w.IsActive)
+            .OrderBy(w => w.Code).ToListAsync(ct);
+        // 上の段から出力すると、取り込み直したときに上位が先に現れて人が読みやすい。
+        // Levelは文字列で保存しているためDB側では段の順に並ばず、取得後に並べ直す
+        return [.. items.OrderBy(w => w.Level).ThenBy(w => w.Code, StringComparer.Ordinal)
+            .Select(w => new string?[]
+        {
+            w.Code, w.Name, w.Level.ToString(), w.Parent?.Code, Bool(w.IsActive),
         })];
     }
 

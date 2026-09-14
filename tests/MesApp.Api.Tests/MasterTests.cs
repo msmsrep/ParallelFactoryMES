@@ -209,6 +209,87 @@ public class MasterTests
         Assert.Equal(2, updatedBody!.Version);
     }
 
+    [Fact]
+    public async Task 作業区の階層を登録でき段の飛び越しと循環は拒否される()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        // 工場 → ライン → エリア → 作業区 の順に積める
+        var plant = await CreateWorkCenterAsync(client, "P1", "第一工場", WorkCenterLevel.Plant, null);
+        var line = await CreateWorkCenterAsync(client, "L1", "組立1ライン", WorkCenterLevel.Line, plant.Id);
+        var area = await CreateWorkCenterAsync(client, "A1", "前工程エリア", WorkCenterLevel.Area, line.Id);
+        var wc = await CreateWorkCenterAsync(client, "WC01", "溶接作業区", WorkCenterLevel.WorkCenter, area.Id);
+        Assert.Equal("A1", wc.ParentCode);
+
+        // コード重複は409
+        var duplicated = await client.PostAsJsonAsync("/api/work-centers",
+            new WorkCenterRequest("P1", "別工場", WorkCenterLevel.Plant, null));
+        Assert.Equal(HttpStatusCode.Conflict, duplicated.StatusCode);
+
+        // 段の飛び越し（作業区の上位に工場）は400
+        var skipped = await client.PostAsJsonAsync("/api/work-centers",
+            new WorkCenterRequest("WC02", "検査作業区", WorkCenterLevel.WorkCenter, plant.Id));
+        Assert.Equal(HttpStatusCode.BadRequest, skipped.StatusCode);
+
+        // 上位なしの下位段は400
+        var orphan = await client.PostAsJsonAsync("/api/work-centers",
+            new WorkCenterRequest("L2", "組立2ライン", WorkCenterLevel.Line, null));
+        Assert.Equal(HttpStatusCode.BadRequest, orphan.StatusCode);
+
+        // 工場に上位を付けると400
+        var rooted = await client.PostAsJsonAsync("/api/work-centers",
+            new WorkCenterRequest("P2", "第二工場", WorkCenterLevel.Plant, plant.Id));
+        Assert.Equal(HttpStatusCode.BadRequest, rooted.StatusCode);
+
+        // 自分の配下を上位にすると400（循環）
+        var cyclic = await client.PutAsJsonAsync($"/api/work-centers/{plant.Id}",
+            new WorkCenterRequest("P1", "第一工場", WorkCenterLevel.Plant, area.Id));
+        Assert.Equal(HttpStatusCode.BadRequest, cyclic.StatusCode);
+
+        // 有効な下位が残っている間は無効化できない
+        var blocked = await client.DeleteAsync($"/api/work-centers/{area.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+
+        // 下位から順に無効化すれば通る
+        var leaf = await client.DeleteAsync($"/api/work-centers/{wc.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, leaf.StatusCode);
+        var parent = await client.DeleteAsync($"/api/work-centers/{area.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, parent.StatusCode);
+
+        // 既定は有効なものだけ返す
+        var active = await client.GetFromJsonAsync<List<WorkCenterResponse>>("/api/work-centers");
+        Assert.DoesNotContain(active!, x => x.Code == "WC01");
+        var all = await client.GetFromJsonAsync<List<WorkCenterResponse>>("/api/work-centers?includeInactive=true");
+        Assert.Contains(all!, x => x.Code == "WC01");
+    }
+
+    [Fact]
+    public async Task 作業区の登録はマスタ更新権限が要る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        using var operator_ = await TestAuth.CreateUserClientAsync(
+            factory, admin, "wc-op", "Passw0rd!x", MesRoles.Operator);
+
+        var denied = await operator_.PostAsJsonAsync("/api/work-centers",
+            new WorkCenterRequest("P9", "第九工場", WorkCenterLevel.Plant, null));
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        // 参照は開いている
+        var list = await operator_.GetAsync("/api/work-centers");
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+    }
+
+    internal static async Task<WorkCenterResponse> CreateWorkCenterAsync(
+        HttpClient client, string code, string name, WorkCenterLevel level, int? parentId)
+    {
+        var response = await client.PostAsJsonAsync("/api/work-centers",
+            new WorkCenterRequest(code, name, level, parentId));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<WorkCenterResponse>())!;
+    }
+
     internal static async Task<ProductResponse> CreateProductAsync(
         HttpClient client, string code, string name, ProductType type)
     {

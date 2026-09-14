@@ -13,6 +13,7 @@ public static class MasterCsvKinds
     public const string Processes = "processes";
     public const string Equipments = "equipments";
     public const string Tools = "tools";
+    public const string WorkCenters = "work-centers";
     public const string Locations = "locations";
     public const string InspectionItems = "inspection-items";
     public const string Checklists = "checklists";
@@ -61,6 +62,15 @@ public static class MasterCsvKinds
             new("LifeThresholdCount", "寿命閾値(回数)", false, null),
             new("LifeThresholdHours", "寿命閾値(時間)", false, null),
             new("Status", "状態", false, "Available / InUse / UnderMaintenance / Retired"),
+            new("IsActive", "有効", false, "true / false"),
+        ]),
+        new(WorkCenters, "作業区", false,
+        [
+            new("Code", "作業区コード", true, "既存コードと一致すれば更新、無ければ新規登録"),
+            new("Name", "名称", true, null),
+            new("Level", "段", false, "Plant（工場）/ Line（ライン）/ Area（エリア）/ WorkCenter（作業区）"),
+            new("ParentCode", "上位の作業区コード", false,
+                "1つ上の段のコード。工場は空欄。同じファイル内で上位を先に定義しなくてもよい"),
             new("IsActive", "有効", false, "true / false"),
         ]),
         new(Locations, "ロケーション", false,
@@ -186,6 +196,10 @@ public static class CsvEnumLabels
     public static readonly IReadOnlyDictionary<string, ToolStatus> ToolStatuses = Build(
         ("使用可能", ToolStatus.Available), ("使用中", ToolStatus.InUse),
         ("メンテナンス中", ToolStatus.UnderMaintenance), ("廃棄", ToolStatus.Retired));
+
+    public static readonly IReadOnlyDictionary<string, WorkCenterLevel> WorkCenterLevels = Build(
+        ("工場", WorkCenterLevel.Plant), ("ライン", WorkCenterLevel.Line),
+        ("エリア", WorkCenterLevel.Area), ("作業区", WorkCenterLevel.WorkCenter));
 
     public static readonly IReadOnlyDictionary<string, LocationAreaType> LocationAreaTypes = Build(
         ("部材倉庫", LocationAreaType.MaterialWarehouse), ("工程内", LocationAreaType.InProcess),

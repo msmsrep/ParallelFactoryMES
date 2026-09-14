@@ -59,6 +59,7 @@
 
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
+| 作業区／資源階層（BOR。工場/ライン/エリア/作業区） | I-10-20-02 | `WorkCentersController.cs` `api/work-centers`<br>`Api/Policies/WorkCenterHierarchyPolicy.cs`（段の妥当性・循環。単票APIとCSV取込の**両方**から呼ぶ） | Masters.cs: WorkCenter（自己参照。`Level` は文字列保存のため**DB側で並べると段の順にならない**。取得後に並べ直す） | `/masters` `Masters/WorkCentersTab.razor` | `Tests/MasterTests.cs` / `MasterCsvTests.cs` |
 | 設備台帳／BOE | E-10-10 / I-10-20 | `EquipmentsController.cs` `api/equipments` | Masters.cs: Equipment | `/masters` `Masters/EquipmentsTab.razor` | `Tests/MasterTests.cs` |
 | 保全手順書（版数管理） | E-10-20 / E-20-30 | `MaintenanceProceduresController.cs` `api/maintenance-procedures` | Maintenance.cs: MaintenanceProcedure | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
 | 保全計画（中長期・年次） | E-30-10 | `MaintenancePlansController.cs` `api/maintenance-plans` | Maintenance.cs: MaintenancePlan | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |

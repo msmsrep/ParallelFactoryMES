@@ -166,6 +166,30 @@ public class Tool
     public bool IsActive { get; set; } = true;
 }
 
+/// <summary>
+/// 作業区／資源階層（Spec.md 5.1 WorkCenter。I-10-20-02）
+/// 工場・ライン・エリア・作業区を1つの自己参照ツリーで表す（資源構成全体＝BOR）。
+/// 最下段の作業区が作業の管理単位になる。
+/// </summary>
+public class WorkCenter
+{
+    public int Id { get; set; }
+
+    /// <summary>作業区コード（一意）</summary>
+    public string Code { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>階層の段（工場/ライン/エリア/作業区）</summary>
+    public WorkCenterLevel Level { get; set; }
+
+    /// <summary>上位の資源（工場は親なし。親は自分より1つ上の段でなければならない）</summary>
+    public int? ParentId { get; set; }
+    public WorkCenter? Parent { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
 /// <summary>ロケーション（Spec.md 5.1 Location。D-50-20-01）</summary>
 public class Location
 {

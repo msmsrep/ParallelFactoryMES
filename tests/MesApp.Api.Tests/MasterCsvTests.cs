@@ -532,6 +532,63 @@ public class MasterCsvTests
         Assert.True(handover.Succeeded, string.Join(" / ", handover.Errors.Select(e => e.Message)));
     }
 
+    [Fact]
+    public async Task 作業区をCSVで一括登録でき上位が後の行でも解決される()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        // 上位（P1）を最後に書いても解決できる＝ファイル内の行順に依存しない
+        var csv = """
+            Code,Name,Level,ParentCode,IsActive
+            WC01,溶接作業区,WorkCenter,A1,true
+            A1,前工程エリア,Area,L1,true
+            L1,組立1ライン,Line,P1,true
+            P1,第一工場,Plant,,true
+            """;
+        var result = await ImportAsync(client, "work-centers", csv);
+        Assert.True(result.Succeeded, string.Join(" / ", result.Errors.Select(e => e.Message)));
+        Assert.Equal(4, result.Created);
+
+        var items = await client.GetFromJsonAsync<List<WorkCenterResponse>>("/api/work-centers");
+        Assert.Equal("A1", items!.Single(x => x.Code == "WC01").ParentCode);
+        Assert.Null(items!.Single(x => x.Code == "P1").ParentId);
+
+        // 出力は上の段から並ぶ
+        var export = await client.GetAsync("/api/masters/csv/work-centers");
+        var bytes = await export.Content.ReadAsByteArrayAsync();
+        var text = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
+        Assert.StartsWith("Code,Name,Level,ParentCode,IsActive\r\nP1,第一工場,Plant,,true", text);
+        Assert.Contains("WC01,溶接作業区,WorkCenter,A1,true", text);
+    }
+
+    [Fact]
+    public async Task 作業区CSVは段の飛び越しと未登録の上位を行番号付きで拒否する()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        // 単票APIと同じ判定（WorkCenterHierarchyPolicy）が効く
+        var skipped = await ImportAsync(client, "work-centers", """
+            Code,Name,Level,ParentCode,IsActive
+            P1,第一工場,Plant,,true
+            WC01,溶接作業区,WorkCenter,P1,true
+            """);
+        Assert.False(skipped.Succeeded);
+        Assert.Contains(skipped.Errors, e => e.Line == 3 && e.Message.Contains("エリア"));
+
+        var missing = await ImportAsync(client, "work-centers", """
+            Code,Name,Level,ParentCode,IsActive
+            L1,組立1ライン,Line,P9,true
+            """);
+        Assert.False(missing.Succeeded);
+        Assert.Contains(missing.Errors, e => e.Line == 2 && e.Message.Contains("P9"));
+
+        // 1行でもエラーなら全件ロールバックされる
+        var items = await client.GetFromJsonAsync<List<WorkCenterResponse>>("/api/work-centers");
+        Assert.Empty(items!);
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {
