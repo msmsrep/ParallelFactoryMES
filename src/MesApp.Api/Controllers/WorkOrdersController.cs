@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Common;
@@ -87,12 +88,29 @@ public class WorkOrdersController(
     /// <summary>
     /// 工程別の進捗集計（B-60-10-01）。作業指示を全件取ってから画面で数えると
     /// 件数が増えるほど重くなるため、集計はDB側で行う。取消は対象外。
+    /// <para>
+    /// <paramref name="workCenterId"/> を指定すると、その資源と**配下すべて**の作業区に
+    /// 展開して絞り込む。作業指示が持つ作業区は最下段（工順のスナップショット）なので、
+    /// 展開せずに絞るとラインや工場を選んだときに常に0件になる。
+    /// </para>
     /// </summary>
     [HttpGet("process-summary")]
-    public async Task<ActionResult<List<ProcessProgressRow>>> ProcessSummary(CancellationToken ct)
+    public async Task<ActionResult<List<ProcessProgressRow>>> ProcessSummary(
+        [FromQuery] int? workCenterId = null, CancellationToken ct = default)
     {
-        return await db.WorkOrders.AsNoTracking()
-            .Where(w => w.Status != WorkOrderStatus.Canceled)
+        var query = db.WorkOrders.AsNoTracking()
+            .Where(w => w.Status != WorkOrderStatus.Canceled);
+        if (workCenterId is { } rootId)
+        {
+            var all = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
+            if (all.All(x => x.Id != rootId))
+            {
+                return BadRequest(new ProblemDetails { Title = $"作業区（ID {rootId}）が見つかりません。" });
+            }
+            var targets = WorkCenterHierarchyPolicy.SelfAndDescendantIds(rootId, all);
+            query = query.Where(w => w.WorkCenterId != null && targets.Contains(w.WorkCenterId.Value));
+        }
+        return await query
             .GroupBy(w => new { w.ProcessId, w.Process!.Code, w.Process!.Name })
             .OrderBy(g => g.Key.Code)
             .Select(g => new ProcessProgressRow(

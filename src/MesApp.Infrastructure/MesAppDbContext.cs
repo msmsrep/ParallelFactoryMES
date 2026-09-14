@@ -191,8 +191,16 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.Property(x => x.Name).HasMaxLength(200);
         });
 
+        builder.Entity<AppUser>(e =>
+        {
+            e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         builder.Entity<Routing>(e =>
         {
+            e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
+                .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.ProductId, x.Sequence }).IsUnique();
             e.Property(x => x.ControlItems).HasMaxLength(1000);
             e.HasOne(x => x.Product)
@@ -344,6 +352,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
 
         builder.Entity<WorkOrder>(e =>
         {
+            e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
+                .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.WorkOrderNo).IsUnique();
             e.HasIndex(x => x.Status);
             e.Property(x => x.WorkOrderNo).HasMaxLength(50);

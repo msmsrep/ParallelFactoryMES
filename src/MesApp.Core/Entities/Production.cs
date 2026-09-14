@@ -103,6 +103,12 @@ public class WorkOrder
     // 工順マスタは改訂され上書きされるため、仕掛中・完了済みの指図が
     // 「当時どの条件で作れと指示されたか」を後から説明できるようここへ写す
 
+    /// <summary>
+    /// この工程を行う作業区（展開時点の工順の値。差立前でも決まるため進捗の集計軸に使える）
+    /// </summary>
+    public int? WorkCenterId { get; set; }
+    public WorkCenter? WorkCenter { get; set; }
+
     /// <summary>標準作業時間（分。展開時点の工順の値）</summary>
     public decimal StandardWorkMinutes { get; set; }
 

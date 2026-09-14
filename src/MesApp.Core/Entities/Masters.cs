@@ -96,6 +96,13 @@ public class Routing
     public int? RequiredSkillId { get; set; }
     public SkillMaster? RequiredSkill { get; set; }
 
+    /// <summary>
+    /// この工程を行う作業区（計画上の場所。差立前でも決まるため、進捗の集計軸に使える。
+    /// 設備は差立で割り当てるため、作業区は設備から導かずここで持つ）
+    /// </summary>
+    public int? WorkCenterId { get; set; }
+    public WorkCenter? WorkCenter { get; set; }
+
     /// <summary>使用設備（BOE）</summary>
     public int? EquipmentId { get; set; }
     public Equipment? Equipment { get; set; }

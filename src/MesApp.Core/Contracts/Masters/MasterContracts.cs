@@ -52,13 +52,15 @@ public record RoutingStepRequest(
     int? EquipmentId,
     int? ToolId,
     string? ControlItems,
-    int? ChecklistId);
+    int? ChecklistId,
+    int? WorkCenterId = null);
 
 public record RoutingStepResponse(
     int Id, int Sequence, int ProcessId, string ProcessCode, string ProcessName,
     decimal StandardWorkMinutes, decimal StandardSetupMinutes,
     int? RequiredSkillId, string? RequiredSkillName,
-    int? EquipmentId, int? ToolId, string? ControlItems, int? ChecklistId);
+    int? EquipmentId, int? ToolId, string? ControlItems, int? ChecklistId,
+    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null);
 
 // ---- 設備（Equipment）----
 

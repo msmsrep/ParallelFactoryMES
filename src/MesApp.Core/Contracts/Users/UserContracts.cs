@@ -13,13 +13,15 @@ public record CreateUserRequest(
 public record UpdateUserRequest(
     [Required, MaxLength(200)] string DisplayName,
     List<string> Roles,
-    bool IsActive);
+    bool IsActive,
+    int? WorkCenterId = null);
 
 public record ResetPasswordRequest([Required] string NewPassword);
 
 public record UserSummaryResponse(
     string Id, string UserName, string DisplayName, bool IsActive,
-    bool MustChangePassword, List<string> Roles);
+    bool MustChangePassword, List<string> Roles,
+    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null);
 
 /// <summary>
 /// 作業者を選ばせるための選択肢（Spec.md 7.5）。差立で使う。

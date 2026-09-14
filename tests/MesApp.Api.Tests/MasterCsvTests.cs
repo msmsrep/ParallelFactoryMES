@@ -656,6 +656,56 @@ public class MasterCsvTests
         Assert.Null(afterClear!.Single().WorkCenterId);
     }
 
+    [Fact]
+    public async Task 工順とユーザーのCSVで作業区をコード参照できる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        Assert.True((await ImportAsync(client, "work-centers", """
+            Code,Name,Level,ParentCode,IsActive
+            P1,第一工場,Plant,,true
+            L1,組立1ライン,Line,P1,true
+            A1,前工程エリア,Area,L1,true
+            WC01,溶接作業区,WorkCenter,A1,true
+            """)).Succeeded);
+        Assert.True((await ImportAsync(client, "products", """
+            Code,Name,Unit,Type
+            FG-01,完成品,個,Product
+            """)).Succeeded);
+        Assert.True((await ImportAsync(client, "processes", """
+            Code,Name,Category
+            PR-01,組立,InHouse
+            """)).Succeeded);
+
+        var routing = await ImportAsync(client, "routing", """
+            ProductCode,Sequence,ProcessCode,StandardWorkMinutes,StandardSetupMinutes,WorkCenterCode
+            FG-01,1,PR-01,30,10,WC01
+            """);
+        Assert.True(routing.Succeeded, string.Join(" / ", routing.Errors.Select(e => e.Message)));
+        var products = await client.GetFromJsonAsync<List<ProductResponse>>("/api/products");
+        var steps = await client.GetFromJsonAsync<List<RoutingStepResponse>>(
+            $"/api/products/{products!.Single().Id}/routing");
+        Assert.Equal("WC01", steps!.Single().WorkCenterCode);
+
+        // 工順の作業区は最下段のみ。上位の段は候補に入らないため未登録として弾かれる
+        var wrongLevel = await ImportAsync(client, "routing", """
+            ProductCode,Sequence,ProcessCode,StandardWorkMinutes,StandardSetupMinutes,WorkCenterCode
+            FG-01,1,PR-01,30,10,L1
+            """);
+        Assert.False(wrongLevel.Succeeded);
+        Assert.Contains(wrongLevel.Errors, e => e.Line == 2 && e.Message.Contains("L1"));
+
+        // ユーザーの作業場所は段を問わない
+        var users = await ImportAsync(client, "users", """
+            UserName,DisplayName,Roles,WorkCenterCode,IsActive,InitialPassword
+            op1,作業者1,Operator,P1,true,Passw0rd!x
+            """);
+        Assert.True(users.Succeeded, string.Join(" / ", users.Errors.Select(e => e.Message)));
+        var userList = await client.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users");
+        Assert.Equal("P1", userList!.Single(u => u.UserName == "op1").WorkCenterCode);
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {

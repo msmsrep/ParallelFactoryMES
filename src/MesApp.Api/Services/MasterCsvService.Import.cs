@@ -854,6 +854,11 @@ public sealed partial class MasterCsvService
             .ToDictionaryAsync(t => t.Code, t => t.Id, StringComparer.Ordinal, ct);
         var checklistIds = await db.Checklists.AsNoTracking()
             .ToDictionaryAsync(c => c.Code, c => c.Id, StringComparer.Ordinal, ct);
+        // 工順の作業区は最下段のみ（単票APIと同じ条件。Spec.md 5.7）。
+        // 候補をここで絞ることで、上位の段を書いた行は「登録されていません」として弾かれる
+        var workCenterIds = await db.WorkCenters.AsNoTracking()
+            .Where(w => w.Level == WorkCenterLevel.WorkCenter && w.IsActive)
+            .ToDictionaryAsync(w => w.Code, w => w.Id, StringComparer.Ordinal, ct);
         var existing = await db.Routings.ToListAsync(ct);
 
         foreach (var group in GroupRows(table, "ProductCode", errors))
@@ -880,6 +885,7 @@ public sealed partial class MasterCsvService
                 var equipmentId = reader.Reference("EquipmentAssetNo", null, equipmentIds, "設備");
                 var toolId = reader.Reference("ToolCode", null, toolIds, "治工具");
                 var checklistId = reader.Reference("ChecklistCode", null, checklistIds, "チェックリスト");
+                var workCenterId = reader.Reference("WorkCenterCode", null, workCenterIds, "作業区");
                 var controlItems = reader.Text("ControlItems", null, 500);
                 if (sequence is null && !reader.Failed)
                 {
@@ -908,6 +914,7 @@ public sealed partial class MasterCsvService
                     RequiredSkillId = skillId,
                     EquipmentId = equipmentId,
                     ToolId = toolId,
+                    WorkCenterId = workCenterId,
                     ChecklistId = checklistId,
                     ControlItems = controlItems,
                 });
@@ -937,6 +944,9 @@ public sealed partial class MasterCsvService
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // 作業場所は段を問わない（Spec.md 5.7）
+        var workCenters = await db.WorkCenters.AsNoTracking()
+            .ToDictionaryAsync(w => w.Code, StringComparer.Ordinal, ct);
 
         foreach (var row in table.Rows)
         {
@@ -952,10 +962,17 @@ public sealed partial class MasterCsvService
             var displayName = reader.RequiredText("DisplayName", 100);
             var isActive = reader.Bool("IsActive", user?.IsActive ?? true);
             var password = reader.Text("InitialPassword", null);
+            var workCenter = ResolveWorkCenter(
+                reader, table, "WorkCenterCode", user?.WorkCenterId, workCenters, out var workCenterKept);
             // Roles列が無ければ現状維持、空欄なら全ロール解除
             var roles = table.HasColumn("Roles") ? ParseRoles(reader, table.Value(row, "Roles")) : null;
             if (reader.Failed)
             {
+                continue;
+            }
+            if (!workCenterKept && WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } wcReason)
+            {
+                reader.Fail(wcReason);
                 continue;
             }
 
@@ -971,6 +988,7 @@ public sealed partial class MasterCsvService
                     UserName = userName,
                     DisplayName = displayName,
                     IsActive = isActive,
+                    WorkCenterId = workCenterKept ? null : workCenter?.Id,
                     // 管理者が発行した初期パスワードは初回ログイン時に変更を強制する
                     MustChangePassword = true,
                 };
@@ -990,6 +1008,10 @@ public sealed partial class MasterCsvService
             var deactivated = user!.IsActive && !isActive;
             user.DisplayName = displayName;
             user.IsActive = isActive;
+            if (!workCenterKept)
+            {
+                user.WorkCenterId = workCenter?.Id;
+            }
             await userManager.UpdateAsync(user);
 
             if (roles is not null)

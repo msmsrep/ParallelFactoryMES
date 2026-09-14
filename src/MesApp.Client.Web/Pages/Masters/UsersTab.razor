@@ -39,6 +39,19 @@
                 }
             </div>
 
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>作業場所（作業区）</label>
+                    <select @bind="_workCenterId">
+                        <option value="0">なし</option>
+                        @foreach (var wc in _workCenters)
+                        {
+                            <option value="@wc.Id">@wc.Code @wc.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
             <h2>ロール</h2>
             <div class="form-grid">
                 @foreach (var role in MesRoles.All)
@@ -76,7 +89,7 @@
             {
                 <table class="table">
                     <thead>
-                        <tr><th>ユーザー名</th><th>氏名</th><th>ロール</th><th>在籍</th><th>パスワード</th><th></th></tr>
+                        <tr><th>ユーザー名</th><th>氏名</th><th>作業場所</th><th>ロール</th><th>在籍</th><th>パスワード</th><th></th></tr>
                     </thead>
                     <tbody>
                         @foreach (var user in _users)
@@ -84,6 +97,7 @@
                             <tr>
                                 <td>@user.UserName</td>
                                 <td>@user.DisplayName</td>
+                                <td>@(user.WorkCenterCode is null ? "-" : $"{user.WorkCenterCode} {user.WorkCenterName}")</td>
                                 <td>@string.Join("、", user.Roles.Select(RoleLabel))</td>
                                 <td>@(user.IsActive ? "在籍" : "無効")</td>
                                 <td>@(user.MustChangePassword ? "要変更" : "-")</td>
@@ -171,6 +185,9 @@
     private string _displayName = string.Empty;
     private string _password = string.Empty;
     private bool _isActive = true;
+    private int _workCenterId;
+    /// <summary>作業場所は段を問わない（Spec.md 5.7 資源階層への紐付け）</summary>
+    private List<WorkCenterResponse> _workCenters = [];
 
     private UserSummaryResponse? _skillTarget;
     private readonly List<UserSkillRequest> _userSkills = [];
@@ -195,8 +212,11 @@
         }
     }
 
-    private async Task LoadAsync() =>
+    private async Task LoadAsync()
+    {
         _users = await Http.GetFromJsonAsync<List<UserSummaryResponse>>("api/users?includeInactive=true");
+        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers") ?? [];
+    }
 
     private void ToggleRole(string role, bool selected)
     {
@@ -219,6 +239,7 @@
         _userName = user.UserName;
         _displayName = user.DisplayName;
         _isActive = user.IsActive;
+        _workCenterId = user.WorkCenterId ?? 0;
         _roles.Clear();
         _roles.AddRange(user.Roles);
     }
@@ -230,6 +251,7 @@
         _displayName = string.Empty;
         _password = string.Empty;
         _isActive = true;
+        _workCenterId = 0;
         _roles.Clear();
     }
 
@@ -259,7 +281,8 @@
             else
             {
                 response = await Http.PutAsJsonAsync($"api/users/{_editingId}",
-                    new UpdateUserRequest(_displayName, [.. _roles], _isActive));
+                    new UpdateUserRequest(_displayName, [.. _roles], _isActive,
+                        _workCenterId == 0 ? null : _workCenterId));
             }
 
             if (!response.IsSuccessStatusCode)

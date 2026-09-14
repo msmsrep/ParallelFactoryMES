@@ -206,7 +206,9 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
                 r.Id, r.Sequence, r.ProcessId, r.Process!.Code, r.Process!.Name,
                 r.StandardWorkMinutes, r.StandardSetupMinutes,
                 r.RequiredSkillId, r.RequiredSkill != null ? r.RequiredSkill.Name : null,
-                r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId))
+                r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId,
+                r.WorkCenterId, r.WorkCenter != null ? r.WorkCenter.Code : null,
+                r.WorkCenter != null ? r.WorkCenter.Name : null))
             .ToListAsync(ct);
     }
 
@@ -237,6 +239,9 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             (steps.Where(s => s.EquipmentId != null).Select(s => s.EquipmentId!.Value), db.Equipments.Select(x => x.Id), "設備"),
             (steps.Where(s => s.ToolId != null).Select(s => s.ToolId!.Value), db.Tools.Select(x => x.Id), "治工具"),
             (steps.Where(s => s.ChecklistId != null).Select(s => s.ChecklistId!.Value), db.Checklists.Select(x => x.Id), "チェックリスト"),
+            // 作業区は最下段に限る（設備と同じ理由。Spec.md 5.7 資源階層への紐付け）
+            (steps.Where(s => s.WorkCenterId != null).Select(s => s.WorkCenterId!.Value),
+                db.WorkCenters.Where(x => x.Level == WorkCenterLevel.WorkCenter && x.IsActive).Select(x => x.Id), "作業区"),
         })
         {
             var wanted = ids.Distinct().ToList();
@@ -262,6 +267,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             RequiredSkillId = s.RequiredSkillId,
             EquipmentId = s.EquipmentId,
             ToolId = s.ToolId,
+            WorkCenterId = s.WorkCenterId,
             ControlItems = s.ControlItems,
             ChecklistId = s.ChecklistId,
         }));

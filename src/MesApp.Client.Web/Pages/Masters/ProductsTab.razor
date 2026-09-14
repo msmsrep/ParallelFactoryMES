@@ -218,6 +218,16 @@
                     </select>
                 </div>
                 <div class="form-field">
+                    <label>作業区</label>
+                    <select @bind="_stepWorkCenterId">
+                        <option value="0">なし</option>
+                        @foreach (var wc in _workCenters)
+                        {
+                            <option value="@wc.Id">@wc.Code @wc.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
                     <label>使用治工具</label>
                     <select @bind="_stepToolId">
                         <option value="0">なし</option>
@@ -257,6 +267,8 @@
     private List<EquipmentResponse> _equipments = [];
     private List<ToolResponse> _tools = [];
     private List<ChecklistResponse> _checklists = [];
+    /// <summary>工順の作業区は最下段のみ（Spec.md 5.7 資源階層への紐付け）</summary>
+    private List<WorkCenterResponse> _workCenters = [];
 
     private ProductResponse? _selected;
     private readonly List<BomItemRequest> _bomLines = [];
@@ -284,6 +296,7 @@
     private int _stepEquipmentId;
     private int _stepToolId;
     private int _stepChecklistId;
+    private int _stepWorkCenterId;
     private string? _stepControlItems;
 
     private string? _error;
@@ -297,6 +310,8 @@
         _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
         _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
         _checklists = await Http.GetFromJsonAsync<List<ChecklistResponse>>("api/checklists") ?? [];
+        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>(
+            $"api/work-centers?level={WorkCenterLevel.WorkCenter}") ?? [];
         await LoadAsync();
     }
 
@@ -401,7 +416,8 @@
             $"api/products/{product.Id}/routing") ?? [];
         _routingSteps.AddRange(routing.Select(r => new RoutingStepRequest(
             r.Sequence, r.ProcessId, r.StandardWorkMinutes, r.StandardSetupMinutes,
-            r.RequiredSkillId, r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId)));
+            r.RequiredSkillId, r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId,
+            r.WorkCenterId)));
         _stepSequence = _routingSteps.Count == 0 ? 1 : _routingSteps.Max(s => s.Sequence) + 1;
     }
 
@@ -462,7 +478,8 @@
             _stepEquipmentId == 0 ? null : _stepEquipmentId,
             _stepToolId == 0 ? null : _stepToolId,
             string.IsNullOrWhiteSpace(_stepControlItems) ? null : _stepControlItems,
-            _stepChecklistId == 0 ? null : _stepChecklistId));
+            _stepChecklistId == 0 ? null : _stepChecklistId,
+            _stepWorkCenterId == 0 ? null : _stepWorkCenterId));
         _stepSequence = _routingSteps.Max(s => s.Sequence) + 1;
         _stepControlItems = null;
     }

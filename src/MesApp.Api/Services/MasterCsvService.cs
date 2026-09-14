@@ -192,20 +192,21 @@ public sealed partial class MasterCsvService(
         var items = await db.Routings.AsNoTracking()
             .Include(r => r.Product).Include(r => r.Process)
             .Include(r => r.RequiredSkill).Include(r => r.Equipment)
-            .Include(r => r.Tool).Include(r => r.Checklist)
+            .Include(r => r.Tool).Include(r => r.Checklist).Include(r => r.WorkCenter)
             .OrderBy(r => r.Product!.Code).ThenBy(r => r.Sequence)
             .ToListAsync(ct);
         return [.. items.Select(r => new string?[]
         {
             r.Product!.Code, Num(r.Sequence), r.Process!.Code,
             Num(r.StandardWorkMinutes), Num(r.StandardSetupMinutes),
-            r.RequiredSkill?.Code, r.Equipment?.AssetNo, r.Tool?.Code, r.Checklist?.Code, r.ControlItems,
+            r.RequiredSkill?.Code, r.Equipment?.AssetNo, r.Tool?.Code, r.WorkCenter?.Code,
+            r.Checklist?.Code, r.ControlItems,
         })];
     }
 
     private async Task<List<string?[]>> ExportUsersAsync(bool includeInactive, CancellationToken ct)
     {
-        var users = await db.Users.AsNoTracking()
+        var users = await db.Users.AsNoTracking().Include(u => u.WorkCenter)
             .Where(u => includeInactive || u.IsActive)
             .OrderBy(u => u.UserName).ToListAsync(ct);
         var roles = await RoleNamesByUserAsync(ct);
@@ -214,7 +215,7 @@ public sealed partial class MasterCsvService(
         {
             u.UserName, u.DisplayName,
             roles.TryGetValue(u.Id, out var names) ? string.Join(";", names) : null,
-            Bool(u.IsActive), null,
+            u.WorkCenter?.Code, Bool(u.IsActive), null,
         })];
     }
 

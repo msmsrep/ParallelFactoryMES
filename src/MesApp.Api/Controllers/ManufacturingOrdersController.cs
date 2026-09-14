@@ -301,6 +301,7 @@ public class ManufacturingOrdersController(
                 StandardWorkMinutes = step.StandardWorkMinutes,
                 StandardSetupMinutes = step.StandardSetupMinutes,
                 RequiredSkillId = step.RequiredSkillId,
+                WorkCenterId = step.WorkCenterId,
                 ControlItems = step.ControlItems,
                 RoutingChecklistId = step.ChecklistId,
             });

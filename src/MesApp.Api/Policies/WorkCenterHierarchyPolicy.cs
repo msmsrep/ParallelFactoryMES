@@ -113,6 +113,36 @@ public static class WorkCenterHierarchyPolicy
             : $"作業区 '{workCenter.Code}' は無効のため、所属先に指定できません。";
     }
 
+    /// <summary>
+    /// 指定した資源とその配下すべてのIdを返す（進捗などを上位の段でまとめて見るため）。
+    /// <para>
+    /// 作業指示が持つ作業区は最下段なので、ラインや工場で絞り込むには配下へ展開する必要がある。
+    /// 展開せずに「指定したIdと一致するもの」で絞ると、ラインを選んだときに常に0件になる。
+    /// </para>
+    /// </summary>
+    public static HashSet<int> SelfAndDescendantIds(int rootId, IReadOnlyCollection<WorkCenter> all)
+    {
+        var childrenByParent = all
+            .Where(x => x.ParentId is not null)
+            .GroupBy(x => x.ParentId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var result = new HashSet<int> { rootId };
+        var queue = new Queue<int>([rootId]);
+        while (queue.Count > 0)
+        {
+            if (!childrenByParent.TryGetValue(queue.Dequeue(), out var children))
+            {
+                continue;
+            }
+            foreach (var child in children.Where(c => result.Add(c.Id)))
+            {
+                queue.Enqueue(child.Id);
+            }
+        }
+        return result;
+    }
+
     /// <summary><paramref name="node"/> が <paramref name="ancestorId"/> の配下にあるか</summary>
     private static bool IsDescendantOf(WorkCenter node, int ancestorId, IReadOnlyCollection<WorkCenter> all)
     {

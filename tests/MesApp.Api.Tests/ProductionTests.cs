@@ -38,6 +38,69 @@ public class ProductionTests
     }
 
     [Fact]
+    public async Task 工順の作業区が展開時に固定され進捗を上位の段でまとめて集計できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var plant = await MasterTests.CreateWorkCenterAsync(admin, "P1", "第一工場", WorkCenterLevel.Plant, null);
+        var line = await MasterTests.CreateWorkCenterAsync(admin, "L1", "組立1ライン", WorkCenterLevel.Line, plant.Id);
+        var area = await MasterTests.CreateWorkCenterAsync(admin, "A1", "前工程エリア", WorkCenterLevel.Area, line.Id);
+        var wc = await MasterTests.CreateWorkCenterAsync(admin, "WC01", "溶接作業区", WorkCenterLevel.WorkCenter, area.Id);
+
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "組立");
+        // 1工程目だけ作業区を指定する
+        var routing = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, wc.Id),
+                new(2, process.Id, 15m, 5m, null, null, null, null, null),
+            });
+        routing.EnsureSuccessStatusCode();
+
+        // 工順の作業区は最下段のみ（設備と同じ条件）
+        var wrongLevel = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null, line.Id) });
+        Assert.Equal(HttpStatusCode.BadRequest, wrongLevel.StatusCode);
+
+        var order = await CreateOrderAsync(admin, product.Id);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        expanded.EnsureSuccessStatusCode();
+
+        // 作業区を指定した工程だけが集計に乗る
+        var byWorkCenter = await admin.GetFromJsonAsync<List<ProcessProgressRow>>(
+            $"/api/work-orders/process-summary?workCenterId={wc.Id}");
+        Assert.Equal(1, byWorkCenter!.Sum(r => r.Created));
+
+        // 上位の段を指定しても配下へ展開されるので同じ件数になる（展開しないと常に0件になる）
+        foreach (var ancestor in new[] { area.Id, line.Id, plant.Id })
+        {
+            var rows = await admin.GetFromJsonAsync<List<ProcessProgressRow>>(
+                $"/api/work-orders/process-summary?workCenterId={ancestor}");
+            Assert.Equal(1, rows!.Sum(r => r.Created));
+        }
+
+        // 絞り込みなしは全件（作業区未設定の工程も含む）
+        var all = await admin.GetFromJsonAsync<List<ProcessProgressRow>>("/api/work-orders/process-summary");
+        Assert.Equal(2, all!.Sum(r => r.Created));
+
+        // 存在しない作業区は400
+        var missing = await admin.GetAsync("/api/work-orders/process-summary?workCenterId=9999");
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+
+        // 工順を改訂しても展開済みの作業指示の作業区は変わらない（Spec.md 5.7）
+        var revised = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null) });
+        revised.EnsureSuccessStatusCode();
+        var afterRevision = await admin.GetFromJsonAsync<List<ProcessProgressRow>>(
+            $"/api/work-orders/process-summary?workCenterId={wc.Id}");
+        Assert.Equal(1, afterRevision!.Sum(r => r.Created));
+    }
+
+    [Fact]
     public async Task 指図の作成から承認展開まで通しで動作しロットと作業指示が生成される()
     {
         using var factory = new ApiFactory();

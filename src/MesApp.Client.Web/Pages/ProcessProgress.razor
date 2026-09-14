@@ -11,6 +11,17 @@
 
 <div class="card">
     <h2 style="margin-top:0;">工程別の進捗</h2>
+    <div class="form-field" style="max-width:320px;">
+        <label>作業区で絞り込む</label>
+        <select @bind="_workCenterId" @bind:after="LoadProgressAsync">
+            <option value="0">全作業区</option>
+            @foreach (var wc in _workCenters)
+            {
+                <option value="@wc.Id">@wc.Code @wc.Name</option>
+            }
+        </select>
+        <span class="text-muted">上位（工場・ライン・エリア）を選ぶと配下の作業区をまとめて集計する</span>
+    </div>
     @if (_progress is null)
     {
         <p class="text-muted">読み込み中...</p>
@@ -157,11 +168,23 @@
     private string? _message;
     private bool _busy;
 
+    private int _workCenterId;
+    /// <summary>絞り込みは段を問わない。上位を選ぶとAPI側で配下の作業区へ展開される</summary>
+    private List<WorkCenterResponse> _workCenters = [];
+
     protected override async Task OnInitializedAsync()
     {
-        _progress = await Http.GetFromJsonAsync<List<ProcessProgressRow>>("api/work-orders/process-summary");
+        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers") ?? [];
+        await LoadProgressAsync();
         _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
         await LoadTroublesAsync();
+    }
+
+    private async Task LoadProgressAsync()
+    {
+        var query = _workCenterId == 0 ? string.Empty : $"?workCenterId={_workCenterId}";
+        _progress = await Http.GetFromJsonAsync<List<ProcessProgressRow>>(
+            $"api/work-orders/process-summary{query}");
     }
 
     private ResponseForm GetResponse(int id)

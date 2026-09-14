@@ -132,7 +132,21 @@ public class UsersController(
             return Conflict(new ProblemDetails { Title = lastAdmin });
         }
 
+        // 作業場所は段を問わない（工場単位で働く担当者も表せるようにするため。Spec.md 5.7）
+        var workCenter = request.WorkCenterId is { } wcId
+            ? await db.WorkCenters.AsNoTracking().FirstOrDefaultAsync(w => w.Id == wcId, ct)
+            : null;
+        if (request.WorkCenterId is { } missingWc && workCenter is null)
+        {
+            return BadRequest(new ProblemDetails { Title = $"作業区（ID {missingWc}）が見つかりません。" });
+        }
+        if (WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } wcReason)
+        {
+            return BadRequest(new ProblemDetails { Title = wcReason });
+        }
+
         user.DisplayName = request.DisplayName;
+        user.WorkCenterId = request.WorkCenterId;
         var deactivated = user.IsActive && !request.IsActive;
         user.IsActive = request.IsActive;
         await userManager.UpdateAsync(user);
@@ -238,8 +252,12 @@ public class UsersController(
     private async Task<UserSummaryResponse> ToSummaryAsync(AppUser user)
     {
         var roles = await userManager.GetRolesAsync(user);
+        var workCenter = user.WorkCenterId is { } id
+            ? await db.WorkCenters.AsNoTracking().FirstOrDefaultAsync(w => w.Id == id)
+            : null;
         return new UserSummaryResponse(
             user.Id, user.UserName ?? string.Empty, user.DisplayName,
-            user.IsActive, user.MustChangePassword, roles.ToList());
+            user.IsActive, user.MustChangePassword, roles.ToList(),
+            user.WorkCenterId, workCenter?.Code, workCenter?.Name);
     }
 }
