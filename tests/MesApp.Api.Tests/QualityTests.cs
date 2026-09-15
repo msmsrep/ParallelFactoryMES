@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Common;
@@ -521,10 +521,31 @@ public class QualityTests
 
         // 夜勤の時間帯（日跨ぎの手前側）の実績
         var nightOrder = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
-        (await admin.PostAsJsonAsync($"/api/work-orders/{nightOrder.WorkOrders[1].Id}/production-records",
+        var nightPost = await admin.PostAsJsonAsync(
+            $"/api/work-orders/{nightOrder.WorkOrders[1].Id}/production-records",
             new Core.Contracts.Execution.ProductionRecordRequest(
-                6m, 4m, AtLocalTime(22, 0), null, ctx.ProductLocationId, false)))
-            .EnsureSuccessStatusCode();
+                6m, 4m, AtLocalTime(22, 0), null, ctx.ProductLocationId, false));
+        nightPost.EnsureSuccessStatusCode();
+        var nightRecord = (await nightPost.Content
+            .ReadFromJsonAsync<Core.Contracts.Execution.ProductionRecordResponse>())!;
+
+        // 記録した直は集計だけでなく実績照会でも辿れる（どの直に入った実績かを現場が確認できる）
+        Assert.Equal("N", nightRecord.ShiftCode);
+        var listed = await admin.GetFromJsonAsync<List<Core.Contracts.Execution.ProductionRecordResponse>>(
+            $"/api/work-orders/{nightOrder.WorkOrders[1].Id}/production-records");
+        Assert.Equal("夜勤", Assert.Single(listed!).ShiftName);
+
+        // ロット履歴にも作業者と並べて出す（H-30-10-03）
+        var history = await admin.GetFromJsonAsync<LotHistoryResponse>(
+            $"/api/traceability/{nightRecord.OutputLotId}/history");
+        Assert.Contains("直: N 夜勤", Assert.Single(history!.ProductionHistory), StringComparison.Ordinal);
+
+        // 数量を訂正しても直は動かない（記録時に固定した値）
+        var corrected = await admin.PutAsJsonAsync($"/api/production-records/{nightRecord.Id}",
+            new Core.Contracts.Execution.ProductionRecordCorrectionRequest(6m, 4m, "検査結果の反映"));
+        corrected.EnsureSuccessStatusCode();
+        Assert.Equal("N", (await corrected.Content
+            .ReadFromJsonAsync<Core.Contracts.Execution.ProductionRecordResponse>())!.ShiftCode);
 
         var summary = await admin.GetFromJsonAsync<QualitySummaryResponse>("/api/quality/summary");
         var day = summary!.ByShift.Single(r => r.Key == "D 昼勤");

@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -60,12 +60,25 @@ public class TraceabilityController(MesAppDbContext db, IBusinessDateService bus
             return NotFound();
         }
 
-        var production = await db.ProductionRecords.AsNoTracking()
-            .Where(r => r.OutputLotId == lotId)
-            .OrderBy(r => r.Id)
-            .Select(r => $"{r.WorkOrder!.WorkOrderNo}: 良品{r.GoodQuantity} 不良{r.DefectQuantity} " +
-                         $"(作業者: {r.PerformedBy!.DisplayName})")
-            .ToListAsync(ct);
+        // 直は「夜勤だけ不良が出る」のような追い方をするときに要るので、作業者と並べて出す。
+        // 組み立てはSQLに載せず、取り出してから行う（直なしの分岐をSQL側に持たせない）
+        var production = (await db.ProductionRecords.AsNoTracking()
+                .Where(r => r.OutputLotId == lotId)
+                .OrderBy(r => r.Id)
+                .Select(r => new
+                {
+                    r.WorkOrder!.WorkOrderNo,
+                    r.GoodQuantity,
+                    r.DefectQuantity,
+                    Performer = r.PerformedBy!.DisplayName,
+                    ShiftCode = r.Shift!.Code,
+                    ShiftName = r.Shift!.Name,
+                })
+                .ToListAsync(ct))
+            .Select(r => $"{r.WorkOrderNo}: 良品{r.GoodQuantity} 不良{r.DefectQuantity} (作業者: {r.Performer}"
+                         + (r.ShiftCode is null ? string.Empty : $" / 直: {r.ShiftCode} {r.ShiftName}")
+                         + ")")
+            .ToList();
 
         var inspections = await db.InspectionOrders.AsNoTracking()
             .Where(i => i.TargetLotId == lotId)

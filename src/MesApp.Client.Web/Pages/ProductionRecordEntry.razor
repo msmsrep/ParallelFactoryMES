@@ -1,4 +1,4 @@
-@page "/work-orders/{Id:int}/record"
+﻿@page "/work-orders/{Id:int}/record"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -127,6 +127,7 @@ else
                     <th>再作業待ち</th>
                     <th>不良理由内訳</th>
                     <th>作業者</th>
+                    <th>直</th>
                     <th>開始</th>
                     <th>終了</th>
                     <th>産出ロット</th>
@@ -153,6 +154,8 @@ else
                             }
                         </td>
                         <td>@record.PerformedByName</td>
+                        @* 直は記録時に固定した値。直を登録していない運用では空になる *@
+                        <td>@(record.ShiftCode is null ? "-" : $"{record.ShiftCode} {record.ShiftName}")</td>
                         <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
                         <td>@(record.OutputLotNumber ?? "-")</td>

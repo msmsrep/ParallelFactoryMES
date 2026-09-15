@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
@@ -31,6 +31,7 @@ public class ProductionRecordsController(
             .Include(r => r.WorkOrder)
             .Include(r => r.OutputLot)
             .Include(r => r.PerformedBy)
+            .Include(r => r.Shift)
             .FirstOrDefaultAsync(r => r.Id == id, ct);
         if (record is null)
         {
@@ -124,6 +125,8 @@ public class ProductionRecordsController(
             record.GoodQuantity, record.DefectQuantity, record.ScrapQuantity, record.ReworkQuantity,
             record.StartedAt, record.EndedAt,
             record.OutputLotId, record.OutputLot?.LotNumber, record.OutputLocationId,
-            record.ApprovedByUserId, record.ApprovedAt);
+            record.ApprovedByUserId, record.ApprovedAt,
+            // 訂正しても直は動かない（記録時に固定した値。Spec.md 5.7）
+            ShiftId: record.ShiftId, ShiftCode: record.Shift?.Code, ShiftName: record.Shift?.Name);
     }
 }

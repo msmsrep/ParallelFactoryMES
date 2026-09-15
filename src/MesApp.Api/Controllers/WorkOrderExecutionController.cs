@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -301,7 +301,8 @@ public class WorkOrderExecutionController(
                 r.OutputLotId, r.OutputLot!.LotNumber, r.OutputLocationId,
                 r.ApprovedByUserId, r.ApprovedAt,
                 r.Defects.Select(d => new ProductionDefectResponse(
-                    d.DefectReasonId, d.DefectReason!.Code, d.DefectReason!.Name, d.Quantity, d.Note)).ToList()))
+                    d.DefectReasonId, d.DefectReason!.Code, d.DefectReason!.Name, d.Quantity, d.Note)).ToList(),
+                r.ShiftId, r.Shift!.Code, r.Shift!.Name))
             .ToListAsync(ct);
     }
 
@@ -496,7 +497,8 @@ public class WorkOrderExecutionController(
                 .Where(d => d.ProductionRecordId == record.Id)
                 .Select(d => new ProductionDefectResponse(
                     d.DefectReasonId, d.DefectReason!.Code, d.DefectReason!.Name, d.Quantity, d.Note))
-                .ToListAsync(ct));
+                .ToListAsync(ct),
+            shift?.Id, shift?.Code, shift?.Name);
     }
 
     /// <summary>製造完了承認（B-40-10-10）。全作業指示が承認/取消済みになると指図も完了になる</summary>

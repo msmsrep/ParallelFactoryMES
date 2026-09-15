@@ -29,7 +29,7 @@
 |:--|:--|:--|:--|:--|:--|
 | 作業指示・差立（作業員/設備割当・着手順） | B-10-20 / F-20-30-01 | `WorkOrdersController.cs` `api/work-orders`<br>候補設備は `api/work-orders/{id}/equipment-candidates`（**候補があればその中からしか割り当てられない**。候補は工順マスタの現在値） | Production.cs: WorkOrder<br>Masters.cs: **RoutingEquipment**（工順の候補設備） | `/work-orders` `WorkOrders.razor`<br>`/dispatch` `Dispatch.razor` | `Tests/ExecutionTests.cs` |
 | 実行系（着手・段取り・チェックリスト・部材投入・実績報告・製造条件データ・状態履歴） | B-30-30-01 / B-20-50 / B-40-40 | `WorkOrderExecutionController.cs`<br>`api/work-orders/{id:int}` | `Core/Entities/Execution.cs`<br>SetupRecord / ChecklistRecord / ChecklistResultItem / MaterialConsumption / ProductionRecord / ProductionDataRecord | `/work-orders/{id}/setup` `WorkOrderSetup.razor`<br>`/work-orders/{id}/record` `ProductionRecordEntry.razor`（部材投入・製造条件データ・訂正・状態履歴もここ）<br>`/process-progress` `ProcessProgress.razor` | `Tests/ExecutionTests.cs` |
-| 製造履歴訂正（訂正履歴＋監査ログ） | B-70-30-01 | `ProductionRecordsController.cs` `api/production-records` | Execution.cs: ProductionRecord / **ProductionRecordCorrection**（訂正前の値。Spec.md 5.7） | `ProductionRecordEntry.razor` の実績一覧から訂正<br>`/traceability` の履歴タブに訂正履歴を表示 | `Tests/ExecutionTests.cs` / `QualityTests.cs` |
+| 製造履歴訂正（訂正履歴＋監査ログ） | B-70-30-01 | `ProductionRecordsController.cs` `api/production-records`（数量だけを訂正する。**直は記録時に固定した値なので動かない**） | Execution.cs: ProductionRecord / **ProductionRecordCorrection**（訂正前の値。Spec.md 5.7） | `ProductionRecordEntry.razor` の実績一覧から訂正<br>`/traceability` の履歴タブに訂正履歴を表示 | `Tests/ExecutionTests.cs` / `QualityTests.cs` |
 | 作業時間記録（直接/間接） | B-30-30-02 / F-30-20-02 | `WorkTimeRecordsController.cs` `api/work-time-records` | Execution.cs: WorkTimeRecord | `/work-time` `WorkTime.razor` | `Tests/ExecutionTests.cs` |
 | 製造トラブル報告 | B-40-10-06 / B-60-10 | `TroubleReportsController.cs` `api/trouble-reports` | Execution.cs: TroubleReport | `ProcessProgress.razor` 内 | `Tests/ExecutionTests.cs` |
 | 工程間搬送・移動指示 | B-50-10 / D-30-10-04 | `TransferOrdersController.cs` `api/transfer-orders`（更新系は在庫権限） | Execution.cs: TransferOrder | `/transfer-orders` `TransferOrders.razor`（`Inventory.razor` の「振替」は別機能の `api/inventory/transfer`） | `Tests/InventoryTests.cs` |
@@ -83,7 +83,7 @@
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
 | 出荷判定（可／保留／特採・単段階承認） | H-10-10 | `ShipmentJudgmentsController.cs` `api/shipment-judgments` | Quality.cs: ShipmentJudgment | `/shipment-judgments` `ShipmentJudgments.razor`<br>`/print/shipment-judgment/{id}` `Print/ShipmentJudgmentDoc.razor` | `Tests/QualityTests.cs`<br>出荷ゲートは `InventoryTests.cs` |
-| ロットトレーサビリティ（前方・後方追跡） | H-30-10 | `TraceabilityController.cs` `api/traceability`（`/history` は製造・検査・在庫・状態・訂正・**設備稼働**の履歴を返す） | Production.cs: Lot<br>Execution.cs: MaterialConsumption<br>Maintenance.cs: EquipmentLog | `/traceability` `Traceability.razor`<br>`Web/Shared/TraceTree.razor` | `Tests/QualityTests.cs` |
+| ロットトレーサビリティ（前方・後方追跡） | H-30-10 | `TraceabilityController.cs` `api/traceability`（`/history` は製造・検査・在庫・状態・訂正・**設備稼働**の履歴を返す。製造行には作業者と**直**を並べる。文字列の組み立てはSQLに載せず取り出してから行う） | Production.cs: Lot<br>Execution.cs: MaterialConsumption<br>Maintenance.cs: EquipmentLog | `/traceability` `Traceability.razor`<br>`Web/Shared/TraceTree.razor` | `Tests/QualityTests.cs` |
 
 ---
 

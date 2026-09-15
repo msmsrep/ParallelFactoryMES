@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using MesApp.Core.Entities;
 
 namespace MesApp.Core.Contracts.Execution;
@@ -83,7 +83,9 @@ public record ProductionRecordResponse(
     DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
     int? OutputLotId, string? OutputLotNumber, int? OutputLocationId,
     string? ApprovedByUserId, DateTimeOffset? ApprovedAt,
-    List<ProductionDefectResponse>? Defects = null);
+    List<ProductionDefectResponse>? Defects = null,
+    /// <summary>記録時に固定した直（ShiftCode・ShiftName は画面表示用の付随情報）</summary>
+    int? ShiftId = null, string? ShiftCode = null, string? ShiftName = null);
 
 /// <summary>製造履歴訂正（B-70-30-01。権限制御＋監査ログ。訂正理由必須）</summary>
 public record ProductionRecordCorrectionRequest(
