@@ -62,7 +62,8 @@
                             <select value="@GetForm(workOrder.Id).EquipmentId"
                                     @onchange="e => GetForm(workOrder.Id).EquipmentId = ToInt(e.Value)">
                                 <option value="0">未割当</option>
-                                @foreach (var equipment in _equipments)
+                                @* 工順に候補設備があればその中だけ。無ければ設備マスタ全件（B-10-20-02） *@
+                                @foreach (var equipment in EquipmentChoices(workOrder.Id))
                                 {
                                     <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
                                 }
@@ -102,6 +103,8 @@
     private List<UserOptionResponse> _users = [];
     private bool _usersTruncated;
     private List<EquipmentResponse> _equipments = [];
+    /// <summary>作業指示ごとの候補設備（工順に登録が無ければ空＝設備を限定しない）</summary>
+    private readonly Dictionary<int, List<WorkOrderEquipmentCandidate>> _candidates = [];
     private readonly Dictionary<int, DispatchForm> _forms = [];
     private string _statusFilter = "Created";
     private string? _error;
@@ -135,6 +138,20 @@
         return form;
     }
 
+    /// <summary>この作業指示で選べる設備。候補が登録されていなければ設備マスタ全件</summary>
+    private IEnumerable<EquipmentResponse> EquipmentChoices(int workOrderId)
+    {
+        if (!_candidates.TryGetValue(workOrderId, out var candidates) || candidates.Count == 0)
+        {
+            return _equipments;
+        }
+        return candidates
+            .Where(c => c.IsActive)
+            .Select(c => new EquipmentResponse(
+                c.EquipmentId, c.AssetNo, c.Name, null, EquipmentStatus.Available,
+                MaintenanceType.None, null, null, true));
+    }
+
     private static int ToInt(object? value) =>
         int.TryParse(value?.ToString(), out var result) ? result : 0;
 
@@ -149,6 +166,15 @@
             url += $"&status={_statusFilter}";
         }
         _workOrders = await Http.GetFromJsonAsync<PagedResult<WorkOrderResponse>>(url);
+
+        // 候補設備は工順ごとに違うため、表示中の作業指示の分だけまとめて引く
+        _candidates.Clear();
+        foreach (var workOrder in _workOrders?.Items ?? [])
+        {
+            _candidates[workOrder.Id] =
+                await Http.GetFromJsonAsync<List<WorkOrderEquipmentCandidate>>(
+                    $"api/work-orders/{workOrder.Id}/equipment-candidates") ?? [];
+        }
     }
 
     private async Task DispatchAsync(WorkOrderResponse workOrder)

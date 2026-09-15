@@ -207,13 +207,16 @@ public sealed partial class MasterCsvService(
             .Include(r => r.Product).Include(r => r.Process)
             .Include(r => r.RequiredSkill).Include(r => r.Equipment)
             .Include(r => r.Tool).Include(r => r.Checklist).Include(r => r.WorkCenter)
+            .Include(r => r.EquipmentCandidates).ThenInclude(c => c.Equipment)
             .OrderBy(r => r.Product!.Code).ThenBy(r => r.Sequence)
             .ToListAsync(ct);
         return [.. items.Select(r => new string?[]
         {
             r.Product!.Code, Num(r.Sequence), r.Process!.Code,
             Num(r.StandardWorkMinutes), Num(r.StandardSetupMinutes),
-            r.RequiredSkill?.Code, r.Equipment?.AssetNo, r.Tool?.Code, r.WorkCenter?.Code,
+            r.RequiredSkill?.Code, r.Equipment?.AssetNo,
+            string.Join(";", r.EquipmentCandidates.Select(c => c.Equipment!.AssetNo).Order(StringComparer.Ordinal)),
+            r.Tool?.Code, r.WorkCenter?.Code,
             r.Checklist?.Code, r.ControlItems,
         })];
     }

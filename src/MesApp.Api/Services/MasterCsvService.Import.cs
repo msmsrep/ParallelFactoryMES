@@ -955,6 +955,7 @@ public sealed partial class MasterCsvService
                 var setup = reader.Number("StandardSetupMinutes", 0m, 0);
                 var skillId = reader.Reference("RequiredSkillCode", null, skillIds, "スキル・資格");
                 var equipmentId = reader.Reference("EquipmentAssetNo", null, equipmentIds, "設備");
+                var candidateIds = ParseCandidates(reader, table, row, equipmentIds);
                 var toolId = reader.Reference("ToolCode", null, toolIds, "治工具");
                 var checklistId = reader.Reference("ChecklistCode", null, checklistIds, "チェックリスト");
                 var workCenterId = reader.Reference("WorkCenterCode", null, workCenterIds, "作業区");
@@ -985,6 +986,12 @@ public sealed partial class MasterCsvService
                     StandardSetupMinutes = setup,
                     RequiredSkillId = skillId,
                     EquipmentId = equipmentId,
+                    // 代表設備も候補の1つとして扱う（候補を書かずに代表だけ指定した工順を移行するため）
+                    EquipmentCandidates =
+                    [
+                        .. candidateIds.Concat(equipmentId is { } e ? [e] : []).Distinct()
+                            .Select(x => new RoutingEquipment { EquipmentId = x }),
+                    ],
                     ToolId = toolId,
                     WorkCenterId = workCenterId,
                     ChecklistId = checklistId,
@@ -1011,6 +1018,34 @@ public sealed partial class MasterCsvService
     }
 
     // ---- ユーザー（システム管理者のみ）----
+
+    /// <summary>工順CSVの候補設備列（セミコロン区切りの資産番号）を解決する</summary>
+    private static List<int> ParseCandidates(
+        CsvRowReader reader, CsvTable table, CsvRecord row, IReadOnlyDictionary<string, int> equipmentIds)
+    {
+        if (!table.HasColumn("EquipmentAssetNos"))
+        {
+            return [];
+        }
+        var raw = table.Value(row, "EquipmentAssetNos");
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return [];
+        }
+        var result = new List<int>();
+        foreach (var code in raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (equipmentIds.TryGetValue(code, out var id))
+            {
+                result.Add(id);
+            }
+            else
+            {
+                reader.Fail($"候補設備 '{code}' は登録されていません（EquipmentAssetNos）。");
+            }
+        }
+        return result;
+    }
 
     private async Task ImportUsersAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)

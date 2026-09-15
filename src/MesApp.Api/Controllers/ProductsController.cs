@@ -200,6 +200,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             return NotFound();
         }
         return await db.Routings.AsNoTracking()
+            .Include(r => r.EquipmentCandidates).ThenInclude(c => c.Equipment)
             .Where(r => r.ProductId == id)
             .OrderBy(r => r.Sequence)
             .Select(r => new RoutingStepResponse(
@@ -208,7 +209,11 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
                 r.RequiredSkillId, r.RequiredSkill != null ? r.RequiredSkill.Name : null,
                 r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId,
                 r.WorkCenterId, r.WorkCenter != null ? r.WorkCenter.Code : null,
-                r.WorkCenter != null ? r.WorkCenter.Name : null))
+                r.WorkCenter != null ? r.WorkCenter.Name : null,
+                r.EquipmentCandidates.OrderBy(c => c.Equipment!.AssetNo)
+                    .Select(c => c.Equipment!.AssetNo).ToList(),
+                r.EquipmentCandidates.OrderBy(c => c.Equipment!.AssetNo)
+                    .Select(c => c.EquipmentId).ToList()))
             .ToListAsync(ct);
     }
 
@@ -239,6 +244,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             (steps.Where(s => s.EquipmentId != null).Select(s => s.EquipmentId!.Value), db.Equipments.Select(x => x.Id), "設備"),
             (steps.Where(s => s.ToolId != null).Select(s => s.ToolId!.Value), db.Tools.Select(x => x.Id), "治工具"),
             (steps.Where(s => s.ChecklistId != null).Select(s => s.ChecklistId!.Value), db.Checklists.Select(x => x.Id), "チェックリスト"),
+            (steps.SelectMany(s => s.EquipmentIds ?? []), db.Equipments.Select(x => x.Id), "候補設備"),
             // 作業区は最下段に限る（設備と同じ理由。Spec.md 5.7 資源階層への紐付け）
             (steps.Where(s => s.WorkCenterId != null).Select(s => s.WorkCenterId!.Value),
                 db.WorkCenters.Where(x => x.Level == WorkCenterLevel.WorkCenter && x.IsActive).Select(x => x.Id), "作業区"),
@@ -266,6 +272,8 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             StandardSetupMinutes = s.StandardSetupMinutes,
             RequiredSkillId = s.RequiredSkillId,
             EquipmentId = s.EquipmentId,
+            // 代表設備は候補の1つとして扱う（候補を書かずに代表だけ指定した工順を移行するため）
+            EquipmentCandidates = [.. CandidateIds(s).Select(x => new RoutingEquipment { EquipmentId = x })],
             ToolId = s.ToolId,
             WorkCenterId = s.WorkCenterId,
             ControlItems = s.ControlItems,
@@ -276,6 +284,15 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             detail: $"steps={steps.Count}", ct: ct);
         return await GetRouting(id, ct);
     }
+
+    /// <summary>
+    /// 工順の候補設備。代表設備（EquipmentId）も候補に含める。
+    /// 候補を書かずに代表だけ指定した既存の工順が、差立で設備を選べなくならないようにするため
+    /// </summary>
+    private static IEnumerable<int> CandidateIds(RoutingStepRequest step) =>
+        (step.EquipmentIds ?? [])
+            .Concat(step.EquipmentId is { } id ? [id] : [])
+            .Distinct();
 
     private static ProductResponse ToResponse(Product p) =>
         new(p.Id, p.Code, p.Name, p.Unit, p.Specification, p.Type, p.StandardDefectRate, p.IsActive);

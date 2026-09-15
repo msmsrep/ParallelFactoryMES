@@ -75,6 +75,12 @@ public record WorkOrderStatusHistoryEntry(
     WorkOrderStatus FromStatus, WorkOrderStatus ToStatus, WorkOrderStatusChangeSource Source,
     string? Note, string? ChangedByName, DateTimeOffset ChangedAt);
 
+/// <summary>
+/// 差立で選べる候補設備（B-10-20-02）。工順に候補が登録されていない工程では空を返し、
+/// 画面はその場合に設備マスタ全件から選ばせる
+/// </summary>
+public record WorkOrderEquipmentCandidate(int EquipmentId, string AssetNo, string Name, bool IsActive);
+
 /// <summary>差立：作業員割当（スキル照合 F-20-30-01）・設備割当・着手順（B-10-20-01〜03）</summary>
 public record DispatchRequest(
     string? AssignedUserId,

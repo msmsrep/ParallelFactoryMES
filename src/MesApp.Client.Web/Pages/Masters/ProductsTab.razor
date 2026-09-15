@@ -153,7 +153,7 @@
         <h2 style="margin-top:0;">@_selected.Code の 工順（BOP。A-40-20）</h2>
         <table class="table">
             <thead>
-                <tr><th>順序</th><th>工程</th><th>標準作業(分)</th><th>標準段取(分)</th><th>必要スキル</th><th>設備</th><th>治工具</th><th>チェックリスト</th><th>管理項目</th><th></th></tr>
+                <tr><th>順序</th><th>工程</th><th>標準作業(分)</th><th>標準段取(分)</th><th>必要スキル</th><th>候補設備</th><th>治工具</th><th>チェックリスト</th><th>管理項目</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var step in _routingSteps.OrderBy(s => s.Sequence))
@@ -164,7 +164,7 @@
                         <td>@step.StandardWorkMinutes</td>
                         <td>@step.StandardSetupMinutes</td>
                         <td>@(_skills.FirstOrDefault(s => s.Id == step.RequiredSkillId)?.Name ?? "-")</td>
-                        <td>@(_equipments.FirstOrDefault(e => e.Id == step.EquipmentId)?.AssetNo ?? "-")</td>
+                        <td>@CandidateLabel(step)</td>
                         <td>@(_tools.FirstOrDefault(t => t.Id == step.ToolId)?.Code ?? "-")</td>
                         <td>@(_checklists.FirstOrDefault(c => c.Id == step.ChecklistId)?.Code ?? "-")</td>
                         <td>@(step.ControlItems ?? "-")</td>
@@ -208,12 +208,14 @@
                     </select>
                 </div>
                 <div class="form-field">
-                    <label>使用設備</label>
-                    <select @bind="_stepEquipmentId">
-                        <option value="0">なし</option>
+                    @* 候補設備（B-10-20-02）。複数選ぶと差立でその中から選ばせる。空なら限定しない *@
+                    <label>候補設備（Ctrl/Shiftで複数選択）</label>
+                    <select multiple size="4" @onchange="OnCandidatesChanged">
                         @foreach (var equipment in _equipments)
                         {
-                            <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
+                            <option value="@equipment.Id" selected="@_stepEquipmentIds.Contains(equipment.Id)">
+                                @equipment.AssetNo @equipment.Name
+                            </option>
                         }
                     </select>
                 </div>
@@ -293,7 +295,8 @@
     private decimal _stepWork;
     private decimal _stepSetup;
     private int _stepSkillId;
-    private int _stepEquipmentId;
+    /// <summary>候補設備（B-10-20-02）。画面ではこちらに一本化する（代表設備はCSV・既存データの移行用）</summary>
+    private readonly List<int> _stepEquipmentIds = [];
     private int _stepToolId;
     private int _stepChecklistId;
     private int _stepWorkCenterId;
@@ -417,7 +420,7 @@
         _routingSteps.AddRange(routing.Select(r => new RoutingStepRequest(
             r.Sequence, r.ProcessId, r.StandardWorkMinutes, r.StandardSetupMinutes,
             r.RequiredSkillId, r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId,
-            r.WorkCenterId)));
+            r.WorkCenterId, r.EquipmentIds)));
         _stepSequence = _routingSteps.Count == 0 ? 1 : _routingSteps.Max(s => s.Sequence) + 1;
     }
 
@@ -475,13 +478,43 @@
         _error = null;
         _routingSteps.Add(new RoutingStepRequest(_stepSequence, _stepProcessId, _stepWork, _stepSetup,
             _stepSkillId == 0 ? null : _stepSkillId,
-            _stepEquipmentId == 0 ? null : _stepEquipmentId,
+            null,
             _stepToolId == 0 ? null : _stepToolId,
             string.IsNullOrWhiteSpace(_stepControlItems) ? null : _stepControlItems,
             _stepChecklistId == 0 ? null : _stepChecklistId,
-            _stepWorkCenterId == 0 ? null : _stepWorkCenterId));
+            _stepWorkCenterId == 0 ? null : _stepWorkCenterId,
+            _stepEquipmentIds.Count == 0 ? null : [.. _stepEquipmentIds]));
         _stepSequence = _routingSteps.Max(s => s.Sequence) + 1;
         _stepControlItems = null;
+        _stepEquipmentIds.Clear();
+    }
+
+    /// <summary>複数選択の設備一覧から候補を取り込む</summary>
+    private void OnCandidatesChanged(ChangeEventArgs e)
+    {
+        _stepEquipmentIds.Clear();
+        foreach (var value in (string[])(e.Value ?? Array.Empty<string>()))
+        {
+            if (int.TryParse(value, out var id))
+            {
+                _stepEquipmentIds.Add(id);
+            }
+        }
+    }
+
+    /// <summary>一覧に出す候補設備の表示（多いときは件数で省略する）</summary>
+    private string CandidateLabel(RoutingStepRequest step)
+    {
+        var ids = step.EquipmentIds ?? (step.EquipmentId is { } single ? [single] : []);
+        if (ids.Count == 0)
+        {
+            return "-";
+        }
+        var codes = ids
+            .Select(id => _equipments.FirstOrDefault(e => e.Id == id)?.AssetNo)
+            .Where(code => code is not null)
+            .ToList();
+        return codes.Count <= 3 ? string.Join("、", codes) : $"{string.Join("、", codes.Take(3))} ほか{codes.Count - 3}件";
     }
 
     private async Task SaveRoutingAsync()

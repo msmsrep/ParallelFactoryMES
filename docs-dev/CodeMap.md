@@ -25,7 +25,7 @@
 
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
-| 作業指示・差立（作業員/設備割当・着手順） | B-10-20 / F-20-30-01 | `WorkOrdersController.cs` `api/work-orders` | Production.cs: WorkOrder | `/work-orders` `WorkOrders.razor`<br>`/dispatch` `Dispatch.razor` | `Tests/ExecutionTests.cs` |
+| 作業指示・差立（作業員/設備割当・着手順） | B-10-20 / F-20-30-01 | `WorkOrdersController.cs` `api/work-orders`<br>候補設備は `api/work-orders/{id}/equipment-candidates`（**候補があればその中からしか割り当てられない**。候補は工順マスタの現在値） | Production.cs: WorkOrder<br>Masters.cs: **RoutingEquipment**（工順の候補設備） | `/work-orders` `WorkOrders.razor`<br>`/dispatch` `Dispatch.razor` | `Tests/ExecutionTests.cs` |
 | 実行系（着手・段取り・チェックリスト・部材投入・実績報告・製造条件データ・状態履歴） | B-30-30-01 / B-20-50 / B-40-40 | `WorkOrderExecutionController.cs`<br>`api/work-orders/{id:int}` | `Core/Entities/Execution.cs`<br>SetupRecord / ChecklistRecord / ChecklistResultItem / MaterialConsumption / ProductionRecord / ProductionDataRecord | `/work-orders/{id}/setup` `WorkOrderSetup.razor`<br>`/work-orders/{id}/record` `ProductionRecordEntry.razor`（部材投入・製造条件データ・訂正・状態履歴もここ）<br>`/process-progress` `ProcessProgress.razor` | `Tests/ExecutionTests.cs` |
 | 製造履歴訂正（訂正履歴＋監査ログ） | B-70-30-01 | `ProductionRecordsController.cs` `api/production-records` | Execution.cs: ProductionRecord / **ProductionRecordCorrection**（訂正前の値。Spec.md 5.7） | `ProductionRecordEntry.razor` の実績一覧から訂正<br>`/traceability` の履歴タブに訂正履歴を表示 | `Tests/ExecutionTests.cs` / `QualityTests.cs` |
 | 作業時間記録（直接/間接） | B-30-30-02 / F-30-20-02 | `WorkTimeRecordsController.cs` `api/work-time-records` | Execution.cs: WorkTimeRecord | `/work-time` `WorkTime.razor` | `Tests/ExecutionTests.cs` |

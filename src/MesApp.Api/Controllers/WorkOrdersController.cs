@@ -131,6 +131,32 @@ public class WorkOrdersController(
     }
 
     /// <summary>
+    /// 差立で選べる候補設備（B-10-20-02）。工順に候補が無ければ空を返す
+    /// （その場合は設備を限定しないため、画面は設備マスタ全件から選ばせる）
+    /// </summary>
+    [HttpGet("{id:int}/equipment-candidates")]
+    public async Task<ActionResult<List<WorkOrderEquipmentCandidate>>> EquipmentCandidates(
+        int id, CancellationToken ct)
+    {
+        var workOrder = await db.WorkOrders.AsNoTracking()
+            .Select(w => new { w.Id, w.ProductId, w.ProcessId, w.RoutingSequence })
+            .FirstOrDefaultAsync(w => w.Id == id, ct);
+        if (workOrder is null)
+        {
+            return NotFound();
+        }
+        return await db.RoutingEquipments.AsNoTracking()
+            .Where(c => c.Routing!.ProductId == workOrder.ProductId
+                        && c.Routing!.ProcessId == workOrder.ProcessId
+                        && c.Routing!.Sequence == workOrder.RoutingSequence)
+            .OrderBy(c => c.Equipment!.AssetNo)
+            .Select(c => new WorkOrderEquipmentCandidate(
+                c.EquipmentId, c.Equipment!.AssetNo, c.Equipment!.Name, c.Equipment!.IsActive))
+            .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// 工程管理項目の指示（B-30-30-04）。    /// <summary>
     /// 工程管理項目の指示（B-30-30-04）。展開時点のマスタを写したもので、
     /// 実績の逸脱判定と画面表示はこれを使う（マスタの現在値を参照しない。Spec.md 5.7）
     /// </summary>
@@ -229,6 +255,24 @@ public class WorkOrdersController(
             if (equipment is null || !equipment.IsActive)
             {
                 return BadRequest(new ProblemDetails { Title = "割当設備が存在しないか無効です。" });
+            }
+
+            // 工順に候補設備が登録されていれば、その中からしか選べない。
+            // 候補は工順マスタの現在値を見る（設備は差立で決めるためスナップショットに含めない：Spec.md 5.7）。
+            // 候補が未登録の工順は従来どおり設備を限定しない
+            var candidates = await db.RoutingEquipments.AsNoTracking()
+                .Where(c => c.Routing!.ProductId == workOrder.ProductId
+                            && c.Routing!.ProcessId == workOrder.ProcessId
+                            && c.Routing!.Sequence == workOrder.RoutingSequence)
+                .Select(c => new { c.EquipmentId, c.Equipment!.AssetNo })
+                .ToListAsync(ct);
+            if (candidates.Count > 0 && candidates.All(c => c.EquipmentId != equipmentId))
+            {
+                return BadRequest(new ProblemDetails
+                {
+                    Title = $"設備 '{equipment.AssetNo}' はこの工程の候補設備ではありません" +
+                            $"（候補：{string.Join("、", candidates.Select(c => c.AssetNo))}）。",
+                });
             }
         }
 

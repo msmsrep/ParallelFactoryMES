@@ -477,6 +477,70 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task 工順に候補設備があると差立はその中からしか選べない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "加工");
+        var eq1 = await CreateEquipmentAsync(admin, "EQ-01", "プレス1号");
+        var eq2 = await CreateEquipmentAsync(admin, "EQ-02", "プレス2号");
+        var other = await CreateEquipmentAsync(admin, "EQ-99", "旋盤");
+
+        // 1工程目は候補2台、2工程目は候補なし（＝設備を限定しない）
+        (await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, null, [eq1.Id, eq2.Id]),
+                new(2, process.Id, 15m, 5m, null, null, null, null, null),
+            })).EnsureSuccessStatusCode();
+
+        // 存在しない設備を候補にすると400
+        var invalid = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, null, [9999]),
+            });
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, product.Id, 10m);
+        var first = order.WorkOrders.Single(w => w.RoutingSequence == 1);
+        var second = order.WorkOrders.Single(w => w.RoutingSequence == 2);
+
+        var candidates = await admin.GetFromJsonAsync<List<WorkOrderEquipmentCandidate>>(
+            $"/api/work-orders/{first.Id}/equipment-candidates");
+        Assert.Equal(["EQ-01", "EQ-02"], candidates!.Select(c => c.AssetNo));
+
+        // 候補外の設備は割り当てられない
+        var outside = await admin.PutAsJsonAsync($"/api/work-orders/{first.Id}/dispatch",
+            new DispatchRequest(null, other.Id, 1));
+        Assert.Equal(HttpStatusCode.BadRequest, outside.StatusCode);
+
+        // 候補内なら通る
+        var inside = await admin.PutAsJsonAsync($"/api/work-orders/{first.Id}/dispatch",
+            new DispatchRequest(null, eq2.Id, 1));
+        Assert.Equal(HttpStatusCode.OK, inside.StatusCode);
+
+        // 候補が未登録の工程は従来どおり限定しない
+        Assert.Empty((await admin.GetFromJsonAsync<List<WorkOrderEquipmentCandidate>>(
+            $"/api/work-orders/{second.Id}/equipment-candidates"))!);
+        var unrestricted = await admin.PutAsJsonAsync($"/api/work-orders/{second.Id}/dispatch",
+            new DispatchRequest(null, other.Id, 1));
+        Assert.Equal(HttpStatusCode.OK, unrestricted.StatusCode);
+    }
+
+    private static async Task<Core.Contracts.Masters.EquipmentResponse> CreateEquipmentAsync(
+        HttpClient admin, string assetNo, string name)
+    {
+        var response = await admin.PostAsJsonAsync("/api/equipments",
+            new Core.Contracts.Masters.EquipmentRequest(
+                assetNo, name, null, EquipmentStatus.Available, MaintenanceType.None, null, null));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<Core.Contracts.Masters.EquipmentResponse>())!;
+    }
+
+    [Fact]
     public async Task 製造条件の実績を指示と照合して逸脱を判定できる()
     {
         using var factory = new ApiFactory();

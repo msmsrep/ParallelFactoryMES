@@ -53,14 +53,19 @@ public record RoutingStepRequest(
     int? ToolId,
     string? ControlItems,
     int? ChecklistId,
-    int? WorkCenterId = null);
+    int? WorkCenterId = null,
+    /// <summary>候補設備（B-10-20-02）。空なら差立で設備を限定しない</summary>
+    List<int>? EquipmentIds = null);
 
 public record RoutingStepResponse(
     int Id, int Sequence, int ProcessId, string ProcessCode, string ProcessName,
     decimal StandardWorkMinutes, decimal StandardSetupMinutes,
     int? RequiredSkillId, string? RequiredSkillName,
     int? EquipmentId, int? ToolId, string? ControlItems, int? ChecklistId,
-    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null);
+    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null,
+    /// <summary>候補設備の資産番号（表示用）</summary>
+    List<string>? EquipmentAssetNos = null,
+    List<int>? EquipmentIds = null);
 
 // ---- 設備（Equipment）----
 

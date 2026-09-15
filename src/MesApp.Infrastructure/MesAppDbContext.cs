@@ -18,6 +18,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<BomItem> BomItems => Set<BomItem>();
     public DbSet<ProcessMaster> Processes => Set<ProcessMaster>();
     public DbSet<Routing> Routings => Set<Routing>();
+    public DbSet<RoutingEquipment> RoutingEquipments => Set<RoutingEquipment>();
     public DbSet<Equipment> Equipments => Set<Equipment>();
     public DbSet<Tool> Tools => Set<Tool>();
     public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
@@ -196,6 +197,19 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Entity<AppUser>(e =>
         {
             e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<RoutingEquipment>(e =>
+        {
+            // 同じ工順に同じ設備を二重登録させない
+            e.HasIndex(x => new { x.RoutingId, x.EquipmentId }).IsUnique();
+            // 工順を置き換えると候補も消えるべき。逆側のナビゲーションを明示する
+            // （WithMany() だけだとEFが規約でもう一本関連を作りFK列が二重になる）
+            e.HasOne(x => x.Routing).WithMany(r => r.EquipmentCandidates)
+                .HasForeignKey(x => x.RoutingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

@@ -103,9 +103,18 @@ public class Routing
     public int? WorkCenterId { get; set; }
     public WorkCenter? WorkCenter { get; set; }
 
-    /// <summary>使用設備（BOE）</summary>
+    /// <summary>
+    /// 代表の使用設備（BOE）。候補が1台だけの工順のための項目で、
+    /// 候補設備（<see cref="EquipmentCandidates"/>）の1つとして扱う
+    /// </summary>
     public int? EquipmentId { get; set; }
     public Equipment? Equipment { get; set; }
+
+    /// <summary>
+    /// 候補設備（B-10-20-02）。同じ工程を複数の装置で実行できる場合に列挙し、
+    /// 差立ではこの中から1台を選ぶ。空なら設備を限定しない
+    /// </summary>
+    public List<RoutingEquipment> EquipmentCandidates { get; set; } = [];
 
     /// <summary>使用治工具</summary>
     public int? ToolId { get; set; }
@@ -117,6 +126,21 @@ public class Routing
     /// <summary>工程・段取りで実施するチェックリスト</summary>
     public int? ChecklistId { get; set; }
     public Checklist? Checklist { get; set; }
+}
+
+/// <summary>
+/// 工順の候補設備（Spec.md 5.1 RoutingEquipment。B-10-20-02）。
+/// 同じ工程を複数の装置で実行できる場合に列挙する。差立ではこの中から1台を選ぶ。
+/// </summary>
+public class RoutingEquipment
+{
+    public int Id { get; set; }
+
+    public int RoutingId { get; set; }
+    public Routing? Routing { get; set; }
+
+    public int EquipmentId { get; set; }
+    public Equipment? Equipment { get; set; }
 }
 
 /// <summary>設備台帳/BOE（Spec.md 5.1 Equipment。E-10-10、I-10-20）</summary>
