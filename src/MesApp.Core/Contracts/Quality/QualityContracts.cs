@@ -181,6 +181,11 @@ public record QualitySummaryResponse(
     List<DefectSummaryRow> ByProduct,
     /// <summary>工程別の良品・不良集計</summary>
     List<DefectSummaryRow> ByProcess,
+    /// <summary>
+    /// 直別の良品・不良集計（C-40-10-03。夜勤と昼勤の不良率を比べる）。
+    /// 直は実績の記録時に固定した値を使う。直を登録していない実績は「（直なし）」にまとまる
+    /// </summary>
+    List<DefectSummaryRow> ByShift,
     /// <summary>不良理由別の集計（C-40-10-01。数量の多い順）</summary>
     List<DefectReasonSummaryRow> ByDefectReason,
     /// <summary>不適合の原因区分別件数</summary>

@@ -524,6 +524,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
 
         builder.Entity<ProductionRecord>(e =>
         {
+            e.HasOne(x => x.Shift).WithMany().HasForeignKey(x => x.ShiftId)
+                .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.WorkOrderId);
             e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
                 .OnDelete(DeleteBehavior.Cascade);

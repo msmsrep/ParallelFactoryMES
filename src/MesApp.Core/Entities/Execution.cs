@@ -125,6 +125,17 @@ public class ProductionRecord
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? EndedAt { get; set; }
 
+    /// <summary>
+    /// この実績を作った直（記録時に開始時刻から引いて固定。C-40-10-03 の直別集計に使う）。
+    /// <para>
+    /// 集計のたびに時刻から引き直さないのは、直の時間帯定義を変えると過去の集計まで
+    /// 動いてしまうため（Spec.md 5.7 指図展開時のマスタ固定と同じ考え方）。
+    /// 直を登録していない運用では null のままになる。
+    /// </para>
+    /// </summary>
+    public int? ShiftId { get; set; }
+    public Shift? Shift { get; set; }
+
     /// <summary>産出ロット（最終工程の実績で設定。在庫計上 B-40-10-02 の対象）</summary>
     public int? OutputLotId { get; set; }
     public Lot? OutputLot { get; set; }

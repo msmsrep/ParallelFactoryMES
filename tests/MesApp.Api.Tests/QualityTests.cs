@@ -493,7 +493,58 @@ public class QualityTests
         Assert.Equal(100m, reasonRow.Share);
         Assert.Equal(1, summary.OpenNonconformanceCount);
         Assert.True(summary.NonconformanceByCause.ContainsKey("設備不調"));
+        // 直を登録していない運用では「（直なし）」にまとまる
+        Assert.Equal("（直なし）", Assert.Single(summary.ByShift).Key);
     }
+
+    [Fact]
+    public async Task 生産実績は記録時の直で固定され直別に不良率を比べられる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        (await admin.PostAsJsonAsync("/api/shifts",
+            new Core.Contracts.Masters.ShiftRequest("D", "昼勤", new TimeOnly(6, 0), new TimeOnly(18, 0))))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/shifts",
+            new Core.Contracts.Masters.ShiftRequest("N", "夜勤", new TimeOnly(18, 0), new TimeOnly(6, 0))))
+            .EnsureSuccessStatusCode();
+
+        // 昼勤の時間帯の実績（開始時刻から直を引く）
+        var dayOrder = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        (await admin.PostAsJsonAsync($"/api/work-orders/{dayOrder.WorkOrders[1].Id}/production-records",
+            new Core.Contracts.Execution.ProductionRecordRequest(
+                10m, 0m, AtLocalTime(10, 0), null, ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+
+        // 夜勤の時間帯（日跨ぎの手前側）の実績
+        var nightOrder = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        (await admin.PostAsJsonAsync($"/api/work-orders/{nightOrder.WorkOrders[1].Id}/production-records",
+            new Core.Contracts.Execution.ProductionRecordRequest(
+                6m, 4m, AtLocalTime(22, 0), null, ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+
+        var summary = await admin.GetFromJsonAsync<QualitySummaryResponse>("/api/quality/summary");
+        var day = summary!.ByShift.Single(r => r.Key == "D 昼勤");
+        var night = summary.ByShift.Single(r => r.Key == "N 夜勤");
+        Assert.Equal(0m, day.DefectRate);
+        Assert.Equal(40m, night.DefectRate);
+
+        // 直の時間帯定義を変えても、記録済みの実績の直は動かない（Spec.md 5.7）
+        var shifts = await admin.GetFromJsonAsync<List<Core.Contracts.Masters.ShiftResponse>>("/api/shifts");
+        var nightId = shifts!.Single(s => s.Code == "N").Id;
+        (await admin.PutAsJsonAsync($"/api/shifts/{nightId}",
+            new Core.Contracts.Masters.ShiftRequest("N", "夜勤", new TimeOnly(18, 0), new TimeOnly(6, 0))))
+            .EnsureSuccessStatusCode();
+        var after = await admin.GetFromJsonAsync<QualitySummaryResponse>("/api/quality/summary");
+        Assert.Equal(40m, after!.ByShift.Single(r => r.Key == "N 夜勤").DefectRate);
+    }
+
+    /// <summary>その日の指定時刻（サーバーのローカル時刻）。直の判定は工場のローカル時刻で行うため</summary>
+    private static DateTimeOffset AtLocalTime(int hour, int minute) =>
+        new(DateTime.Today.AddHours(hour).AddMinutes(minute), DateTimeOffset.Now.Offset);
 
     [Fact]
     public async Task 品質系操作は担当ロールのみ実行できる()

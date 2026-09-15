@@ -445,10 +445,17 @@ public class WorkOrderExecutionController(
             return BadRequest(new ProblemDetails { Title = ex.Message });
         }
 
+        // どの直の実績かを記録時に固定する（C-40-10-03 の直別集計。Spec.md 5.7）。
+        // 集計のたびに時刻から引き直すと、直の時間帯定義を変えたときに過去の集計まで動く
+        var shifts = await db.Shifts.AsNoTracking().Where(s => s.IsActive).ToListAsync(ct);
+        var startedAtLocal = TimeOnly.FromDateTime(businessDate.ToFactoryTime(request.StartedAt).DateTime);
+        var shift = ShiftSchedulePolicy.Resolve(shifts, startedAtLocal);
+
         var record = new ProductionRecord
         {
             WorkOrderId = id,
             PerformedByUserId = CurrentUserId!,
+            ShiftId = shift?.Id,
             GoodQuantity = request.GoodQuantity,
             DefectQuantity = request.DefectQuantity,
             ScrapQuantity = request.ScrapQuantity,

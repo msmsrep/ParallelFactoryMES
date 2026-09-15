@@ -37,6 +37,8 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
                     r.ReworkQuantity,
                     ProductCode = r.WorkOrder!.Product!.Code,
                     ProcessCode = r.WorkOrder!.Process!.Code,
+                    // 直は記録時に固定した値。集計のたびに時刻から引き直さない（Spec.md 5.7）
+                    ShiftLabel = r.Shift == null ? null : r.Shift.Code + " " + r.Shift.Name,
                 })
                 .ToListAsync(ct))
             .Where(r => (fromStart is null || r.CreatedAt >= fromStart)
@@ -52,6 +54,14 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
         var byProcess = records
             .GroupBy(r => r.ProcessCode)
             .OrderBy(g => g.Key)
+            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity),
+                g.Sum(r => r.ScrapQuantity), g.Sum(r => r.ReworkQuantity)))
+            .ToList();
+        // 直別（C-40-10-03）。3.9節の製造日が夜勤を前提にしているので、
+        // 昼勤と夜勤で不良率が違わないかを見られるようにする
+        var byShift = records
+            .GroupBy(r => r.ShiftLabel ?? "（直なし）")
+            .OrderBy(g => g.Key, StringComparer.Ordinal)
             .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity),
                 g.Sum(r => r.ScrapQuantity), g.Sum(r => r.ReworkQuantity)))
             .ToList();
@@ -102,6 +112,7 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
         return new QualitySummaryResponse(
             byProduct,
             byProcess,
+            byShift,
             byDefectReason,
             byCause,
             inspections.Count(i => i.OverallJudgment == InspectionJudgment.Pass),
