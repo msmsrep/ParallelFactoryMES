@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace MesApp.Core.Contracts.Users;
 
@@ -8,7 +8,12 @@ public record CreateUserRequest(
     [Required, MaxLength(256)] string UserName,
     [Required] string Password,
     [Required, MaxLength(200)] string DisplayName,
-    List<string> Roles);
+    List<string> Roles,
+    int? WorkCenterId = null,
+    /// <summary>所属（部署・課）</summary>
+    [MaxLength(100)] string? Department = null,
+    /// <summary>所属する直（既定のシフト）</summary>
+    int? ShiftId = null);
 
 public record UpdateUserRequest(
     [Required, MaxLength(200)] string DisplayName,

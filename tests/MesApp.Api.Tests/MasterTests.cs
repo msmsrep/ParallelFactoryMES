@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
@@ -488,10 +488,23 @@ public class MasterTests
         created.EnsureSuccessStatusCode();
         var shift = (await created.Content.ReadFromJsonAsync<ShiftResponse>())!;
 
+        // 登録時に指定した所属・直はそのまま保存される（登録後に編集し直さなくてよい）
         var user = await admin.PostAsJsonAsync("/api/users",
-            new CreateUserRequest("op1", "Passw0rd!", "作業者1", [MesRoles.Operator]));
+            new CreateUserRequest("op1", "Passw0rd!", "作業者1", [MesRoles.Operator],
+                null, "第1製造課", shift.Id));
         user.EnsureSuccessStatusCode();
-        var userId = (await user.Content.ReadFromJsonAsync<UserSummaryResponse>())!.Id;
+        var registered = (await user.Content.ReadFromJsonAsync<UserSummaryResponse>())!;
+        Assert.Equal("第1製造課", registered.Department);
+        Assert.Equal("N", registered.ShiftCode);
+        var userId = registered.Id;
+
+        // 登録でも更新と同じ判定を通す。弾かれたユーザーは作られない
+        var badShift = await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("op2", "Passw0rd!", "作業者2", [MesRoles.Operator], null, null, 9999));
+        Assert.Equal(HttpStatusCode.BadRequest, badShift.StatusCode);
+        Assert.DoesNotContain(
+            (await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users"))!,
+            u => u.UserName == "op2");
 
         var updated = await admin.PutAsJsonAsync($"/api/users/{userId}",
             new UpdateUserRequest("作業者1", [MesRoles.Operator], true, null, "第1製造課", shift.Id));

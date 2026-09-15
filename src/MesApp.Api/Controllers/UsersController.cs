@@ -1,4 +1,4 @@
-using MesApp.Api.Policies;
+﻿using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
@@ -86,6 +86,12 @@ public class UsersController(
             return BadRequest(new ProblemDetails { Title = $"不明なロールが含まれています: {string.Join(", ", invalidRoles)}" });
         }
 
+        // 検証はユーザーを作る前に通す（作成後に弾くと、所属だけ入っていないユーザーが残る）
+        if (await CheckAssignmentAsync(request.WorkCenterId, request.ShiftId, ct) is { } assignmentError)
+        {
+            return BadRequest(new ProblemDetails { Title = assignmentError });
+        }
+
         var user = new AppUser
         {
             UserName = request.UserName,
@@ -93,6 +99,9 @@ public class UsersController(
             IsActive = true,
             // 管理者が発行した初期パスワードは初回ログイン時に変更を強制する
             MustChangePassword = true,
+            WorkCenterId = request.WorkCenterId,
+            Department = request.Department,
+            ShiftId = request.ShiftId,
         };
         var result = await userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
@@ -132,23 +141,9 @@ public class UsersController(
             return Conflict(new ProblemDetails { Title = lastAdmin });
         }
 
-        // 作業場所は段を問わない（工場単位で働く担当者も表せるようにするため。Spec.md 5.7）
-        var workCenter = request.WorkCenterId is { } wcId
-            ? await db.WorkCenters.AsNoTracking().FirstOrDefaultAsync(w => w.Id == wcId, ct)
-            : null;
-        if (request.WorkCenterId is { } missingWc && workCenter is null)
+        if (await CheckAssignmentAsync(request.WorkCenterId, request.ShiftId, ct) is { } assignmentError)
         {
-            return BadRequest(new ProblemDetails { Title = $"作業区（ID {missingWc}）が見つかりません。" });
-        }
-        if (WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } wcReason)
-        {
-            return BadRequest(new ProblemDetails { Title = wcReason });
-        }
-
-        if (request.ShiftId is { } shiftId
-            && !await db.Shifts.AnyAsync(s => s.Id == shiftId && s.IsActive, ct))
-        {
-            return BadRequest(new ProblemDetails { Title = $"直（ID {shiftId}）が見つからないか無効です。" });
+            return BadRequest(new ProblemDetails { Title = assignmentError });
         }
 
         user.DisplayName = request.DisplayName;
@@ -174,6 +169,31 @@ public class UsersController(
     }
 
     /// <summary>パスワードリセット（管理者操作。次回ログイン時に変更を強制）</summary>
+    /// <summary>
+    /// 作業場所（作業区）と所属する直の指定が使える値かを確認する。使えない場合は日本語の理由を返す。
+    /// 登録と更新で同じ判定を通す（片方にだけ書くと、登録した内容が編集で弾かれる食い違いが出る）。
+    /// </summary>
+    private async Task<string?> CheckAssignmentAsync(int? workCenterId, int? shiftId, CancellationToken ct)
+    {
+        // 作業場所は段を問わない（工場単位で働く担当者も表せるようにするため。Spec.md 5.7）
+        var workCenter = workCenterId is { } wcId
+            ? await db.WorkCenters.AsNoTracking().FirstOrDefaultAsync(w => w.Id == wcId, ct)
+            : null;
+        if (workCenterId is { } missingWc && workCenter is null)
+        {
+            return $"作業区（ID {missingWc}）が見つかりません。";
+        }
+        if (WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } wcReason)
+        {
+            return wcReason;
+        }
+        if (shiftId is { } sid && !await db.Shifts.AnyAsync(s => s.Id == sid && s.IsActive, ct))
+        {
+            return $"直（ID {sid}）が見つからないか無効です。";
+        }
+        return null;
+    }
+
     [HttpPost("{id}/reset-password")]
     [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<IActionResult> ResetPassword(string id, ResetPasswordRequest request, CancellationToken ct)

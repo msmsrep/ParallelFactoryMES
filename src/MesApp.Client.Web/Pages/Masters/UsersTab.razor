@@ -1,4 +1,4 @@
-@inject HttpClient Http
+﻿@inject HttpClient Http
 
 @* ユーザー/工場従業員管理（F-10-10）とスキル・資格の割当（F-20-10-02〜05）。システム管理者専用 *@
 <AuthorizeView Roles="@MesRoleGroups.UserAdmin">
@@ -301,7 +301,10 @@
                     return;
                 }
                 response = await Http.PostAsJsonAsync("api/users",
-                    new CreateUserRequest(_userName, _password, _displayName, [.. _roles]));
+                    new CreateUserRequest(_userName, _password, _displayName, [.. _roles],
+                        _workCenterId == 0 ? null : _workCenterId,
+                        string.IsNullOrWhiteSpace(_department) ? null : _department,
+                        _shiftId == 0 ? null : _shiftId));
             }
             else
             {
