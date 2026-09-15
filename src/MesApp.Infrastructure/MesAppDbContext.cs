@@ -27,6 +27,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<ControlItem> ControlItems => Set<ControlItem>();
     public DbSet<InspectionItem> InspectionItems => Set<InspectionItem>();
     public DbSet<Checklist> Checklists => Set<Checklist>();
+    public DbSet<WorkProcedure> WorkProcedures => Set<WorkProcedure>();
     public DbSet<DefectReason> DefectReasons => Set<DefectReason>();
     public DbSet<SkillMaster> Skills => Set<SkillMaster>();
     public DbSet<UserSkill> UserSkills => Set<UserSkill>();
@@ -216,9 +217,21 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        builder.Entity<WorkProcedure>(e =>
+        {
+            e.HasIndex(x => x.ProcedureNo).IsUnique();
+            e.Property(x => x.ProcedureNo).HasMaxLength(50);
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Steps).HasMaxLength(4000);
+            e.Property(x => x.Reference).HasMaxLength(500);
+        });
+
         builder.Entity<Routing>(e =>
         {
             e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // 工順から参照されている手順書を消させない（作業指示が手順を辿れなくなる）
+            e.HasOne(x => x.WorkProcedure).WithMany().HasForeignKey(x => x.WorkProcedureId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.ProductId, x.Sequence }).IsUnique();
             e.Property(x => x.ControlItems).HasMaxLength(1000);

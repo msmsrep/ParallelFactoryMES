@@ -55,7 +55,9 @@ public record RoutingStepRequest(
     int? ChecklistId,
     int? WorkCenterId = null,
     /// <summary>候補設備（B-10-20-02）。空なら差立で設備を限定しない</summary>
-    List<int>? EquipmentIds = null);
+    List<int>? EquipmentIds = null,
+    /// <summary>作業手順書（SOP。I-30-20-12）</summary>
+    int? WorkProcedureId = null);
 
 public record RoutingStepResponse(
     int Id, int Sequence, int ProcessId, string ProcessCode, string ProcessName,
@@ -65,7 +67,21 @@ public record RoutingStepResponse(
     int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null,
     /// <summary>候補設備の資産番号（表示用）</summary>
     List<string>? EquipmentAssetNos = null,
-    List<int>? EquipmentIds = null);
+    List<int>? EquipmentIds = null,
+    int? WorkProcedureId = null, string? WorkProcedureNo = null, string? WorkProcedureTitle = null);
+
+// ---- 作業手順書（SOP。I-30-40、B-10-30-03）----
+
+public record WorkProcedureRequest(
+    [Required, MaxLength(50)] string ProcedureNo,
+    [Required, MaxLength(200)] string Title,
+    [MaxLength(4000)] string Steps,
+    /// <summary>手順書の所在（別システムの文書番号・URLなど。本文をMESに置けない場合に使う）</summary>
+    [MaxLength(500)] string? Reference);
+
+public record WorkProcedureResponse(
+    int Id, string ProcedureNo, string Title, string Steps, string? Reference,
+    int Version, bool IsActive);
 
 // ---- 設備（Equipment）----
 

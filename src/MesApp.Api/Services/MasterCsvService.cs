@@ -41,6 +41,7 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.Skills => await ExportSkillsAsync(includeInactive, ct),
             MasterCsvKinds.Bom => await ExportBomAsync(ct),
             MasterCsvKinds.Routing => await ExportRoutingAsync(ct),
+            MasterCsvKinds.WorkProcedures => await ExportWorkProceduresAsync(includeInactive, ct),
             MasterCsvKinds.Users => await ExportUsersAsync(includeInactive, ct),
             MasterCsvKinds.UserSkills => await ExportUserSkillsAsync(ct),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
@@ -220,6 +221,7 @@ public sealed partial class MasterCsvService(
             .Include(r => r.Product).Include(r => r.Process)
             .Include(r => r.RequiredSkill).Include(r => r.Equipment)
             .Include(r => r.Tool).Include(r => r.Checklist).Include(r => r.WorkCenter)
+            .Include(r => r.WorkProcedure)
             .Include(r => r.EquipmentCandidates).ThenInclude(c => c.Equipment)
             .OrderBy(r => r.Product!.Code).ThenBy(r => r.Sequence)
             .ToListAsync(ct);
@@ -230,7 +232,18 @@ public sealed partial class MasterCsvService(
             r.RequiredSkill?.Code, r.Equipment?.AssetNo,
             string.Join(";", r.EquipmentCandidates.Select(c => c.Equipment!.AssetNo).Order(StringComparer.Ordinal)),
             r.Tool?.Code, r.WorkCenter?.Code,
-            r.Checklist?.Code, r.ControlItems,
+            r.Checklist?.Code, r.ControlItems, r.WorkProcedure?.ProcedureNo,
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportWorkProceduresAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.WorkProcedures.AsNoTracking()
+            .Where(p => includeInactive || p.IsActive)
+            .OrderBy(p => p.ProcedureNo).ToListAsync(ct);
+        return [.. items.Select(p => new string?[]
+        {
+            p.ProcedureNo, p.Title, p.Steps, p.Reference, Bool(p.IsActive),
         })];
     }
 

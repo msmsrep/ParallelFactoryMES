@@ -23,6 +23,7 @@ public static class MasterCsvKinds
     public const string Skills = "skills";
     public const string Bom = "bom";
     public const string Routing = "routing";
+    public const string WorkProcedures = "work-procedures";
     public const string Users = "users";
     public const string UserSkills = "user-skills";
 
@@ -172,6 +173,15 @@ public static class MasterCsvKinds
             new("WorkCenterCode", "作業区コード", false, "登録済みの作業区コード（段が作業区のもの）"),
             new("ChecklistCode", "チェックリストコード", false, null),
             new("ControlItems", "工程管理項目", false, "温度・回転数 など"),
+            new("WorkProcedureNo", "作業手順書番号", false, "登録済みで有効な手順書の番号"),
+        ]),
+        new(WorkProcedures, "作業手順書（SOP）", true,
+        [
+            new("ProcedureNo", "手順書番号", true, "既存と一致すれば更新（版数+1）、無ければ新規登録"),
+            new("Title", "表題", true, null),
+            new("Steps", "手順ステップ", false, "手順書の所在を書かない場合は必須"),
+            new("Reference", "手順書の所在", false, "別システムの文書番号・URLなど。手順ステップを書かない場合は必須"),
+            new("IsActive", "有効", false, "true / false"),
         ]),
         new(Users, "ユーザー", true,
         [

@@ -102,6 +102,9 @@ public sealed partial class MasterCsvService
                 case MasterCsvKinds.Routing:
                     await ImportRoutingAsync(table, errors, counter, ct);
                     break;
+                case MasterCsvKinds.WorkProcedures:
+                    await ImportWorkProceduresAsync(table, errors, counter, ct);
+                    break;
                 case MasterCsvKinds.Users:
                     await ImportUsersAsync(table, errors, counter, ct);
                     break;
@@ -989,6 +992,56 @@ public sealed partial class MasterCsvService
         }
     }
 
+    private async Task ImportWorkProceduresAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byNo = await db.WorkProcedures.ToDictionaryAsync(p => p.ProcedureNo, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var procedureNo = reader.RequiredText("ProcedureNo", 50);
+            if (reader.Failed || !CheckUnique(reader, seen, procedureNo, "手順書番号"))
+            {
+                continue;
+            }
+
+            var isNew = !byNo.TryGetValue(procedureNo, out var procedure);
+            procedure ??= new WorkProcedure { ProcedureNo = procedureNo };
+
+            var title = reader.RequiredText("Title", 200);
+            var steps = reader.Text("Steps", procedure.Steps, 4000) ?? string.Empty;
+            var reference = reader.Text("Reference", procedure.Reference, 500);
+            var isActive = reader.Bool("IsActive", procedure.IsActive);
+            if (!reader.Failed && string.IsNullOrWhiteSpace(steps) && string.IsNullOrWhiteSpace(reference))
+            {
+                reader.Fail("Steps（手順ステップ）かReference（手順書の所在）のどちらかを指定してください。");
+            }
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            procedure.Title = title;
+            procedure.Steps = steps;
+            procedure.Reference = reference;
+            procedure.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.WorkProcedures.Add(procedure);
+                byNo[procedureNo] = procedure;
+                counter.Created++;
+            }
+            else
+            {
+                procedure.Version++; // 取込による改訂も版数を上げる（I-30-40-02）
+                counter.Updated++;
+            }
+        }
+    }
+
     private async Task ImportRoutingAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
@@ -1003,6 +1056,9 @@ public sealed partial class MasterCsvService
             .ToDictionaryAsync(t => t.Code, t => t.Id, StringComparer.Ordinal, ct);
         var checklistIds = await db.Checklists.AsNoTracking()
             .ToDictionaryAsync(c => c.Code, c => c.Id, StringComparer.Ordinal, ct);
+        // 無効な手順書は候補に入れない（単票APIと同じ条件）
+        var workProcedureIds = await db.WorkProcedures.AsNoTracking().Where(p => p.IsActive)
+            .ToDictionaryAsync(p => p.ProcedureNo, p => p.Id, StringComparer.Ordinal, ct);
         // 工順の作業区は最下段のみ（単票APIと同じ条件。Spec.md 5.7）。
         // 候補をここで絞ることで、上位の段を書いた行は「登録されていません」として弾かれる
         var workCenterIds = await db.WorkCenters.AsNoTracking()
@@ -1037,6 +1093,7 @@ public sealed partial class MasterCsvService
                 var checklistId = reader.Reference("ChecklistCode", null, checklistIds, "チェックリスト");
                 var workCenterId = reader.Reference("WorkCenterCode", null, workCenterIds, "作業区");
                 var controlItems = reader.Text("ControlItems", null, 500);
+                var workProcedureId = reader.Reference("WorkProcedureNo", null, workProcedureIds, "作業手順書");
                 if (sequence is null && !reader.Failed)
                 {
                     reader.Fail("Sequence（工程順序）は1以上の整数で指定してください。");
@@ -1073,6 +1130,7 @@ public sealed partial class MasterCsvService
                     WorkCenterId = workCenterId,
                     ChecklistId = checklistId,
                     ControlItems = controlItems,
+                    WorkProcedureId = workProcedureId,
                 });
             }
             if (failed)

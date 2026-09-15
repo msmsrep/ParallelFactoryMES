@@ -126,6 +126,49 @@ public class Routing
     /// <summary>工程・段取りで実施するチェックリスト</summary>
     public int? ChecklistId { get; set; }
     public Checklist? Checklist { get; set; }
+
+    /// <summary>
+    /// この工程の作業手順書（SOP。I-30-20-12「BOPに登録された作業に作業手順書/SOPを紐づける」）。
+    /// 作業者は作業指示からこれを辿って手順を確認する（B-10-30-03）
+    /// </summary>
+    public int? WorkProcedureId { get; set; }
+    public WorkProcedure? WorkProcedure { get; set; }
+}
+
+/// <summary>
+/// 作業手順書（SOP。Spec.md 5.1 WorkProcedure。I-30-40-01〜02、B-10-30-03）。
+/// <para>
+/// 保全手順書（<see cref="MaintenanceProcedure"/>）の製造版。保全側にだけ手順書があり、
+/// 製造の作業者が参照する手順の置き場が無かった非対称を解消する。
+/// </para>
+/// <para>
+/// 対象品目・対象工程は持たない。紐付けは工順（BOP）側から行う（<see cref="Routing.WorkProcedureId"/>）。
+/// 手順書側にも対象を持たせると、同じ手順書をどちらで紐付けたかで運用が割れる。
+/// </para>
+/// </summary>
+public class WorkProcedure
+{
+    public int Id { get; set; }
+
+    /// <summary>手順書番号（一意）</summary>
+    public string ProcedureNo { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>手順ステップ（テキスト。1行1ステップ等の自由書式）</summary>
+    public string Steps { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 手順書の所在（別システムの文書番号・URL など）。
+    /// 手順書の作成自体はMESの対象外（I-30-30-01）で、3Dデータや図面のように
+    /// MESに本文を置けない形式もあるため、外部を指す手段を用意する
+    /// </summary>
+    public string? Reference { get; set; }
+
+    /// <summary>版数（改訂のたびに上がる。I-30-40-02 の承認対象）</summary>
+    public int Version { get; set; } = 1;
+
+    public bool IsActive { get; set; } = true;
 }
 
 /// <summary>

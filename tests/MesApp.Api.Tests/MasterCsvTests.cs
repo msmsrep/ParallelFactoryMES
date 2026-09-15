@@ -793,6 +793,66 @@ public class MasterCsvTests
         Assert.Equal(5m, after![0].QuantityPer);
     }
 
+    [Fact]
+    public async Task 作業手順書をCSVで登録し工順から番号で紐付けできる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        var procedures = await ImportAsync(client, "work-procedures", """
+            ProcedureNo,Title,Steps,Reference,IsActive
+            SOP-01,組立作業手順,1. 部材を並べる,,true
+            SOP-02,3Dデータの手順,,DOC-1234,true
+            """);
+        Assert.True(procedures.Succeeded, string.Join(" / ", procedures.Errors.Select(e => e.Message)));
+        Assert.Equal(2, procedures.Created);
+
+        // 手順も所在も無い行は行番号付きで拒否される
+        var invalid = await ImportAsync(client, "work-procedures", """
+            ProcedureNo,Title,Steps,Reference
+            SOP-03,空の手順書,,
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Equal(2, invalid.Errors[0].Line);
+
+        // 再取込は更新扱いで版数が上がる
+        var revised = await ImportAsync(client, "work-procedures", """
+            ProcedureNo,Title,Steps
+            SOP-01,組立作業手順,1. 部材を並べる／2. 規定トルクで締結する
+            """);
+        Assert.True(revised.Succeeded, string.Join(" / ", revised.Errors.Select(e => e.Message)));
+        Assert.Equal(1, revised.Updated);
+        var saved = await client.GetFromJsonAsync<List<WorkProcedureResponse>>("/api/work-procedures");
+        Assert.Equal(2, saved!.Single(p => p.ProcedureNo == "SOP-01").Version);
+        Assert.Equal("DOC-1234", saved!.Single(p => p.ProcedureNo == "SOP-02").Reference);
+
+        // 工順CSVから手順書番号で紐付ける
+        Assert.True((await ImportAsync(client, "products", """
+            Code,Name,Unit,Type
+            FG-01,完成品,個,Product
+            """)).Succeeded);
+        Assert.True((await ImportAsync(client, "processes", """
+            Code,Name,Category
+            PR-01,組立,InHouse
+            """)).Succeeded);
+        var routing = await ImportAsync(client, "routing", """
+            ProductCode,Sequence,ProcessCode,WorkProcedureNo
+            FG-01,1,PR-01,SOP-01
+            """);
+        Assert.True(routing.Succeeded, string.Join(" / ", routing.Errors.Select(e => e.Message)));
+
+        var products = await client.GetFromJsonAsync<List<ProductResponse>>("/api/products");
+        var productId = products!.Single(p => p.Code == "FG-01").Id;
+        var steps = await client.GetFromJsonAsync<List<RoutingStepResponse>>($"/api/products/{productId}/routing");
+        Assert.Equal("SOP-01", Assert.Single(steps!).WorkProcedureNo);
+
+        // 出力にも手順書番号が出る
+        var export = await client.GetAsync("/api/masters/csv/routing");
+        export.EnsureSuccessStatusCode();
+        var exported = Encoding.UTF8.GetString(await export.Content.ReadAsByteArrayAsync());
+        Assert.Contains("SOP-01", exported, StringComparison.Ordinal);
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {

@@ -1,0 +1,179 @@
+@inject HttpClient Http
+
+@* 作業手順書（SOP。Spec.md 5.1 WorkProcedure。I-30-40-01〜02、B-10-30-03。更新で版数が上がる） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "作業手順書の登録" : $"編集（{_procedureNo}）")</h2>
+        <p class="text-muted">
+            工順（BOP）の工程に紐付けて使う。作業者は作業指示から手順を確認する。
+            手順書の作成そのものはMESの対象外のため、本文を置けないときは所在（文書番号・URL）だけでもよい。
+        </p>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>手順書番号</label>
+                <input @bind="_procedureNo" />
+            </div>
+            <div class="form-field">
+                <label>表題</label>
+                <input @bind="_title" />
+            </div>
+            <div class="form-field">
+                <label>手順書の所在</label>
+                <input @bind="_reference" placeholder="文書番号 / URL など" />
+            </div>
+        </div>
+        <div class="form-field">
+            <label>手順ステップ</label>
+            <textarea rows="6" @bind="_steps" placeholder="1行1ステップで記入"></textarea>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新（版数+1）")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<CsvIoPanel Kind="work-procedures" Label="作業手順書" KeyLabel="手順書番号" OnImported="LoadAsync" />
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>番号</th><th>表題</th><th>手順</th><th>所在</th><th>版数</th><th>状態</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.ProcedureNo</td>
+                        <td>@item.Title</td>
+                        <td>@Summarize(item.Steps)</td>
+                        <td>@(item.Reference ?? "-")</td>
+                        <td>v@(item.Version)</td>
+                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="wp">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<WorkProcedureResponse>? _items;
+
+    private int? _editingId;
+    private string _procedureNo = string.Empty;
+    private string _title = string.Empty;
+    private string _steps = string.Empty;
+    private string? _reference;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<WorkProcedureResponse>>("api/work-procedures?includeInactive=true");
+
+    /// <summary>一覧では手順の先頭だけ見せる（全文は編集で開く）</summary>
+    private static string Summarize(string steps)
+    {
+        if (string.IsNullOrWhiteSpace(steps))
+        {
+            return "-";
+        }
+        var firstLine = steps.Split('\n')[0].Trim();
+        return firstLine.Length > 40 ? firstLine[..40] + "…" : firstLine;
+    }
+
+    private void Edit(WorkProcedureResponse item)
+    {
+        _editingId = item.Id;
+        _procedureNo = item.ProcedureNo;
+        _title = item.Title;
+        _steps = item.Steps;
+        _reference = item.Reference;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _procedureNo = string.Empty;
+        _title = string.Empty;
+        _steps = string.Empty;
+        _reference = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_procedureNo) || string.IsNullOrWhiteSpace(_title))
+        {
+            _error = "手順書番号と表題を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new WorkProcedureRequest(_procedureNo, _title, _steps, _reference);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/work-procedures", request)
+                : await Http.PutAsJsonAsync($"api/work-procedures/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/work-procedures/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

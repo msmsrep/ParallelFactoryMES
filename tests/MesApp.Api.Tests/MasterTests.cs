@@ -383,6 +383,59 @@ public class MasterTests
         return (await response.Content.ReadFromJsonAsync<WorkCenterResponse>())!;
     }
 
+    [Fact]
+    public async Task 作業手順書を登録すると版数が上がり工順から紐付けできる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var product = await CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await CreateProcessAsync(admin, "PR-01", "組立");
+
+        var created = await admin.PostAsJsonAsync("/api/work-procedures",
+            new WorkProcedureRequest("SOP-01", "組立作業手順", "1. 部材を並べる／2. 締結する", null));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var procedure = (await created.Content.ReadFromJsonAsync<WorkProcedureResponse>())!;
+        Assert.Equal(1, procedure.Version);
+
+        // 手順も所在も無い手順書は作業者が何も参照できないので400
+        var empty = await admin.PostAsJsonAsync("/api/work-procedures",
+            new WorkProcedureRequest("SOP-99", "空の手順書", "", null));
+        Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
+
+        // 本文を置けない手順書は所在だけでよい
+        var external = await admin.PostAsJsonAsync("/api/work-procedures",
+            new WorkProcedureRequest("SOP-02", "3Dデータの手順", "", "DOC-1234"));
+        Assert.Equal(HttpStatusCode.Created, external.StatusCode);
+
+        // 改訂で版数が上がる
+        var updated = await admin.PutAsJsonAsync($"/api/work-procedures/{procedure.Id}",
+            new WorkProcedureRequest("SOP-01", "組立作業手順", "1. 部材を並べる／2. 規定トルクで締結する", null));
+        updated.EnsureSuccessStatusCode();
+        Assert.Equal(2, (await updated.Content.ReadFromJsonAsync<WorkProcedureResponse>())!.Version);
+
+        // 工順（BOP）へ紐付ける（I-30-20-12）
+        var routing = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, null, null, procedure.Id),
+            });
+        routing.EnsureSuccessStatusCode();
+        var steps = await admin.GetFromJsonAsync<List<RoutingStepResponse>>($"/api/products/{product.Id}/routing");
+        Assert.Equal("SOP-01", Assert.Single(steps!).WorkProcedureNo);
+
+        // 工順から参照されている手順書は無効化できない
+        var blocked = await admin.DeleteAsync($"/api/work-procedures/{procedure.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+
+        // 存在しない手順書を紐付けたら400
+        var missing = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, null, null, 9999),
+            });
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+    }
+
     internal static async Task<ProductResponse> CreateProductAsync(
         HttpClient client, string code, string name, ProductType type)
     {

@@ -201,6 +201,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         }
         return await db.Routings.AsNoTracking()
             .Include(r => r.EquipmentCandidates).ThenInclude(c => c.Equipment)
+            .Include(r => r.WorkProcedure)
             .Where(r => r.ProductId == id)
             .OrderBy(r => r.Sequence)
             .Select(r => new RoutingStepResponse(
@@ -213,7 +214,10 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
                 r.EquipmentCandidates.OrderBy(c => c.Equipment!.AssetNo)
                     .Select(c => c.Equipment!.AssetNo).ToList(),
                 r.EquipmentCandidates.OrderBy(c => c.Equipment!.AssetNo)
-                    .Select(c => c.EquipmentId).ToList()))
+                    .Select(c => c.EquipmentId).ToList(),
+                r.WorkProcedureId,
+                r.WorkProcedure != null ? r.WorkProcedure.ProcedureNo : null,
+                r.WorkProcedure != null ? r.WorkProcedure.Title : null))
             .ToListAsync(ct);
     }
 
@@ -244,6 +248,9 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             (steps.Where(s => s.EquipmentId != null).Select(s => s.EquipmentId!.Value), db.Equipments.Select(x => x.Id), "設備"),
             (steps.Where(s => s.ToolId != null).Select(s => s.ToolId!.Value), db.Tools.Select(x => x.Id), "治工具"),
             (steps.Where(s => s.ChecklistId != null).Select(s => s.ChecklistId!.Value), db.Checklists.Select(x => x.Id), "チェックリスト"),
+            // 無効な手順書を紐付けると、作業者が改訂前の手順で作業してしまう
+            (steps.Where(s => s.WorkProcedureId != null).Select(s => s.WorkProcedureId!.Value),
+                db.WorkProcedures.Where(x => x.IsActive).Select(x => x.Id), "作業手順書"),
             (steps.SelectMany(s => s.EquipmentIds ?? []), db.Equipments.Select(x => x.Id), "候補設備"),
             // 作業区は最下段に限る（設備と同じ理由。Spec.md 5.7 資源階層への紐付け）
             (steps.Where(s => s.WorkCenterId != null).Select(s => s.WorkCenterId!.Value),
@@ -278,6 +285,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             WorkCenterId = s.WorkCenterId,
             ControlItems = s.ControlItems,
             ChecklistId = s.ChecklistId,
+            WorkProcedureId = s.WorkProcedureId,
         }));
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Master", "Update", "Routing", id.ToString(),

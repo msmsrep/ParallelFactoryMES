@@ -153,7 +153,7 @@
         <h2 style="margin-top:0;">@_selected.Code の 工順（BOP。A-40-20）</h2>
         <table class="table">
             <thead>
-                <tr><th>順序</th><th>工程</th><th>標準作業(分)</th><th>標準段取(分)</th><th>必要スキル</th><th>候補設備</th><th>治工具</th><th>チェックリスト</th><th>管理項目</th><th></th></tr>
+                <tr><th>順序</th><th>工程</th><th>標準作業(分)</th><th>標準段取(分)</th><th>必要スキル</th><th>候補設備</th><th>治工具</th><th>チェックリスト</th><th>管理項目</th><th>作業手順書</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var step in _routingSteps.OrderBy(s => s.Sequence))
@@ -168,6 +168,7 @@
                         <td>@(_tools.FirstOrDefault(t => t.Id == step.ToolId)?.Code ?? "-")</td>
                         <td>@(_checklists.FirstOrDefault(c => c.Id == step.ChecklistId)?.Code ?? "-")</td>
                         <td>@(step.ControlItems ?? "-")</td>
+                        <td>@(_workProcedures.FirstOrDefault(w => w.Id == step.WorkProcedureId)?.ProcedureNo ?? "-")</td>
                         <td><button class="btn btn-danger btn-sm" @onclick="() => _routingSteps.Remove(step)">削除</button></td>
                     </tr>
                 }
@@ -253,6 +254,17 @@
                     <label>工程管理項目</label>
                     <input @bind="_stepControlItems" placeholder="例：温度、回転数" />
                 </div>
+                <div class="form-field">
+                    @* 作業手順書の紐付け（I-30-20-12）。作業者は作業指示からこれを辿る *@
+                    <label>作業手順書（SOP）</label>
+                    <select @bind="_stepWorkProcedureId">
+                        <option value="0">なし</option>
+                        @foreach (var procedure in _workProcedures)
+                        {
+                            <option value="@procedure.Id">@procedure.ProcedureNo @procedure.Title（v@(procedure.Version)）</option>
+                        }
+                    </select>
+                </div>
             </div>
             <div class="actions">
                 <button class="btn btn-secondary" @onclick="AddRoutingStep">工程を追加</button>
@@ -269,6 +281,7 @@
     private List<EquipmentResponse> _equipments = [];
     private List<ToolResponse> _tools = [];
     private List<ChecklistResponse> _checklists = [];
+    private List<WorkProcedureResponse> _workProcedures = [];
     /// <summary>工順の作業区は最下段のみ（Spec.md 5.7 資源階層への紐付け）</summary>
     private List<WorkCenterResponse> _workCenters = [];
 
@@ -299,6 +312,7 @@
     private readonly List<int> _stepEquipmentIds = [];
     private int _stepToolId;
     private int _stepChecklistId;
+    private int _stepWorkProcedureId;
     private int _stepWorkCenterId;
     private string? _stepControlItems;
 
@@ -313,6 +327,7 @@
         _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
         _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
         _checklists = await Http.GetFromJsonAsync<List<ChecklistResponse>>("api/checklists") ?? [];
+        _workProcedures = await Http.GetFromJsonAsync<List<WorkProcedureResponse>>("api/work-procedures") ?? [];
         _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>(
             $"api/work-centers?level={WorkCenterLevel.WorkCenter}") ?? [];
         await LoadAsync();
@@ -420,7 +435,7 @@
         _routingSteps.AddRange(routing.Select(r => new RoutingStepRequest(
             r.Sequence, r.ProcessId, r.StandardWorkMinutes, r.StandardSetupMinutes,
             r.RequiredSkillId, r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId,
-            r.WorkCenterId, r.EquipmentIds)));
+            r.WorkCenterId, r.EquipmentIds, r.WorkProcedureId)));
         _stepSequence = _routingSteps.Count == 0 ? 1 : _routingSteps.Max(s => s.Sequence) + 1;
     }
 
@@ -483,7 +498,8 @@
             string.IsNullOrWhiteSpace(_stepControlItems) ? null : _stepControlItems,
             _stepChecklistId == 0 ? null : _stepChecklistId,
             _stepWorkCenterId == 0 ? null : _stepWorkCenterId,
-            _stepEquipmentIds.Count == 0 ? null : [.. _stepEquipmentIds]));
+            _stepEquipmentIds.Count == 0 ? null : [.. _stepEquipmentIds],
+            _stepWorkProcedureId == 0 ? null : _stepWorkProcedureId));
         _stepSequence = _routingSteps.Max(s => s.Sequence) + 1;
         _stepControlItems = null;
         _stepEquipmentIds.Clear();
