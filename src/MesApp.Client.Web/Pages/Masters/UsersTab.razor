@@ -50,6 +50,21 @@
                         }
                     </select>
                 </div>
+                <div class="form-field">
+                    <label>所属（部署・課）</label>
+                    <input @bind="_department" placeholder="例：第1製造課" />
+                </div>
+                <div class="form-field">
+                    @* 所属する直（F-10-10-01）。実績の直は記録時刻から引くので、ここは既定の所属 *@
+                    <label>所属する直</label>
+                    <select @bind="_shiftId">
+                        <option value="0">なし</option>
+                        @foreach (var shift in _shifts)
+                        {
+                            <option value="@shift.Id">@shift.Code @shift.Name（@shift.ScheduleLabel）</option>
+                        }
+                    </select>
+                </div>
             </div>
 
             <h2>ロール</h2>
@@ -89,7 +104,7 @@
             {
                 <table class="table">
                     <thead>
-                        <tr><th>ユーザー名</th><th>氏名</th><th>作業場所</th><th>ロール</th><th>在籍</th><th>パスワード</th><th></th></tr>
+                        <tr><th>ユーザー名</th><th>氏名</th><th>所属</th><th>作業場所</th><th>直</th><th>ロール</th><th>在籍</th><th>パスワード</th><th></th></tr>
                     </thead>
                     <tbody>
                         @foreach (var user in _users)
@@ -97,7 +112,9 @@
                             <tr>
                                 <td>@user.UserName</td>
                                 <td>@user.DisplayName</td>
+                                <td>@(user.Department ?? "-")</td>
                                 <td>@(user.WorkCenterCode is null ? "-" : $"{user.WorkCenterCode} {user.WorkCenterName}")</td>
+                                <td>@(user.ShiftCode is null ? "-" : $"{user.ShiftCode} {user.ShiftName}")</td>
                                 <td>@string.Join("、", user.Roles.Select(RoleLabel))</td>
                                 <td>@(user.IsActive ? "在籍" : "無効")</td>
                                 <td>@(user.MustChangePassword ? "要変更" : "-")</td>
@@ -188,6 +205,9 @@
     private int _workCenterId;
     /// <summary>作業場所は段を問わない（Spec.md 5.7 資源階層への紐付け）</summary>
     private List<WorkCenterResponse> _workCenters = [];
+    private string? _department;
+    private int _shiftId;
+    private List<ShiftResponse> _shifts = [];
 
     private UserSummaryResponse? _skillTarget;
     private readonly List<UserSkillRequest> _userSkills = [];
@@ -216,6 +236,7 @@
     {
         _users = await Http.GetFromJsonAsync<List<UserSummaryResponse>>("api/users?includeInactive=true");
         _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers") ?? [];
+        _shifts = await Http.GetFromJsonAsync<List<ShiftResponse>>("api/shifts") ?? [];
     }
 
     private void ToggleRole(string role, bool selected)
@@ -240,6 +261,8 @@
         _displayName = user.DisplayName;
         _isActive = user.IsActive;
         _workCenterId = user.WorkCenterId ?? 0;
+        _department = user.Department;
+        _shiftId = user.ShiftId ?? 0;
         _roles.Clear();
         _roles.AddRange(user.Roles);
     }
@@ -252,6 +275,8 @@
         _password = string.Empty;
         _isActive = true;
         _workCenterId = 0;
+        _department = null;
+        _shiftId = 0;
         _roles.Clear();
     }
 
@@ -282,7 +307,9 @@
             {
                 response = await Http.PutAsJsonAsync($"api/users/{_editingId}",
                     new UpdateUserRequest(_displayName, [.. _roles], _isActive,
-                        _workCenterId == 0 ? null : _workCenterId));
+                        _workCenterId == 0 ? null : _workCenterId,
+                        string.IsNullOrWhiteSpace(_department) ? null : _department,
+                        _shiftId == 0 ? null : _shiftId));
             }
 
             if (!response.IsSuccessStatusCode)

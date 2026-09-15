@@ -105,6 +105,9 @@ public sealed partial class MasterCsvService
                 case MasterCsvKinds.WorkProcedures:
                     await ImportWorkProceduresAsync(table, errors, counter, ct);
                     break;
+                case MasterCsvKinds.Shifts:
+                    await ImportShiftsAsync(table, errors, counter, ct);
+                    break;
                 case MasterCsvKinds.Users:
                     await ImportUsersAsync(table, errors, counter, ct);
                     break;
@@ -1182,6 +1185,78 @@ public sealed partial class MasterCsvService
         return result;
     }
 
+    private async Task ImportShiftsAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.Shifts.ToDictionaryAsync(s => s.Code, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 20);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "シフトコード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var shift);
+            shift ??= new Shift { Code = code };
+
+            var name = reader.RequiredText("Name", 100);
+            var start = ParseTime(reader, "StartTime", isNew ? null : shift.StartTime);
+            var end = ParseTime(reader, "EndTime", isNew ? null : shift.EndTime);
+            var isActive = reader.Bool("IsActive", shift.IsActive);
+            if (reader.Failed || start is not { } startTime || end is not { } endTime)
+            {
+                if (!reader.Failed)
+                {
+                    reader.Fail("StartTime（開始時刻）とEndTime（終了時刻）は HH:mm で指定してください。");
+                }
+                continue;
+            }
+            // 時間帯の重なりは単票APIと同じ条件で弾く（重なると実績の直が一意に決まらない）
+            var others = byCode.Values.Where(s => s.IsActive && !ReferenceEquals(s, shift)).ToList();
+            if (isActive && ShiftSchedulePolicy.Check(code, startTime, endTime, others) is { } scheduleError)
+            {
+                reader.Fail(scheduleError);
+                continue;
+            }
+
+            shift.Name = name;
+            shift.StartTime = startTime;
+            shift.EndTime = endTime;
+            shift.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.Shifts.Add(shift);
+                byCode[code] = shift;
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
+    /// <summary>HH:mm の時刻列を読む（空欄なら既定値。TimeOnlyを読む列はここだけ）</summary>
+    private static TimeOnly? ParseTime(CsvRowReader reader, string column, TimeOnly? fallback)
+    {
+        var text = reader.Text(column, null, 10);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return fallback;
+        }
+        if (TimeOnly.TryParse(text, out var parsed))
+        {
+            return parsed;
+        }
+        reader.Fail($"{column} は HH:mm 形式で指定してください（'{text}'）。");
+        return null;
+    }
+
     private async Task ImportUsersAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
@@ -1189,6 +1264,9 @@ public sealed partial class MasterCsvService
         // 作業場所は段を問わない（Spec.md 5.7）
         var workCenters = await db.WorkCenters.AsNoTracking()
             .ToDictionaryAsync(w => w.Code, StringComparer.Ordinal, ct);
+        // 無効な直は所属先にしない（単票APIと同じ条件）
+        var shiftIds = await db.Shifts.AsNoTracking().Where(s => s.IsActive)
+            .ToDictionaryAsync(s => s.Code, s => s.Id, StringComparer.Ordinal, ct);
 
         foreach (var row in table.Rows)
         {
@@ -1206,6 +1284,13 @@ public sealed partial class MasterCsvService
             var password = reader.Text("InitialPassword", null);
             var workCenter = ResolveWorkCenter(
                 reader, table, "WorkCenterCode", user?.WorkCenterId, workCenters, out var workCenterKept);
+            // 列が無ければ現状維持、空欄なら解除（作業場所と同じ扱い）
+            var departmentKept = !table.HasColumn("Department");
+            var department = departmentKept ? user?.Department : reader.Text("Department", null, 100);
+            var shiftKept = !table.HasColumn("ShiftCode");
+            var shiftId = shiftKept
+                ? user?.ShiftId
+                : reader.Reference("ShiftCode", null, shiftIds, "直");
             // Roles列が無ければ現状維持、空欄なら全ロール解除
             var roles = table.HasColumn("Roles") ? ParseRoles(reader, table.Value(row, "Roles")) : null;
             if (reader.Failed)
@@ -1231,6 +1316,8 @@ public sealed partial class MasterCsvService
                     DisplayName = displayName,
                     IsActive = isActive,
                     WorkCenterId = workCenterKept ? null : workCenter?.Id,
+                    Department = department,
+                    ShiftId = shiftId,
                     // 管理者が発行した初期パスワードは初回ログイン時に変更を強制する
                     MustChangePassword = true,
                 };
@@ -1253,6 +1340,14 @@ public sealed partial class MasterCsvService
             if (!workCenterKept)
             {
                 user.WorkCenterId = workCenter?.Id;
+            }
+            if (!departmentKept)
+            {
+                user.Department = department;
+            }
+            if (!shiftKept)
+            {
+                user.ShiftId = shiftId;
             }
             await userManager.UpdateAsync(user);
 

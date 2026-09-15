@@ -42,6 +42,7 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.Bom => await ExportBomAsync(ct),
             MasterCsvKinds.Routing => await ExportRoutingAsync(ct),
             MasterCsvKinds.WorkProcedures => await ExportWorkProceduresAsync(includeInactive, ct),
+            MasterCsvKinds.Shifts => await ExportShiftsAsync(includeInactive, ct),
             MasterCsvKinds.Users => await ExportUsersAsync(includeInactive, ct),
             MasterCsvKinds.UserSkills => await ExportUserSkillsAsync(ct),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
@@ -249,7 +250,7 @@ public sealed partial class MasterCsvService(
 
     private async Task<List<string?[]>> ExportUsersAsync(bool includeInactive, CancellationToken ct)
     {
-        var users = await db.Users.AsNoTracking().Include(u => u.WorkCenter)
+        var users = await db.Users.AsNoTracking().Include(u => u.WorkCenter).Include(u => u.Shift)
             .Where(u => includeInactive || u.IsActive)
             .OrderBy(u => u.UserName).ToListAsync(ct);
         var roles = await RoleNamesByUserAsync(ct);
@@ -258,8 +259,22 @@ public sealed partial class MasterCsvService(
         {
             u.UserName, u.DisplayName,
             roles.TryGetValue(u.Id, out var names) ? string.Join(";", names) : null,
-            u.WorkCenter?.Code, Bool(u.IsActive), null,
+            u.WorkCenter?.Code, u.Department, u.Shift?.Code, Bool(u.IsActive), null,
         })];
+    }
+
+    private async Task<List<string?[]>> ExportShiftsAsync(bool includeInactive, CancellationToken ct)
+    {
+        var shifts = await db.Shifts.AsNoTracking()
+            .Where(s => includeInactive || s.IsActive)
+            .ToListAsync(ct);
+        // 直は時間帯で並べる（一覧APIと同じ並び。TimeOnlyはSQLiteで並べ替えられないため取り出してから）
+        return [.. shifts
+            .OrderBy(s => s.StartTime).ThenBy(s => s.Code, StringComparer.Ordinal)
+            .Select(s => new string?[]
+            {
+                s.Code, s.Name, s.StartTime.ToString("HH:mm"), s.EndTime.ToString("HH:mm"), Bool(s.IsActive),
+            })];
     }
 
     private async Task<List<string?[]>> ExportUserSkillsAsync(CancellationToken ct)

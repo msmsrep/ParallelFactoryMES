@@ -436,6 +436,86 @@ public class MasterTests
         Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
     }
 
+    [Fact]
+    public async Task 勤務シフトは夜勤の日跨ぎを表せ時間帯が重なる直は登録できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var day = await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("D", "昼勤", new TimeOnly(6, 0), new TimeOnly(18, 0)));
+        Assert.Equal(HttpStatusCode.Created, day.StatusCode);
+        var dayShift = (await day.Content.ReadFromJsonAsync<ShiftResponse>())!;
+        Assert.False(dayShift.CrossesMidnight);
+        Assert.Equal("06:00〜18:00", dayShift.ScheduleLabel);
+
+        // 終了時刻が開始時刻以下なら翌日にまたぐ夜勤
+        var night = await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("N", "夜勤", new TimeOnly(18, 0), new TimeOnly(6, 0)));
+        Assert.Equal(HttpStatusCode.Created, night.StatusCode);
+        var nightShift = (await night.Content.ReadFromJsonAsync<ShiftResponse>())!;
+        Assert.True(nightShift.CrossesMidnight);
+        Assert.Equal("18:00〜翌06:00", nightShift.ScheduleLabel);
+
+        // 時間帯が重なる直は登録できない（実績の直が一意に決まらないため）
+        var overlapping = await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("E", "準夜勤", new TimeOnly(16, 0), new TimeOnly(0, 0)));
+        Assert.Equal(HttpStatusCode.BadRequest, overlapping.StatusCode);
+
+        // 日跨ぎ側にかかる重なりも見落とさない（05:00は夜勤の時間帯）
+        var crossingOverlap = await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("E", "早番", new TimeOnly(5, 0), new TimeOnly(6, 0)));
+        Assert.Equal(HttpStatusCode.BadRequest, crossingOverlap.StatusCode);
+
+        // 24時間の直は表せない
+        var wholeDay = await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("A", "通し", new TimeOnly(6, 0), new TimeOnly(6, 0)));
+        Assert.Equal(HttpStatusCode.BadRequest, wholeDay.StatusCode);
+
+        // 一覧は時間帯順（夜勤が後ろ）
+        var list = await admin.GetFromJsonAsync<List<ShiftResponse>>("/api/shifts");
+        Assert.Equal(["D", "N"], list!.Select(s => s.Code));
+    }
+
+    [Fact]
+    public async Task 従業員に所属と直を登録でき所属中の直は無効化できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var created = await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("N", "夜勤", new TimeOnly(18, 0), new TimeOnly(6, 0)));
+        created.EnsureSuccessStatusCode();
+        var shift = (await created.Content.ReadFromJsonAsync<ShiftResponse>())!;
+
+        var user = await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("op1", "Passw0rd!", "作業者1", [MesRoles.Operator]));
+        user.EnsureSuccessStatusCode();
+        var userId = (await user.Content.ReadFromJsonAsync<UserSummaryResponse>())!.Id;
+
+        var updated = await admin.PutAsJsonAsync($"/api/users/{userId}",
+            new UpdateUserRequest("作業者1", [MesRoles.Operator], true, null, "第1製造課", shift.Id));
+        updated.EnsureSuccessStatusCode();
+        var saved = (await updated.Content.ReadFromJsonAsync<UserSummaryResponse>())!;
+        Assert.Equal("第1製造課", saved.Department);
+        Assert.Equal("N", saved.ShiftCode);
+
+        // 在籍中の従業員の所属になっている直は無効化できない
+        var blocked = await admin.DeleteAsync($"/api/shifts/{shift.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+
+        // 存在しない直は400
+        var missing = await admin.PutAsJsonAsync($"/api/users/{userId}",
+            new UpdateUserRequest("作業者1", [MesRoles.Operator], true, null, null, 9999));
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+
+        // 所属を外せば無効化できる
+        (await admin.PutAsJsonAsync($"/api/users/{userId}",
+            new UpdateUserRequest("作業者1", [MesRoles.Operator], true, null, null, null)))
+            .EnsureSuccessStatusCode();
+        (await admin.DeleteAsync($"/api/shifts/{shift.Id}")).EnsureSuccessStatusCode();
+    }
+
     internal static async Task<ProductResponse> CreateProductAsync(
         HttpClient client, string code, string name, ProductType type)
     {

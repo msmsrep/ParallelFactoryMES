@@ -254,6 +254,39 @@ public class EquipmentPart
     public string? Note { get; set; }
 }
 
+/// <summary>
+/// 勤務シフト（直。Spec.md 5.1 Shift。F-10-10-01）。
+/// <para>
+/// 3.9節の製造日（業務日付）は夜勤の日跨ぎ実績を同じ製造日へ集めるための仕組みだが、
+/// 「その実績がどの直のものか」を表す定義が無かった。ここで直の時間帯を定義する。
+/// </para>
+/// <para>
+/// 誰がいつどの直に入るかの勤務計画は持たない（勤怠管理 F-30-10 はMESの対象外寄り）。
+/// 従業員には所属する直を既定として持たせ、実績の直は記録時刻から引く。
+/// </para>
+/// </summary>
+public class Shift
+{
+    public int Id { get; set; }
+
+    /// <summary>シフトコード（一意。例: D／N）</summary>
+    public string Code { get; set; } = string.Empty;
+
+    /// <summary>名称（昼勤・夜勤・準夜勤など）</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>開始時刻（工場のローカル時刻）</summary>
+    public TimeOnly StartTime { get; set; }
+
+    /// <summary>
+    /// 終了時刻（工場のローカル時刻）。
+    /// 開始時刻以下のときは翌日にまたぐ夜勤として扱う（22:00〜06:00 など）
+    /// </summary>
+    public TimeOnly EndTime { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
 /// <summary>治工具マスタ（Spec.md 5.1 Tool。E-60）</summary>
 public class Tool
 {

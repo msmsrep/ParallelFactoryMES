@@ -24,6 +24,7 @@ public static class MasterCsvKinds
     public const string Bom = "bom";
     public const string Routing = "routing";
     public const string WorkProcedures = "work-procedures";
+    public const string Shifts = "shifts";
     public const string Users = "users";
     public const string UserSkills = "user-skills";
 
@@ -183,6 +184,14 @@ public static class MasterCsvKinds
             new("Reference", "手順書の所在", false, "別システムの文書番号・URLなど。手順ステップを書かない場合は必須"),
             new("IsActive", "有効", false, "true / false"),
         ]),
+        new(Shifts, "勤務シフト（直）", true,
+        [
+            new("Code", "シフトコード", true, "既存と一致すれば更新、無ければ新規登録"),
+            new("Name", "名称", true, "昼勤 / 夜勤 など"),
+            new("StartTime", "開始時刻", true, "HH:mm"),
+            new("EndTime", "終了時刻", true, "HH:mm。開始時刻以下なら翌日にまたぐ夜勤として扱う"),
+            new("IsActive", "有効", false, "true / false"),
+        ]),
         new(Users, "ユーザー", true,
         [
             new("UserName", "ユーザー名", true, "既存ユーザーと一致すれば更新、無ければ新規登録"),
@@ -190,6 +199,8 @@ public static class MasterCsvKinds
             new("Roles", "ロール", false,
                 "セミコロン区切り。SystemAdmin / ProductionManager / Operator / Logistics / QualityControl / QualityAssurance / Maintenance"),
             new("WorkCenterCode", "作業場所の作業区コード", false, "登録済みの作業区コード（段は問わない）"),
+            new("Department", "所属（部署・課）", false, null),
+            new("ShiftCode", "所属する直のシフトコード", false, "登録済みで有効なシフトコード"),
             new("IsActive", "在籍", false, "false で無効化（ログイン不可・セッション失効）"),
             new("InitialPassword", "初期パスワード", false,
                 "新規登録時のみ必須。8文字以上で英小文字と数字を含む。初回ログイン時に変更を強制"),

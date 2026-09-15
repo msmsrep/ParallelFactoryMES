@@ -145,8 +145,16 @@ public class UsersController(
             return BadRequest(new ProblemDetails { Title = wcReason });
         }
 
+        if (request.ShiftId is { } shiftId
+            && !await db.Shifts.AnyAsync(s => s.Id == shiftId && s.IsActive, ct))
+        {
+            return BadRequest(new ProblemDetails { Title = $"直（ID {shiftId}）が見つからないか無効です。" });
+        }
+
         user.DisplayName = request.DisplayName;
         user.WorkCenterId = request.WorkCenterId;
+        user.Department = request.Department;
+        user.ShiftId = request.ShiftId;
         var deactivated = user.IsActive && !request.IsActive;
         user.IsActive = request.IsActive;
         await userManager.UpdateAsync(user);
@@ -255,9 +263,13 @@ public class UsersController(
         var workCenter = user.WorkCenterId is { } id
             ? await db.WorkCenters.AsNoTracking().FirstOrDefaultAsync(w => w.Id == id)
             : null;
+        var shift = user.ShiftId is { } shiftId
+            ? await db.Shifts.AsNoTracking().FirstOrDefaultAsync(s => s.Id == shiftId)
+            : null;
         return new UserSummaryResponse(
             user.Id, user.UserName ?? string.Empty, user.DisplayName,
             user.IsActive, user.MustChangePassword, roles.ToList(),
-            user.WorkCenterId, workCenter?.Code, workCenter?.Name);
+            user.WorkCenterId, workCenter?.Code, workCenter?.Name,
+            user.Department, user.ShiftId, shift?.Code, shift?.Name);
     }
 }

@@ -14,14 +14,20 @@ public record UpdateUserRequest(
     [Required, MaxLength(200)] string DisplayName,
     List<string> Roles,
     bool IsActive,
-    int? WorkCenterId = null);
+    int? WorkCenterId = null,
+    /// <summary>所属（部署・課）</summary>
+    [MaxLength(100)] string? Department = null,
+    /// <summary>所属する直（既定のシフト）</summary>
+    int? ShiftId = null);
 
 public record ResetPasswordRequest([Required] string NewPassword);
 
 public record UserSummaryResponse(
     string Id, string UserName, string DisplayName, bool IsActive,
     bool MustChangePassword, List<string> Roles,
-    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null);
+    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null,
+    string? Department = null,
+    int? ShiftId = null, string? ShiftCode = null, string? ShiftName = null);
 
 /// <summary>
 /// 作業者を選ばせるための選択肢（Spec.md 7.5）。差立で使う。

@@ -4,7 +4,7 @@
 <PageTitle>マスタ管理 - Parallel Factory MES</PageTitle>
 
 <h1>マスタ管理</h1>
-<p class="text-muted">品目／MBOM／工順（BOP）／工程／作業区／設備（BOE）／治工具／ロケーション／検査項目・基準／工程管理項目／作業手順書（SOP）／チェックリスト／ユーザー・スキル資格。</p>
+<p class="text-muted">品目／MBOM／工順（BOP）／工程／作業区／設備（BOE）／治工具／ロケーション／検査項目・基準／工程管理項目／作業手順書（SOP）／チェックリスト／勤務シフト／ユーザー・スキル資格。</p>
 
 <div class="tabs">
     <button class="@TabClass("products")" @onclick='() => _tab = "products"'>品目・MBOM・工順</button>
@@ -19,6 +19,7 @@
     <button class="@TabClass("checklists")" @onclick='() => _tab = "checklists"'>チェックリスト</button>
     <button class="@TabClass("defect-reasons")" @onclick='() => _tab = "defect-reasons"'>不良理由</button>
     <button class="@TabClass("skills")" @onclick='() => _tab = "skills"'>スキル・資格</button>
+    <button class="@TabClass("shifts")" @onclick='() => _tab = "shifts"'>勤務シフト</button>
     <button class="@TabClass("users")" @onclick='() => _tab = "users"'>ユーザー</button>
 </div>
 
@@ -59,6 +60,9 @@
         break;
     case "skills":
         <SkillsTab />
+        break;
+    case "shifts":
+        <ShiftsTab />
         break;
     case "users":
         <UsersTab />

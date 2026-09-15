@@ -30,6 +30,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<WorkProcedure> WorkProcedures => Set<WorkProcedure>();
     public DbSet<DefectReason> DefectReasons => Set<DefectReason>();
     public DbSet<SkillMaster> Skills => Set<SkillMaster>();
+    public DbSet<Shift> Shifts => Set<Shift>();
     public DbSet<UserSkill> UserSkills => Set<UserSkill>();
 
     // 指図・実績系（Spec.md 5.2）／在庫系（5.3。Lotは産出ロット採番のため先行導入）
@@ -200,7 +201,10 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
 
         builder.Entity<AppUser>(e =>
         {
+            e.Property(x => x.Department).HasMaxLength(100);
             e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Shift).WithMany().HasForeignKey(x => x.ShiftId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -267,6 +271,13 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Shift>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(20);
+            e.Property(x => x.Name).HasMaxLength(100);
         });
 
         builder.Entity<Tool>(e =>

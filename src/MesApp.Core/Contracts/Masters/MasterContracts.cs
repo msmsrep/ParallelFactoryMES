@@ -113,6 +113,24 @@ public record EquipmentPartResponse(
     int Id, int EquipmentId, int ProductId, string ProductCode, string ProductName, string Unit,
     MaintenancePartCategory Category, decimal QuantityPer, string? Note);
 
+// ---- 勤務シフト（直。F-10-10-01）----
+
+public record ShiftRequest(
+    [Required, MaxLength(20)] string Code,
+    [Required, MaxLength(100)] string Name,
+    /// <summary>開始時刻（工場のローカル時刻）</summary>
+    TimeOnly StartTime,
+    /// <summary>終了時刻。開始時刻以下なら翌日にまたぐ夜勤として扱う</summary>
+    TimeOnly EndTime);
+
+public record ShiftResponse(
+    int Id, string Code, string Name, TimeOnly StartTime, TimeOnly EndTime,
+    /// <summary>翌日にまたぐ直か（夜勤）</summary>
+    bool CrossesMidnight,
+    /// <summary>時間帯の表示（夜勤は「22:00〜翌06:00」）</summary>
+    string ScheduleLabel,
+    bool IsActive);
+
 // ---- 治工具（Tool）----
 
 public record ToolRequest(

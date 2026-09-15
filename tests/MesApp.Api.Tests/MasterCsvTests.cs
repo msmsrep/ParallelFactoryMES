@@ -853,6 +853,64 @@ public class MasterCsvTests
         Assert.Contains("SOP-01", exported, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task 勤務シフトをCSVで登録し従業員の所属と直をCSVで設定できる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        var shifts = await ImportAsync(client, "shifts", """
+            Code,Name,StartTime,EndTime,IsActive
+            D,昼勤,06:00,18:00,true
+            N,夜勤,18:00,06:00,true
+            """);
+        Assert.True(shifts.Succeeded, string.Join(" / ", shifts.Errors.Select(e => e.Message)));
+        Assert.Equal(2, shifts.Created);
+        var saved = await client.GetFromJsonAsync<List<ShiftResponse>>("/api/shifts");
+        Assert.True(saved!.Single(s => s.Code == "N").CrossesMidnight);
+
+        // 時間帯が重なる直は行番号付きで拒否される（単票APIと同じ条件）
+        var overlapping = await ImportAsync(client, "shifts", """
+            Code,Name,StartTime,EndTime
+            E,準夜勤,16:00,00:00
+            """);
+        Assert.False(overlapping.Succeeded);
+        Assert.Equal(2, overlapping.Errors[0].Line);
+
+        // 時刻の書式違いも行番号付きで拒否される
+        var badTime = await ImportAsync(client, "shifts", """
+            Code,Name,StartTime,EndTime
+            E,準夜勤,16時,00:00
+            """);
+        Assert.False(badTime.Succeeded);
+
+        var users = await ImportAsync(client, "users", """
+            UserName,DisplayName,Roles,Department,ShiftCode,IsActive,InitialPassword
+            op1,作業者1,Operator,第1製造課,N,true,Passw0rd1
+            """);
+        Assert.True(users.Succeeded, string.Join(" / ", users.Errors.Select(e => e.Message)));
+        var list = await client.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users");
+        var op1 = list!.Single(u => u.UserName == "op1");
+        Assert.Equal("第1製造課", op1.Department);
+        Assert.Equal("N", op1.ShiftCode);
+
+        // 列を書かなければ現状維持（作業場所と同じ扱い）
+        Assert.True((await ImportAsync(client, "users", """
+            UserName,DisplayName
+            op1,作業者1（改称）
+            """)).Succeeded);
+        var kept = (await client.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users"))!
+            .Single(u => u.UserName == "op1");
+        Assert.Equal("第1製造課", kept.Department);
+        Assert.Equal("N", kept.ShiftCode);
+
+        // 出力にも所属と直が出る
+        var export = await client.GetAsync("/api/masters/csv/users");
+        export.EnsureSuccessStatusCode();
+        var exported = Encoding.UTF8.GetString(await export.Content.ReadAsByteArrayAsync());
+        Assert.Contains("第1製造課", exported, StringComparison.Ordinal);
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {
