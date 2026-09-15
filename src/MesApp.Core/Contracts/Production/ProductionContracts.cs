@@ -47,6 +47,14 @@ public record ProcessProgressRow(
     int ProcessId, string ProcessCode, string ProcessName,
     int Created, int Dispatched, int Started, int Completed, int Approved);
 
+/// <summary>
+/// 作業指示の工程管理項目（展開時点のスナップショット。B-30-30-04）。
+/// 実績の逸脱判定はこの指示値・許容範囲を基準にする
+/// </summary>
+public record WorkOrderControlItemResponse(
+    int Id, int? ControlItemId, string ItemCode, string ItemName, string? Unit,
+    int ItemVersion, decimal? TargetValue, decimal? LowerLimit, decimal? UpperLimit);
+
 public record WorkOrderResponse(
     int Id, string WorkOrderNo, int ManufacturingOrderId, string OrderNo,
     int ProductId, string ProductCode, string ProductName,

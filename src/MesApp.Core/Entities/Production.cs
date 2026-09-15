@@ -126,6 +126,12 @@ public class WorkOrder
     public int? RoutingChecklistId { get; set; }
     public Checklist? RoutingChecklist { get; set; }
 
+    /// <summary>
+    /// 工程管理項目の指示（展開時点のマスタのスナップショット。B-30-30-04）。
+    /// 実績の逸脱判定はこれを基準にする
+    /// </summary>
+    public List<WorkOrderControlItem> ControlItemSnapshots { get; set; } = [];
+
     /// <summary>着手順（差立で設定。B-10-20-03。初期リリースでは順序強制はしない：Spec.md 3.9）</summary>
     public int? DispatchOrder { get; set; }
 
@@ -269,3 +275,42 @@ public class LotStatusHistory
 
     public DateTimeOffset ChangedAt { get; set; } = DateTimeOffset.UtcNow;
 }
+/// <summary>
+/// 作業指示の工程管理項目（Spec.md 5.2 WorkOrderControlItem。B-30-30-04）。
+/// 指図展開時点の工程管理項目マスタを写したもの。
+/// <para>
+/// 検査指示の基準スナップショット（<see cref="InspectionOrderItem"/>）と同じ考え方。
+/// マスタは改訂され上書きされるため、実績の逸脱判定は**当時どの条件で作れと指示されたか**を
+/// 基準にしないと、後から見たときに判定が変わってしまう。
+/// </para>
+/// </summary>
+public class WorkOrderControlItem
+{
+    public int Id { get; set; }
+
+    public int WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
+    /// <summary>元の工程管理項目（マスタが消えても実績は残るため参照は任意）</summary>
+    public int? ControlItemId { get; set; }
+    public ControlItem? ControlItem { get; set; }
+
+    // ---- 展開時点のスナップショット ----
+
+    public string ItemCode { get; set; } = string.Empty;
+
+    public string ItemName { get; set; } = string.Empty;
+
+    public string? Unit { get; set; }
+
+    /// <summary>展開時点のマスタ版数</summary>
+    public int ItemVersion { get; set; }
+
+    /// <summary>指示値（レシピ上の狙い値）</summary>
+    public decimal? TargetValue { get; set; }
+
+    public decimal? LowerLimit { get; set; }
+
+    public decimal? UpperLimit { get; set; }
+}
+

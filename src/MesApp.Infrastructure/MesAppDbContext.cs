@@ -34,6 +34,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<ManufacturingOrderMaterial> ManufacturingOrderMaterials => Set<ManufacturingOrderMaterial>();
     public DbSet<WorkOrderStatusHistory> WorkOrderStatusHistories => Set<WorkOrderStatusHistory>();
+    public DbSet<WorkOrderControlItem> WorkOrderControlItems => Set<WorkOrderControlItem>();
     public DbSet<Lot> Lots => Set<Lot>();
     public DbSet<LotGenealogy> LotGenealogies => Set<LotGenealogy>();
     public DbSet<LotStatusHistory> LotStatusHistories => Set<LotStatusHistory>();
@@ -356,6 +357,23 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.HasOne(x => x.ChildProduct)
                 .WithMany()
                 .HasForeignKey(x => x.ChildProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<WorkOrderControlItem>(e =>
+        {
+            e.HasIndex(x => x.WorkOrderId);
+            e.Property(x => x.ItemCode).HasMaxLength(50);
+            e.Property(x => x.ItemName).HasMaxLength(200);
+            e.Property(x => x.Unit).HasMaxLength(30);
+            // 作業指示を消すと指示内容も一緒に消えるべき
+            // 逆側のナビゲーション（WorkOrder.ControlItemSnapshots）を明示する。
+            // WithMany() だけだとEFが規約で別の関連を作り、FK列が二重になる
+            e.HasOne(x => x.WorkOrder).WithMany(w => w.ControlItemSnapshots)
+                .HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // マスタは無効化で運用するため、参照が残っている項目を消せないようにする
+            e.HasOne(x => x.ControlItem).WithMany().HasForeignKey(x => x.ControlItemId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

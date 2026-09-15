@@ -37,7 +37,7 @@
 
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
-| 工程管理項目マスタ（指示値・許容範囲。版数付き） | B-30-30-04 | `ControlItemsController.cs` `api/control-items` | Masters.cs: ControlItem | `/masters` `Masters/ControlItemsTab.razor` | `Tests/MasterTests.cs` / `MasterCsvTests.cs` |
+| 工程管理項目マスタ（指示値・許容範囲。版数付き） | B-30-30-04 | `ControlItemsController.cs` `api/control-items`<br>展開時のスナップショット取得は `WorkOrdersController.ControlItems` `api/work-orders/{id}/control-items` | Masters.cs: ControlItem<br>Production.cs: **WorkOrderControlItem**（展開時点の指示値。判定・表示はこちらを使い、マスタ現在値を参照しない） | `/masters` `Masters/ControlItemsTab.razor` | `Tests/MasterTests.cs` / `MasterCsvTests.cs` |
 | 検査項目・基準マスタ | C-10-10 | `InspectionItemsController.cs` `api/inspection-items` | Masters.cs: InspectionItem | `/masters` `Masters/InspectionItemsTab.razor` | `Tests/MasterTests.cs` |
 | 検査指示・実績・判定・成績書 | C-20 | `InspectionOrdersController.cs` `api/inspection-orders` | `Core/Entities/Quality.cs`<br>InspectionOrder / InspectionOrderItem（**発行時点の基準スナップショット**。判定・成績書はこちらを使い、マスタ現在値を参照しない：Spec.md 5.7） / InspectionResult / **InspectionResultCorrection**（訂正前の記録。詳細画面・成績書に表示） | `/inspections` `Inspections.razor`<br>`/inspections/{id}` `InspectionDetail.razor`<br>`/print/inspection/{id}` `Print/InspectionCertificate.razor` | `Tests/QualityTests.cs` |
 | 不適合・逸脱管理（特採・廃棄・保留） | C-30 / B-40-30 | `NonconformanceController.cs` `api/nonconformances` | Quality.cs: NonconformanceReport | `/nonconformances` `Nonconformances.razor` | `Tests/QualityTests.cs` |

@@ -267,6 +267,26 @@ else
         }
     </AuthorizeView>
 
+    @* 工程管理項目の指示（展開時点のスナップショット。Spec.md 5.7） *@
+    @if (_controlItems.Count > 0)
+    {
+        <h2>製造条件の指示（この指示が展開された時点の条件）</h2>
+        <table class="table">
+            <thead><tr><th>項目</th><th>指示値</th><th>許容範囲</th><th>版数</th></tr></thead>
+            <tbody>
+                @foreach (var item in _controlItems)
+                {
+                    <tr>
+                        <td>@item.ItemCode @item.ItemName</td>
+                        <td>@(item.TargetValue?.ToString() ?? "-") @item.Unit</td>
+                        <td>@(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")</td>
+                        <td>v@(item.ItemVersion)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
     @* 製造条件データ（B-30-30-04。温度・回転数などを手入力で残す） *@
     <h2>製造条件データ</h2>
     @if (_dataRecords.Count == 0)
@@ -364,6 +384,8 @@ else
     private string? _substituteReason;
 
     // 製造条件データ（B-30-30-04）
+    /// <summary>展開時点の指示（マスタの現在値ではない。Spec.md 5.7）</summary>
+    private List<WorkOrderControlItemResponse> _controlItems = [];
     private string _dataItem = string.Empty;
     private string _dataValue = string.Empty;
 
@@ -426,6 +448,8 @@ else
             $"api/work-orders/{Id}/data-records") ?? [];
         _statusHistory = await Http.GetFromJsonAsync<List<WorkOrderStatusHistoryEntry>>(
             $"api/work-orders/{Id}/status-history") ?? [];
+        _controlItems = await Http.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
+            $"api/work-orders/{Id}/control-items") ?? [];
     }
 
     /// <summary>投入ロットの選択に合わせて、引き落とすロケーションも決める（在庫はロット×棚で持つため）</summary>

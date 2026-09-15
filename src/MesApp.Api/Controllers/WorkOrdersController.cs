@@ -131,6 +131,27 @@ public class WorkOrdersController(
     }
 
     /// <summary>
+    /// 工程管理項目の指示（B-30-30-04）。展開時点のマスタを写したもので、
+    /// 実績の逸脱判定と画面表示はこれを使う（マスタの現在値を参照しない。Spec.md 5.7）
+    /// </summary>
+    [HttpGet("{id:int}/control-items")]
+    public async Task<ActionResult<List<WorkOrderControlItemResponse>>> ControlItems(
+        int id, CancellationToken ct)
+    {
+        if (!await db.WorkOrders.AnyAsync(w => w.Id == id, ct))
+        {
+            return NotFound();
+        }
+        return await db.WorkOrderControlItems.AsNoTracking()
+            .Where(i => i.WorkOrderId == id)
+            .OrderBy(i => i.ItemCode)
+            .Select(i => new WorkOrderControlItemResponse(
+                i.Id, i.ControlItemId, i.ItemCode, i.ItemName, i.Unit,
+                i.ItemVersion, i.TargetValue, i.LowerLimit, i.UpperLimit))
+            .ToListAsync(ct);
+    }
+
+    /// <summary>
     /// 状態履歴（Spec.md 5.2 WorkOrderStatusHistory）。配布・着手・完了・承認・取消の遷移を時系列で返す
     /// </summary>
     [HttpGet("{id:int}/status-history")]

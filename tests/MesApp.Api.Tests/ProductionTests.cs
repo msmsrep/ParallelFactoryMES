@@ -38,6 +38,71 @@ public class ProductionTests
     }
 
     [Fact]
+    public async Task 工程管理項目が展開時に固定され以降のマスタ改訂で指示が変わらない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "加熱");
+        (await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null) }))
+            .EnsureSuccessStatusCode();
+
+        // 品目単位の項目と工程単位の項目を用意する（両方が作業指示へ写る）
+        var byProduct = await admin.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-01", "投入重量", "kg", product.Id, null, 10m, 9.5m, 10.5m));
+        byProduct.EnsureSuccessStatusCode();
+        var byProcess = await admin.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-02", "加熱温度", "℃", null, process.Id, 180m, 175m, 185m));
+        byProcess.EnsureSuccessStatusCode();
+        // 別工程の項目は写らない
+        var other = await MasterTests.CreateProcessAsync(admin, "PR-02", "検査");
+        (await admin.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-03", "別工程の項目", null, null, other.Id, null, null, null)))
+            .EnsureSuccessStatusCode();
+
+        var order = await CreateOrderAsync(admin, product.Id);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        expanded.EnsureSuccessStatusCode();
+        var detail = await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>();
+        var workOrder = detail!.WorkOrders.Single();
+
+        var items = await admin.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
+            $"/api/work-orders/{workOrder.Id}/control-items");
+        Assert.Equal(["CI-01", "CI-02"], items!.Select(i => i.ItemCode));
+        var temperature = items!.Single(i => i.ItemCode == "CI-02");
+        Assert.Equal(180m, temperature.TargetValue);
+        Assert.Equal(175m, temperature.LowerLimit);
+        Assert.Equal(1, temperature.ItemVersion);
+        Assert.Equal("℃", temperature.Unit);
+
+        // マスタを改訂しても展開済みの指示は変わらない（Spec.md 5.7）
+        var itemId = (await byProcess.Content.ReadFromJsonAsync<ControlItemResponse>())!.Id;
+        (await admin.PutAsJsonAsync($"/api/control-items/{itemId}",
+            new ControlItemRequest("CI-02", "加熱温度", "℃", null, process.Id, 200m, 195m, 205m)))
+            .EnsureSuccessStatusCode();
+        var afterRevision = await admin.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
+            $"/api/work-orders/{workOrder.Id}/control-items");
+        var kept = afterRevision!.Single(i => i.ItemCode == "CI-02");
+        Assert.Equal(180m, kept.TargetValue);
+        Assert.Equal(1, kept.ItemVersion);
+
+        // 改訂後に展開した指図には新しい条件が写る
+        var next = await CreateOrderAsync(admin, product.Id);
+        await admin.PostAsync($"/api/manufacturing-orders/{next.Id}/approve", null);
+        var nextExpanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{next.Id}/expand", new ExpandRequest(null));
+        var nextDetail = await nextExpanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>();
+        var nextItems = await admin.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
+            $"/api/work-orders/{nextDetail!.WorkOrders.Single().Id}/control-items");
+        Assert.Equal(200m, nextItems!.Single(i => i.ItemCode == "CI-02").TargetValue);
+        Assert.Equal(2, nextItems!.Single(i => i.ItemCode == "CI-02").ItemVersion);
+    }
+
+    [Fact]
     public async Task 工順の作業区が展開時に固定され進捗を上位の段でまとめて集計できる()
     {
         using var factory = new ApiFactory();
