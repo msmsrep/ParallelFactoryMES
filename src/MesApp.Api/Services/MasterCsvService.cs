@@ -30,6 +30,7 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.Products => await ExportProductsAsync(includeInactive, ct),
             MasterCsvKinds.Processes => await ExportProcessesAsync(includeInactive, ct),
             MasterCsvKinds.Equipments => await ExportEquipmentsAsync(includeInactive, ct),
+            MasterCsvKinds.EquipmentParts => await ExportEquipmentPartsAsync(ct),
             MasterCsvKinds.Tools => await ExportToolsAsync(includeInactive, ct),
             MasterCsvKinds.WorkCenters => await ExportWorkCentersAsync(includeInactive, ct),
             MasterCsvKinds.Locations => await ExportLocationsAsync(includeInactive, ct),
@@ -75,6 +76,18 @@ public sealed partial class MasterCsvService(
         {
             e.AssetNo, e.Name, e.WorkCenter?.Code, e.Site, e.Status.ToString(), e.MaintenanceType.ToString(),
             Num(e.MaintenanceThreshold), e.MaintenanceParts, Bool(e.IsActive),
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportEquipmentPartsAsync(CancellationToken ct)
+    {
+        var items = await db.EquipmentParts.AsNoTracking()
+            .Include(p => p.Equipment).Include(p => p.Product)
+            .OrderBy(p => p.Equipment!.AssetNo).ThenBy(p => p.Product!.Code)
+            .ToListAsync(ct);
+        return [.. items.Select(p => new string?[]
+        {
+            p.Equipment!.AssetNo, p.Product!.Code, p.Category.ToString(), Num(p.QuantityPer), p.Note,
         })];
     }
 

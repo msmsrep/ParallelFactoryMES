@@ -172,10 +172,43 @@ public class Equipment
     /// <summary>保全閾値（保全タイプに応じて日数・時間・回数）</summary>
     public decimal? MaintenanceThreshold { get; set; }
 
-    /// <summary>保全部品（交換部品リスト等の自由記述）</summary>
+    /// <summary>
+    /// 保全部品（交換部品リスト等の自由記述。品目マスタ参照の
+    /// <see cref="Parts"/> を整備するまでの旧項目）
+    /// </summary>
     public string? MaintenanceParts { get; set; }
 
+    /// <summary>保全部品（品目マスタ参照。E-10-10-01、E-20-10-04）</summary>
+    public List<EquipmentPart> Parts { get; set; } = [];
+
     public bool IsActive { get; set; } = true;
+}
+
+/// <summary>
+/// 設備の保全部品（Spec.md 5.1 EquipmentPart。E-10-10-01、E-20-10-04）。
+/// <para>
+/// 自由記述では消耗材の使用状況（E-20-10-04）を集計できないため、品目マスタを参照する。
+/// 資産管理部品（金型）と消耗品（Oリング）は管理形態が違うので区分を持つ。
+/// </para>
+/// </summary>
+public class EquipmentPart
+{
+    public int Id { get; set; }
+
+    public int EquipmentId { get; set; }
+    public Equipment? Equipment { get; set; }
+
+    /// <summary>部品の品目（在庫を持つため品目マスタで管理する）</summary>
+    public int ProductId { get; set; }
+    public Product? Product { get; set; }
+
+    /// <summary>管理区分（資産管理部品/消耗品）</summary>
+    public MaintenancePartCategory Category { get; set; }
+
+    /// <summary>1回の保全で使う標準数量（消耗品の所要量の目安。E-40-30-01）</summary>
+    public decimal QuantityPer { get; set; }
+
+    public string? Note { get; set; }
 }
 
 /// <summary>治工具マスタ（Spec.md 5.1 Tool。E-60）</summary>

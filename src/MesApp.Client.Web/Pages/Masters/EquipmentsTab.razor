@@ -66,6 +66,66 @@
     </div>
 </AuthorizeView>
 
+@* 保全部品（E-10-10-01、E-20-10-04）。自由記述では消耗材の使用状況を集計できないため品目で持つ *@
+@if (_selected is not null)
+{
+    <div class="card">
+        <h2 style="margin-top:0;">保全部品（@_selected.AssetNo @_selected.Name）</h2>
+        <table class="table">
+            <thead><tr><th>品目</th><th>区分</th><th>1回あたり数量</th><th>備考</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var part in _partLines)
+                {
+                    <tr>
+                        <td>@(_products.FirstOrDefault(p => p.Id == part.ProductId)?.Code ?? part.ProductId.ToString())</td>
+                        <td>@CategoryLabel(part.Category)</td>
+                        <td>@part.QuantityPer</td>
+                        <td>@(part.Note ?? "-")</td>
+                        <td>
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="partWrite">
+                                <button class="btn btn-danger btn-sm" @onclick="() => _partLines.Remove(part)">削除</button>
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="partAdd">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>部品の品目</label>
+                    <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                                  @bind-Value="_partProductId"
+                                  ValueOf="p => p.Id"
+                                  LabelOf='@(p => $"{p.Code} {p.Name}")' />
+                </div>
+                <div class="form-field">
+                    <label>管理区分</label>
+                    <select @bind="_partCategory">
+                        <option value="@MaintenancePartCategory.Consumable">消耗品</option>
+                        <option value="@MaintenancePartCategory.Asset">資産管理部品</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>1回あたり数量</label>
+                    <input type="number" step="any" @bind="_partQuantity" />
+                </div>
+                <div class="form-field">
+                    <label>備考</label>
+                    <input @bind="_partNote" />
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-secondary" @onclick="AddPart">行を追加</button>
+                <button class="btn" disabled="@_busy" @onclick="SavePartsAsync">保全部品を保存</button>
+                <button class="btn btn-secondary" @onclick="() => _selected = null">閉じる</button>
+            </div>
+        </AuthorizeView>
+    </div>
+}
+
+<CsvIoPanel Kind="equipment-parts" Label="設備の保全部品" KeyLabel="設備の資産番号＋品目コード" OnImported="ReloadPartsAsync" />
+
 <CsvIoPanel Kind="equipments" Label="設備（BOE）" KeyLabel="資産番号" OnImported="LoadAsync" />
 
 <div class="card">
@@ -94,6 +154,7 @@
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => SelectPartsAsync(item)">保全部品</button>
                                 @if (item.IsActive)
                                 {
                                     <button class="btn btn-danger btn-sm" disabled="@_busy"
@@ -110,6 +171,15 @@
 
 @code {
     private List<EquipmentResponse>? _items;
+
+    // 保全部品（E-10-10-01）。設備を選ぶと一括置換の編集に入る
+    private EquipmentResponse? _selected;
+    private readonly List<EquipmentPartRequest> _partLines = [];
+    private List<ProductResponse> _products = [];
+    private int _partProductId;
+    private MaintenancePartCategory _partCategory = MaintenancePartCategory.Consumable;
+    private decimal _partQuantity = 1m;
+    private string? _partNote;
     private int? _editingId;
     private string _assetNo = string.Empty;
     private string _name = string.Empty;
@@ -130,6 +200,7 @@
     private async Task LoadAsync()
     {
         _items = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments?includeInactive=true");
+        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
         _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>(
             $"api/work-centers?level={WorkCenterLevel.WorkCenter}");
     }
@@ -212,6 +283,77 @@
             _busy = false;
         }
     }
+
+    /// <summary>保全部品の編集に入る（一括置換なので現在の内容を読み込む）</summary>
+    private async Task SelectPartsAsync(EquipmentResponse item)
+    {
+        _selected = item;
+        _partLines.Clear();
+        var parts = await Http.GetFromJsonAsync<List<EquipmentPartResponse>>(
+            $"api/equipments/{item.Id}/parts") ?? [];
+        _partLines.AddRange(parts.Select(p =>
+            new EquipmentPartRequest(p.ProductId, p.Category, p.QuantityPer, p.Note)));
+    }
+
+    private async Task ReloadPartsAsync()
+    {
+        await LoadAsync();
+        if (_selected is not null)
+        {
+            await SelectPartsAsync(_selected);
+        }
+    }
+
+    private void AddPart()
+    {
+        if (_partProductId == 0)
+        {
+            _error = "部品の品目を選んでください。";
+            return;
+        }
+        if (_partLines.Any(p => p.ProductId == _partProductId))
+        {
+            _error = "同じ品目は1行だけ登録できます。";
+            return;
+        }
+        _error = null;
+        _partLines.Add(new EquipmentPartRequest(_partProductId, _partCategory, _partQuantity, _partNote));
+        _partProductId = 0;
+        _partNote = null;
+    }
+
+    private async Task SavePartsAsync()
+    {
+        if (_selected is null)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/equipments/{_selected.Id}/parts", _partLines);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保全部品の保存に失敗しました。";
+                return;
+            }
+            _message = "保全部品を保存しました。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string CategoryLabel(MaintenancePartCategory category) => category switch
+    {
+        MaintenancePartCategory.Asset => "資産管理部品",
+        MaintenancePartCategory.Consumable => "消耗品",
+        _ => category.ToString(),
+    };
 
     private static string StatusLabel(EquipmentStatus status) => status switch
     {

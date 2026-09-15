@@ -746,6 +746,53 @@ public class MasterCsvTests
         Assert.Equal(2, after!.Single().Version);
     }
 
+    [Fact]
+    public async Task 設備の保全部品をCSVで一括置換できる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(client, "equipments", """
+            AssetNo,Name,Status,MaintenanceType
+            EQ-01,プレス機,Available,None
+            """)).Succeeded);
+        Assert.True((await ImportAsync(client, "products", """
+            Code,Name,Unit,Type
+            PT-01,金型A,個,Material
+            PT-02,Oリング,個,Material
+            """)).Succeeded);
+
+        var result = await ImportAsync(client, "equipment-parts", """
+            EquipmentAssetNo,ProductCode,Category,QuantityPer,Note
+            EQ-01,PT-01,資産管理部品,1,個体管理
+            EQ-01,PT-02,消耗品,2,
+            """);
+        Assert.True(result.Succeeded, string.Join(" / ", result.Errors.Select(e => e.Message)));
+        var equipments = await client.GetFromJsonAsync<List<EquipmentResponse>>("/api/equipments");
+        var parts = await client.GetFromJsonAsync<List<EquipmentPartResponse>>(
+            $"/api/equipments/{equipments!.Single().Id}/parts");
+        Assert.Equal(2, parts!.Count);
+        Assert.Equal(MaintenancePartCategory.Asset, parts[0].Category);
+
+        // 未登録の設備は行番号付きで拒否
+        var unknown = await ImportAsync(client, "equipment-parts", """
+            EquipmentAssetNo,ProductCode,Category,QuantityPer
+            EQ-99,PT-01,消耗品,1
+            """);
+        Assert.False(unknown.Succeeded);
+        Assert.Contains(unknown.Errors, e => e.Message.Contains("EQ-99"));
+
+        // 一括置換：CSVから外した行は消える
+        var replaced = await ImportAsync(client, "equipment-parts", """
+            EquipmentAssetNo,ProductCode,Category,QuantityPer
+            EQ-01,PT-02,消耗品,5
+            """);
+        Assert.True(replaced.Succeeded, string.Join(" / ", replaced.Errors.Select(e => e.Message)));
+        var after = await client.GetFromJsonAsync<List<EquipmentPartResponse>>(
+            $"/api/equipments/{equipments!.Single().Id}/parts");
+        Assert.Equal("PT-02", Assert.Single(after!).ProductCode);
+        Assert.Equal(5m, after![0].QuantityPer);
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {

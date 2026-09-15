@@ -20,6 +20,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<Routing> Routings => Set<Routing>();
     public DbSet<RoutingEquipment> RoutingEquipments => Set<RoutingEquipment>();
     public DbSet<Equipment> Equipments => Set<Equipment>();
+    public DbSet<EquipmentPart> EquipmentParts => Set<EquipmentPart>();
     public DbSet<Tool> Tools => Set<Tool>();
     public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
     public DbSet<Location> Locations => Set<Location>();
@@ -100,6 +101,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<NonconformanceStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ShipmentJudgmentResult>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<EquipmentLogStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<MaintenancePartCategory>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenanceCategory>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenancePlanStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenanceRequestType>().HaveConversion<string>().HaveMaxLength(30);
@@ -237,6 +239,19 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.Property(x => x.Site).HasMaxLength(200);
             e.Property(x => x.MaintenanceParts).HasMaxLength(1000);
             e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<EquipmentPart>(e =>
+        {
+            // 同じ設備に同じ品目を二重登録させない
+            e.HasIndex(x => new { x.EquipmentId, x.ProductId }).IsUnique();
+            e.Property(x => x.QuantityPer).HasPrecision(18, 4);
+            e.Property(x => x.Note).HasMaxLength(500);
+            // 設備を消すと保全部品も消えるべき。逆側のナビゲーションを明示する
+            e.HasOne(x => x.Equipment).WithMany(q => q.Parts).HasForeignKey(x => x.EquipmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

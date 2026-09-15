@@ -55,6 +55,51 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 設備の保全部品を品目参照で管理でき資産管理部品と消耗品を区別できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+        var mold = await MasterTests.CreateProductAsync(admin, "PT-01", "金型A", ProductType.Material);
+        var oring = await MasterTests.CreateProductAsync(admin, "PT-02", "Oリング", ProductType.Material);
+
+        var saved = await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}/parts",
+            new List<EquipmentPartRequest>
+            {
+                new(mold.Id, MaintenancePartCategory.Asset, 1m, "資産番号で個体管理"),
+                new(oring.Id, MaintenancePartCategory.Consumable, 2m, null),
+            });
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var parts = await saved.Content.ReadFromJsonAsync<List<EquipmentPartResponse>>();
+        Assert.Equal(["PT-01", "PT-02"], parts!.Select(p => p.ProductCode));
+        Assert.Equal(MaintenancePartCategory.Asset, parts![0].Category);
+        Assert.Equal(2m, parts[1].QuantityPer);
+
+        // 同じ品目を2行は400
+        var duplicated = await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}/parts",
+            new List<EquipmentPartRequest>
+            {
+                new(oring.Id, MaintenancePartCategory.Consumable, 1m, null),
+                new(oring.Id, MaintenancePartCategory.Consumable, 2m, null),
+            });
+        Assert.Equal(HttpStatusCode.BadRequest, duplicated.StatusCode);
+
+        // 存在しない品目は400
+        var missing = await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}/parts",
+            new List<EquipmentPartRequest> { new(9999, MaintenancePartCategory.Consumable, 1m, null) });
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+
+        // 一括置換（工順と同じ方式）：残した行だけになる
+        (await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}/parts",
+            new List<EquipmentPartRequest> { new(oring.Id, MaintenancePartCategory.Consumable, 3m, null) }))
+            .EnsureSuccessStatusCode();
+        var after = await admin.GetFromJsonAsync<List<EquipmentPartResponse>>(
+            $"/api/equipments/{equipment.Id}/parts");
+        Assert.Equal("PT-02", Assert.Single(after!).ProductCode);
+        Assert.Equal(3m, after![0].QuantityPer);
+    }
+
+    [Fact]
     public async Task 設備稼働ログを作業指示に紐付けるとロットの履歴から辿れる()
     {
         using var factory = new ApiFactory();

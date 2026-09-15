@@ -85,6 +85,18 @@ public record EquipmentResponse(
     MaintenanceType MaintenanceType, decimal? MaintenanceThreshold, string? MaintenanceParts, bool IsActive,
     int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null);
 
+// ---- 設備の保全部品（EquipmentPart）----
+
+public record EquipmentPartRequest(
+    int ProductId,
+    MaintenancePartCategory Category,
+    [Range(0, double.MaxValue)] decimal QuantityPer,
+    [MaxLength(500)] string? Note);
+
+public record EquipmentPartResponse(
+    int Id, int EquipmentId, int ProductId, string ProductCode, string ProductName, string Unit,
+    MaintenancePartCategory Category, decimal QuantityPer, string? Note);
+
 // ---- 治工具（Tool）----
 
 public record ToolRequest(

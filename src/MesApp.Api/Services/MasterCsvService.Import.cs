@@ -69,6 +69,9 @@ public sealed partial class MasterCsvService
                 case MasterCsvKinds.Equipments:
                     await ImportEquipmentsAsync(table, errors, counter, ct);
                     break;
+                case MasterCsvKinds.EquipmentParts:
+                    await ImportEquipmentPartsAsync(table, errors, counter, ct);
+                    break;
                 case MasterCsvKinds.Tools:
                     await ImportToolsAsync(table, errors, counter, ct);
                     break;
@@ -298,6 +301,80 @@ public sealed partial class MasterCsvService
             {
                 db.Equipments.Add(equipment);
                 byAssetNo[assetNo] = equipment;
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 設備の保全部品。単票APIと同じく設備ごとの一括置換にする
+    /// （行単位の追加だと、CSVから削除したつもりの部品が残る）
+    /// </summary>
+    private async Task ImportEquipmentPartsAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var equipmentIds = await db.Equipments.AsNoTracking()
+            .ToDictionaryAsync(e => e.AssetNo, e => e.Id, StringComparer.Ordinal, ct);
+        var productIds = await db.Products.AsNoTracking()
+            .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
+
+        foreach (var group in GroupRows(table, "EquipmentAssetNo", errors))
+        {
+            var groupReader = new CsvRowReader(table, group.First(), errors);
+            var assetNo = groupReader.RequiredText("EquipmentAssetNo");
+            if (!equipmentIds.TryGetValue(assetNo, out var equipmentId))
+            {
+                groupReader.Fail($"設備 '{assetNo}' は登録されていません。先に設備マスタを取り込んでください。");
+                continue;
+            }
+
+            var parts = new List<EquipmentPart>();
+            var seenProducts = new HashSet<int>();
+            var failed = false;
+            foreach (var row in group)
+            {
+                var reader = new CsvRowReader(table, row, errors);
+                var productId = reader.Reference("ProductCode", null, productIds, "部品の品目");
+                var category = reader.Enum("Category", MaintenancePartCategory.Consumable,
+                    CsvEnumLabels.MaintenancePartCategories);
+                var quantity = reader.Number("QuantityPer", 0m, 0);
+                var note = reader.Text("Note", null, 500);
+                if (productId is null && !reader.Failed)
+                {
+                    reader.Fail("ProductCode（部品の品目コード）は必須です。");
+                }
+                if (productId is { } id && !seenProducts.Add(id))
+                {
+                    reader.Fail($"設備 '{assetNo}' に同じ品目が複数行あります。");
+                }
+                if (reader.Failed)
+                {
+                    failed = true;
+                    continue;
+                }
+                parts.Add(new EquipmentPart
+                {
+                    EquipmentId = equipmentId,
+                    ProductId = productId!.Value,
+                    Category = category,
+                    QuantityPer = quantity,
+                    Note = note,
+                });
+            }
+            if (failed)
+            {
+                continue;
+            }
+
+            var existing = await db.EquipmentParts.Where(p => p.EquipmentId == equipmentId).ToListAsync(ct);
+            db.EquipmentParts.RemoveRange(existing);
+            db.EquipmentParts.AddRange(parts);
+            if (existing.Count == 0)
+            {
                 counter.Created++;
             }
             else

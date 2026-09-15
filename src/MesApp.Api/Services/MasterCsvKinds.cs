@@ -12,6 +12,7 @@ public static class MasterCsvKinds
     public const string Products = "products";
     public const string Processes = "processes";
     public const string Equipments = "equipments";
+    public const string EquipmentParts = "equipment-parts";
     public const string Tools = "tools";
     public const string WorkCenters = "work-centers";
     public const string Locations = "locations";
@@ -55,6 +56,14 @@ public static class MasterCsvKinds
             new("MaintenanceThreshold", "保全閾値", false, "保全タイプに応じた日数・時間・回数"),
             new("MaintenanceParts", "保全部品", false, null),
             new("IsActive", "有効", false, "true / false"),
+        ]),
+        new(EquipmentParts, "設備の保全部品", false,
+        [
+            new("EquipmentAssetNo", "設備の資産番号", true, "同じ設備の保全部品を一括置換する"),
+            new("ProductCode", "部品の品目コード", true, "登録済みの品目コード"),
+            new("Category", "管理区分", false, "Asset（資産管理部品）/ Consumable（消耗品）"),
+            new("QuantityPer", "1回あたり数量", false, "0以上"),
+            new("Note", "備考", false, null),
         ]),
         new(Tools, "治工具", false,
         [
@@ -206,6 +215,10 @@ public static class CsvEnumLabels
         ("稼働可能", EquipmentStatus.Available), ("停止中", EquipmentStatus.Stopped),
         ("保全中", EquipmentStatus.UnderMaintenance), ("廃棄", EquipmentStatus.Retired),
         ("除却", EquipmentStatus.Retired));
+
+    public static readonly IReadOnlyDictionary<string, MaintenancePartCategory> MaintenancePartCategories = Build(
+        ("資産管理部品", MaintenancePartCategory.Asset), ("資産", MaintenancePartCategory.Asset),
+        ("消耗品", MaintenancePartCategory.Consumable), ("消耗材", MaintenancePartCategory.Consumable));
 
     public static readonly IReadOnlyDictionary<string, MaintenanceType> MaintenanceTypes = Build(
         ("対象外", MaintenanceType.None), ("カレンダ", MaintenanceType.Calendar),

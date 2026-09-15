@@ -490,6 +490,19 @@ public enum EquipmentLogStatus
     Idle,
 }
 
+/// <summary>
+/// 保全部品の管理区分（Spec.md 5.1 EquipmentPart。E-10-10-01）。
+/// 資産管理部品（金型など設備の一部として資産計上するもの）と、
+/// 消耗品（Oリングなど交換のたびに在庫から引き落とすもの）で管理形態が違う
+/// </summary>
+public enum MaintenancePartCategory
+{
+    /// <summary>資産管理部品（金型など。寿命・個体を追う）</summary>
+    Asset,
+    /// <summary>消耗品（Oリング・フィルタなど。在庫から引き落とす）</summary>
+    Consumable,
+}
+
 /// <summary>保全種別（定期/計画外。Spec.md 5.5 MaintenancePlan）</summary>
 public enum MaintenanceCategory
 {

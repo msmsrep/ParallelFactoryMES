@@ -61,7 +61,7 @@
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
 | 作業区／資源階層（BOR。工場/ライン/エリア/作業区） | I-10-20-02 | `WorkCentersController.cs` `api/work-centers`<br>`Api/Policies/WorkCenterHierarchyPolicy.cs`（段の妥当性・循環。単票APIとCSV取込の**両方**から呼ぶ） | Masters.cs: WorkCenter（自己参照。`Level` は文字列保存のため**DB側で並べると段の順にならない**。取得後に並べ直す） | `/masters` `Masters/WorkCentersTab.razor` | `Tests/MasterTests.cs` / `MasterCsvTests.cs` |
-| 設備台帳／BOE | E-10-10 / I-10-20 | `EquipmentsController.cs` `api/equipments` | Masters.cs: Equipment（`WorkCenterId`＝設置場所の正。**作業区（最下段）のみ**。`Site` は移行用の旧項目） | `/masters` `Masters/EquipmentsTab.razor` | `Tests/MasterTests.cs` |
+| 設備台帳／BOE・保全部品 | E-10-10 / I-10-20 | `EquipmentsController.cs` `api/equipments`<br>保全部品は `api/equipments/{id}/parts`（**設備ごとの一括置換**） | Masters.cs: Equipment（`WorkCenterId`＝設置場所の正。**作業区（最下段）のみ**。`Site` は移行用の旧項目）<br>Masters.cs: **EquipmentPart**（品目参照。資産管理部品/消耗品の区分。`MaintenanceParts` の自由記述は移行元） | `/masters` `Masters/EquipmentsTab.razor` | `Tests/MasterTests.cs` |
 | 保全手順書（版数管理） | E-10-20 / E-20-30 | `MaintenanceProceduresController.cs` `api/maintenance-procedures` | Maintenance.cs: MaintenanceProcedure | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
 | 保全計画（中長期・年次） | E-30-10 | `MaintenancePlansController.cs` `api/maintenance-plans` | Maintenance.cs: MaintenancePlan | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
 | 保全指示・実績・突発依頼 | E-30-20 / E-30-30 / E-40 | `MaintenanceOrdersController.cs` `api/maintenance-orders` | Maintenance.cs: MaintenanceOrder / MaintenanceRecord | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |

@@ -123,6 +123,62 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
         return NoContent();
     }
 
+    // ---- 保全部品（E-10-10-01、E-20-10-04）----
+
+    [HttpGet("{id:int}/parts")]
+    public async Task<ActionResult<List<EquipmentPartResponse>>> GetParts(int id, CancellationToken ct)
+    {
+        if (!await db.Equipments.AnyAsync(e => e.Id == id, ct))
+        {
+            return NotFound();
+        }
+        return await db.EquipmentParts.AsNoTracking()
+            .Where(p => p.EquipmentId == id)
+            .OrderBy(p => p.Product!.Code)
+            .Select(p => new EquipmentPartResponse(
+                p.Id, p.EquipmentId, p.ProductId, p.Product!.Code, p.Product!.Name, p.Product!.Unit,
+                p.Category, p.QuantityPer, p.Note))
+            .ToListAsync(ct);
+    }
+
+    /// <summary>保全部品の一括置換（工順と同じ方式。部分更新より差分が読みやすい）</summary>
+    [HttpPut("{id:int}/parts")]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
+    public async Task<ActionResult<List<EquipmentPartResponse>>> ReplaceParts(
+        int id, List<EquipmentPartRequest> parts, CancellationToken ct)
+    {
+        var equipment = await db.Equipments.FindAsync([id], ct);
+        if (equipment is null)
+        {
+            return NotFound();
+        }
+        if (parts.GroupBy(p => p.ProductId).Any(g => g.Count() > 1))
+        {
+            return BadRequest(new ProblemDetails { Title = "同じ品目が複数行あります。" });
+        }
+        var productIds = parts.Select(p => p.ProductId).Distinct().ToList();
+        if (productIds.Count > 0
+            && await db.Products.CountAsync(p => productIds.Contains(p.Id), ct) != productIds.Count)
+        {
+            return BadRequest(new ProblemDetails { Title = "存在しない品目IDが含まれています。" });
+        }
+
+        var existing = await db.EquipmentParts.Where(p => p.EquipmentId == id).ToListAsync(ct);
+        db.EquipmentParts.RemoveRange(existing);
+        db.EquipmentParts.AddRange(parts.Select(p => new EquipmentPart
+        {
+            EquipmentId = id,
+            ProductId = p.ProductId,
+            Category = p.Category,
+            QuantityPer = p.QuantityPer,
+            Note = p.Note,
+        }));
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Master", "Update", nameof(EquipmentPart), id.ToString(),
+            detail: $"assetNo={equipment.AssetNo}, parts={parts.Count}", ct: ct);
+        return await GetParts(id, ct);
+    }
+
     private async Task<WorkCenter?> FindWorkCenterAsync(int? id, CancellationToken ct) =>
         id is { } value
             ? await db.WorkCenters.AsNoTracking().FirstOrDefaultAsync(w => w.Id == value, ct)
