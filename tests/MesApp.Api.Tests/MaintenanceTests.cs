@@ -4,6 +4,7 @@ using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
+using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Quality;
@@ -52,6 +53,111 @@ public class MaintenanceTests
                 "1. 電源遮断\n2. ベルト張力確認\n3. 給油\n4. 安全カバー確認"));
         var updatedBody = await updated.Content.ReadFromJsonAsync<MaintenanceProcedureResponse>();
         Assert.Equal(2, updatedBody!.Version);
+    }
+
+    /// <summary>消耗品を1品目登録した設備と、その在庫ロットを用意する</summary>
+    private static async Task<(EquipmentResponse Equipment, ProductResponse Part, LotResponse Lot, int LocationId)>
+        SetupConsumablePartAsync(HttpClient admin, decimal stockQuantity)
+    {
+        var equipment = await CreateEquipmentAsync(admin);
+        var part = await MasterTests.CreateProductAsync(admin, "PT-02", "Oリング", ProductType.Material);
+        var location = await admin.PostAsJsonAsync("/api/locations",
+            new LocationRequest("LOC-M", LocationAreaType.MaterialWarehouse, null));
+        location.EnsureSuccessStatusCode();
+        var locationId = (await location.Content.ReadFromJsonAsync<LocationResponse>())!.Id;
+
+        (await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}/parts",
+            new List<EquipmentPartRequest> { new(part.Id, MaintenancePartCategory.Consumable, 2m, null) }))
+            .EnsureSuccessStatusCode();
+
+        var lot = await Phase3TestData.ReceiveAsync(admin, part.Id, stockQuantity, locationId);
+        return (equipment, part, lot, locationId);
+    }
+
+    private static async Task<MaintenanceOrderResponse> CreateSpotOrderAsync(HttpClient admin, int equipmentId)
+    {
+        var response = await admin.PostAsJsonAsync("/api/maintenance-orders",
+            new MaintenanceOrderCreateRequest(equipmentId, null, null, null, null,
+                MaintenanceRequestType.Spot, "Oリング交換"));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<MaintenanceOrderResponse>())!;
+    }
+
+    [Fact]
+    public async Task 保全実績の消費部材で在庫が引き落とされ消耗材モニタリングに集計される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, part, lot, locationId) = await SetupConsumablePartAsync(admin, 10m);
+        var order = await CreateSpotOrderAsync(admin, equipment.Id);
+
+        var recorded = await admin.PostAsJsonAsync($"/api/maintenance-orders/{order.Id}/record",
+            new MaintenanceRecordRequest(DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow,
+                "目視で劣化を確認", "交換完了", null, false,
+                [new MaintenanceRecordPartRequest(lot.Id, locationId, 3m, "2本のうち3本使用")]));
+        Assert.Equal(HttpStatusCode.OK, recorded.StatusCode);
+
+        var saved = (await recorded.Content.ReadFromJsonAsync<MaintenanceOrderResponse>())!;
+        var line = Assert.Single(Assert.Single(saved.Records).Parts);
+        Assert.Equal("PT-02", line.ProductCode);
+        Assert.Equal(lot.LotNumber, line.LotNumber);
+        Assert.Equal(3m, line.Quantity);
+
+        // 引落しは InventoryService 経由なので、在庫と在庫履歴の両方に出る
+        Assert.Equal(7m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+        var transactions = await admin.GetFromJsonAsync<PagedResult<TransactionResponse>>(
+            $"/api/inventory/transactions?productId={part.Id}");
+        Assert.Contains(transactions!.Items,
+            x => x.Type == InventoryTransactionType.MaintenanceIssue && x.Quantity == 3m);
+
+        // 消耗材モニタリング（E-20-10-04）：消費数量と現在庫が並ぶ
+        var consumption = await admin.GetFromJsonAsync<List<MaintenancePartConsumptionRow>>(
+            "/api/maintenance-orders/parts-consumption");
+        var row = Assert.Single(consumption!);
+        Assert.Equal("PT-02", row.ProductCode);
+        Assert.Equal(3m, row.Quantity);
+        Assert.Equal(1, row.RecordCount);
+        Assert.Equal(7m, row.StockOnHand);
+
+        // 期間で絞れる（SQLiteはDateTimeOffsetの比較をSQLへ翻訳できないため、取り出してから絞る経路を通す）
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var inRange = await admin.GetFromJsonAsync<List<MaintenancePartConsumptionRow>>(
+            $"/api/maintenance-orders/parts-consumption?from={today.AddDays(-1):yyyy-MM-dd}&to={today:yyyy-MM-dd}");
+        Assert.Single(inRange!);
+        var outOfRange = await admin.GetFromJsonAsync<List<MaintenancePartConsumptionRow>>(
+            $"/api/maintenance-orders/parts-consumption?from={today.AddDays(1):yyyy-MM-dd}");
+        Assert.Empty(outOfRange!);
+    }
+
+    [Fact]
+    public async Task 資産管理部品と在庫不足は保全実績の消費部材にできない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, _, lot, locationId) = await SetupConsumablePartAsync(admin, 5m);
+
+        // 在庫不足は400。実績ごと弾くので指示は未完了のまま
+        var order = await CreateSpotOrderAsync(admin, equipment.Id);
+        var shortage = await admin.PostAsJsonAsync($"/api/maintenance-orders/{order.Id}/record",
+            new MaintenanceRecordRequest(DateTimeOffset.UtcNow, null, null, null, null, false,
+                [new MaintenanceRecordPartRequest(lot.Id, locationId, 99m, null)]));
+        Assert.Equal(HttpStatusCode.BadRequest, shortage.StatusCode);
+        var stillOpen = await admin.GetFromJsonAsync<MaintenanceOrderResponse>(
+            $"/api/maintenance-orders/{order.Id}");
+        Assert.Equal(MaintenanceOrderStatus.Instructed, stillOpen!.Status);
+        Assert.Equal(5m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 資産管理部品（金型）は数量在庫の引落し対象外
+        var mold = await MasterTests.CreateProductAsync(admin, "PT-01", "金型A", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}/parts",
+            new List<EquipmentPartRequest> { new(mold.Id, MaintenancePartCategory.Asset, 1m, null) }))
+            .EnsureSuccessStatusCode();
+        var moldLot = await Phase3TestData.ReceiveAsync(admin, mold.Id, 2m, locationId, lotNumber: "MOLD-1");
+        var asset = await admin.PostAsJsonAsync($"/api/maintenance-orders/{order.Id}/record",
+            new MaintenanceRecordRequest(DateTimeOffset.UtcNow, null, null, null, null, false,
+                [new MaintenanceRecordPartRequest(moldLot.Id, locationId, 1m, null)]));
+        Assert.Equal(HttpStatusCode.BadRequest, asset.StatusCode);
+        Assert.Equal(2m, await Phase3TestData.GetStockQuantityAsync(admin, moldLot.Id));
     }
 
     [Fact]

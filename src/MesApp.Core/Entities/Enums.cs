@@ -338,6 +338,12 @@ public enum InventoryTransactionType
     StocktakeAdjust,
     /// <summary>出荷</summary>
     Ship,
+    /// <summary>保全消費（保全実績で交換・消費した部材の引落し。E-40-30-01）</summary>
+    /// <remarks>
+    /// JSONでは列挙子を数値でやり取りするため、既存の値を動かさないよう末尾に追加する。
+    /// DBは文字列で保存するので保存済みデータへの影響はない。
+    /// </remarks>
+    MaintenanceIssue,
 }
 
 /// <summary>ピッキング指示区分（Spec.md 5.3 PickingOrder）</summary>

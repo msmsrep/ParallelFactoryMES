@@ -64,7 +64,8 @@
 | 設備台帳／BOE・保全部品 | E-10-10 / I-10-20 | `EquipmentsController.cs` `api/equipments`<br>保全部品は `api/equipments/{id}/parts`（**設備ごとの一括置換**） | Masters.cs: Equipment（`WorkCenterId`＝設置場所の正。**作業区（最下段）のみ**。`Site` は移行用の旧項目）<br>Masters.cs: **EquipmentPart**（品目参照。資産管理部品/消耗品の区分。`MaintenanceParts` の自由記述は移行元） | `/masters` `Masters/EquipmentsTab.razor` | `Tests/MasterTests.cs` |
 | 保全手順書（版数管理） | E-10-20 / E-20-30 | `MaintenanceProceduresController.cs` `api/maintenance-procedures` | Maintenance.cs: MaintenanceProcedure | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
 | 保全計画（中長期・年次） | E-30-10 | `MaintenancePlansController.cs` `api/maintenance-plans` | Maintenance.cs: MaintenancePlan | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
-| 保全指示・実績・突発依頼 | E-30-20 / E-30-30 / E-40 | `MaintenanceOrdersController.cs` `api/maintenance-orders` | Maintenance.cs: MaintenanceOrder / MaintenanceRecord | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
+| 保全指示・実績・突発依頼 | E-30-20 / E-30-30 / E-40 | `MaintenanceOrdersController.cs` `api/maintenance-orders`<br>消費部材の在庫引落しは `POST {id}/record` の `parts`（**`InventoryService.RemoveAsync` 経由**。区分 `MaintenanceIssue`） | Maintenance.cs: MaintenanceOrder / MaintenanceRecord / **MaintenanceRecordPart**（ロット単位の消費明細。`PartsUsed` の自由記述は補足） | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
+| 消耗材モニタリング | E-20-10-04 | `MaintenanceOrdersController.cs` `GET api/maintenance-orders/parts-consumption`（品目別の消費数量＋現在庫） | Maintenance.cs: MaintenanceRecordPart | `/maintenance` `Maintenance.razor`（消耗材モニタリングタブ） | `Tests/MaintenanceTests.cs` |
 | 治工具マスタ・寿命管理・利用実績 | E-60 | `ToolsController.cs` `api/tools`<br>`ToolUsagesController.cs` `api/tool-usages` | Masters.cs: Tool<br>Maintenance.cs: ToolUsage | `/masters` `Masters/ToolsTab.razor`<br>`/tool-management` `ToolManagement.razor` | `Tests/MaintenanceTests.cs` |
 
 ## F. 従業員管理

@@ -14,6 +14,7 @@
     <button class="@TabClass("plans")" @onclick='() => SetTab("plans")'>保全計画</button>
     <button class="@TabClass("orders")" @onclick='() => SetTab("orders")'>保全指示・実績</button>
     <button class="@TabClass("procedures")" @onclick='() => SetTab("procedures")'>保全手順書</button>
+    <button class="@TabClass("parts")" @onclick='() => SetTab("parts")'>消耗材モニタリング</button>
 </div>
 
 @if (_tab == "logs")
@@ -313,7 +314,22 @@ else if (_tab == "orders")
                                         <td>@record.PerformedByName</td>
                                         <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                                         <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
-                                        <td>@(record.PartsUsed ?? "-")</td>
+                                        <td>
+                                            @foreach (var part in record.Parts)
+                                            {
+                                                <div>@part.ProductCode @part.ProductName @part.Quantity@part.Unit
+                                                    <span class="text-muted">（@part.LotNumber / @part.LocationCode）</span>
+                                                </div>
+                                            }
+                                            @if (record.PartsUsed is not null)
+                                            {
+                                                <div class="text-muted">@record.PartsUsed</div>
+                                            }
+                                            @if (record.Parts.Count == 0 && record.PartsUsed is null)
+                                            {
+                                                @("-")
+                                            }
+                                        </td>
                                         <td>@(record.Result ?? "-")</td>
                                     </tr>
                                 }
@@ -355,6 +371,34 @@ else if (_tab == "orders")
                                 </div>
                             }
                         </div>
+                        @* 在庫を引き落とす消費部材（E-40-30-01）。自由記述の欄は補足として残している *@
+                        <h3>消費部材（在庫から引き落とす）</h3>
+                        @foreach (var line in GetRecord(order.Id).Parts)
+                        {
+                            <div class="form-grid">
+                                <div class="form-field">
+                                    <label>消費ロット（スキャン可）</label>
+                                    <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                                                  @bind-Value="line.LotId"
+                                                  SelectedItemChanged="stock => OnPartStockSelected(line, stock)"
+                                                  ValueOf="stock => stock.LotId"
+                                                  LabelOf='@(stock => $"{stock.LotNumber}（{stock.ProductCode} / {stock.LocationCode} 残{stock.Quantity}）")' />
+                                </div>
+                                <div class="form-field">
+                                    <label>数量</label>
+                                    <input type="number" step="any" min="0" value="@line.Quantity"
+                                           @onchange="e => line.Quantity = ToDecimal(e.Value)" />
+                                </div>
+                                <div class="form-field">
+                                    <label>&nbsp;</label>
+                                    <button class="btn btn-secondary" @onclick="() => RemovePartLine(order.Id, line)">この行を削除</button>
+                                </div>
+                            </div>
+                        }
+                        <div class="actions">
+                            <button class="btn btn-secondary" @onclick="() => AddPartLine(order.Id)">消費部材の行を追加</button>
+                        </div>
+
                         <div class="actions">
                             <button class="btn" disabled="@_busy" @onclick="() => AddRecordAsync(order)">保全実績を登録</button>
                             <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage" Context="mtCancel">
@@ -364,6 +408,58 @@ else if (_tab == "orders")
                     }
                 </div>
             }
+        }
+    </div>
+}
+else if (_tab == "parts")
+{
+    @* 消耗材モニタリング（E-20-10-04）。保全実績で引き落とした部材と現在庫を並べる *@
+    <div class="card">
+        <h2 style="margin-top:0;">消耗材の消費実績（E-20-10-04）</h2>
+        <p class="text-muted">保全実績で在庫から引き落とした部材の集計。現在庫と見比べて補充の要否を判断する。</p>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>開始日</label>
+                <input type="date" @bind="_partsFrom" />
+            </div>
+            <div class="form-field">
+                <label>終了日</label>
+                <input type="date" @bind="_partsTo" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="LoadPartsConsumptionAsync">集計</button>
+        </div>
+    </div>
+
+    <div class="card">
+        @if (_partsConsumption is null)
+        {
+            <p class="text-muted">読み込み中...</p>
+        }
+        else if (_partsConsumption.Count == 0)
+        {
+            <p class="text-muted">該当期間の消費実績はありません。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr><th>品目</th><th>名称</th><th>消費数量</th><th>保全件数</th><th>現在庫</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _partsConsumption)
+                    {
+                        <tr>
+                            <td>@row.ProductCode</td>
+                            <td>@row.ProductName</td>
+                            <td>@row.Quantity @row.Unit</td>
+                            <td>@row.RecordCount</td>
+                            <td>@row.StockOnHand @row.Unit</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         }
     </div>
 }
@@ -474,6 +570,15 @@ else
         public string? PartsUsed { get; set; }
         public string? Result { get; set; }
         public bool ResetLife { get; set; }
+        public List<PartLine> Parts { get; } = [];
+    }
+
+    /// <summary>消費部材の入力1行（ロケーションは選んだ在庫から決まる）</summary>
+    private sealed class PartLine
+    {
+        public int LotId { get; set; }
+        public int LocationId { get; set; }
+        public decimal Quantity { get; set; }
     }
 
     private sealed class ProcedureForm
@@ -493,6 +598,9 @@ else
     private List<MaintenancePlanResponse>? _plans;
     private PagedResult<MaintenanceOrderResponse>? _orders;
     private List<MaintenanceProcedureResponse> _procedures = [];
+    private List<MaintenancePartConsumptionRow>? _partsConsumption;
+    private DateTime? _partsFrom = DateTime.Today.AddMonths(-1);
+    private DateTime? _partsTo = DateTime.Today;
 
     private readonly LogForm _log = new();
     private readonly PlanForm _plan = new();
@@ -517,6 +625,16 @@ else
 
     private static DateTime ToDateTime(object? value) =>
         DateTime.TryParse(value?.ToString(), out var result) ? result : DateTime.Now;
+
+    private static decimal ToDecimal(object? value) =>
+        decimal.TryParse(value?.ToString(), out var result) ? result : 0m;
+
+    private void AddPartLine(int orderId) => GetRecord(orderId).Parts.Add(new PartLine());
+
+    private void RemovePartLine(int orderId, PartLine line) => GetRecord(orderId).Parts.Remove(line);
+
+    private static void OnPartStockSelected(PartLine line, StockResponse? stock) =>
+        line.LocationId = stock?.LocationId ?? 0;
 
     private RecordForm GetRecord(int orderId)
     {
@@ -543,6 +661,9 @@ else
                 break;
             case "orders":
                 await LoadMaintenanceOrdersAsync(1);
+                break;
+            case "parts":
+                await LoadPartsConsumptionAsync();
                 break;
             case "procedures":
                 _procedures = await Http.GetFromJsonAsync<List<MaintenanceProcedureResponse>>(
@@ -679,6 +800,22 @@ else
         }
     }
 
+    private async Task LoadPartsConsumptionAsync()
+    {
+        _partsConsumption = null;
+        var query = new List<string>();
+        if (_partsFrom is { } from)
+        {
+            query.Add($"from={from:yyyy-MM-dd}");
+        }
+        if (_partsTo is { } to)
+        {
+            query.Add($"to={to:yyyy-MM-dd}");
+        }
+        _partsConsumption = await Http.GetFromJsonAsync<List<MaintenancePartConsumptionRow>>(
+            $"api/maintenance-orders/parts-consumption?{string.Join('&', query)}") ?? [];
+    }
+
     private async Task AddRecordAsync(MaintenanceOrderResponse order)
     {
         var form = GetRecord(order.Id);
@@ -690,7 +827,11 @@ else
             var response = await Http.PostAsJsonAsync($"api/maintenance-orders/{order.Id}/record",
                 new MaintenanceRecordRequest(new DateTimeOffset(form.StartedAt),
                     form.EndedAt is null ? null : new DateTimeOffset(form.EndedAt.Value),
-                    form.PartsUsed, form.Result, null, form.ResetLife));
+                    form.PartsUsed, form.Result, null, form.ResetLife,
+                    form.Parts.Where(line => line.LotId != 0 && line.Quantity > 0)
+                        .Select(line => new MaintenanceRecordPartRequest(
+                            line.LotId, line.LocationId, line.Quantity, null))
+                        .ToList()));
             if (!response.IsSuccessStatusCode)
             {
                 _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";

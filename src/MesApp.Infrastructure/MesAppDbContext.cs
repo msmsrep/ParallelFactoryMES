@@ -73,6 +73,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<MaintenancePlan> MaintenancePlans => Set<MaintenancePlan>();
     public DbSet<MaintenanceOrder> MaintenanceOrders => Set<MaintenanceOrder>();
     public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
+    public DbSet<MaintenanceRecordPart> MaintenanceRecordParts => Set<MaintenanceRecordPart>();
     public DbSet<ToolUsage> ToolUsages => Set<ToolUsage>();
 
     public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
@@ -815,6 +816,22 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.Property(x => x.Result).HasMaxLength(2000);
             e.Property(x => x.Note).HasMaxLength(1000);
             e.HasOne(x => x.PerformedBy).WithMany().HasForeignKey(x => x.PerformedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Parts).WithOne().HasForeignKey(x => x.MaintenanceRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<MaintenanceRecordPart>(e =>
+        {
+            e.HasIndex(x => x.ProductId);
+            e.Property(x => x.Quantity).HasPrecision(18, 4);
+            e.Property(x => x.Note).HasMaxLength(500);
+            // 現品の履歴なので、参照先のマスタ・ロットは消させない
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

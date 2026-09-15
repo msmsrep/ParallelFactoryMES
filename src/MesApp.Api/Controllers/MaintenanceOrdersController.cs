@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Common;
@@ -26,6 +27,8 @@ namespace MesApp.Api.Controllers;
 public class MaintenanceOrdersController(
     MesAppDbContext db,
     NumberingService numbering,
+    InventoryService inventory,
+    IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -156,7 +159,7 @@ public class MaintenanceOrdersController(
             return BadRequest(new ProblemDetails { Title = "寿命リセットは治工具メンテナンスの指示でのみ指定できます。" });
         }
 
-        db.MaintenanceRecords.Add(new MaintenanceRecord
+        var record = new MaintenanceRecord
         {
             MaintenanceOrderId = id,
             PerformedByUserId = CurrentUserId!,
@@ -165,7 +168,46 @@ public class MaintenanceOrdersController(
             PartsUsed = request.PartsUsed,
             Result = request.Result,
             Note = request.Note,
-        });
+        };
+        // 消費部材の在庫引落し（E-40-30-01）。引落しは InventoryService に一本化してあるので
+        // ここでは在庫を直接触らず、業務判定だけを行って同サービスへ渡す
+        foreach (var line in request.Parts ?? [])
+        {
+            var lot = await db.Lots.Include(l => l.Product)
+                .FirstOrDefaultAsync(l => l.Id == line.LotId, ct);
+            if (lot is null)
+            {
+                return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            }
+            // 使える現品かの判定は部材投入・出荷と同じ LotUsabilityPolicy を通す
+            if (LotUsabilityPolicy.CheckIssuable(lot, businessDate.Today) is string reason)
+            {
+                return BadRequest(new ProblemDetails { Title = reason });
+            }
+            if (await CheckPartCategoryAsync(order, lot, ct) is string categoryError)
+            {
+                return BadRequest(new ProblemDetails { Title = categoryError });
+            }
+            try
+            {
+                await inventory.RemoveAsync(lot, line.LocationId, line.Quantity,
+                    InventoryTransactionType.MaintenanceIssue, CurrentUserId,
+                    note: $"保全消費（{order.OrderNo}）", ct: ct);
+            }
+            catch (InventoryException ex)
+            {
+                return BadRequest(new ProblemDetails { Title = ex.Message });
+            }
+            record.Parts.Add(new MaintenanceRecordPart
+            {
+                ProductId = lot.ProductId,
+                LotId = lot.Id,
+                LocationId = line.LocationId,
+                Quantity = line.Quantity,
+                Note = line.Note,
+            });
+        }
+        db.MaintenanceRecords.Add(record);
         order.Status = MaintenanceOrderStatus.Completed;
         if (order.MaintenancePlan is not null)
         {
@@ -177,7 +219,8 @@ public class MaintenanceOrdersController(
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Maintenance", "RecordAdd", nameof(MaintenanceOrder), id.ToString(),
-            detail: $"orderNo={order.OrderNo}, resetToolLife={request.ResetToolLife}", ct: ct);
+            detail: $"orderNo={order.OrderNo}, resetToolLife={request.ResetToolLife}, " +
+                    $"parts={record.Parts.Count}", ct: ct);
         var saved = await BaseQuery().FirstAsync(o => o.Id == id, ct);
         return ToResponse(saved);
     }
@@ -208,12 +251,106 @@ public class MaintenanceOrdersController(
         return ToResponse(saved);
     }
 
+    /// <summary>
+    /// 消耗材モニタリング（E-20-10-04）。期間内の保全実績で引き落とした部材を品目ごとに集計し、
+    /// 現在の在庫合計を並べて返す。補充の要否をこの1画面で判断できるようにする。
+    /// </summary>
+    [HttpGet("parts-consumption")]
+    public async Task<ActionResult<List<MaintenancePartConsumptionRow>>> PartsConsumption(
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null,
+        CancellationToken ct = default)
+    {
+        // 期間の基準は「いつ保全したか」なので実績の開始時刻を使う。
+        // SQLiteではDateTimeOffsetの比較をSQLへ翻訳できないため、明細を取り出してから絞り込む
+        // （保全の消費明細は件数が限られるため、全件の取得で足りる）
+        var lines = await (from part in db.MaintenanceRecordParts.AsNoTracking()
+                           join rec in db.MaintenanceRecords.AsNoTracking()
+                               on part.MaintenanceRecordId equals rec.Id
+                           select new
+                           {
+                               part.ProductId,
+                               part.Quantity,
+                               part.MaintenanceRecordId,
+                               rec.StartedAt,
+                           }).ToListAsync(ct);
+
+        if (from is { } fromDate)
+        {
+            var fromMoment = new DateTimeOffset(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            lines = [.. lines.Where(p => p.StartedAt >= fromMoment)];
+        }
+        if (to is { } toDate)
+        {
+            var toMoment = new DateTimeOffset(toDate.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            lines = [.. lines.Where(p => p.StartedAt < toMoment)];
+        }
+
+        var consumed = lines
+            .GroupBy(p => p.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                Quantity = g.Sum(x => x.Quantity),
+                RecordCount = g.Select(x => x.MaintenanceRecordId).Distinct().Count(),
+            })
+            .ToList();
+
+        var productIds = consumed.Select(c => c.ProductId).ToList();
+        var products = await db.Products.AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Code, p.Name, p.Unit })
+            .ToListAsync(ct);
+        var stocks = await db.InventoryStocks.AsNoTracking()
+            .Where(s => productIds.Contains(s.ProductId))
+            .GroupBy(s => s.ProductId)
+            .Select(g => new { ProductId = g.Key, Quantity = g.Sum(x => x.Quantity) })
+            .ToListAsync(ct);
+
+        return consumed
+            .Select(c =>
+            {
+                var product = products.First(p => p.Id == c.ProductId);
+                var onHand = stocks.FirstOrDefault(s => s.ProductId == c.ProductId)?.Quantity ?? 0m;
+                return new MaintenancePartConsumptionRow(
+                    c.ProductId, product.Code, product.Name, product.Unit,
+                    c.Quantity, c.RecordCount, onHand);
+            })
+            .OrderByDescending(r => r.Quantity).ThenBy(r => r.ProductCode)
+            .ToList();
+    }
+
+    /// <summary>
+    /// 消費部材の管理区分の確認（Spec.md 5.7 保全部品は品目マスタで持つ）。
+    /// 資産管理部品（金型など）は個体と寿命で管理する対象で、数量在庫の引落しにはなじまない。
+    /// 引き落とせば在庫と実物が合わなくなるため、登録済みの区分が資産管理部品なら拒否する。
+    /// 保全部品として未登録の品目は、突発保全でありうるため通す（記録できない方が在庫がずれる）。
+    /// </summary>
+    private async Task<string?> CheckPartCategoryAsync(MaintenanceOrder order, Lot lot, CancellationToken ct)
+    {
+        if (order.EquipmentId is not int equipmentId)
+        {
+            return null;
+        }
+        var part = await db.EquipmentParts.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.EquipmentId == equipmentId && p.ProductId == lot.ProductId, ct);
+        if (part is { Category: MaintenancePartCategory.Asset })
+        {
+            return $"品目 '{lot.Product?.Code}' は資産管理部品のため在庫引落しの対象外です" +
+                   "（個体と寿命は治工具の寿命管理で扱います）。";
+        }
+        return null;
+    }
+
     private IQueryable<MaintenanceOrder> BaseQuery() =>
         db.MaintenanceOrders.AsNoTracking()
             .Include(o => o.Equipment)
             .Include(o => o.Tool)
             .Include(o => o.Procedure)
-            .Include(o => o.Records).ThenInclude(r => r.PerformedBy);
+            .Include(o => o.Records).ThenInclude(r => r.PerformedBy)
+            .Include(o => o.Records).ThenInclude(r => r.Parts).ThenInclude(p => p.Product)
+            .Include(o => o.Records).ThenInclude(r => r.Parts).ThenInclude(p => p.Lot)
+            .Include(o => o.Records).ThenInclude(r => r.Parts).ThenInclude(p => p.Location);
 
     private static MaintenanceOrderResponse ToResponse(MaintenanceOrder o) =>
         new(o.Id, o.OrderNo,
@@ -222,5 +359,11 @@ public class MaintenanceOrdersController(
             o.ScheduledDate, o.RequestType, o.Status, o.Note, o.CreatedAt,
             o.Records.OrderBy(r => r.Id).Select(r => new MaintenanceRecordResponse(
                 r.Id, r.PerformedByUserId, r.PerformedBy?.DisplayName,
-                r.StartedAt, r.EndedAt, r.PartsUsed, r.Result, r.Note)).ToList());
+                r.StartedAt, r.EndedAt, r.PartsUsed, r.Result, r.Note,
+                r.Parts.OrderBy(p => p.Id).Select(p => new MaintenanceRecordPartResponse(
+                    p.Id, p.ProductId, p.Product?.Code ?? string.Empty, p.Product?.Name ?? string.Empty,
+                    p.Product?.Unit ?? string.Empty,
+                    p.LotId, p.Lot?.LotNumber ?? string.Empty,
+                    p.LocationId, p.Location?.Code ?? string.Empty,
+                    p.Quantity, p.Note)).ToList())).ToList());
 }

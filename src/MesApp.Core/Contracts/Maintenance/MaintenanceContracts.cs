@@ -74,21 +74,51 @@ public record MaintenanceOrderCreateRequest(
     MaintenanceRequestType RequestType,
     string? Note);
 
+/// <summary>
+/// 保全で消費した部材1行（E-40-30-01）。指定した現品を在庫から引き落とす。
+/// 品目はロットから導けるので指定しない。
+/// </summary>
+public record MaintenanceRecordPartRequest(
+    int LotId,
+    int LocationId,
+    [Range(0.0001, double.MaxValue)] decimal Quantity,
+    [MaxLength(500)] string? Note);
+
+public record MaintenanceRecordPartResponse(
+    int Id, int ProductId, string ProductCode, string ProductName, string Unit,
+    int LotId, string LotNumber, int LocationId, string LocationCode,
+    decimal Quantity, string? Note);
+
 /// <summary>保全実績登録（E-40-30-01。登録と同時に指示は完了になる）</summary>
 public record MaintenanceRecordRequest(
     DateTimeOffset StartedAt,
     DateTimeOffset? EndedAt,
-    /// <summary>消費部材・交換部品</summary>
+    /// <summary>消費部材・交換部品の自由記述（補足。在庫を動かす部材は Parts に入れる）</summary>
     string? PartsUsed,
     string? Result,
     string? Note,
     /// <summary>治工具メンテ完了時に寿命カウンタをリセットするか（E-60-30）</summary>
-    bool ResetToolLife = false);
+    bool ResetToolLife = false,
+    /// <summary>消費した部材（在庫から引き落とす。未指定なら在庫は動かさない）</summary>
+    List<MaintenanceRecordPartRequest>? Parts = null);
 
 public record MaintenanceRecordResponse(
     int Id, string PerformedByUserId, string? PerformedByName,
     DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
-    string? PartsUsed, string? Result, string? Note);
+    string? PartsUsed, string? Result, string? Note,
+    List<MaintenanceRecordPartResponse> Parts);
+
+/// <summary>
+/// 消耗材の消費実績サマリ（E-20-10-04 消耗材モニタリング）。
+/// 期間内の保全実績で引き落とした部材を品目ごとに集計する。
+/// </summary>
+public record MaintenancePartConsumptionRow(
+    int ProductId, string ProductCode, string ProductName, string Unit,
+    decimal Quantity,
+    /// <summary>消費した保全実績の件数</summary>
+    int RecordCount,
+    /// <summary>現在の在庫合計（発注・補充の判断に使う）</summary>
+    decimal StockOnHand);
 
 public record MaintenanceOrderResponse(
     int Id, string OrderNo,
