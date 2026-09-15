@@ -14,4 +14,10 @@ public interface IBusinessDateService
 
     /// <summary>指定製造日の開始・終了時刻（ローカル）を返す</summary>
     (DateTimeOffset Start, DateTimeOffset End) GetRange(DateOnly businessDate);
+
+    /// <summary>
+    /// 工場のタイムゾーンへ変換する。サーバー側で時刻を文字列にする場面（履歴の表示など）で使う。
+    /// UTCのまま文字列にすると、画面がローカル時刻へ直して表示する箇所と食い違う
+    /// </summary>
+    DateTimeOffset ToFactoryTime(DateTimeOffset moment);
 }

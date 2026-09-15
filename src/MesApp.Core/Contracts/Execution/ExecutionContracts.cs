@@ -97,10 +97,18 @@ public record ProductionRecordCorrectionRequest(
 
 public record DataRecordRequest(
     [Required, MaxLength(100)] string Item,
-    [Required, MaxLength(500)] string Value);
+    [Required, MaxLength(500)] string Value,
+    /// <summary>対応する工程管理項目の指示（作業指示のスナップショットのId）。指定すると逸脱を判定する</summary>
+    int? WorkOrderControlItemId = null,
+    /// <summary>判定に使う数値（指示を指定したときは必須）</summary>
+    decimal? NumericValue = null);
 
 public record DataRecordResponse(
-    int Id, int WorkOrderId, string Item, string Value, DateTimeOffset RecordedAt);
+    int Id, int WorkOrderId, string Item, string Value, DateTimeOffset RecordedAt,
+    int? WorkOrderControlItemId = null, decimal? NumericValue = null,
+    /// <summary>true=逸脱、false=範囲内、null=判定していない</summary>
+    bool? IsDeviation = null,
+    decimal? TargetValue = null, decimal? LowerLimit = null, decimal? UpperLimit = null);
 
 // ---- 作業時間記録（B-30-30-02、F-30-20）----
 

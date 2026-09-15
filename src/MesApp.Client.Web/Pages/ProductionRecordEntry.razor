@@ -296,13 +296,37 @@ else
     else
     {
         <table class="table">
-            <thead><tr><th>項目</th><th>値</th><th>記録日時</th></tr></thead>
+            <thead><tr><th>項目</th><th>値</th><th>許容範囲</th><th>判定</th><th>記録日時</th></tr></thead>
             <tbody>
                 @foreach (var data in _dataRecords)
                 {
                     <tr>
                         <td>@data.Item</td>
                         <td>@data.Value</td>
+                        <td>
+                            @if (data.WorkOrderControlItemId is null)
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                            else
+                            {
+                                @($"{data.LowerLimit?.ToString() ?? "-"} 〜 {data.UpperLimit?.ToString() ?? "-"}")
+                            }
+                        </td>
+                        <td>
+                            @if (data.IsDeviation == true)
+                            {
+                                <span class="badge badge-danger">逸脱</span>
+                            }
+                            else if (data.IsDeviation == false)
+                            {
+                                <span class="badge badge-success">範囲内</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                        </td>
                         <td>@data.RecordedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                     </tr>
                 }
@@ -316,14 +340,37 @@ else
             <div class="card">
                 <h2 style="margin-top:0;">製造条件を記録する（B-30-30-04）</h2>
                 <div class="form-grid">
+                    @if (_controlItems.Count > 0)
+                    {
+                        <div class="form-field">
+                            <label>指示項目（選ぶと許容範囲と照合する）</label>
+                            <select @bind="_dataControlItemId" @bind:after="OnControlItemSelected">
+                                <option value="0">指示に紐づけない（自由記述）</option>
+                                @foreach (var item in _controlItems)
+                                {
+                                    <option value="@item.Id">@item.ItemCode @item.ItemName</option>
+                                }
+                            </select>
+                        </div>
+                    }
                     <div class="form-field">
                         <label>項目（例：加熱温度）</label>
                         <input @bind="_dataItem" />
                     </div>
-                    <div class="form-field">
-                        <label>値（例：180℃）</label>
-                        <input @bind="_dataValue" />
-                    </div>
+                    @if (_dataControlItemId == 0)
+                    {
+                        <div class="form-field">
+                            <label>値（例：180℃）</label>
+                            <input @bind="_dataValue" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="form-field">
+                            <label>実績値（数値。@(SelectedControlItem?.Unit)）</label>
+                            <input type="number" step="any" @bind="_dataNumericValue" />
+                        </div>
+                    }
                 </div>
                 <button class="btn" disabled="@_busy" @onclick="AddDataRecordAsync">条件を記録</button>
             </div>
@@ -386,6 +433,8 @@ else
     // 製造条件データ（B-30-30-04）
     /// <summary>展開時点の指示（マスタの現在値ではない。Spec.md 5.7）</summary>
     private List<WorkOrderControlItemResponse> _controlItems = [];
+    private int _dataControlItemId;
+    private decimal? _dataNumericValue;
     private string _dataItem = string.Empty;
     private string _dataValue = string.Empty;
 
@@ -499,15 +548,39 @@ else
         }
     }
 
+    /// <summary>選択中の指示（単位や許容範囲の表示に使う）</summary>
+    private WorkOrderControlItemResponse? SelectedControlItem =>
+        _controlItems.FirstOrDefault(i => i.Id == _dataControlItemId);
+
+    /// <summary>指示を選んだら項目名を埋める（同じ内容を二度入力させない）</summary>
+    private void OnControlItemSelected()
+    {
+        if (SelectedControlItem is { } item)
+        {
+            _dataItem = $"{item.ItemCode} {item.ItemName}";
+            _dataNumericValue ??= item.TargetValue;
+        }
+    }
+
     private async Task AddDataRecordAsync()
     {
         if (_busy)
         {
             return;
         }
-        if (string.IsNullOrWhiteSpace(_dataItem) || string.IsNullOrWhiteSpace(_dataValue))
+        if (string.IsNullOrWhiteSpace(_dataItem))
         {
-            _error = "項目と値を入力してください。";
+            _error = "項目を入力してください。";
+            return;
+        }
+        if (_dataControlItemId == 0 && string.IsNullOrWhiteSpace(_dataValue))
+        {
+            _error = "値を入力してください。";
+            return;
+        }
+        if (_dataControlItemId != 0 && _dataNumericValue is null)
+        {
+            _error = "実績値を入力してください。";
             return;
         }
         _busy = true;
@@ -515,8 +588,17 @@ else
         _message = null;
         try
         {
+            // 指示に紐づけるときは、表示用の値を数値＋単位から組み立てる（入力を二重にさせない）
+            var value = _dataControlItemId == 0
+                ? _dataValue
+                : $"{_dataNumericValue}{SelectedControlItem?.Unit}";
             var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/data-records",
-                new List<DataRecordRequest> { new(_dataItem, _dataValue) });
+                new List<DataRecordRequest>
+                {
+                    new(_dataItem, value,
+                        _dataControlItemId == 0 ? null : _dataControlItemId,
+                        _dataControlItemId == 0 ? null : _dataNumericValue),
+                });
             if (!response.IsSuccessStatusCode)
             {
                 _error = await AuthService.ReadProblemTitleAsync(response) ?? "製造条件の記録に失敗しました。";
@@ -525,6 +607,8 @@ else
             _message = "製造条件を記録しました。";
             _dataItem = string.Empty;
             _dataValue = string.Empty;
+            _dataNumericValue = null;
+            _dataControlItemId = 0;
             await LoadAsync();
         }
         finally

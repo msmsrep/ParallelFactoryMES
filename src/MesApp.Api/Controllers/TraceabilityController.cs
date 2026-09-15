@@ -1,3 +1,4 @@
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -16,7 +17,7 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/traceability")]
 [Authorize]
-public class TraceabilityController(MesAppDbContext db) : ControllerBase
+public class TraceabilityController(MesAppDbContext db, IBusinessDateService businessDate) : ControllerBase
 {
     private const int MaxDepth = 10;
 
@@ -130,14 +131,39 @@ public class TraceabilityController(MesAppDbContext db) : ControllerBase
             .ToListAsync(ct);
         var equipmentHistory = equipmentLogs
             .Select(l => $"{l.AssetNo} {l.EquipmentName}: [{EquipmentLogStatusLabel(l.Status)}] " +
-                         $"{l.StartedAt:yyyy-MM-dd HH:mm}〜" +
-                         (l.EndedAt is { } ended ? $"{ended:yyyy-MM-dd HH:mm}" : "（継続中）") +
+                         $"{businessDate.ToFactoryTime(l.StartedAt):yyyy-MM-dd HH:mm}〜" +
+                         (l.EndedAt is { } ended
+                             ? $"{businessDate.ToFactoryTime(ended):yyyy-MM-dd HH:mm}"
+                             : "（継続中）") +
                          $" ({l.WorkOrderNo})" +
                          (l.StopCause is not null ? $" 原因: {l.StopCause}" : string.Empty))
             .ToList();
 
+        // 製造条件の逸脱（B-30-30-04）。不良の原因を「どの条件が外れていたか」から追えるようにする。
+        // 範囲内の記録まで並べると件数が多くなり、見るべきものが埋もれる
+        var deviations = await db.ProductionDataRecords.AsNoTracking()
+            .Where(r => r.IsDeviation == true && producingWorkOrderIds.Contains(r.WorkOrderId))
+            .OrderBy(r => r.Id)
+            .Select(r => new
+            {
+                r.Item,
+                r.Value,
+                r.RecordedAt,
+                WorkOrderNo = r.WorkOrder!.WorkOrderNo,
+                Lower = r.WorkOrderControlItem!.LowerLimit,
+                Upper = r.WorkOrderControlItem!.UpperLimit,
+                Unit = r.WorkOrderControlItem!.Unit,
+            })
+            .ToListAsync(ct);
+        var controlItemDeviations = deviations
+            .Select(d => $"{d.Item}: 実績 {d.Value}（許容 {d.Lower?.ToString() ?? "-"}〜" +
+                         $"{d.Upper?.ToString() ?? "-"}{d.Unit}） " +
+                         $"{businessDate.ToFactoryTime(d.RecordedAt):yyyy-MM-dd HH:mm} ({d.WorkOrderNo})")
+            .ToList();
+
         return new LotHistoryResponse(lot.Id, lot.LotNumber, lot.Product!.Code, lot.Product!.Name,
-            production, inspections, transactions, statusHistory, correctionHistory, equipmentHistory);
+            production, inspections, transactions, statusHistory, correctionHistory,
+            equipmentHistory, controlItemDeviations);
     }
 
     /// <summary>稼働状態の日本語名（履歴は人が読む前提のため）</summary>

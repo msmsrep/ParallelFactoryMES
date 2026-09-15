@@ -477,6 +477,64 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task 製造条件の実績を指示と照合して逸脱を判定できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 指示（工程単位）を用意してから展開する。展開時点の値が作業指示へ写る
+        (await admin.PostAsJsonAsync("/api/control-items",
+            new Core.Contracts.Masters.ControlItemRequest(
+                "CI-01", "加熱温度", "℃", null, ctx.ProcessId, 180m, 175m, 185m)))
+            .EnsureSuccessStatusCode();
+        // 上下限を持たない項目は判定しない（記録だけが目的の条件）
+        (await admin.PostAsJsonAsync("/api/control-items",
+            new Core.Contracts.Masters.ControlItemRequest(
+                "CI-02", "作業者メモ", null, null, ctx.ProcessId, null, null, null)))
+            .EnsureSuccessStatusCode();
+
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrderId = order.WorkOrders[0].Id;
+        var instructions = await admin.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
+            $"/api/work-orders/{workOrderId}/control-items");
+        var temperature = instructions!.Single(i => i.ItemCode == "CI-01");
+        var memo = instructions!.Single(i => i.ItemCode == "CI-02");
+
+        // 範囲内・逸脱・判定しない の3通り
+        var data = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/data-records",
+            new List<DataRecordRequest>
+            {
+                new("CI-01 加熱温度", "180℃", temperature.Id, 180m),
+                new("CI-01 加熱温度", "190℃", temperature.Id, 190m),
+                new("CI-02 作業者メモ", "問題なし", memo.Id, 1m),
+                new("回転数", "1200"),
+            });
+        Assert.Equal(HttpStatusCode.OK, data.StatusCode);
+        var records = await data.Content.ReadFromJsonAsync<List<DataRecordResponse>>();
+        Assert.Equal(false, records![0].IsDeviation);
+        Assert.Equal(true, records[1].IsDeviation);
+        Assert.Null(records[2].IsDeviation);  // 上下限が無い項目は判定しない
+        Assert.Null(records[3].IsDeviation);  // 指示に紐づかない自由記述も判定しない
+        Assert.Equal(175m, records[1].LowerLimit);
+
+        // 指示を指定したのに数値が無いと400
+        var noValue = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/data-records",
+            new List<DataRecordRequest> { new("CI-01 加熱温度", "高め", temperature.Id) });
+        Assert.Equal(HttpStatusCode.BadRequest, noValue.StatusCode);
+
+        // 他の作業指示の指示は指定できない
+        var otherWorkOrderId = order.WorkOrders[1].Id;
+        var wrongOwner = await admin.PostAsJsonAsync($"/api/work-orders/{otherWorkOrderId}/data-records",
+            new List<DataRecordRequest> { new("CI-01 加熱温度", "180℃", temperature.Id, 180m) });
+        Assert.Equal(HttpStatusCode.BadRequest, wrongOwner.StatusCode);
+
+        // 逸脱は監査ログの詳細にも残る（後から原因を説明する根拠になるため）
+        var detail = await GetLatestAuditDetailAsync(factory, "Execution", "DataRecord");
+        Assert.Contains("許容範囲", detail);
+    }
+
+    [Fact]
     public async Task トラブル報告と対応履歴と作業時間を記録できる()
     {
         using var factory = new ApiFactory();

@@ -99,6 +99,17 @@
                 <ul>@foreach (var line in _history.InspectionHistory) { <li>@line</li> }</ul>
             }
 
+            <h2>製造条件の逸脱（B-30-30-04）</h2>
+            @* 許容範囲から外れた記録だけを出す。範囲内まで並べると見るべきものが埋もれる *@
+            @if (_history.ControlItemDeviations.Count == 0)
+            {
+                <p class="text-muted">逸脱はありません。</p>
+            }
+            else
+            {
+                <ul>@foreach (var line in _history.ControlItemDeviations) { <li>@line</li> }</ul>
+            }
+
             <h2>設備稼働履歴（H-30-10-04）</h2>
             @* このロットを産出した作業指示に紐づく稼働区間。品質不良の原因を設備の状態から追う *@
             @if (_history.EquipmentHistory.Count == 0)

@@ -31,6 +31,9 @@ public class BusinessDateService : IBusinessDateService
 
     public DateOnly Today => GetBusinessDate(DateTimeOffset.UtcNow);
 
+    public DateTimeOffset ToFactoryTime(DateTimeOffset moment) =>
+        TimeZoneInfo.ConvertTime(moment, _timeZone);
+
     public (DateTimeOffset Start, DateTimeOffset End) GetRange(DateOnly businessDate) =>
         (StartOf(businessDate), StartOf(businessDate.AddDays(1)));
 

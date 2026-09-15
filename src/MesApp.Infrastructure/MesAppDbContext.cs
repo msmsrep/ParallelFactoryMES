@@ -503,6 +503,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
 
         builder.Entity<ProductionDataRecord>(e =>
         {
+            e.HasOne(x => x.WorkOrderControlItem).WithMany().HasForeignKey(x => x.WorkOrderControlItemId)
+                .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.WorkOrderId);
             e.Property(x => x.Item).HasMaxLength(100);
             e.Property(x => x.Value).HasMaxLength(500);

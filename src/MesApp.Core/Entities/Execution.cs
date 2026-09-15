@@ -209,10 +209,27 @@ public class ProductionDataRecord
     public int WorkOrderId { get; set; }
     public WorkOrder? WorkOrder { get; set; }
 
+    /// <summary>
+    /// 対応する工程管理項目の指示（展開時点のスナップショット。B-30-30-04）。
+    /// 指示に紐づかない自由記述の記録もあるため任意
+    /// </summary>
+    public int? WorkOrderControlItemId { get; set; }
+    public WorkOrderControlItem? WorkOrderControlItem { get; set; }
+
     /// <summary>項目（温度・回転数等。工順の工程管理項目に対応）</summary>
     public string Item { get; set; } = string.Empty;
 
+    /// <summary>表示用の値（単位を含む文字列。「180℃」など）</summary>
     public string Value { get; set; } = string.Empty;
+
+    /// <summary>判定に使う数値（指示に紐づく記録のみ。定性的な記録では持たない）</summary>
+    public decimal? NumericValue { get; set; }
+
+    /// <summary>
+    /// 許容範囲からの逸脱（true=逸脱、false=範囲内、null=判定していない）。
+    /// 指示値・許容範囲を持たない記録や、数値でない記録は判定しない
+    /// </summary>
+    public bool? IsDeviation { get; set; }
 
     public DateTimeOffset RecordedAt { get; set; } = DateTimeOffset.UtcNow;
 

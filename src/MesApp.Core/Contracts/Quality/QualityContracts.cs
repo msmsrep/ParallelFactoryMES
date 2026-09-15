@@ -158,7 +158,9 @@ public record LotHistoryResponse(
     List<LotStatusHistoryEntry> StatusHistory,
     List<ProductionCorrectionEntry> CorrectionHistory,
     /// <summary>設備稼働履歴（H-30-10-04）。このロットを産出した作業指示に紐づく稼働区間</summary>
-    List<string> EquipmentHistory);
+    List<string> EquipmentHistory,
+    /// <summary>製造条件の逸脱（B-30-30-04）。許容範囲から外れた記録だけを出す</summary>
+    List<string> ControlItemDeviations);
 
 // ---- 品質分析（C-40-10）----
 

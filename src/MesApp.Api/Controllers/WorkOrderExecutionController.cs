@@ -546,7 +546,12 @@ public class WorkOrderExecutionController(
         return await db.ProductionDataRecords.AsNoTracking()
             .Where(r => r.WorkOrderId == id)
             .OrderBy(r => r.Id)
-            .Select(r => new DataRecordResponse(r.Id, r.WorkOrderId, r.Item, r.Value, r.RecordedAt))
+            .Select(r => new DataRecordResponse(
+                r.Id, r.WorkOrderId, r.Item, r.Value, r.RecordedAt,
+                r.WorkOrderControlItemId, r.NumericValue, r.IsDeviation,
+                r.WorkOrderControlItem != null ? r.WorkOrderControlItem.TargetValue : null,
+                r.WorkOrderControlItem != null ? r.WorkOrderControlItem.LowerLimit : null,
+                r.WorkOrderControlItem != null ? r.WorkOrderControlItem.UpperLimit : null))
             .ToListAsync(ct);
     }
 
@@ -564,16 +569,67 @@ public class WorkOrderExecutionController(
         {
             return BadRequest(new ProblemDetails { Title = "記録する項目がありません。" });
         }
-        db.ProductionDataRecords.AddRange(requests.Select(r => new ProductionDataRecord
+        // 指示に紐づく記録は、展開時点のスナップショットと照合して逸脱を判定する（Spec.md 5.7）
+        var instructionIds = requests
+            .Where(r => r.WorkOrderControlItemId is not null)
+            .Select(r => r.WorkOrderControlItemId!.Value)
+            .Distinct()
+            .ToList();
+        var instructions = instructionIds.Count == 0
+            ? []
+            : await db.WorkOrderControlItems.AsNoTracking()
+                .Where(i => i.WorkOrderId == id && instructionIds.Contains(i.Id))
+                .ToDictionaryAsync(i => i.Id, ct);
+        foreach (var request in requests.Where(r => r.WorkOrderControlItemId is not null))
         {
-            WorkOrderId = id,
-            Item = r.Item,
-            Value = r.Value,
-            RecordedByUserId = CurrentUserId,
-        }));
+            if (!instructions.ContainsKey(request.WorkOrderControlItemId!.Value))
+            {
+                return BadRequest(new ProblemDetails
+                {
+                    Title = $"工程管理項目の指示（ID {request.WorkOrderControlItemId}）は" +
+                            "この作業指示のものではありません。",
+                });
+            }
+            if (request.NumericValue is null)
+            {
+                return BadRequest(new ProblemDetails
+                {
+                    Title = "工程管理項目の指示を指定した記録には、判定に使う数値（numericValue）が必要です。",
+                });
+            }
+        }
+
+        var records = requests.Select(r =>
+        {
+            var instruction = r.WorkOrderControlItemId is { } instructionId
+                ? instructions[instructionId]
+                : null;
+            return new ProductionDataRecord
+            {
+                WorkOrderId = id,
+                WorkOrderControlItemId = r.WorkOrderControlItemId,
+                Item = r.Item,
+                Value = r.Value,
+                NumericValue = r.NumericValue,
+                IsDeviation = ControlItemDeviationPolicy.Judge(instruction, r.NumericValue),
+                RecordedByUserId = CurrentUserId,
+            };
+        }).ToList();
+        db.ProductionDataRecords.AddRange(records);
         await db.SaveChangesAsync(ct);
+
+        // 逸脱は後から「なぜ不良が出たか」を説明する根拠になるため、監査ログにも内容を残す
+        var deviations = records
+            .Where(r => r.IsDeviation == true)
+            .Select(r => ControlItemDeviationPolicy.Describe(
+                instructions[r.WorkOrderControlItemId!.Value], r.NumericValue!.Value))
+            .ToList();
         await auditLogger.LogAsync("Execution", "DataRecord", nameof(WorkOrder), id.ToString(),
-            detail: new { items = requests.Select(r => r.Item).ToList() }, ct: ct);
+            detail: new
+            {
+                items = requests.Select(r => r.Item).ToList(),
+                deviations,
+            }, ct: ct);
         return await GetDataRecords(id, ct);
     }
 
