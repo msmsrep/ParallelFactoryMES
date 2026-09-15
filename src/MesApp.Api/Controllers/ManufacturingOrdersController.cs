@@ -256,6 +256,7 @@ public class ManufacturingOrdersController(
         }
 
         var routing = await db.Routings
+            .Include(r => r.WorkProcedure)
             .Where(r => r.ProductId == order.ProductId)
             .OrderBy(r => r.Sequence)
             .ToListAsync(ct);
@@ -313,6 +314,10 @@ public class ManufacturingOrdersController(
                 WorkCenterId = step.WorkCenterId,
                 ControlItems = step.ControlItems,
                 RoutingChecklistId = step.ChecklistId,
+                WorkProcedureId = step.WorkProcedureId,
+                // 手順の本文は写さない。改訂した手順は仕掛中の指示にも届くべきなので
+                // 表示はマスタの現在値を使い、ここには「計画時の版数」だけを残す
+                WorkProcedureVersion = step.WorkProcedure?.Version,
             };
             // 品目単位の項目と、この工程を対象にした項目を合わせる（同じ項目は1回だけ）
             workOrder.ControlItemSnapshots =

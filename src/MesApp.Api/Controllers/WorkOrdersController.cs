@@ -178,6 +178,39 @@ public class WorkOrdersController(
     }
 
     /// <summary>
+    /// 作業手順書（SOP。B-10-30-03「作業指示書に書かれている作業手順などの内容を確認する」）。
+    /// 手順の本文はマスタの現在値を返し、展開時点の版数と突き合わせて改訂の有無を示す。
+    /// 工順に手順書が紐付いていない作業指示は 404。
+    /// </summary>
+    [HttpGet("{id:int}/procedure")]
+    public async Task<ActionResult<WorkOrderProcedureResponse>> Procedure(int id, CancellationToken ct)
+    {
+        var workOrder = await db.WorkOrders.AsNoTracking()
+            .Where(w => w.Id == id)
+            .Select(w => new { w.Id, w.WorkProcedureId, w.WorkProcedureVersion })
+            .FirstOrDefaultAsync(ct);
+        if (workOrder is null)
+        {
+            return NotFound();
+        }
+        if (workOrder.WorkProcedureId is not int procedureId)
+        {
+            return NotFound(new ProblemDetails { Title = "この作業指示には作業手順書が紐付いていません。" });
+        }
+        var procedure = await db.WorkProcedures.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == procedureId, ct);
+        if (procedure is null)
+        {
+            return NotFound();
+        }
+        return new WorkOrderProcedureResponse(
+            procedure.Id, procedure.ProcedureNo, procedure.Title, procedure.Steps, procedure.Reference,
+            procedure.Version, workOrder.WorkProcedureVersion,
+            workOrder.WorkProcedureVersion is { } planned && planned != procedure.Version,
+            procedure.IsActive);
+    }
+
+    /// <summary>
     /// 状態履歴（Spec.md 5.2 WorkOrderStatusHistory）。配布・着手・完了・承認・取消の遷移を時系列で返す
     /// </summary>
     [HttpGet("{id:int}/status-history")]

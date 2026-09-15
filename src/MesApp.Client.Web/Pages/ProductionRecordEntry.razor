@@ -267,6 +267,43 @@ else
         }
     </AuthorizeView>
 
+    @* 作業手順書（B-10-30-03）。本文はマスタの現在値で、版数だけが展開時点のスナップショット *@
+    @if (_procedure is { } procedure)
+    {
+        <h2>作業手順書（@procedure.ProcedureNo @procedure.Title）</h2>
+        <div class="card">
+            <p class="text-muted">
+                版数 v@(procedure.CurrentVersion)
+                @if (procedure.PlannedVersion is { } planned)
+                {
+                    <span>／計画時 v@(planned)</span>
+                }
+            </p>
+            @if (procedure.IsRevised)
+            {
+                <p class="text-muted">
+                    <span class="badge badge-danger">改訂あり</span>
+                    この作業指示を展開した時点から手順書が改訂されています。最新の手順で作業してください。
+                </p>
+            }
+            @if (!procedure.IsActive)
+            {
+                <p class="text-muted">
+                    <span class="badge badge-danger">無効</span>
+                    この手順書は無効化されています。作業前に手順を確認してください。
+                </p>
+            }
+            @if (!string.IsNullOrWhiteSpace(procedure.Steps))
+            {
+                <pre style="white-space:pre-wrap;">@procedure.Steps</pre>
+            }
+            @if (procedure.Reference is { } reference)
+            {
+                <p class="text-muted">手順書の所在：@reference</p>
+            }
+        </div>
+    }
+
     @* 工程管理項目の指示（展開時点のスナップショット。Spec.md 5.7） *@
     @if (_controlItems.Count > 0)
     {
@@ -433,6 +470,7 @@ else
     // 製造条件データ（B-30-30-04）
     /// <summary>展開時点の指示（マスタの現在値ではない。Spec.md 5.7）</summary>
     private List<WorkOrderControlItemResponse> _controlItems = [];
+    private WorkOrderProcedureResponse? _procedure;
     private int _dataControlItemId;
     private decimal? _dataNumericValue;
     private string _dataItem = string.Empty;
@@ -499,6 +537,11 @@ else
             $"api/work-orders/{Id}/status-history") ?? [];
         _controlItems = await Http.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
             $"api/work-orders/{Id}/control-items") ?? [];
+        // 手順書が紐付いていない作業指示は404になる（工順に登録が無い運用でも画面は開ける）
+        var procedure = await Http.GetAsync($"api/work-orders/{Id}/procedure");
+        _procedure = procedure.IsSuccessStatusCode
+            ? await procedure.Content.ReadFromJsonAsync<WorkOrderProcedureResponse>()
+            : null;
     }
 
     /// <summary>投入ロットの選択に合わせて、引き落とすロケーションも決める（在庫はロット×棚で持つため）</summary>

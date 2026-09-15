@@ -448,6 +448,10 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
                 .WithMany()
                 .HasForeignKey(x => x.RoutingChecklistId)
                 .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.WorkProcedure)
+                .WithMany()
+                .HasForeignKey(x => x.WorkProcedureId)
+                .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.AssignedUser)
                 .WithMany()
                 .HasForeignKey(x => x.AssignedUserId)

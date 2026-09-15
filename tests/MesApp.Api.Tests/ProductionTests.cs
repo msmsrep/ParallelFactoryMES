@@ -103,6 +103,77 @@ public class ProductionTests
     }
 
     [Fact]
+    public async Task 作業手順書は改訂が仕掛中の作業指示にも届き計画時の版数と食い違えば改訂ありになる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "組立");
+
+        var created = await admin.PostAsJsonAsync("/api/work-procedures",
+            new WorkProcedureRequest("SOP-01", "組立作業手順", "1. 部材を並べる", null));
+        created.EnsureSuccessStatusCode();
+        var procedure = (await created.Content.ReadFromJsonAsync<WorkProcedureResponse>())!;
+
+        // 1工程目だけ手順書を紐付ける
+        var routing = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, null, null, procedure.Id),
+                new(2, process.Id, 15m, 5m, null, null, null, null, null),
+            });
+        routing.EnsureSuccessStatusCode();
+
+        var order = await CreateOrderAsync(admin, product.Id);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        expanded.EnsureSuccessStatusCode();
+        var detail = (await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+        var first = detail.WorkOrders.Single(w => w.RoutingSequence == 1);
+        var second = detail.WorkOrders.Single(w => w.RoutingSequence == 2);
+
+        var shown = await admin.GetFromJsonAsync<WorkOrderProcedureResponse>(
+            $"/api/work-orders/{first.Id}/procedure");
+        Assert.Equal("SOP-01", shown!.ProcedureNo);
+        Assert.Equal("1. 部材を並べる", shown.Steps);
+        Assert.Equal(1, shown.CurrentVersion);
+        Assert.Equal(1, shown.PlannedVersion);
+        Assert.False(shown.IsRevised);
+
+        // 手順書が紐付いていない工程は404（工順に登録が無い運用でも画面は開ける）
+        var none = await admin.GetAsync($"/api/work-orders/{second.Id}/procedure");
+        Assert.Equal(HttpStatusCode.NotFound, none.StatusCode);
+
+        // 改訂は仕掛中の作業指示にも届く（本文はマスタの現在値。製造条件の固定とは前提が違う）
+        var revised = await admin.PutAsJsonAsync($"/api/work-procedures/{procedure.Id}",
+            new WorkProcedureRequest("SOP-01", "組立作業手順", "1. 部材を並べる／2. 規定トルクで締結する", null));
+        revised.EnsureSuccessStatusCode();
+
+        var afterRevision = await admin.GetFromJsonAsync<WorkOrderProcedureResponse>(
+            $"/api/work-orders/{first.Id}/procedure");
+        Assert.Equal("1. 部材を並べる／2. 規定トルクで締結する", afterRevision!.Steps);
+        Assert.Equal(2, afterRevision.CurrentVersion);
+        // 計画時の版数は展開時のまま。食い違いを「改訂あり」として示す
+        Assert.Equal(1, afterRevision.PlannedVersion);
+        Assert.True(afterRevision.IsRevised);
+
+        // 工順から手順書を外しても、展開済みの作業指示の紐付けは変わらない（Spec.md 5.7）
+        var unlinked = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null) });
+        unlinked.EnsureSuccessStatusCode();
+        var stillLinked = await admin.GetFromJsonAsync<WorkOrderProcedureResponse>(
+            $"/api/work-orders/{first.Id}/procedure");
+        Assert.Equal("SOP-01", stillLinked!.ProcedureNo);
+
+        // 外した後なら手順書を無効化でき、作業指示側では無効と分かる
+        (await admin.DeleteAsync($"/api/work-procedures/{procedure.Id}")).EnsureSuccessStatusCode();
+        var deactivated = await admin.GetFromJsonAsync<WorkOrderProcedureResponse>(
+            $"/api/work-orders/{first.Id}/procedure");
+        Assert.False(deactivated!.IsActive);
+    }
+
+    [Fact]
     public async Task 工順の作業区が展開時に固定され進捗を上位の段でまとめて集計できる()
     {
         using var factory = new ApiFactory();

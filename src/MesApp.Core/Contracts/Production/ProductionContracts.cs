@@ -55,6 +55,25 @@ public record WorkOrderControlItemResponse(
     int Id, int? ControlItemId, string ItemCode, string ItemName, string? Unit,
     int ItemVersion, decimal? TargetValue, decimal? LowerLimit, decimal? UpperLimit);
 
+/// <summary>
+/// 作業指示の作業手順書（SOP。B-10-30-03）。
+/// <para>
+/// 本文は<b>マスタの現在値</b>を返す。安全上の訂正のように改訂した手順は仕掛中の作業指示にも
+/// 届くべきだからで、代わりに展開時点の版数（<c>PlannedVersion</c>）を併せて返し、
+/// 計画時から改訂されたか（<c>IsRevised</c>）を画面と監査に示す。
+/// </para>
+/// </summary>
+public record WorkOrderProcedureResponse(
+    int WorkProcedureId, string ProcedureNo, string Title, string Steps, string? Reference,
+    /// <summary>マスタの現在の版数（表示している手順の版数）</summary>
+    int CurrentVersion,
+    /// <summary>指図展開時点の版数（計画時に想定していた手順の版数）</summary>
+    int? PlannedVersion,
+    /// <summary>計画時から手順書が改訂されているか</summary>
+    bool IsRevised,
+    /// <summary>手順書が無効化されているか（改訂中・廃止の可能性がある）</summary>
+    bool IsActive);
+
 public record WorkOrderResponse(
     int Id, string WorkOrderNo, int ManufacturingOrderId, string OrderNo,
     int ProductId, string ProductCode, string ProductName,

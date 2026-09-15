@@ -126,6 +126,22 @@ public class WorkOrder
     public int? RoutingChecklistId { get; set; }
     public Checklist? RoutingChecklist { get; set; }
 
+    /// <summary>作業手順書（SOP。展開時点の工順の値。B-10-30-03）</summary>
+    public int? WorkProcedureId { get; set; }
+    public WorkProcedure? WorkProcedure { get; set; }
+
+    /// <summary>
+    /// 展開時点の手順書の版数。
+    /// <para>
+    /// 手順の本文は写さず、版数だけを固定する。安全上の訂正のように
+    /// 改訂した手順は仕掛中の作業指示にも届くべきで、表示は常にマスタの現在値を使う。
+    /// 版数を残しておけば「計画時から改訂されたか」を作業者と監査に示せる。
+    /// 製造条件（<see cref="WorkOrderControlItem"/>）が本文ごと固定するのは、
+    /// 逸脱の判定基準が後から変わってはいけないためで、手順書とは前提が違う。
+    /// </para>
+    /// </summary>
+    public int? WorkProcedureVersion { get; set; }
+
     /// <summary>
     /// 工程管理項目の指示（展開時点のマスタのスナップショット。B-30-30-04）。
     /// 実績の逸脱判定はこれを基準にする
