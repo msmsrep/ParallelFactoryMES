@@ -1,4 +1,4 @@
-@page "/quality-analysis"
+﻿@page "/quality-analysis"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -129,6 +129,15 @@ else
                     }
                 </tbody>
             </table>
+            @if (_summary.ByShift.All(r => r.Key == ShiftLabels.NoShift))
+            {
+                @* 直を運用していないと全実績がここへ落ちる。無言だと表の意味が伝わらない *@
+                <p class="text-muted">
+                    実績に直が付いていません。マスタ管理の勤務シフトで直を定義すると、
+                    以降の実績が直別に分かれて比べられます
+                    （直は実績の記録時に固定するため、それ以前の実績は「@ShiftLabels.NoShift」のままです）。
+                </p>
+            }
         }
     </div>
 

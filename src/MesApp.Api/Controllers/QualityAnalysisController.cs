@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -60,7 +60,7 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
         // 直別（C-40-10-03）。3.9節の製造日が夜勤を前提にしているので、
         // 昼勤と夜勤で不良率が違わないかを見られるようにする
         var byShift = records
-            .GroupBy(r => r.ShiftLabel ?? "（直なし）")
+            .GroupBy(r => r.ShiftLabel ?? ShiftLabels.NoShift)
             .OrderBy(g => g.Key, StringComparer.Ordinal)
             .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity),
                 g.Sum(r => r.ScrapQuantity), g.Sum(r => r.ReworkQuantity)))

@@ -21,7 +21,7 @@
 | 品目マスタ・MBOM・工順/BOP（工順の作業区は**最下段のみ**。展開時に作業指示へスナップショット） | A-40-10 / A-40-20 | `ProductsController.cs` `api/products`<br>`ProcessesController.cs` `api/processes` | `Core/Entities/Masters.cs`<br>Product / BomItem / ProcessMaster / Routing | `/masters` `Web/Pages/Masters/ProductsTab.razor` / `ProcessesTab.razor` | `Tests/MasterTests.cs` |
 | 作業手順書（SOP。版数管理） | I-30-40 / I-30-20-12 / B-10-30-03 | `WorkProceduresController.cs` `api/work-procedures`（更新で版数+1。**工順から参照中は無効化できない**。CSV取込も同じ判定） | Masters.cs: WorkProcedure（対象品目・工程は持たない。紐付けは `Routing.WorkProcedureId` 側）<br>本文を置けない手順書は `Reference`（文書番号・URL）だけでよい | `/masters` `Masters/WorkProceduresTab.razor`<br>工順への紐付けは `Masters/ProductsTab.razor`<br>作業指示での閲覧は `ProductionRecordEntry.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
 | 作業指示の手順書表示 | B-10-30-03 | `WorkOrdersController.cs` `GET api/work-orders/{id}/procedure`（紐付けなしは404） | Production.cs: WorkOrder（`WorkProcedureId` ＋ `WorkProcedureVersion`）<br>**本文は固定せず版数だけスナップショット**。表示はマスタ現在値で、版数が食い違えば `IsRevised`（他のスナップショットとは方針が逆。Spec.md 5.7） | `/work-orders/{id}` `ProductionRecordEntry.razor` | `Tests/ProductionTests.cs` |
-| マスタCSV一括入出力 | Spec.md 3.1 | `MasterCsvController.cs` `api/masters/csv`<br>`Api/Services/MasterCsvService.cs` / `.Import.cs` / `MasterCsvKinds.cs` / `CsvTable.cs` / `CsvFile.cs` | （各マスタ） | `Web/Shared/CsvIoPanel.razor`（各Tabに配置） | `Tests/MasterCsvTests.cs` |
+| マスタCSV一括入出力 | Spec.md 3.1 | `MasterCsvController.cs` `api/masters/csv`<br>`Api/Services/MasterCsvService.cs` / `.Import.cs` / `MasterCsvKinds.cs` / `CsvTable.cs` / `CsvFile.cs`<br>**無効化したマスタを戻せるのはCSVの `IsActive` 列だけ**（画面に再有効化の導線は無い。全マスタ共通） | （各マスタ） | `Web/Shared/CsvIoPanel.razor`（各Tabに配置） | `Tests/MasterCsvTests.cs` |
 
 ## B. 製造実行
 

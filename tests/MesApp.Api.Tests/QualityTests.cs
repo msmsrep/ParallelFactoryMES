@@ -494,7 +494,7 @@ public class QualityTests
         Assert.Equal(1, summary.OpenNonconformanceCount);
         Assert.True(summary.NonconformanceByCause.ContainsKey("設備不調"));
         // 直を登録していない運用では「（直なし）」にまとまる
-        Assert.Equal("（直なし）", Assert.Single(summary.ByShift).Key);
+        Assert.Equal(ShiftLabels.NoShift, Assert.Single(summary.ByShift).Key);
     }
 
     [Fact]
