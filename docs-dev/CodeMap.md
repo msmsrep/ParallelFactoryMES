@@ -1,4 +1,4 @@
-# CodeMap — 業務機能 → 実装ファイル 対応表
+﻿# CodeMap — 業務機能 → 実装ファイル 対応表
 
 `Orchestration.md` §6.3 の資産。**探索（Glob→Grep→Read）を1回の参照に置換するための表**であり、
 「どこを触ればよいか」はまずここで確認する。ここで足りないときだけ grep する。
@@ -19,7 +19,7 @@
 |:--|:--|:--|:--|:--|:--|
 | 製造指図（発行・承認・変更・工程展開） | A-20 / B-10-10 | `Api/Controllers/ManufacturingOrdersController.cs`<br>`api/manufacturing-orders` | `Core/Entities/Production.cs`<br>ManufacturingOrder / **ManufacturingOrderMaterial**（予定材料＝展開時のMBOM固定） / WorkOrder（工順スナップショット付き） / Lot | `/manufacturing-orders` `Web/Pages/ManufacturingOrders.razor`<br>`/manufacturing-orders/{id}` `ManufacturingOrderDetail.razor` | `Tests/ProductionTests.cs` |
 | 品目マスタ・MBOM・工順/BOP（工順の作業区は**最下段のみ**。展開時に作業指示へスナップショット） | A-40-10 / A-40-20 | `ProductsController.cs` `api/products`<br>`ProcessesController.cs` `api/processes` | `Core/Entities/Masters.cs`<br>Product / BomItem / ProcessMaster / Routing | `/masters` `Web/Pages/Masters/ProductsTab.razor` / `ProcessesTab.razor` | `Tests/MasterTests.cs` |
-| 作業手順書（SOP。版数管理） | I-30-40 / I-30-20-12 / B-10-30-03 | `WorkProceduresController.cs` `api/work-procedures`（更新で版数+1。**工順から参照中は無効化できない**） | Masters.cs: WorkProcedure（対象品目・工程は持たない。紐付けは `Routing.WorkProcedureId` 側）<br>本文を置けない手順書は `Reference`（文書番号・URL）だけでよい | `/masters` `Masters/WorkProceduresTab.razor`<br>工順への紐付けは `Masters/ProductsTab.razor`<br>作業指示での閲覧は `ProductionRecordEntry.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
+| 作業手順書（SOP。版数管理） | I-30-40 / I-30-20-12 / B-10-30-03 | `WorkProceduresController.cs` `api/work-procedures`（更新で版数+1。**工順から参照中は無効化できない**。CSV取込も同じ判定） | Masters.cs: WorkProcedure（対象品目・工程は持たない。紐付けは `Routing.WorkProcedureId` 側）<br>本文を置けない手順書は `Reference`（文書番号・URL）だけでよい | `/masters` `Masters/WorkProceduresTab.razor`<br>工順への紐付けは `Masters/ProductsTab.razor`<br>作業指示での閲覧は `ProductionRecordEntry.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
 | 作業指示の手順書表示 | B-10-30-03 | `WorkOrdersController.cs` `GET api/work-orders/{id}/procedure`（紐付けなしは404） | Production.cs: WorkOrder（`WorkProcedureId` ＋ `WorkProcedureVersion`）<br>**本文は固定せず版数だけスナップショット**。表示はマスタ現在値で、版数が食い違えば `IsRevised`（他のスナップショットとは方針が逆。Spec.md 5.7） | `/work-orders/{id}` `ProductionRecordEntry.razor` | `Tests/ProductionTests.cs` |
 | マスタCSV一括入出力 | Spec.md 3.1 | `MasterCsvController.cs` `api/masters/csv`<br>`Api/Services/MasterCsvService.cs` / `.Import.cs` / `MasterCsvKinds.cs` / `CsvTable.cs` / `CsvFile.cs` | （各マスタ） | `Web/Shared/CsvIoPanel.razor`（各Tabに配置） | `Tests/MasterCsvTests.cs` |
 
@@ -75,7 +75,7 @@
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
 | 工場従業員（ユーザー）管理・論理削除 | F-10-10 | `UsersController.cs` `api/users` | `Core/Entities/AppUser.cs`（`WorkCenterId`＝作業場所・`Department`＝所属・`ShiftId`＝所属する直） | `/masters` `Masters/UsersTab.razor` | `Tests/MasterTests.cs` |
-| 勤務シフト（直） | F-10-10-01 | `ShiftsController.cs` `api/shifts`（**時間帯が重なる直は登録不可**。所属者がいる直は無効化不可） | Masters.cs: Shift（夜勤は `EndTime <= StartTime` で日跨ぎを表す。翌日フラグは持たない） | `/masters` `Masters/ShiftsTab.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
+| 勤務シフト（直） | F-10-10-01 | `ShiftsController.cs` `api/shifts`（**時間帯が重なる直は登録不可**。所属者がいる直は無効化不可。いずれもCSV取込と同じ判定） | Masters.cs: Shift（夜勤は `EndTime <= StartTime` で日跨ぎを表す。翌日フラグは持たない） | `/masters` `Masters/ShiftsTab.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
 | スキル・資格マスタと割当（有効期限） | F-20-10 | `SkillsController.cs` `api/skills` | Masters.cs: SkillMaster / UserSkill | `/masters` `Masters/SkillsTab.razor` | `Tests/MasterTests.cs` |
 
 ## H. 出荷判定・トレーサビリティ
@@ -109,6 +109,7 @@
 | 部材投入の照合（予定材料） | `Api/Policies/MaterialIssuePolicy.cs` | Spec.md 3.9・5.7。基準はMBOMの現在値ではなく**指図の予定材料**。呼び先は `WorkOrderExecutionController.AddConsumption` |
 | 作業指示ステータス変更（＋状態履歴） | `Api/Services/WorkOrderStatusService.cs`<br>`Core/Entities/Production.cs`: WorkOrderStatusHistory | Spec.md 5.2。`WorkOrder.Status` を**直接代入しない**。履歴は `GET api/work-orders/{id}/status-history` |
 | システム管理者を失わない | `Api/Policies/LastAdminPolicy.cs` | Spec.md 3.6。有効なシステム管理者が0人になる無効化・降格を拒否する。呼び先は `UsersController.Update`（1件ずつ判定）／`MasterCsvService.Import.ImportUsersAsync`（**全行の適用後**に判定。行順で引き継ぎを弾かないため）。`Tests/MasterTests.cs` / `MasterCsvTests.cs` |
+| 参照中マスタの無効化拒否 | `Api/Policies/MasterDeactivationPolicy.cs` | Spec.md 3.8。工順から参照中の作業手順書／在籍中の従業員が所属する直の無効化を拒否する。呼び先は `WorkProceduresController.Deactivate`・`ShiftsController.Deactivate` と `MasterCsvService.Import` の `ImportWorkProceduresAsync`・`ImportShiftsAsync`（**単票APIにだけ書くとCSVから迂回できる**）。`Tests/MasterTests.cs` / `MasterCsvTests.cs` |
 | 出荷判定ゲート | `Api/Policies/ShipmentGatePolicy.cs` | Spec.md 3.9。承認済みの「可／特採」判定の条件はここだけに置く |
 | ロット在庫ステータス変更（＋状態履歴） | `Api/Services/LotStatusService.cs`<br>`Core/Entities/Production.cs`: LotStatusHistory | Spec.md 5.3。`Lot.StockStatus` を**直接代入しない**。呼び先は `InventoryController`／`InspectionOrdersController`／`NonconformanceController`／`ReceivingController` |
 | ロット系譜（分割・統合・振替） | `Core/Entities/Production.cs`: LotGenealogy<br>`InventoryController.AddGenealogy` | Spec.md 5.3・5.7。追跡の正は `Lot.ParentLotId` ではなくこちら。`TraceabilityController` はこの関係を辿る |

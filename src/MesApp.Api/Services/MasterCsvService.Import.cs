@@ -1,4 +1,4 @@
-using MesApp.Api.Policies;
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -1000,6 +1000,17 @@ public sealed partial class MasterCsvService
     {
         var byNo = await db.WorkProcedures.ToDictionaryAsync(p => p.ProcedureNo, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        // 参照中の手順書を無効化できないのは単票APIと同じ。行ごとに引けるよう先にまとめて読む
+        // （工順は別種別のCSVなので、この取込の途中で参照関係が変わることはない）
+        var referencingProducts = (await db.Routings.AsNoTracking()
+                .Where(r => r.WorkProcedureId != null)
+                .Select(r => new { ProcedureId = r.WorkProcedureId!.Value, ProductCode = r.Product!.Code })
+                .Distinct()
+                .ToListAsync(ct))
+            .GroupBy(x => x.ProcedureId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyCollection<string>)g.Select(x => x.ProductCode).ToList());
 
         foreach (var row in table.Rows)
         {
@@ -1020,6 +1031,12 @@ public sealed partial class MasterCsvService
             if (!reader.Failed && string.IsNullOrWhiteSpace(steps) && string.IsNullOrWhiteSpace(reference))
             {
                 reader.Fail("Steps（手順ステップ）かReference（手順書の所在）のどちらかを指定してください。");
+            }
+            if (!isNew && procedure.IsActive && !isActive
+                && MasterDeactivationPolicy.CheckWorkProcedure(
+                    procedureNo, referencingProducts.GetValueOrDefault(procedure.Id, [])) is { } inUse)
+            {
+                reader.Fail(inUse);
             }
             if (reader.Failed)
             {
@@ -1190,6 +1207,13 @@ public sealed partial class MasterCsvService
     {
         var byCode = await db.Shifts.ToDictionaryAsync(s => s.Code, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        // 所属者がいる直を無効化できないのは単票APIと同じ。行ごとに引けるよう先にまとめて数える
+        // （ユーザーは別種別のCSVなので、この取込の途中で所属が変わることはない）
+        var assignedUsers = await db.Users.AsNoTracking()
+            .Where(u => u.IsActive && u.ShiftId != null)
+            .GroupBy(u => u.ShiftId!.Value)
+            .Select(g => new { ShiftId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ShiftId, x => x.Count, ct);
 
         foreach (var row in table.Rows)
         {
@@ -1220,6 +1244,13 @@ public sealed partial class MasterCsvService
             if (isActive && ShiftSchedulePolicy.Check(code, startTime, endTime, others) is { } scheduleError)
             {
                 reader.Fail(scheduleError);
+                continue;
+            }
+            if (!isNew && shift.IsActive && !isActive
+                && MasterDeactivationPolicy.CheckShift(
+                    code, assignedUsers.GetValueOrDefault(shift.Id)) is { } inUse)
+            {
+                reader.Fail(inUse);
                 continue;
             }
 

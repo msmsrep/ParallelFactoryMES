@@ -1,4 +1,4 @@
-using MesApp.Api.Policies;
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -108,14 +108,12 @@ public class ShiftsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
         {
             return NotFound();
         }
-        // 所属する直として使われている間は無効化しない（従業員の所属が宙に浮く）
+        // 所属する直として使われている間は無効化しない（従業員の所属が宙に浮く）。
+        // 判定は MasterDeactivationPolicy に置き、CSV取込と同じ条件・同じ文面で弾く
         var assigned = await db.Users.CountAsync(u => u.ShiftId == id && u.IsActive, ct);
-        if (assigned > 0)
+        if (MasterDeactivationPolicy.CheckShift(shift.Code, assigned) is { } error)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = $"直 '{shift.Code}' は在籍中の従業員 {assigned} 名の所属になっているため無効化できません。",
-            });
+            return Conflict(new ProblemDetails { Title = error });
         }
 
         shift.IsActive = false;

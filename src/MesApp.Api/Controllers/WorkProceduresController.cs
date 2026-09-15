@@ -1,3 +1,4 @@
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -104,18 +105,16 @@ public class WorkProceduresController(MesAppDbContext db, IAuditLogger auditLogg
         {
             return NotFound();
         }
-        // 工順から参照されている手順書を無効化すると、作業者が手順を辿れない作業指示ができる
+        // 工順から参照されている手順書を無効化すると、作業者が手順を辿れない作業指示ができる。
+        // 判定は MasterDeactivationPolicy に置き、CSV取込と同じ条件・同じ文面で弾く
         var referencing = await db.Routings.AsNoTracking()
             .Where(r => r.WorkProcedureId == id)
             .Select(r => r.Product!.Code)
             .Distinct()
             .ToListAsync(ct);
-        if (referencing.Count > 0)
+        if (MasterDeactivationPolicy.CheckWorkProcedure(procedure.ProcedureNo, referencing) is { } error)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = $"手順書 '{procedure.ProcedureNo}' は品目 {string.Join("、", referencing)} の工順から参照されているため無効化できません。",
-            });
+            return Conflict(new ProblemDetails { Title = error });
         }
 
         procedure.IsActive = false;

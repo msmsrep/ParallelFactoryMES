@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -846,6 +846,21 @@ public class MasterCsvTests
         var steps = await client.GetFromJsonAsync<List<RoutingStepResponse>>($"/api/products/{productId}/routing");
         Assert.Equal("SOP-01", Assert.Single(steps!).WorkProcedureNo);
 
+        // 工順から参照中の手順書はCSVからも無効化できない（単票APIと同じ判定）
+        var deactivate = await ImportAsync(client, "work-procedures", """
+            ProcedureNo,Title,Steps,IsActive
+            SOP-01,組立作業手順,1. 部材を並べる,false
+            """);
+        Assert.False(deactivate.Succeeded);
+        Assert.Equal(2, deactivate.Errors[0].Line);
+        Assert.Contains("FG-01", deactivate.Errors[0].Message, StringComparison.Ordinal);
+
+        // 参照していない手順書は無効化できる
+        Assert.True((await ImportAsync(client, "work-procedures", """
+            ProcedureNo,Title,Reference,IsActive
+            SOP-02,3Dデータの手順,DOC-1234,false
+            """)).Succeeded);
+
         // 出力にも手順書番号が出る
         var export = await client.GetAsync("/api/masters/csv/routing");
         export.EnsureSuccessStatusCode();
@@ -893,6 +908,20 @@ public class MasterCsvTests
         var op1 = list!.Single(u => u.UserName == "op1");
         Assert.Equal("第1製造課", op1.Department);
         Assert.Equal("N", op1.ShiftCode);
+
+        // 所属者がいる直はCSVからも無効化できない（単票APIと同じ判定）
+        var deactivate = await ImportAsync(client, "shifts", """
+            Code,Name,StartTime,EndTime,IsActive
+            N,夜勤,18:00,06:00,false
+            """);
+        Assert.False(deactivate.Succeeded);
+        Assert.Equal(2, deactivate.Errors[0].Line);
+
+        // 所属者がいない直は無効化できる
+        Assert.True((await ImportAsync(client, "shifts", """
+            Code,Name,StartTime,EndTime,IsActive
+            D,昼勤,06:00,18:00,false
+            """)).Succeeded);
 
         // 列を書かなければ現状維持（作業場所と同じ扱い）
         Assert.True((await ImportAsync(client, "users", """
