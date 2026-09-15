@@ -81,6 +81,9 @@ public sealed partial class MasterCsvService
                 case MasterCsvKinds.InspectionItems:
                     await ImportInspectionItemsAsync(table, errors, counter, ct);
                     break;
+                case MasterCsvKinds.ControlItems:
+                    await ImportControlItemsAsync(table, errors, counter, ct);
+                    break;
                 case MasterCsvKinds.Checklists:
                     await ImportChecklistsAsync(table, errors, counter, ct);
                     break;
@@ -693,6 +696,75 @@ public sealed partial class MasterCsvService
     }
 
     // ---- 明細を持つマスタ（同一キーの行をまとめて一括置換）----
+
+    private async Task ImportControlItemsAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.ControlItems.ToDictionaryAsync(i => i.Code, StringComparer.Ordinal, ct);
+        var productIds = await db.Products.AsNoTracking()
+            .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
+        var processIds = await db.Processes.AsNoTracking()
+            .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 50);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "工程管理項目コード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var item);
+            item ??= new ControlItem { Code = code };
+
+            var name = reader.RequiredText("Name", 200);
+            var unit = reader.Text("Unit", item.Unit, 30);
+            var productId = reader.Reference("TargetProductCode", item.TargetProductId, productIds, "対象品目");
+            var processId = reader.Reference("TargetProcessCode", item.TargetProcessId, processIds, "対象工程");
+            var target = reader.NumberOrNull("TargetValue", item.TargetValue);
+            var lower = reader.NumberOrNull("LowerLimit", item.LowerLimit);
+            var upper = reader.NumberOrNull("UpperLimit", item.UpperLimit);
+            var isActive = reader.Bool("IsActive", item.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+            // 判定条件は単票APIと同じにする（片方だけ通る状態を作らない。Spec.md 7.4）
+            if (lower is { } l && upper is { } u && l > u)
+            {
+                reader.Fail("許容下限は許容上限以下で指定してください。");
+                continue;
+            }
+            if (target is { } tv && ((lower is { } lo && tv < lo) || (upper is { } up && tv > up)))
+            {
+                reader.Fail("指示値が許容範囲の外にあります。");
+                continue;
+            }
+
+            item.Name = name;
+            item.Unit = unit;
+            item.TargetProductId = productId;
+            item.TargetProcessId = processId;
+            item.TargetValue = target;
+            item.LowerLimit = lower;
+            item.UpperLimit = upper;
+            item.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.ControlItems.Add(item);
+                byCode[code] = item;
+                counter.Created++;
+            }
+            else
+            {
+                item.Version++; // 条件の改訂
+                counter.Updated++;
+            }
+        }
+    }
 
     private async Task ImportChecklistsAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)

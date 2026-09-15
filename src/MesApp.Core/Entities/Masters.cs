@@ -268,6 +268,50 @@ public class InspectionItem
     public bool IsActive { get; set; } = true;
 }
 
+/// <summary>
+/// 工程管理項目（Spec.md 5.1 ControlItem。B-30-30-04）。
+/// 温度・回転数など、製造時に記録すべき条件の定義と指示値・上下限。
+/// <para>
+/// 検査項目（<see cref="InspectionItem"/>）と同じ形にしている。ガイドの言う「指示値と実績値」の
+/// 関係は「検査パラメータと検査結果」と同じ構造であり、判定の考え方も揃うため。
+/// 違いは、検査が結果を測るのに対し、こちらは作る前に与える条件だという点。
+/// </para>
+/// </summary>
+public class ControlItem
+{
+    public int Id { get; set; }
+
+    /// <summary>工程管理項目コード（一意）</summary>
+    public string Code { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>単位（℃・rpm など）</summary>
+    public string? Unit { get; set; }
+
+    /// <summary>対象品目（品目単位の条件の場合）</summary>
+    public int? TargetProductId { get; set; }
+    public Product? TargetProduct { get; set; }
+
+    /// <summary>対象工程（工程単位の条件の場合）</summary>
+    public int? TargetProcessId { get; set; }
+    public ProcessMaster? TargetProcess { get; set; }
+
+    /// <summary>指示値（レシピ上の狙い値。例「600W」）</summary>
+    public decimal? TargetValue { get; set; }
+
+    /// <summary>許容下限</summary>
+    public decimal? LowerLimit { get; set; }
+
+    /// <summary>許容上限</summary>
+    public decimal? UpperLimit { get; set; }
+
+    /// <summary>版数（条件改訂の管理）</summary>
+    public int Version { get; set; } = 1;
+
+    public bool IsActive { get; set; } = true;
+}
+
 /// <summary>チェックリストマスタ（Spec.md 5.1 Checklist。B-30-10、G-20/G-30）</summary>
 public class Checklist
 {

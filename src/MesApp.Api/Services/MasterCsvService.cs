@@ -34,6 +34,7 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.WorkCenters => await ExportWorkCentersAsync(includeInactive, ct),
             MasterCsvKinds.Locations => await ExportLocationsAsync(includeInactive, ct),
             MasterCsvKinds.InspectionItems => await ExportInspectionItemsAsync(includeInactive, ct),
+            MasterCsvKinds.ControlItems => await ExportControlItemsAsync(includeInactive, ct),
             MasterCsvKinds.Checklists => await ExportChecklistsAsync(includeInactive, ct),
             MasterCsvKinds.DefectReasons => await ExportDefectReasonsAsync(includeInactive, ct),
             MasterCsvKinds.Skills => await ExportSkillsAsync(includeInactive, ct),
@@ -136,6 +137,19 @@ public sealed partial class MasterCsvService(
             i.Code, i.Name, i.TargetProduct?.Code, i.TargetProcess?.Code, i.Type.ToString(),
             Num(i.LowerLimit), Num(i.UpperLimit), Num(i.StandardValue), i.Method, Num(i.SamplingCount),
             Bool(i.IsActive), i.Version.ToString(CultureInfo.InvariantCulture),
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportControlItemsAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.ControlItems.AsNoTracking()
+            .Include(i => i.TargetProduct).Include(i => i.TargetProcess)
+            .Where(i => includeInactive || i.IsActive)
+            .OrderBy(i => i.Code).ToListAsync(ct);
+        return [.. items.Select(i => new string?[]
+        {
+            i.Code, i.Name, i.Unit, i.TargetProduct?.Code, i.TargetProcess?.Code,
+            Num(i.TargetValue), Num(i.LowerLimit), Num(i.UpperLimit), Bool(i.IsActive),
         })];
     }
 

@@ -130,6 +130,25 @@ public record DefectReasonRequest(
 public record DefectReasonResponse(
     int Id, string Code, string Name, DefectReasonCategory Category, bool IsActive);
 
+// ---- 工程管理項目（ControlItem）----
+
+public record ControlItemRequest(
+    [Required, MaxLength(50)] string Code,
+    [Required, MaxLength(200)] string Name,
+    [MaxLength(30)] string? Unit,
+    int? TargetProductId,
+    int? TargetProcessId,
+    decimal? TargetValue,
+    decimal? LowerLimit,
+    decimal? UpperLimit);
+
+public record ControlItemResponse(
+    int Id, string Code, string Name, string? Unit,
+    int? TargetProductId, string? TargetProductCode,
+    int? TargetProcessId, string? TargetProcessCode,
+    decimal? TargetValue, decimal? LowerLimit, decimal? UpperLimit,
+    int Version, bool IsActive);
+
 // ---- 検査項目・基準（InspectionItem）----
 
 public record InspectionItemRequest(

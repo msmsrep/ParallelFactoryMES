@@ -16,6 +16,7 @@ public static class MasterCsvKinds
     public const string WorkCenters = "work-centers";
     public const string Locations = "locations";
     public const string InspectionItems = "inspection-items";
+    public const string ControlItems = "control-items";
     public const string Checklists = "checklists";
     public const string DefectReasons = "defect-reasons";
     public const string Skills = "skills";
@@ -97,6 +98,18 @@ public static class MasterCsvKinds
             new("SamplingCount", "サンプリング数", false, null),
             new("IsActive", "有効", false, "true / false"),
             new("Version", "版数", false, "出力のみ。基準値が変わる更新で自動採番"),
+        ]),
+        new(ControlItems, "工程管理項目", false,
+        [
+            new("Code", "工程管理項目コード", true, null),
+            new("Name", "名称", true, null),
+            new("Unit", "単位", false, "℃ / rpm など"),
+            new("TargetProductCode", "対象品目コード", false, "登録済みの品目コード"),
+            new("TargetProcessCode", "対象工程コード", false, "登録済みの工程コード"),
+            new("TargetValue", "指示値", false, "許容範囲の内側であること"),
+            new("LowerLimit", "許容下限", false, null),
+            new("UpperLimit", "許容上限", false, null),
+            new("IsActive", "有効", false, "true / false"),
         ]),
         new(Checklists, "チェックリスト", false,
         [

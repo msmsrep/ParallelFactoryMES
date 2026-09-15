@@ -1,0 +1,214 @@
+@inject HttpClient Http
+
+@* 工程管理項目マスタ（Spec.md 5.1 ControlItem。B-30-30-04。更新で版数が上がる） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "工程管理項目の登録" : $"編集（{_code}）")</h2>
+        <p class="text-muted">
+            温度・回転数など、製造時に記録すべき条件の定義と指示値・上下限。実績はこの範囲と照合する。
+        </p>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>工程管理項目コード</label>
+                <input @bind="_code" />
+            </div>
+            <div class="form-field">
+                <label>名称</label>
+                <input @bind="_name" />
+            </div>
+            <div class="form-field">
+                <label>単位</label>
+                <input @bind="_unit" placeholder="℃ / rpm など" />
+            </div>
+            <div class="form-field">
+                <label>対象品目</label>
+                <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                              @bind-Value="_productId"
+                              EmptyLabel="指定なし"
+                              ValueOf="p => p.Id"
+                              LabelOf='@(p => $"{p.Code} {p.Name}")' />
+            </div>
+            <div class="form-field">
+                <label>対象工程</label>
+                <select @bind="_processId">
+                    <option value="0">指定なし</option>
+                    @foreach (var process in _processes)
+                    {
+                        <option value="@process.Id">@process.Code @process.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>指示値</label>
+                <input type="number" step="any" @bind="_target" />
+            </div>
+            <div class="form-field">
+                <label>許容下限</label>
+                <input type="number" step="any" @bind="_lower" />
+            </div>
+            <div class="form-field">
+                <label>許容上限</label>
+                <input type="number" step="any" @bind="_upper" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新（版数+1）")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<CsvIoPanel Kind="control-items" Label="工程管理項目" KeyLabel="工程管理項目コード" OnImported="LoadAsync" />
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>コード</th><th>名称</th><th>単位</th><th>対象</th><th>指示値</th><th>許容範囲</th><th>版数</th><th>状態</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.Code</td>
+                        <td>@item.Name</td>
+                        <td>@(item.Unit ?? "-")</td>
+                        <td>@(item.TargetProductCode ?? item.TargetProcessCode ?? "-")</td>
+                        <td>@(item.TargetValue?.ToString() ?? "-")</td>
+                        <td>@(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")</td>
+                        <td>v@(item.Version)</td>
+                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<ControlItemResponse>? _items;
+    private List<ProcessResponse> _processes = [];
+
+    private int? _editingId;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private string? _unit;
+    private int _productId;
+    private int _processId;
+    private decimal? _target;
+    private decimal? _lower;
+    private decimal? _upper;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<ControlItemResponse>>("api/control-items?includeInactive=true");
+
+    private void Edit(ControlItemResponse item)
+    {
+        _editingId = item.Id;
+        _code = item.Code;
+        _name = item.Name;
+        _unit = item.Unit;
+        _productId = item.TargetProductId ?? 0;
+        _processId = item.TargetProcessId ?? 0;
+        _target = item.TargetValue;
+        _lower = item.LowerLimit;
+        _upper = item.UpperLimit;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _name = string.Empty;
+        _unit = null;
+        _productId = 0;
+        _processId = 0;
+        _target = null;
+        _lower = null;
+        _upper = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "工程管理項目コードと名称を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new ControlItemRequest(_code, _name, _unit,
+                _productId == 0 ? null : _productId,
+                _processId == 0 ? null : _processId,
+                _target, _lower, _upper);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/control-items", request)
+                : await Http.PutAsJsonAsync($"api/control-items/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/control-items/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

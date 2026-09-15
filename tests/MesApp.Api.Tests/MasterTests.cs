@@ -326,6 +326,54 @@ public class MasterTests
         Assert.Equal(HttpStatusCode.BadRequest, toInactive.StatusCode);
     }
 
+    [Fact]
+    public async Task 工程管理項目のCRUDと版数管理ができ許容範囲の矛盾は拒否される()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        var process = await CreateProcessAsync(client, "PR-01", "加熱");
+
+        var created = await client.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-01", "加熱温度", "℃", null, process.Id, 180m, 175m, 185m));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var item = await created.Content.ReadFromJsonAsync<ControlItemResponse>();
+        Assert.Equal(1, item!.Version);
+        Assert.Equal("PR-01", item.TargetProcessCode);
+
+        // コード重複は409
+        var duplicated = await client.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-01", "別項目", null, null, null, null, null, null));
+        Assert.Equal(HttpStatusCode.Conflict, duplicated.StatusCode);
+
+        // 下限>上限は400
+        var reversed = await client.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-02", "逆転", null, null, null, null, 200m, 100m));
+        Assert.Equal(HttpStatusCode.BadRequest, reversed.StatusCode);
+
+        // 指示値が許容範囲の外は400（指示どおり作っても逸脱になってしまうため）
+        var outOfRange = await client.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-03", "範囲外", null, null, null, 300m, 175m, 185m));
+        Assert.Equal(HttpStatusCode.BadRequest, outOfRange.StatusCode);
+
+        // 存在しない対象工程は400
+        var missingProcess = await client.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-04", "工程なし", null, null, 9999, null, null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, missingProcess.StatusCode);
+
+        // 更新で版数が上がる
+        var updated = await client.PutAsJsonAsync($"/api/control-items/{item.Id}",
+            new ControlItemRequest("CI-01", "加熱温度", "℃", null, process.Id, 182m, 178m, 186m));
+        var updatedBody = await updated.Content.ReadFromJsonAsync<ControlItemResponse>();
+        Assert.Equal(2, updatedBody!.Version);
+        Assert.Equal(182m, updatedBody.TargetValue);
+
+        // 無効化すると既定の一覧から消える
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await client.DeleteAsync($"/api/control-items/{item.Id}")).StatusCode);
+        var active = await client.GetFromJsonAsync<List<ControlItemResponse>>("/api/control-items");
+        Assert.Empty(active!);
+    }
+
     internal static async Task<WorkCenterResponse> CreateWorkCenterAsync(
         HttpClient client, string code, string name, WorkCenterLevel level, int? parentId)
     {

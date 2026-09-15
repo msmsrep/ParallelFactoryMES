@@ -706,6 +706,46 @@ public class MasterCsvTests
         Assert.Equal("P1", userList!.Single(u => u.UserName == "op1").WorkCenterCode);
     }
 
+    [Fact]
+    public async Task 工程管理項目をCSVで一括登録でき許容範囲の矛盾は行番号付きで拒否される()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(client, "processes", """
+            Code,Name,Category
+            PR-01,加熱,InHouse
+            """)).Succeeded);
+
+        var result = await ImportAsync(client, "control-items", """
+            Code,Name,Unit,TargetProductCode,TargetProcessCode,TargetValue,LowerLimit,UpperLimit,IsActive
+            CI-01,加熱温度,℃,,PR-01,180,175,185,true
+            """);
+        Assert.True(result.Succeeded, string.Join(" / ", result.Errors.Select(e => e.Message)));
+        var items = await client.GetFromJsonAsync<List<ControlItemResponse>>("/api/control-items");
+        Assert.Equal(180m, items!.Single().TargetValue);
+        Assert.Equal("PR-01", items!.Single().TargetProcessCode);
+
+        // 単票APIと同じ条件で弾かれる
+        var invalid = await ImportAsync(client, "control-items", """
+            Code,Name,TargetValue,LowerLimit,UpperLimit
+            CI-02,逆転,,200,100
+            CI-03,範囲外,300,175,185
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 2 && e.Message.Contains("許容下限"));
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("指示値"));
+
+        // 既存コードの更新で版数が上がる
+        var revised = await ImportAsync(client, "control-items", """
+            Code,Name,TargetValue,LowerLimit,UpperLimit
+            CI-01,加熱温度,182,178,186
+            """);
+        Assert.True(revised.Succeeded, string.Join(" / ", revised.Errors.Select(e => e.Message)));
+        Assert.Equal(1, revised.Updated);
+        var after = await client.GetFromJsonAsync<List<ControlItemResponse>>("/api/control-items");
+        Assert.Equal(2, after!.Single().Version);
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {

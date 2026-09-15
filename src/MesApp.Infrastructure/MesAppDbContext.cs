@@ -22,6 +22,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<Tool> Tools => Set<Tool>();
     public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
     public DbSet<Location> Locations => Set<Location>();
+    public DbSet<ControlItem> ControlItems => Set<ControlItem>();
     public DbSet<InspectionItem> InspectionItems => Set<InspectionItem>();
     public DbSet<Checklist> Checklists => Set<Checklist>();
     public DbSet<DefectReason> DefectReasons => Set<DefectReason>();
@@ -249,6 +250,14 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.Property(x => x.ShelfNo).HasMaxLength(50);
             e.HasOne(x => x.WorkCenter).WithMany().HasForeignKey(x => x.WorkCenterId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ControlItem>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(50);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Unit).HasMaxLength(30);
         });
 
         builder.Entity<InspectionItem>(e =>
