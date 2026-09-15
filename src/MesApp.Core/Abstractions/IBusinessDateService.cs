@@ -1,4 +1,4 @@
-namespace MesApp.Core.Abstractions;
+﻿namespace MesApp.Core.Abstractions;
 
 /// <summary>
 /// 製造日（業務日付）の算出（Spec.md 3.9：日付境界は既定で午前6時、設定で変更可能。
@@ -14,6 +14,13 @@ public interface IBusinessDateService
 
     /// <summary>指定製造日の開始・終了時刻（ローカル）を返す</summary>
     (DateTimeOffset Start, DateTimeOffset End) GetRange(DateOnly businessDate);
+
+    /// <summary>
+    /// 製造日の境界時刻（既定6時。`BusinessDay:BoundaryHour`）。
+    /// 直の時間帯がこの時刻をまたぐと、同じ直の実績が2つの製造日へ分かれるため、
+    /// 直の登録時にそれを警告するのに使う（Spec.md 5.7）
+    /// </summary>
+    int BoundaryHour { get; }
 
     /// <summary>
     /// 工場のタイムゾーンへ変換する。サーバー側で時刻を文字列にする場面（履歴の表示など）で使う。

@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 
 namespace MesApp.Api.Services;
 
@@ -30,6 +30,8 @@ public class BusinessDateService : IBusinessDateService
     }
 
     public DateOnly Today => GetBusinessDate(DateTimeOffset.UtcNow);
+
+    public int BoundaryHour => _boundaryHour;
 
     public DateTimeOffset ToFactoryTime(DateTimeOffset moment) =>
         TimeZoneInfo.ConvertTime(moment, _timeZone);

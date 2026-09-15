@@ -478,6 +478,37 @@ public class MasterTests
     }
 
     [Fact]
+    public async Task 製造日の境界をまたぐ直は登録できるが警告が返る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        // 22:00〜翌07:00 は既定の境界時刻（6時）を内側に含む＝実績が2つの製造日へ分かれる
+        var crossing = await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("N", "夜勤", new TimeOnly(22, 0), new TimeOnly(7, 0)));
+        crossing.EnsureSuccessStatusCode();
+        var saved = (await crossing.Content.ReadFromJsonAsync<ShiftResponse>())!;
+        Assert.NotNull(saved.BoundaryWarning);
+        Assert.Contains("06:00", saved.BoundaryWarning, StringComparison.Ordinal);
+
+        // 拒否はしないので一覧にも出し続ける（境界時刻は設定値で、後からまたぐこともある）
+        var listed = await admin.GetFromJsonAsync<List<ShiftResponse>>("/api/shifts");
+        Assert.NotNull(Assert.Single(listed!).BoundaryWarning);
+
+        // 境界ちょうどで終わる直はまたがない（終了時刻は時間帯に含めない）
+        var ending = await admin.PutAsJsonAsync($"/api/shifts/{saved.Id}",
+            new ShiftRequest("N", "夜勤", new TimeOnly(22, 0), new TimeOnly(6, 0)));
+        ending.EnsureSuccessStatusCode();
+        Assert.Null((await ending.Content.ReadFromJsonAsync<ShiftResponse>())!.BoundaryWarning);
+
+        // 境界ちょうどで始まる直もまたがない
+        var starting = await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("D", "昼勤", new TimeOnly(6, 0), new TimeOnly(18, 0)));
+        starting.EnsureSuccessStatusCode();
+        Assert.Null((await starting.Content.ReadFromJsonAsync<ShiftResponse>())!.BoundaryWarning);
+    }
+
+    [Fact]
     public async Task 従業員に所属と直を登録でき所属中の直は無効化できない()
     {
         using var factory = new ApiFactory();

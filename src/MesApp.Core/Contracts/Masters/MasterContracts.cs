@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using MesApp.Core.Entities;
 
 namespace MesApp.Core.Contracts.Masters;
@@ -129,7 +129,13 @@ public record ShiftResponse(
     bool CrossesMidnight,
     /// <summary>時間帯の表示（夜勤は「22:00〜翌06:00」）</summary>
     string ScheduleLabel,
-    bool IsActive);
+    bool IsActive,
+    /// <summary>
+    /// 製造日の境界時刻（Spec.md 3.9）をまたぐ直への警告（またがないなら null）。
+    /// 登録を拒否はしないので、一覧でも出し続けて運用中に気づけるようにする
+    /// （境界時刻は設定値なので、設定を変えて初めてまたぐようになることもある）
+    /// </summary>
+    string? BoundaryWarning = null);
 
 // ---- 治工具（Tool）----
 

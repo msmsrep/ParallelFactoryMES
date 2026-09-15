@@ -18,7 +18,8 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/shifts")]
 [Authorize]
-public class ShiftsController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
+public class ShiftsController(
+    MesAppDbContext db, IAuditLogger auditLogger, IBusinessDateService businessDate) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<ShiftResponse>>> List(
@@ -132,9 +133,12 @@ public class ShiftsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
         return ShiftSchedulePolicy.Check(request.Code, request.StartTime, request.EndTime, others);
     }
 
-    private static ShiftResponse ToResponse(Shift s) =>
+    private ShiftResponse ToResponse(Shift s) =>
         new(s.Id, s.Code, s.Name, s.StartTime, s.EndTime,
             ShiftSchedulePolicy.CrossesMidnight(s.StartTime, s.EndTime),
             ShiftSchedulePolicy.Format(s.StartTime, s.EndTime),
-            s.IsActive);
+            s.IsActive,
+            // 製造日の境界またぎは拒否せず警告で伝える。保存時だけでなく一覧にも載せる
+            ShiftSchedulePolicy.CheckBusinessDateBoundary(
+                s.StartTime, s.EndTime, businessDate.BoundaryHour));
 }

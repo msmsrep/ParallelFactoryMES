@@ -1,4 +1,4 @@
-@inject HttpClient Http
+﻿@inject HttpClient Http
 
 @* 勤務シフト（直）マスタ（Spec.md 5.1 Shift。F-10-10-01） *@
 <Notice Error="@_error" Message="@_message" />
@@ -9,6 +9,7 @@
         <p class="text-muted">
             昼勤・夜勤などの時間帯を定義する。終了時刻が開始時刻以下なら翌日にまたぐ夜勤として扱う。
             時間帯が重なる直は登録できない（重なると実績がどの直か決まらないため）。
+            製造日の境界時刻をまたぐ直は登録できるが、実績が2つの製造日へ分かれるため警告を出す。
         </p>
         <div class="form-grid">
             <div class="form-field">
@@ -57,7 +58,14 @@
                     <tr>
                         <td>@item.Code</td>
                         <td>@item.Name</td>
-                        <td>@item.ScheduleLabel</td>
+                        <td>
+                            @item.ScheduleLabel
+                            @if (item.BoundaryWarning is not null)
+                            {
+                                @* 拒否はしないので、運用中も気づけるよう一覧に出し続ける *@
+                                <span class="badge badge-warning" title="@item.BoundaryWarning">製造日境界またぎ</span>
+                            }
+                        </td>
                         <td>@(item.CrossesMidnight ? "あり（夜勤）" : "-")</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
@@ -134,6 +142,11 @@
                 return;
             }
             _message = "保存しました。";
+            var saved = await response.Content.ReadFromJsonAsync<ShiftResponse>();
+            if (saved?.BoundaryWarning is not null)
+            {
+                _message += " " + saved.BoundaryWarning;
+            }
             ResetForm();
             await LoadAsync();
         }

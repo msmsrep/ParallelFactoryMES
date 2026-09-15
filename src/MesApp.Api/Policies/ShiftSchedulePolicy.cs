@@ -1,4 +1,4 @@
-using MesApp.Core.Entities;
+﻿using MesApp.Core.Entities;
 
 namespace MesApp.Api.Policies;
 
@@ -52,6 +52,28 @@ public static class ShiftSchedulePolicy
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// 製造日の境界時刻（Spec.md 3.9）をまたぐ直かを確認する。またぐなら日本語の警告を返す。
+    /// <para>
+    /// <b>拒否ではなく警告にとどめる。</b>境界をまたぐ直は運用として成立しうる（交代時刻と
+    /// 日次締めの時刻が揃わない工場はある）ため、登録自体は通す。ただし、その直の実績は
+    /// 2つの製造日へ分かれるので、日報（製造日単位）と直別集計の母数が食い違う。
+    /// 気づかずに数字を突き合わせると原因の分からない差になるため、登録時に伝える。
+    /// </para>
+    /// </summary>
+    public static string? CheckBusinessDateBoundary(TimeOnly start, TimeOnly end, int boundaryHour)
+    {
+        var boundary = new TimeOnly(boundaryHour, 0);
+        // 開始が境界ちょうどなら、その直は境界の直後から始まるのでまたがない。
+        // 終了が境界ちょうどの場合も InRange が終了を含まないため、ここで拾われない
+        if (start == boundary || !InRange(start, end, boundary))
+        {
+            return null;
+        }
+        return $"この直は製造日の境界時刻（{boundary:HH:mm}）をまたぎます。" +
+               "同じ直の実績が2つの製造日へ分かれるため、日次集計と直別集計で母数が食い違います。";
     }
 
     /// <summary>時間帯の表示（夜勤は翌日であることが分かるようにする）</summary>
