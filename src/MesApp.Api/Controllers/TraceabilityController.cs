@@ -105,9 +105,51 @@ public class TraceabilityController(MesAppDbContext db) : ControllerBase
                 c.Reason, c.CorrectedBy!.DisplayName, c.CorrectedAt))
             .ToListAsync(ct);
 
+        // 設備稼働履歴（H-30-10-04）。このロットを産出した作業指示に紐づく稼働区間を出す。
+        // 製造品の実績（PQC）と設備の実績（EQC）の交差点にあたり、品質不良の原因を
+        // 設備の状態から追えるようにするためのもの（Spec.md 5.7 2軸データの紐付け）
+        var producingWorkOrderIds = await db.ProductionRecords.AsNoTracking()
+            .Where(r => r.OutputLotId == lotId)
+            .Select(r => r.WorkOrderId)
+            .Distinct()
+            .ToListAsync(ct);
+        // 状態は日本語で出すため、文字列の組み立てはDBから取り出したあとに行う
+        var equipmentLogs = await db.EquipmentLogs.AsNoTracking()
+            .Where(l => l.WorkOrderId != null && producingWorkOrderIds.Contains(l.WorkOrderId.Value))
+            .OrderBy(l => l.Id)
+            .Select(l => new
+            {
+                l.Equipment!.AssetNo,
+                EquipmentName = l.Equipment!.Name,
+                l.Status,
+                l.StartedAt,
+                l.EndedAt,
+                WorkOrderNo = l.WorkOrder!.WorkOrderNo,
+                l.StopCause,
+            })
+            .ToListAsync(ct);
+        var equipmentHistory = equipmentLogs
+            .Select(l => $"{l.AssetNo} {l.EquipmentName}: [{EquipmentLogStatusLabel(l.Status)}] " +
+                         $"{l.StartedAt:yyyy-MM-dd HH:mm}〜" +
+                         (l.EndedAt is { } ended ? $"{ended:yyyy-MM-dd HH:mm}" : "（継続中）") +
+                         $" ({l.WorkOrderNo})" +
+                         (l.StopCause is not null ? $" 原因: {l.StopCause}" : string.Empty))
+            .ToList();
+
         return new LotHistoryResponse(lot.Id, lot.LotNumber, lot.Product!.Code, lot.Product!.Name,
-            production, inspections, transactions, statusHistory, correctionHistory);
+            production, inspections, transactions, statusHistory, correctionHistory, equipmentHistory);
     }
+
+    /// <summary>稼働状態の日本語名（履歴は人が読む前提のため）</summary>
+    private static string EquipmentLogStatusLabel(EquipmentLogStatus status) => status switch
+    {
+        EquipmentLogStatus.Running => "稼働",
+        EquipmentLogStatus.Stopped => "停止",
+        EquipmentLogStatus.Setup => "段取り",
+        EquipmentLogStatus.Failure => "故障",
+        EquipmentLogStatus.Idle => "アイドル",
+        _ => status.ToString(),
+    };
 
     /// <summary>産出ロット→（生成元作業指示の指図の全作業指示）→投入部材ロットを再帰的に辿る</summary>
     private async Task<List<TraceNode>> BuildBackNodesAsync(

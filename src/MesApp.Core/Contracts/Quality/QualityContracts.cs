@@ -156,7 +156,9 @@ public record LotHistoryResponse(
     List<string> InspectionHistory,
     List<string> InventoryHistory,
     List<LotStatusHistoryEntry> StatusHistory,
-    List<ProductionCorrectionEntry> CorrectionHistory);
+    List<ProductionCorrectionEntry> CorrectionHistory,
+    /// <summary>設備稼働履歴（H-30-10-04）。このロットを産出した作業指示に紐づく稼働区間</summary>
+    List<string> EquipmentHistory);
 
 // ---- 品質分析（C-40-10）----
 

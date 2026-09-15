@@ -27,6 +27,7 @@ public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogge
     public async Task<ActionResult<PagedResult<EquipmentLogResponse>>> List(
         [FromQuery] PageQuery paging,
         [FromQuery] int? equipmentId = null,
+        [FromQuery] int? workOrderId = null,
         [FromQuery] EquipmentLogStatus? status = null,
         CancellationToken ct = default)
     {
@@ -35,6 +36,10 @@ public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogge
         {
             query = query.Where(l => l.EquipmentId == equipmentId);
         }
+        if (workOrderId is not null)
+        {
+            query = query.Where(l => l.WorkOrderId == workOrderId);
+        }
         if (status is not null)
         {
             query = query.Where(l => l.Status == status);
@@ -42,7 +47,8 @@ public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogge
         return await query.OrderByDescending(l => l.Id)
             .Select(l => new EquipmentLogResponse(
                 l.Id, l.EquipmentId, l.Equipment!.Name, l.Status,
-                l.StartedAt, l.EndedAt, l.StopCause, l.Note))
+                l.StartedAt, l.EndedAt, l.StopCause, l.Note,
+                l.WorkOrderId, l.WorkOrder != null ? l.WorkOrder.WorkOrderNo : null))
             .ToPagedResultAsync(paging, ct);
     }
 
@@ -64,9 +70,23 @@ public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogge
             return BadRequest(new ProblemDetails { Title = "停止・故障の記録には停止原因（stopCause）が必要です（B-40-20-02）。" });
         }
 
+        // 作業指示に紐づけると、その指示で作ったロットの品質と設備の状態を突き合わせられる
+        // （PQC×EQCの交差点。Spec.md 5.7）。段取り・保全のように紐づかない記録もあるため任意
+        WorkOrder? workOrder = null;
+        if (request.WorkOrderId is { } workOrderId)
+        {
+            workOrder = await db.WorkOrders.AsNoTracking()
+                .FirstOrDefaultAsync(w => w.Id == workOrderId, ct);
+            if (workOrder is null)
+            {
+                return BadRequest(new ProblemDetails { Title = $"作業指示（ID {workOrderId}）が見つかりません。" });
+            }
+        }
+
         var log = new EquipmentLog
         {
             EquipmentId = request.EquipmentId,
+            WorkOrderId = request.WorkOrderId,
             Status = request.Status,
             StartedAt = request.StartedAt,
             EndedAt = request.EndedAt,
@@ -77,9 +97,16 @@ public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogge
         db.EquipmentLogs.Add(log);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Equipment", "Log", nameof(EquipmentLog), log.Id.ToString(),
-            detail: new { equipmentId = log.EquipmentId, status = log.Status, stopCause = log.StopCause }, ct: ct);
+            detail: new
+            {
+                equipmentId = log.EquipmentId,
+                workOrderId = log.WorkOrderId,
+                status = log.Status,
+                stopCause = log.StopCause,
+            }, ct: ct);
         return new EquipmentLogResponse(log.Id, log.EquipmentId, equipment.Name, log.Status,
-            log.StartedAt, log.EndedAt, log.StopCause, log.Note);
+            log.StartedAt, log.EndedAt, log.StopCause, log.Note,
+            log.WorkOrderId, workOrder?.WorkOrderNo);
     }
 
     /// <summary>
@@ -115,10 +142,11 @@ public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogge
                 var stopped = Hours(EquipmentLogStatus.Stopped);
                 var setup = Hours(EquipmentLogStatus.Setup);
                 var failure = Hours(EquipmentLogStatus.Failure);
-                var total = running + stopped + setup + failure;
+                var idle = Hours(EquipmentLogStatus.Idle);
+                var total = running + stopped + setup + failure + idle;
                 return new EquipmentUtilizationRow(
                     g.Key.EquipmentId, g.Key.AssetNo, g.Key.EquipmentName,
-                    running, stopped, setup, failure,
+                    running, stopped, setup, failure, idle,
                     g.Count(l => l.Status == EquipmentLogStatus.Failure),
                     total == 0 ? 0 : Math.Round(running / total * 100, 2));
             })

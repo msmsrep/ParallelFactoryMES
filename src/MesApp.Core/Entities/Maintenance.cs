@@ -35,6 +35,13 @@ public class EquipmentLog
     public int EquipmentId { get; set; }
     public Equipment? Equipment { get; set; }
 
+    /// <summary>
+    /// この稼働区間で処理していた作業指示（PQC×EQCの交差点。Spec.md 5.7 2軸データの紐付け）。
+    /// 設備の段取り・保全のように作業指示に紐づかない記録もあるため任意。
+    /// </summary>
+    public int? WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
     public EquipmentLogStatus Status { get; set; }
 
     public DateTimeOffset StartedAt { get; set; }

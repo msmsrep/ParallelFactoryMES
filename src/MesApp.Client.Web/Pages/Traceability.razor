@@ -99,6 +99,17 @@
                 <ul>@foreach (var line in _history.InspectionHistory) { <li>@line</li> }</ul>
             }
 
+            <h2>設備稼働履歴（H-30-10-04）</h2>
+            @* このロットを産出した作業指示に紐づく稼働区間。品質不良の原因を設備の状態から追う *@
+            @if (_history.EquipmentHistory.Count == 0)
+            {
+                <p class="text-muted">記録はありません（稼働実績が作業指示に紐付いていません）。</p>
+            }
+            else
+            {
+                <ul>@foreach (var line in _history.EquipmentHistory) { <li>@line</li> }</ul>
+            }
+
             <h2>在庫履歴</h2>
             @if (_history.InventoryHistory.Count == 0)
             {

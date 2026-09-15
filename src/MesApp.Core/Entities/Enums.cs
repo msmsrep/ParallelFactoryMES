@@ -480,6 +480,14 @@ public enum EquipmentLogStatus
     Setup,
     /// <summary>故障</summary>
     Failure,
+    /// <summary>
+    /// アイドル（設備は動かせるが加工していない待機。停止と分けるのはOEEの時間区分に要るため）
+    /// </summary>
+    /// <remarks>
+    /// JSONでは列挙子を数値でやり取りするため、既存の値を動かさないよう末尾に追加する。
+    /// DBは文字列で保存するので保存済みデータへの影響はない。
+    /// </remarks>
+    Idle,
 }
 
 /// <summary>保全種別（定期/計画外。Spec.md 5.5 MaintenancePlan）</summary>

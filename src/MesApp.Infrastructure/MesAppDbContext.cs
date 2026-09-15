@@ -714,6 +714,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
 
         builder.Entity<EquipmentLog>(e =>
         {
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.EquipmentId);
             e.Property(x => x.StopCause).HasMaxLength(500);
             e.Property(x => x.Note).HasMaxLength(500);

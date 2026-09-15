@@ -38,7 +38,16 @@
                     <option value="@EquipmentLogStatus.Stopped">停止</option>
                     <option value="@EquipmentLogStatus.Setup">段取り</option>
                     <option value="@EquipmentLogStatus.Failure">故障</option>
+                    <option value="@EquipmentLogStatus.Idle">アイドル</option>
                 </select>
+            </div>
+            <div class="form-field">
+                <label>対象作業指示（任意）</label>
+                @* 作業指示に紐づけると、そのロットの品質と設備の状態を突き合わせられる（Spec.md 5.7） *@
+                <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
+                              @bind-Value="_log.WorkOrderId" EmptyLabel="（なし）"
+                              ValueOf="w => w.Id"
+                              LabelOf='@(w => $"{w.WorkOrderNo}（{w.ProductCode}）")' />
             </div>
             <div class="form-field">
                 <label>開始時刻</label>
@@ -70,7 +79,7 @@
         {
             <table class="table">
                 <thead>
-                    <tr><th>設備</th><th>稼働(h)</th><th>停止(h)</th><th>段取り(h)</th><th>故障(h)</th><th>故障回数</th><th>時間稼働率</th></tr>
+                    <tr><th>設備</th><th>稼働(h)</th><th>停止(h)</th><th>段取り(h)</th><th>故障(h)</th><th>アイドル(h)</th><th>故障回数</th><th>時間稼働率</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var row in _utilization)
@@ -81,6 +90,7 @@
                             <td>@row.StoppedHours</td>
                             <td>@row.SetupHours</td>
                             <td>@row.FailureHours</td>
+                            <td>@row.IdleHours</td>
                             <td>@row.FailureCount</td>
                             <td>
                                 @row.UtilizationRate %
@@ -98,13 +108,14 @@
         @if (_logs is not null && _logs.Total > 0)
         {
             <table class="table">
-                <thead><tr><th>設備</th><th>状態</th><th>開始</th><th>終了</th><th>停止原因</th></tr></thead>
+                <thead><tr><th>設備</th><th>状態</th><th>作業指示</th><th>開始</th><th>終了</th><th>停止原因</th></tr></thead>
                 <tbody>
                     @foreach (var log in _logs.Items)
                     {
                         <tr>
                             <td>@log.EquipmentName</td>
                             <td>@LogStatusLabel(log.Status)</td>
+                            <td>@(log.WorkOrderNo ?? "-")</td>
                             <td>@log.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                             <td>@(log.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
                             <td>@(log.StopCause ?? "-")</td>
@@ -433,6 +444,7 @@ else
         public DateTime StartedAt { get; set; } = DateTime.Now.AddHours(-1);
         public DateTime? EndedAt { get; set; } = DateTime.Now;
         public string? StopCause { get; set; }
+        public int WorkOrderId { get; set; }
     }
 
     private sealed class PlanForm
@@ -567,7 +579,7 @@ else
             var response = await Http.PostAsJsonAsync("api/equipment-logs",
                 new EquipmentLogRequest(_log.EquipmentId, _log.Status, new DateTimeOffset(_log.StartedAt),
                     _log.EndedAt is null ? null : new DateTimeOffset(_log.EndedAt.Value),
-                    _log.StopCause, null));
+                    _log.StopCause, null, _log.WorkOrderId == 0 ? null : _log.WorkOrderId));
             if (!response.IsSuccessStatusCode)
             {
                 _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
@@ -756,6 +768,7 @@ else
         EquipmentLogStatus.Stopped => "停止",
         EquipmentLogStatus.Setup => "段取り",
         EquipmentLogStatus.Failure => "故障",
+        EquipmentLogStatus.Idle => "アイドル",
         _ => status.ToString(),
     };
 

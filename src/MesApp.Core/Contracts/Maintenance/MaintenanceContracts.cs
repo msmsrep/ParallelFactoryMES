@@ -27,16 +27,20 @@ public record EquipmentLogRequest(
     DateTimeOffset? EndedAt,
     /// <summary>停止原因（停止・故障時。B-40-20-02）</summary>
     string? StopCause,
-    string? Note);
+    string? Note,
+    /// <summary>この稼働区間で処理していた作業指示（任意。PQC×EQCの紐付け）</summary>
+    int? WorkOrderId = null);
 
 public record EquipmentLogResponse(
     int Id, int EquipmentId, string EquipmentName, EquipmentLogStatus Status,
-    DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string? StopCause, string? Note);
+    DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string? StopCause, string? Note,
+    int? WorkOrderId = null, string? WorkOrderNo = null);
 
 /// <summary>設備別の稼働サマリ（E-20-10-03 稼働・停止実績、E-20-30-03 パフォーマンス確認）</summary>
 public record EquipmentUtilizationRow(
     int EquipmentId, string AssetNo, string EquipmentName,
     decimal RunningHours, decimal StoppedHours, decimal SetupHours, decimal FailureHours,
+    decimal IdleHours,
     int FailureCount,
     /// <summary>時間稼働率（%。稼働時間 ÷ 記録済み総時間）</summary>
     decimal UtilizationRate);

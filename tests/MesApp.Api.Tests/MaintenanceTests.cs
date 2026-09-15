@@ -2,7 +2,11 @@ using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Maintenance;
+using MesApp.Core.Contracts.Common;
+using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Masters;
+using MesApp.Core.Contracts.Production;
+using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Tests;
@@ -48,6 +52,80 @@ public class MaintenanceTests
                 "1. 電源遮断\n2. ベルト張力確認\n3. 給油\n4. 安全カバー確認"));
         var updatedBody = await updated.Content.ReadFromJsonAsync<MaintenanceProcedureResponse>();
         Assert.Equal(2, updatedBody!.Version);
+    }
+
+    [Fact]
+    public async Task 設備稼働ログを作業指示に紐付けるとロットの履歴から辿れる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+
+        // 指図を展開して作業指示と産出ロットを作る
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "組立");
+        (await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null) }))
+            .EnsureSuccessStatusCode();
+        var order = await admin.PostAsJsonAsync("/api/manufacturing-orders",
+            new CreateManufacturingOrderRequest(product.Id, 10m, null,
+                ManufacturingOrderType.Normal, null, null));
+        var orderBody = await order.Content.ReadFromJsonAsync<ManufacturingOrderResponse>();
+        await admin.PostAsync($"/api/manufacturing-orders/{orderBody!.Id}/approve", null);
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{orderBody.Id}/expand", new ExpandRequest(null));
+        var detail = await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>();
+        var workOrder = detail!.WorkOrders.First();
+
+        var start = DateTimeOffset.Now.AddHours(-4);
+
+        // 存在しない作業指示は400
+        var missing = await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running,
+                start, start.AddHours(1), null, null, 9999));
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+
+        // 作業指示に紐付けた稼働（PQC×EQCの交差点）と、紐付かないアイドル
+        var linked = await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running,
+                start, start.AddHours(3), null, null, workOrder.Id));
+        linked.EnsureSuccessStatusCode();
+        var linkedBody = await linked.Content.ReadFromJsonAsync<EquipmentLogResponse>();
+        Assert.Equal(workOrder.WorkOrderNo, linkedBody!.WorkOrderNo);
+
+        (await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Idle,
+                start.AddHours(3), start.AddHours(4), null, null)))
+            .EnsureSuccessStatusCode();
+
+        // 作業指示で絞り込める
+        var filtered = await admin.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>(
+            $"/api/equipment-logs?workOrderId={workOrder.Id}");
+        Assert.Equal(1, filtered!.Total);
+
+        // アイドルはサマリの時間区分に出て、稼働率の分母にも入る（3/4=75%）
+        var summary = await admin.GetFromJsonAsync<List<EquipmentUtilizationRow>>("/api/equipment-logs/summary");
+        var row = Assert.Single(summary!);
+        Assert.Equal(1m, row.IdleHours);
+        Assert.Equal(75m, row.UtilizationRate);
+
+        // 産出ロットの履歴から設備稼働履歴を辿れる（H-30-10-04）
+        var location = await admin.PostAsJsonAsync("/api/locations",
+            new LocationRequest("LOC-01", LocationAreaType.ProductWarehouse, "A-1"));
+        location.EnsureSuccessStatusCode();
+        var locationBody = await location.Content.ReadFromJsonAsync<LocationResponse>();
+        var record = await admin.PostAsJsonAsync($"/api/work-orders/{workOrder.Id}/production-records",
+            new ProductionRecordRequest(10m, 0m, start, start.AddHours(3), locationBody!.Id, false));
+        record.EnsureSuccessStatusCode();
+        var recordBody = await record.Content.ReadFromJsonAsync<ProductionRecordResponse>();
+        var lotId = recordBody!.OutputLotId;
+        Assert.NotNull(lotId);
+        var history = await admin.GetFromJsonAsync<LotHistoryResponse>($"/api/traceability/{lotId}/history");
+        Assert.Contains(history!.EquipmentHistory, h => h.Contains(workOrder.WorkOrderNo));
+        // 紐付けのない稼働は履歴に出ない（別のロットの設備状態を混ぜて見せないため）
+        Assert.DoesNotContain(history.EquipmentHistory, h => h.Contains("アイドル"));
+        // 状態は日本語で出す（履歴は人が読む前提。CLAUDE.md のUI文言の方針）
+        Assert.Contains(history.EquipmentHistory, h => h.Contains("[稼働]"));
     }
 
     [Fact]
