@@ -399,7 +399,8 @@ public class MasterCsvTests
         var products = (await client.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!;
         var pump = products.Single(p => p.Code == "FG-1000");
         var bom = await client.GetFromJsonAsync<List<BomItemResponse>>($"/api/products/{pump.Id}/bom");
-        Assert.Equal(6, bom!.Count);
+        Assert.Equal(7, bom!.Count);
+        Assert.Single(bom, b => b.IsAlternative);
         var routing = await client.GetFromJsonAsync<List<RoutingStepResponse>>($"/api/products/{pump.Id}/routing");
         Assert.Equal(3, routing!.Count);
         Assert.All(routing, step => Assert.False(string.IsNullOrEmpty(step.ProcessCode)));

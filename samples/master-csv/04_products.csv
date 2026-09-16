@@ -1,0 +1,13 @@
+﻿Code,Name,Unit,Specification,Type,StandardDefectRate,DefaultLocationCode,IsActive
+FG-1000,ギアポンプ組立品,個,"吐出量20L/min, 最高圧力1.0MPa",Product,1.5,WH-P01,true
+SF-2000,ハウジング加工品,個,アルミA6063,SemiFinished,2,WIP-02,true
+RM-3001,ハウジング鋳造品,個,アルミA6063 鋳造品,Material,0,WH-M01,true
+RM-3002,ギアセット,セット,モジュール1.5,Material,0,WH-M01,true
+RM-3003,シャフト,本,S45C φ12,Material,0,WH-M01,true
+RM-3004,Oリング,個,NBR P-20,Material,0,WH-M02,true
+RM-3005,六角ボルト M6x20,本,SUS304,Material,0,WH-M02,true
+RM-3006,潤滑油,L,ISO VG32,Material,0,WH-M02,true
+RM-3007,Oリング（耐油）,個,FKM P-20,Material,0,WH-M02,true
+MP-9001,主軸ベルト,本,5M-450,Material,0,WH-S01,true
+MP-9002,クーラントフィルタ,個,10μm,Material,0,WH-S01,true
+MP-9003,シールヒーター,本,200V 300W,Material,0,WH-S01,true

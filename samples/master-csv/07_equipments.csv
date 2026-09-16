@@ -1,0 +1,6 @@
+﻿AssetNo,Name,WorkCenterCode,Status,MaintenanceType,MaintenanceThreshold,IsActive
+EQ-01,マシニングセンタ,WC-MC1,Available,Count,10000,true
+EQ-02,組立ステーション,WC-AS1,Available,None,,true
+EQ-03,三次元測定機,WC-QC1,Available,Calendar,180,true
+EQ-04,真空包装機,WC-PK1,Available,RunTime,2000,true
+EQ-05,マシニングセンタ（2号機）,WC-MC1,Available,Count,10000,true

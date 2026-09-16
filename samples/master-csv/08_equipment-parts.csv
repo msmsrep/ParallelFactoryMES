@@ -1,0 +1,6 @@
+﻿EquipmentAssetNo,ProductCode,Category,QuantityPer,Note
+EQ-01,MP-9001,Asset,1,主軸ベルトは交換履歴を個体で追う
+EQ-01,MP-9002,Consumable,1,
+EQ-05,MP-9001,Asset,1,
+EQ-05,MP-9002,Consumable,1,
+EQ-04,MP-9003,Consumable,1,

@@ -4,3 +4,4 @@ INS-02,ハウジング外観,SF-2000,PR-10,InProcess,,,,目視,3,true
 INS-03,鋳造品 受入外観,RM-3001,,Receiving,,,,目視,10,true
 INS-04,吐出量測定,FG-1000,PR-40,FinalProduct,19,21,20,流量計,1,true
 INS-05,気密試験,FG-1000,PR-40,FinalProduct,,,,加圧0.5MPa 60秒保持,1,true
+INS-06,保管サンプル外観,FG-1000,,Sample,,,,目視,1,true

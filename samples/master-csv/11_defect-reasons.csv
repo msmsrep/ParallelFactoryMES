@@ -1,0 +1,7 @@
+﻿Code,Name,Category,IsActive
+DR-01,鋳巣,Material,true
+DR-02,寸法不良,Process,true
+DR-03,キズ・打痕,Process,true
+DR-04,工具摩耗,Equipment,true
+DR-05,組付けミス,Human,true
+DR-99,その他,Other,true
