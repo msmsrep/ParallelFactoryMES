@@ -1,4 +1,4 @@
-@page "/tool-management"
+﻿@page "/tool-management"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -106,6 +106,106 @@
     }
 </div>
 
+@* 寿命分析（E-60-20-03）。寿命ステータスが「いま何%か」なのに対し、こちらは「いつ交換が要るか」 *@
+<div class="card">
+    <h2 style="margin-top:0;">寿命分析（E-60-20-03）</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>開始日（製造日）</label>
+            <input type="date" @bind="_analysisFrom" />
+        </div>
+        <div class="form-field">
+            <label>終了日（製造日）</label>
+            <input type="date" @bind="_analysisTo" />
+        </div>
+    </div>
+    <button class="btn" @onclick="LoadAnalysisAsync">分析</button>
+
+    @if (_analysis is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_analysis.Count == 0)
+    {
+        <p class="text-muted">有効な治工具がありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>治工具</th><th>寿命閾値</th><th>累計</th><th>残り</th>
+                    <th>期間内の使用</th><th>使用日数</th><th>1日平均</th><th>指示1件平均</th><th>寿命到達見込み</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _analysis)
+                {
+                    <tr>
+                        <td>@row.ToolCode @row.ToolName</td>
+                        <td>@(row.LifeThresholdCount?.ToString() ?? "-")</td>
+                        <td>@row.CumulativeCount</td>
+                        <td>@(row.RemainingCount?.ToString() ?? "-")</td>
+                        <td>@row.PeriodUsageCount</td>
+                        <td>@row.UsageDays</td>
+                        <td>@(row.AveragePerDay?.ToString("0.##") ?? "-")</td>
+                        <td>@(row.AveragePerWorkOrder?.ToString("0.##") ?? "-")</td>
+                        <td>
+                            @if (row.EstimatedLifeReachedOn is { } due)
+                            {
+                                <span>@due.ToString("yyyy-MM-dd")</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="text-muted">
+            1日平均は「使用実績のあった日」で割る（稼働しない日を含めると余裕があるように見えるため）。
+            寿命閾値が未設定・期間内に使用が無い・すでに寿命到達のものは見込みを出さない（「-」）。
+        </p>
+    }
+</div>
+
+@* いま現場に出ている治工具（B-20-30）。引当・払出そのものは作業指示の段取り画面から行う *@
+<div class="card">
+    <h2 style="margin-top:0;">引当中・払出中の治工具（B-20-30）</h2>
+    @if (_openIssues is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_openIssues.Count == 0)
+    {
+        <p class="text-muted">引当中・払出中の治工具はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>治工具</th><th>作業指示</th><th>品目</th><th>工程</th><th>状態</th><th>引当日時</th><th>受領者</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var issue in _openIssues)
+                {
+                    <tr>
+                        <td>@issue.ToolCode @issue.ToolName</td>
+                        <td><a href="work-orders/@issue.WorkOrderId/setup">@issue.WorkOrderNo</a></td>
+                        <td>@issue.ProductCode</td>
+                        <td>@issue.ProcessCode</td>
+                        <td><StatusBadge Status="@issue.Status.ToString()" /></td>
+                        <td>@issue.AllocatedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                        <td>@(issue.IssuedToName ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
 <div class="card">
     <h2 style="margin-top:0;">利用実績履歴</h2>
     @if (_usages is null || _usages.Total == 0)
@@ -137,6 +237,10 @@
     private List<ToolResponse> _tools = [];
     private List<ToolLifeStatusRow>? _lifeStatus;
     private PagedResult<ToolUsageResponse>? _usages;
+    private List<ToolLifeAnalysisRow>? _analysis;
+    private List<ToolIssueResponse>? _openIssues;
+    private DateTime? _analysisFrom = DateTime.Today.AddMonths(-1);
+    private DateTime? _analysisTo = DateTime.Today;
 
     private int _toolId;
     private int _workOrderId;
@@ -157,6 +261,8 @@
     {
         _lifeStatus = await Http.GetFromJsonAsync<List<ToolLifeStatusRow>>(
             $"api/tool-usages/life-status?alertOnly={_alertOnly.ToString().ToLowerInvariant()}");
+        _openIssues = await Http.GetFromJsonAsync<List<ToolIssueResponse>>("api/tool-issues?openOnly=true");
+        await LoadAnalysisAsync();
         await LoadUsagesAsync(1);
     }
 
@@ -202,4 +308,19 @@
         ToolStatus.Retired => "廃棄",
         _ => status.ToString(),
     };
+
+    private async Task LoadAnalysisAsync()
+    {
+        var query = new List<string>();
+        if (_analysisFrom is not null)
+        {
+            query.Add($"from={DateOnly.FromDateTime(_analysisFrom.Value):yyyy-MM-dd}");
+        }
+        if (_analysisTo is not null)
+        {
+            query.Add($"to={DateOnly.FromDateTime(_analysisTo.Value):yyyy-MM-dd}");
+        }
+        var url = "api/tool-usages/life-analysis" + (query.Count > 0 ? "?" + string.Join("&", query) : string.Empty);
+        _analysis = await Http.GetFromJsonAsync<List<ToolLifeAnalysisRow>>(url);
+    }
 }

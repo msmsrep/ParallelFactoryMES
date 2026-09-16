@@ -1,4 +1,4 @@
-namespace MesApp.Core.Entities;
+﻿namespace MesApp.Core.Entities;
 
 /// <summary>品目区分（Spec.md 5.1 Product）</summary>
 public enum ProductType
@@ -60,6 +60,19 @@ public enum ToolStatus
 }
 
 /// <summary>資源階層の段（Spec.md 5.1 WorkCenter。上から 工場 → ライン → エリア → 作業区）</summary>
+/// <summary>治工具の引当・払出の状態（Spec.md 5.5 ToolIssue。B-20-30）</summary>
+public enum ToolIssueStatus
+{
+    /// <summary>引当済（作業指示に確保した。まだ現物は渡っていない）</summary>
+    Allocated,
+    /// <summary>払出済（現場が受領した）</summary>
+    Issued,
+    /// <summary>返却済（使用を終えて戻した）</summary>
+    Returned,
+    /// <summary>取消</summary>
+    Canceled,
+}
+
 public enum WorkCenterLevel
 {
     /// <summary>工場</summary>

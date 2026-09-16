@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using System.Security.Claims;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
@@ -21,7 +21,8 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/tool-usages")]
 [Authorize]
-public class ToolUsagesController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
+public class ToolUsagesController(
+    MesAppDbContext db, IAuditLogger auditLogger, IBusinessDateService businessDate) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ToolUsageResponse>>> List(
@@ -84,6 +85,75 @@ public class ToolUsagesController(MesAppDbContext db, IAuditLogger auditLogger) 
                 u.Id, u.ToolId, u.Tool!.Code, u.WorkOrderId, u.WorkOrder!.WorkOrderNo,
                 u.UsageCount, u.UsageHours, u.RecordedAt))
             .FirstAsync(ct);
+    }
+
+    /// <summary>
+    /// 寿命分析（E-60-20-03）。期間内の使用ペースから寿命へ達する見込みを出し、交換の準備に使う。
+    /// <para>
+    /// 期間は製造日（業務日付）基準。見込みが立たないもの（寿命閾値が未設定・期間内に使用が無い・
+    /// すでに寿命到達）は予測日を null で返す。適当な日付を置くと交換計画が実態とずれるため。
+    /// </para>
+    /// </summary>
+    [HttpGet("life-analysis")]
+    public async Task<ActionResult<List<ToolLifeAnalysisRow>>> LifeAnalysis(
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null,
+        CancellationToken ct = default)
+    {
+        var fromStart = from is null ? (DateTimeOffset?)null : businessDate.GetRange(from.Value).Start;
+        var toEnd = to is null ? (DateTimeOffset?)null : businessDate.GetRange(to.Value).End;
+        var today = businessDate.Today;
+
+        var tools = await db.Tools.AsNoTracking().Where(t => t.IsActive).ToListAsync(ct);
+        // SQLiteはDateTimeOffsetの比較を翻訳できないため、期間とリセットの判定は取り出してから行う
+        var usages = await db.ToolUsages.AsNoTracking()
+            .Select(u => new { u.ToolId, u.WorkOrderId, u.UsageCount, u.UsageHours, u.RecordedAt })
+            .ToListAsync(ct);
+
+        return tools
+            .OrderBy(t => t.Code, StringComparer.Ordinal)
+            .Select(t =>
+            {
+                // 寿命の累計はリセット（メンテ完了）以降だけを数える（寿命ステータスと同じ条件）
+                var effective = usages
+                    .Where(u => u.ToolId == t.Id && (t.LifeResetAt is null || u.RecordedAt > t.LifeResetAt))
+                    .ToList();
+                var cumulative = effective.Sum(u => u.UsageCount);
+
+                var period = effective
+                    .Where(u => (fromStart is null || u.RecordedAt >= fromStart)
+                                && (toEnd is null || u.RecordedAt < toEnd))
+                    .ToList();
+                var periodCount = period.Sum(u => u.UsageCount);
+                // 使用のあった日で割る（稼働しない日を含めると、まだ余裕があるように見える）
+                var usageDays = period
+                    .Select(u => businessDate.GetBusinessDate(u.RecordedAt))
+                    .Distinct()
+                    .Count();
+                var workOrderCount = period
+                    .Where(u => u.WorkOrderId != null)
+                    .Select(u => u.WorkOrderId!.Value)
+                    .Distinct()
+                    .Count();
+
+                int? remaining = t.LifeThresholdCount is > 0
+                    ? Math.Max(0, t.LifeThresholdCount.Value - cumulative)
+                    : null;
+                decimal? perDay = usageDays == 0 ? null : Math.Round((decimal)periodCount / usageDays, 2);
+                decimal? perWorkOrder = workOrderCount == 0
+                    ? null
+                    : Math.Round((decimal)periodCount / workOrderCount, 2);
+
+                DateOnly? estimated = remaining is > 0 && perDay is > 0
+                    ? today.AddDays((int)Math.Ceiling(remaining.Value / perDay.Value))
+                    : null;
+
+                return new ToolLifeAnalysisRow(
+                    t.Id, t.Code, t.Name, t.Status,
+                    t.LifeThresholdCount, cumulative, remaining,
+                    periodCount, usageDays, perDay, workOrderCount, perWorkOrder, estimated);
+            })
+            .ToList();
     }
 
     /// <summary>

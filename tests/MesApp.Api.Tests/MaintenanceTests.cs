@@ -33,6 +33,120 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 治工具を作業指示へ引き当てて払出し返却できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var tool = await CreateToolAsync(admin, lifeCount: 100);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var first = order.WorkOrders[0];
+        var second = order.WorkOrders[1];
+
+        var allocated = await admin.PostAsJsonAsync("/api/tool-issues",
+            new ToolAllocateRequest(tool.Id, first.Id, "前段取りで使用"));
+        Assert.Equal(HttpStatusCode.Created, allocated.StatusCode);
+        var issue = (await allocated.Content.ReadFromJsonAsync<ToolIssueResponse>())!;
+        Assert.Equal(ToolIssueStatus.Allocated, issue.Status);
+
+        // 現物は1つしかないので、他の作業指示へは引き当てられない
+        var conflict = await admin.PostAsJsonAsync("/api/tool-issues",
+            new ToolAllocateRequest(tool.Id, second.Id, null));
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+
+        // 払出（受領確認）→ 返却で、治工具は再び引当可能になる
+        var issued = await admin.PostAsJsonAsync($"/api/tool-issues/{issue.Id}/issue",
+            new ToolIssueReceiveRequest(null));
+        issued.EnsureSuccessStatusCode();
+        var issuedBody = (await issued.Content.ReadFromJsonAsync<ToolIssueResponse>())!;
+        Assert.Equal(ToolIssueStatus.Issued, issuedBody.Status);
+        Assert.NotNull(issuedBody.IssuedAt);
+        Assert.NotNull(issuedBody.IssuedToName);
+
+        // 払出済みは取り消せない（返却で戻す）
+        var cancelAfterIssue = await admin.PostAsJsonAsync($"/api/tool-issues/{issue.Id}/cancel",
+            new ToolIssueCloseRequest(null));
+        Assert.Equal(HttpStatusCode.Conflict, cancelAfterIssue.StatusCode);
+
+        var returned = await admin.PostAsJsonAsync($"/api/tool-issues/{issue.Id}/return",
+            new ToolIssueCloseRequest("摩耗なし"));
+        returned.EnsureSuccessStatusCode();
+        Assert.Equal(ToolIssueStatus.Returned,
+            (await returned.Content.ReadFromJsonAsync<ToolIssueResponse>())!.Status);
+
+        var afterReturn = await admin.GetFromJsonAsync<ToolResponse>($"/api/tools/{tool.Id}");
+        Assert.Equal(ToolStatus.Available, afterReturn!.Status);
+
+        var reallocated = await admin.PostAsJsonAsync("/api/tool-issues",
+            new ToolAllocateRequest(tool.Id, second.Id, null));
+        Assert.Equal(HttpStatusCode.Created, reallocated.StatusCode);
+    }
+
+    [Fact]
+    public async Task 寿命に達した治工具は引き当てられない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var tool = await CreateToolAsync(admin, lifeCount: 100);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        // 閾値まで使い切る（E-60-20-02 の寿命到達と同じ条件で引当を止める）
+        (await admin.PostAsJsonAsync("/api/tool-usages",
+                new ToolUsageRequest(tool.Id, order.WorkOrders[0].Id, 100, null)))
+            .EnsureSuccessStatusCode();
+
+        var rejected = await admin.PostAsJsonAsync("/api/tool-issues",
+            new ToolAllocateRequest(tool.Id, order.WorkOrders[0].Id, null));
+        Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
+
+        // メンテナンス中も引き当てられない（治工具コードは一意なので別コードで登録する）
+        var created = await admin.PostAsJsonAsync("/api/tools",
+            new ToolRequest("T-02", "金型B", "型", null, null, ToolStatus.UnderMaintenance));
+        created.EnsureSuccessStatusCode();
+        var maintained = (await created.Content.ReadFromJsonAsync<ToolResponse>())!;
+        var underMaintenance = await admin.PostAsJsonAsync("/api/tool-issues",
+            new ToolAllocateRequest(maintained.Id, order.WorkOrders[0].Id, null));
+        Assert.Equal(HttpStatusCode.Conflict, underMaintenance.StatusCode);
+    }
+
+    [Fact]
+    public async Task 寿命分析で使用ペースから寿命到達の見込みを出せる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var tool = await CreateToolAsync(admin, lifeCount: 100);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        // 1日で20回使用 → 残り80回、1日平均20回なので4日後に到達する見込み
+        (await admin.PostAsJsonAsync("/api/tool-usages",
+                new ToolUsageRequest(tool.Id, order.WorkOrders[0].Id, 20, null)))
+            .EnsureSuccessStatusCode();
+
+        var rows = await admin.GetFromJsonAsync<List<ToolLifeAnalysisRow>>("/api/tool-usages/life-analysis");
+        var row = Assert.Single(rows!, r => r.ToolCode == tool.Code);
+        Assert.Equal(20, row.CumulativeCount);
+        Assert.Equal(80, row.RemainingCount);
+        Assert.Equal(20, row.PeriodUsageCount);
+        Assert.Equal(1, row.UsageDays);
+        Assert.Equal(20m, row.AveragePerDay);
+        Assert.Equal(1, row.WorkOrderCount);
+        Assert.Equal(20m, row.AveragePerWorkOrder);
+        Assert.NotNull(row.EstimatedLifeReachedOn);
+
+        // 期間外だけを指定すると使用実績が無いので見込みは出さない（0ではなくnull）
+        var empty = await admin.GetFromJsonAsync<List<ToolLifeAnalysisRow>>(
+            "/api/tool-usages/life-analysis?from=2020-01-01&to=2020-01-31");
+        var emptyRow = Assert.Single(empty!, r => r.ToolCode == tool.Code);
+        Assert.Equal(0, emptyRow.PeriodUsageCount);
+        Assert.Null(emptyRow.AveragePerDay);
+        Assert.Null(emptyRow.EstimatedLifeReachedOn);
+        // 累計（寿命の消化）は期間に関係なく通算で見る
+        Assert.Equal(20, emptyRow.CumulativeCount);
+    }
+
+    [Fact]
     public async Task 保全手順書のCRUDと版数管理ができる()
     {
         using var factory = new ApiFactory();

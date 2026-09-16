@@ -1,4 +1,4 @@
-namespace MesApp.Core.Entities;
+﻿namespace MesApp.Core.Entities;
 
 /// <summary>保全手順書（Spec.md 5.1 MaintenanceProcedure。E-10-20）</summary>
 public class MaintenanceProcedure
@@ -187,6 +187,45 @@ public class MaintenanceRecordPart
 }
 
 /// <summary>治工具利用実績（Spec.md 5.5 ToolUsage。E-60-20。寿命検知の根拠データ）</summary>
+/// <summary>
+/// 治工具の引当・払出・受領（Spec.md 5.5 ToolIssue。B-20-30-01〜03）。
+/// <para>
+/// 前段取りで作業指示に治工具を確保し（引当）、現場が受け取り（払出・受領確認）、
+/// 使い終えたら戻す（返却）という流れを1レコードで表す。
+/// 「いま誰がどの治工具を持っているか」は未返却の行で分かる。
+/// </para>
+/// <para>
+/// 利用実績（<see cref="ToolUsage"/>）とは別物である。こちらは現物の所在、
+/// あちらは寿命の累計であり、片方だけを記録する運用もありうるため統合しない。
+/// </para>
+/// </summary>
+public class ToolIssue
+{
+    public int Id { get; set; }
+
+    public int ToolId { get; set; }
+    public Tool? Tool { get; set; }
+
+    public int WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
+    public ToolIssueStatus Status { get; set; } = ToolIssueStatus.Allocated;
+
+    public DateTimeOffset AllocatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public string? AllocatedByUserId { get; set; }
+
+    /// <summary>払出（受領確認）の日時と受領者（B-20-30-03）</summary>
+    public DateTimeOffset? IssuedAt { get; set; }
+    public string? IssuedToUserId { get; set; }
+    public AppUser? IssuedTo { get; set; }
+
+    public DateTimeOffset? ReturnedAt { get; set; }
+    public string? ReturnedByUserId { get; set; }
+
+    /// <summary>備考（取消理由・返却時の所見など）</summary>
+    public string? Note { get; set; }
+}
+
 public class ToolUsage
 {
     public int Id { get; set; }

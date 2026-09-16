@@ -183,3 +183,50 @@ public record ToolLifeStatusRow(
     /// <summary>閾値到達（要交換・廃棄）</summary>
     bool IsLifeReached,
     DateTimeOffset? LifeResetAt);
+
+// ---- 治工具の引当・払出（B-20-30）----
+
+/// <summary>治工具の引当（B-20-30-01。作業指示に対して確保する）</summary>
+public record ToolAllocateRequest(int ToolId, int WorkOrderId, string? Note);
+
+/// <summary>払出・受領確認（B-20-30-02〜03。受領者を省略すると操作者本人）</summary>
+public record ToolIssueReceiveRequest(string? IssuedToUserId);
+
+/// <summary>返却・取消の共通要求（理由は任意）</summary>
+public record ToolIssueCloseRequest(string? Note);
+
+public record ToolIssueResponse(
+    int Id, int ToolId, string ToolCode, string ToolName,
+    int WorkOrderId, string WorkOrderNo, string ProductCode, string ProcessCode,
+    ToolIssueStatus Status,
+    DateTimeOffset AllocatedAt,
+    DateTimeOffset? IssuedAt, string? IssuedToUserId, string? IssuedToName,
+    DateTimeOffset? ReturnedAt,
+    string? Note);
+
+// ---- 治工具の寿命分析（E-60-20-03）----
+
+/// <summary>
+/// 治工具の寿命分析（E-60-20-03）。期間内の使用ペースから寿命到達を見込み、交換の準備に使う。
+/// <para>
+/// 見込みが立たない治工具（寿命閾値が未設定、期間内に使用が無い、すでに寿命到達）は
+/// 予測日を null で返す。適当な日付を置くと交換計画が実態と外れるため。
+/// </para>
+/// </summary>
+public record ToolLifeAnalysisRow(
+    int ToolId, string ToolCode, string ToolName, ToolStatus Status,
+    int? LifeThresholdCount, int CumulativeCount,
+    /// <summary>寿命まで残り（回数。閾値未設定はnull。到達済みは0）</summary>
+    int? RemainingCount,
+    /// <summary>期間内の使用回数</summary>
+    int PeriodUsageCount,
+    /// <summary>期間内に使用実績のあった日数</summary>
+    int UsageDays,
+    /// <summary>1日あたりの平均使用回数（使用のあった日で割る）</summary>
+    decimal? AveragePerDay,
+    /// <summary>期間内に使用した作業指示の数</summary>
+    int WorkOrderCount,
+    /// <summary>作業指示1件あたりの平均使用回数</summary>
+    decimal? AveragePerWorkOrder,
+    /// <summary>このペースで使い続けた場合に寿命へ達する見込み日</summary>
+    DateOnly? EstimatedLifeReachedOn);

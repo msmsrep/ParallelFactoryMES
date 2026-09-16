@@ -1,4 +1,4 @@
-<span class="badge @CssClass">@Label</span>
+﻿<span class="badge @CssClass">@Label</span>
 
 @code {
     [Parameter, EditorRequired]
@@ -16,6 +16,10 @@
         "Created" => "未配布",
         "Dispatched" => "配布済",
         "Started" => "着手",
+        // 治工具の引当・払出（ToolIssueStatus）
+        "Allocated" => "引当済",
+        "Issued" => "払出済",
+        "Returned" => "返却済",
         _ => Status,
     };
 
@@ -23,8 +27,9 @@
     {
         "Draft" or "Created" => "",
         "Approved" or "Dispatched" => "badge-info",
-        "Released" or "Started" => "badge-warning",
-        "Completed" => "badge-success",
+        "Released" or "Started" or "Issued" => "badge-warning",
+        "Allocated" => "badge-info",
+        "Completed" or "Returned" => "badge-success",
         "Canceled" => "badge-danger",
         _ => "",
     };

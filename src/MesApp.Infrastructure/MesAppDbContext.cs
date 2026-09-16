@@ -79,6 +79,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
     public DbSet<MaintenanceRecordPart> MaintenanceRecordParts => Set<MaintenanceRecordPart>();
     public DbSet<ToolUsage> ToolUsages => Set<ToolUsage>();
+    public DbSet<ToolIssue> ToolIssues => Set<ToolIssue>();
 
     public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
 
@@ -280,6 +281,19 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.HasIndex(x => x.Code).IsUnique();
             e.Property(x => x.Code).HasMaxLength(20);
             e.Property(x => x.Name).HasMaxLength(100);
+        });
+
+        builder.Entity<ToolIssue>(e =>
+        {
+            e.HasIndex(x => new { x.ToolId, x.Status });
+            e.HasIndex(x => x.WorkOrderId);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasOne(x => x.Tool).WithMany()
+                .HasForeignKey(x => x.ToolId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.WorkOrder).WithMany()
+                .HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.IssuedTo).WithMany()
+                .HasForeignKey(x => x.IssuedToUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<InspectionResult>(e =>
