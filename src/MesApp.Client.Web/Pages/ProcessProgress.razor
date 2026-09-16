@@ -1,4 +1,4 @@
-@page "/process-progress"
+﻿@page "/process-progress"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -46,6 +46,71 @@
                 }
             </tbody>
         </table>
+    }
+</div>
+
+@* 遅れている作業指示（A-30-20-01）。通知の仕組みは持たないので画面で気づけるようにする *@
+<div class="card">
+    <h2 style="margin-top:0;">遅れている作業指示（A-30-20-01）</h2>
+    <div class="form-field" style="max-width:320px;">
+        <label>標準時間の超過しきい値（%）</label>
+        <input type="number" @bind="_overrunPercent" @bind:after="LoadDelaysAsync" />
+        <span class="text-muted">予定時間（段取り＋作業×計画数量）に対する超過率がこれ以上のものを出す</span>
+    </div>
+    @if (_delays is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_delays.Count == 0)
+    {
+        <p class="text-muted">納期超過・標準時間超過の作業指示はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>種別</th><th>作業指示</th><th>指図</th><th>品目</th><th>工程</th>
+                    <th>状態</th><th>納期</th><th>予定（分）</th><th>経過（分）</th><th>超過</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _delays)
+                {
+                    <tr>
+                        <td>
+                            @if (row.Kind == WorkOrderDelayKind.OverdueDueDate)
+                            {
+                                <span class="badge badge-danger">納期超過</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-warning">標準時間超過</span>
+                            }
+                        </td>
+                        <td><a href="work-orders/@row.WorkOrderId/record">@row.WorkOrderNo</a></td>
+                        <td>@row.OrderNo</td>
+                        <td>@row.ProductCode</td>
+                        <td>@row.ProcessCode</td>
+                        <td><StatusBadge Status="@row.Status.ToString()" /></td>
+                        <td>
+                            @(row.DueDate?.ToString("yyyy-MM-dd") ?? "-")
+                            @if (row.OverdueDays is { } days)
+                            {
+                                <span class="text-danger">（@(days)日超過）</span>
+                            }
+                        </td>
+                        <td>@row.PlannedMinutes.ToString("0.##")</td>
+                        <td>@row.ElapsedMinutes.ToString("0.##")</td>
+                        <td>@(row.OverrunPercent is null ? "-" : $"{row.OverrunPercent:0.##} %")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="text-muted">
+            経過時間は着手（状態履歴）からの実時間で、休憩や段取り待ちも含む。
+            標準時間を登録していない工程は超過を判定できないため出ない。
+        </p>
     }
 </div>
 
@@ -159,6 +224,8 @@
     }
 
     private List<ProcessProgressRow>? _progress;
+    private List<WorkOrderDelayRow>? _delays;
+    private decimal _overrunPercent = 20m;
     private List<EquipmentResponse> _equipments = [];
     private PagedResult<TroubleReportResponse>? _troubles;
     private readonly TroubleForm _form = new();
@@ -176,6 +243,7 @@
     {
         _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers") ?? [];
         await LoadProgressAsync();
+        await LoadDelaysAsync();
         _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
         await LoadTroublesAsync();
     }
@@ -186,6 +254,10 @@
         _progress = await Http.GetFromJsonAsync<List<ProcessProgressRow>>(
             $"api/work-orders/process-summary{query}");
     }
+
+    private async Task LoadDelaysAsync() =>
+        _delays = await Http.GetFromJsonAsync<List<WorkOrderDelayRow>>(
+            $"api/work-orders/delays?overrunPercent={_overrunPercent}");
 
     private ResponseForm GetResponse(int id)
     {

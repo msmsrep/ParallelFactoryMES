@@ -1,4 +1,4 @@
-@* ダッシュボード（Spec.md 3.8。当日実績・稼働率・不良率・進捗のKPI表示。
+﻿@* ダッシュボード（Spec.md 3.8。当日実績・稼働率・不良率・進捗のKPI表示。
    B-60-10-05 生産性モニタリング／C-40-10-05 不適合モニタリング／E-20-10-03 稼働モニタリング／A-30-10-01 進捗） *@
 @page "/"
 @attribute [Authorize]
@@ -90,9 +90,20 @@ else if (_progress.Count == 0)
 }
 else
 {
-    @if (_overdueCount > 0)
+    @if (_overdueCount > 0 || _delayCount > 0)
     {
-        <p><span class="badge badge-danger">納期超過 @_overdueCount 件</span></p>
+        <p>
+            @if (_overdueCount > 0)
+            {
+                <span class="badge badge-danger">納期超過の指図 @_overdueCount 件</span>
+                <span>&nbsp;</span>
+            }
+            @if (_delayCount > 0)
+            {
+                @* 工程レベルの遅れ（A-30-20-01）。内訳は工程進捗画面で見る *@
+                <a class="badge badge-warning" href="process-progress">遅れている作業指示 @_delayCount 件</a>
+            }
+        </p>
     }
     <table class="table">
         <thead>
@@ -143,6 +154,7 @@ else
     private int _inspectionFailCount;
     private int _openNonconformanceCount;
     private int _overdueCount;
+    private int _delayCount;
 
     private decimal DefectRate => _goodQuantity + _defectQuantity == 0
         ? 0
@@ -173,6 +185,9 @@ else
                 _inspectionFailCount = quality.InspectionFailCount;
                 _openNonconformanceCount = quality.OpenNonconformanceCount;
             }
+
+            var delays = await Http.GetFromJsonAsync<List<WorkOrderDelayRow>>("api/work-orders/delays");
+            _delayCount = delays?.Count ?? 0;
 
             var utilization = await Http.GetFromJsonAsync<List<EquipmentUtilizationRow>>(
                 $"api/equipment-logs/summary?from={today}&to={today}");

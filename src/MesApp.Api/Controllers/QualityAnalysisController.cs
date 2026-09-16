@@ -89,6 +89,19 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
                 defectTotal == 0 ? 0 : Math.Round(g.Sum(d => d.Quantity) / defectTotal * 100, 2)))
             .OrderByDescending(r => r.Quantity).ThenBy(r => r.Code)
             .ToList();
+        // 累積構成比（パレート図。C-40-10-01）。構成比を丸めてから積むと合計が100%からずれるため、
+        // 数量の累計から毎回求め直す
+        decimal cumulative = 0;
+        byDefectReason = byDefectReason
+            .Select(r =>
+            {
+                cumulative += r.Quantity;
+                return r with
+                {
+                    CumulativeShare = defectTotal == 0 ? 0 : Math.Round(cumulative / defectTotal * 100, 2),
+                };
+            })
+            .ToList();
 
         var nonconformances = (await db.NonconformanceReports.AsNoTracking()
                 .Select(n => new { n.CreatedAt, n.CauseCategory, n.Status })

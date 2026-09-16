@@ -158,3 +158,37 @@ public record ProductivitySummaryResponse(
     List<ProductivityRow> ByProcess,
     /// <summary>期間内に実績のあった作業指示の予実（超過率の大きい順）</summary>
     List<StandardTimeVarianceRow> TimeVariances);
+
+// ---- 遅延検知（A-30-20-01）----
+
+/// <summary>遅れの種類</summary>
+public enum WorkOrderDelayKind
+{
+    /// <summary>指図の納期を過ぎているのに完了していない</summary>
+    OverdueDueDate,
+
+    /// <summary>着手済みだが、経過時間が予定時間をしきい値以上超えている</summary>
+    OverrunStandardTime,
+}
+
+/// <summary>
+/// 遅れている作業指示（A-30-20-01 納期遅延・トラブル発生時の状況把握）。
+/// <para>
+/// 通知の仕組み（メール・プッシュ）は持たないため、画面に出すところまでを担う。
+/// 予定時間は指図展開時に固定した工順の値（標準段取り時間＋標準作業時間×計画数量）。
+/// </para>
+/// </summary>
+public record WorkOrderDelayRow(
+    int WorkOrderId, string WorkOrderNo, string OrderNo,
+    string ProductCode, string ProcessCode,
+    WorkOrderStatus Status,
+    WorkOrderDelayKind Kind,
+    DateOnly? DueDate,
+    /// <summary>納期からの超過日数（納期超過のみ）</summary>
+    int? OverdueDays,
+    /// <summary>着手時刻（標準時間超過のみ）</summary>
+    DateTimeOffset? StartedAt,
+    decimal PlannedMinutes,
+    decimal ElapsedMinutes,
+    /// <summary>予定に対する超過率（%。標準時間超過のみ）</summary>
+    decimal? OverrunPercent);

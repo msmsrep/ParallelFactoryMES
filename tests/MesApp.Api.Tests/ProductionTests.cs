@@ -580,4 +580,57 @@ public class ProductionTests
         Assert.Empty(empty.ByProduct);
         Assert.Empty(empty.TimeVariances);
     }
+
+    [Fact]
+    public async Task 納期超過と標準時間超過の作業指示を遅延として拾える()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 納期が過去の指図（工順1段目は 作業30分/個・段取り10分）
+        var overdue = await admin.PostAsJsonAsync("/api/manufacturing-orders",
+            new CreateManufacturingOrderRequest(ctx.ProductId, 10m,
+                DateOnly.FromDateTime(DateTime.Today).AddDays(-3),
+                ManufacturingOrderType.Normal, null, null));
+        overdue.EnsureSuccessStatusCode();
+        var overdueOrder = (await overdue.Content.ReadFromJsonAsync<ManufacturingOrderResponse>())!;
+        (await admin.PostAsync($"/api/manufacturing-orders/{overdueOrder.Id}/approve", null))
+            .EnsureSuccessStatusCode();
+        var overdueExpanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{overdueOrder.Id}/expand", new ExpandRequest(null));
+        overdueExpanded.EnsureSuccessStatusCode();
+        var overdueDetail = (await overdueExpanded.Content
+            .ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+
+        var delays = await admin.GetFromJsonAsync<List<WorkOrderDelayRow>>("/api/work-orders/delays");
+        var overdueRow = Assert.Single(delays!,
+            d => d.WorkOrderNo == overdueDetail.WorkOrders[0].WorkOrderNo);
+        Assert.Equal(WorkOrderDelayKind.OverdueDueDate, overdueRow.Kind);
+        Assert.Equal(3, overdueRow.OverdueDays);
+
+        // 納期内の指図を着手すると、経過時間が予定（310分）を超えるまでは遅延に出ない
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrder = order.WorkOrders[0];
+        (await admin.PostAsync($"/api/work-orders/{workOrder.Id}/start", null)).EnsureSuccessStatusCode();
+        var justStarted = await admin.GetFromJsonAsync<List<WorkOrderDelayRow>>("/api/work-orders/delays");
+        Assert.DoesNotContain(justStarted!, d => d.WorkOrderNo == workOrder.WorkOrderNo);
+
+        // しきい値を下げれば着手直後でも拾える（超過率は負なので-100%より上を対象にする）
+        var sensitive = await admin.GetFromJsonAsync<List<WorkOrderDelayRow>>(
+            "/api/work-orders/delays?overrunPercent=-100");
+        var overrunRow = Assert.Single(sensitive!, d => d.WorkOrderNo == workOrder.WorkOrderNo);
+        Assert.Equal(WorkOrderDelayKind.OverrunStandardTime, overrunRow.Kind);
+        Assert.Equal(310m, overrunRow.PlannedMinutes);
+        Assert.NotNull(overrunRow.StartedAt);
+
+        // 実績を報告して完了した作業指示は遅延に出ない
+        (await admin.PostAsJsonAsync($"/api/work-orders/{workOrder.Id}/production-records",
+                new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now,
+                    ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+        var afterComplete = await admin.GetFromJsonAsync<List<WorkOrderDelayRow>>(
+            "/api/work-orders/delays?overrunPercent=-100");
+        Assert.DoesNotContain(afterComplete!, d => d.WorkOrderNo == workOrder.WorkOrderNo);
+    }
 }

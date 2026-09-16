@@ -177,9 +177,15 @@ public record DefectSummaryRow(
     string Key, decimal GoodQuantity, decimal DefectQuantity,
     decimal ScrapQuantity, decimal ReworkQuantity, decimal DefectRate);
 
-/// <summary>不良理由別の集計（C-40-10-01 不良項目別分析）</summary>
+/// <summary>
+/// 不良理由別の集計（C-40-10-01 不良項目別分析）。
+/// 数量の多い順に並べ、累積構成比を持たせることでパレート図として読める
+/// （ガイド 4.4.3 のQC七つ道具。上位いくつで全体の何割かが分かると改善対象を選べる）
+/// </summary>
 public record DefectReasonSummaryRow(
-    string Code, string Name, DefectReasonCategory Category, decimal Quantity, decimal Share);
+    string Code, string Name, DefectReasonCategory Category, decimal Quantity, decimal Share,
+    /// <summary>累積構成比（%）。この行までの構成比の合計</summary>
+    decimal CumulativeShare = 0);
 
 public record QualitySummaryResponse(
     /// <summary>品目別の良品・不良集計（C-40-10-03）</summary>

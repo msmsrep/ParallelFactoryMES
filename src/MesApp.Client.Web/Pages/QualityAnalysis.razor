@@ -143,7 +143,10 @@ else
 
     @* 不良理由別の集計（C-40-10-01）。改善の対象を選ぶための構成比つき *@
     <div class="card">
-        <h2 style="margin-top:0;">不良理由別の不良数</h2>
+        <h2 style="margin-top:0;">不良理由別の不良数（パレート）</h2>
+        <p class="text-muted">
+            不良数の多い順に並べ、累積構成比を添える。上位いくつで全体の何割を占めるかが分かると、改善の対象を選べる。
+        </p>
         @if (_summary.ByDefectReason.Count == 0)
         {
             <p class="text-muted">対象期間の不良理由内訳はありません（実績入力で不良理由別の内訳を登録すると集計されます）。</p>
@@ -151,7 +154,7 @@ else
         else
         {
             <table class="table">
-                <thead><tr><th>不良理由</th><th>区分</th><th>不良数</th><th>構成比</th><th></th></tr></thead>
+                <thead><tr><th>不良理由</th><th>区分</th><th>不良数</th><th>構成比</th><th>累積構成比</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var row in _summary.ByDefectReason)
                     {
@@ -160,7 +163,9 @@ else
                             <td>@Labels.DefectCategory(row.Category)</td>
                             <td>@row.Quantity</td>
                             <td>@row.Share %</td>
-                            <td><BarMeter Value="@row.Share" /></td>
+                            <td>@row.CumulativeShare %</td>
+                            @* パレート図として読む：多い順に並べ、累積の伸びで改善対象の範囲を決める *@
+                            <td><BarMeter Value="@row.CumulativeShare" /></td>
                         </tr>
                     }
                 </tbody>

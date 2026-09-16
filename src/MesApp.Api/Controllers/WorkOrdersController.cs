@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -121,6 +121,95 @@ public class WorkOrdersController(
                 g.Count(w => w.Status == WorkOrderStatus.Completed),
                 g.Count(w => w.Status == WorkOrderStatus.Approved)))
             .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// 遅れている作業指示（A-30-20-01）。次の2つを返す。
+    /// <list type="bullet">
+    /// <item>指図の納期を過ぎているのに完了していない作業指示</item>
+    /// <item>着手済みで、経過時間が予定時間を <paramref name="overrunPercent"/> 以上超えている作業指示</item>
+    /// </list>
+    /// <para>
+    /// 通知の仕組み（メール等）は持たないため、画面に出すところまでを担う。
+    /// 予定時間が0分（標準時間が未設定）の工程は超過を判定できないため対象にしない。
+    /// </para>
+    /// </summary>
+    [HttpGet("delays")]
+    public async Task<ActionResult<List<WorkOrderDelayRow>>> Delays(
+        [FromQuery] decimal overrunPercent = 20m, CancellationToken ct = default)
+    {
+        var today = businessDate.Today;
+        var open = await db.WorkOrders.AsNoTracking()
+            .Where(w => w.Status != WorkOrderStatus.Canceled
+                        && w.Status != WorkOrderStatus.Completed
+                        && w.Status != WorkOrderStatus.Approved)
+            .Select(w => new
+            {
+                w.Id,
+                w.WorkOrderNo,
+                OrderNo = w.ManufacturingOrder!.OrderNo,
+                DueDate = w.ManufacturingOrder!.DueDate,
+                ProductCode = w.Product!.Code,
+                ProcessCode = w.Process!.Code,
+                w.Status,
+                w.PlannedQuantity,
+                w.StandardSetupMinutes,
+                w.StandardWorkMinutes,
+            })
+            .ToListAsync(ct);
+        if (open.Count == 0)
+        {
+            return new List<WorkOrderDelayRow>();
+        }
+
+        // 着手時刻は作業指示に持たせていないので、状態履歴の最初の「着手」から取る（Spec.md 5.2）
+        var ids = open.Select(w => w.Id).ToList();
+        var startedAt = (await db.WorkOrderStatusHistories.AsNoTracking()
+                .Where(h => ids.Contains(h.WorkOrderId) && h.ToStatus == WorkOrderStatus.Started)
+                .Select(h => new { h.WorkOrderId, h.ChangedAt })
+                .ToListAsync(ct))
+            .GroupBy(h => h.WorkOrderId)
+            .ToDictionary(g => g.Key, g => g.Min(h => h.ChangedAt));
+
+        var now = DateTimeOffset.Now;
+        var rows = new List<WorkOrderDelayRow>();
+        foreach (var w in open)
+        {
+            var planned = w.StandardSetupMinutes + w.StandardWorkMinutes * w.PlannedQuantity;
+            var started = startedAt.GetValueOrDefault(w.Id);
+            var elapsed = started == default
+                ? 0m
+                : Math.Round((decimal)(now - started).TotalMinutes, 2);
+
+            if (w.DueDate is { } due && due < today)
+            {
+                rows.Add(new WorkOrderDelayRow(
+                    w.Id, w.WorkOrderNo, w.OrderNo, w.ProductCode, w.ProcessCode, w.Status,
+                    WorkOrderDelayKind.OverdueDueDate, due, today.DayNumber - due.DayNumber,
+                    started == default ? null : started, planned, elapsed, null));
+                continue;
+            }
+
+            // 標準時間が未設定の工程は超過を判定できない（0分に対する超過率は意味を持たない）
+            if (started == default || planned <= 0)
+            {
+                continue;
+            }
+            var overrun = Math.Round((elapsed - planned) / planned * 100, 2);
+            if (overrun >= overrunPercent)
+            {
+                rows.Add(new WorkOrderDelayRow(
+                    w.Id, w.WorkOrderNo, w.OrderNo, w.ProductCode, w.ProcessCode, w.Status,
+                    WorkOrderDelayKind.OverrunStandardTime, w.DueDate, null,
+                    started, planned, elapsed, overrun));
+            }
+        }
+
+        return rows
+            .OrderByDescending(r => r.OverdueDays ?? 0)
+            .ThenByDescending(r => r.OverrunPercent ?? 0)
+            .ThenBy(r => r.WorkOrderNo, StringComparer.Ordinal)
+            .ToList();
     }
 
     [HttpGet("{id:int}")]

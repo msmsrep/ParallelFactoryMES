@@ -653,4 +653,40 @@ public class QualityTests
             new ShipmentJudgmentCreateRequest(lot.Id, null, ShipmentJudgmentResult.Approved, null));
         Assert.Equal(HttpStatusCode.Created, judgeByQa.StatusCode);
     }
+
+    [Fact]
+    public async Task 不良理由別の集計が多い順に累積構成比を持つ()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        async Task<int> CreateReasonAsync(string code, string name)
+        {
+            var response = await admin.PostAsJsonAsync("/api/defect-reasons",
+                new Core.Contracts.Masters.DefectReasonRequest(code, name, DefectReasonCategory.Process));
+            response.EnsureSuccessStatusCode();
+            return (await response.Content
+                .ReadFromJsonAsync<Core.Contracts.Masters.DefectReasonResponse>())!.Id;
+        }
+
+        var major = await CreateReasonAsync("DF-01", "寸法外れ");
+        var minor = await CreateReasonAsync("DF-02", "キズ");
+        (await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+                new Core.Contracts.Execution.ProductionRecordRequest(
+                    2m, 8m, DateTimeOffset.Now, null, ctx.ProductLocationId, false,
+                    Defects: [new(major, 6m), new(minor, 2m)])))
+            .EnsureSuccessStatusCode();
+
+        var summary = await admin.GetFromJsonAsync<QualitySummaryResponse>("/api/quality/summary");
+
+        // 多い順に並び、累積構成比は最後で100%になる（パレート図として読む。C-40-10-01）
+        Assert.Equal("DF-01", summary!.ByDefectReason[0].Code);
+        Assert.Equal(75m, summary.ByDefectReason[0].Share);
+        Assert.Equal(75m, summary.ByDefectReason[0].CumulativeShare);
+        Assert.Equal(25m, summary.ByDefectReason[1].Share);
+        Assert.Equal(100m, summary.ByDefectReason[1].CumulativeShare);
+    }
 }
