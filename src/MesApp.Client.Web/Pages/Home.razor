@@ -1,3 +1,5 @@
+@* ダッシュボード（Spec.md 3.8。当日実績・稼働率・不良率・進捗のKPI表示。
+   B-60-10-05 生産性モニタリング／C-40-10-05 不適合モニタリング／E-20-10-03 稼働モニタリング／A-30-10-01 進捗） *@
 @page "/"
 @attribute [Authorize]
 @inject HttpClient Http
@@ -6,6 +8,76 @@
 <PageTitle>ダッシュボード - Parallel Factory MES</PageTitle>
 
 <h1>ダッシュボード</h1>
+@if (_businessDate is not null)
+{
+    <p class="text-muted">
+        当日＝製造日 @_businessDate.Today.ToString("yyyy-MM-dd")（@(_businessDate.BoundaryHour)時境界。夜勤の日跨ぎ実績も同じ製造日に集計する）
+    </p>
+}
+
+<Notice Error="@_error" />
+
+<h2>当日の実績</h2>
+@if (_loading)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <div class="card">
+        <table class="table">
+            <tbody>
+                <tr>
+                    <th>良品数</th>
+                    <td>@_goodQuantity.ToString("0.##")</td>
+                    <th>不良数</th>
+                    <td>@_defectQuantity.ToString("0.##")</td>
+                </tr>
+                <tr>
+                    <th>不良率</th>
+                    <td>
+                        @if (_goodQuantity + _defectQuantity == 0)
+                        {
+                            <span class="text-muted">実績なし</span>
+                        }
+                        else
+                        {
+                            <span>@DefectRate.ToString("0.##") %</span>
+                            <BarMeter Value="DefectRate" />
+                        }
+                    </td>
+                    <th>設備稼働率</th>
+                    <td>
+                        @if (_recordedHours == 0)
+                        {
+                            <span class="text-muted">記録なし</span>
+                        }
+                        else
+                        {
+                            <span>@UtilizationRate.ToString("0.##") %</span>
+                            <BarMeter Value="UtilizationRate" HighIsBad="false" />
+                        }
+                    </td>
+                </tr>
+                <tr>
+                    <th>検査 合格 / 不合格</th>
+                    <td>@_inspectionPassCount 件 / @_inspectionFailCount 件</td>
+                    <th>未クローズの不適合</th>
+                    <td>
+                        @_openNonconformanceCount 件
+                        @if (_openNonconformanceCount > 0)
+                        {
+                            <a class="badge badge-warning" href="nonconformances">要対応</a>
+                        }
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <p class="text-muted">
+            内訳は<a href="quality-analysis">品質分析</a>・<a href="maintenance">設備保全</a>で確認する。
+        </p>
+    </div>
+}
 
 <h2>生産進捗（A-30-10-01）</h2>
 @if (_progress is null)
@@ -18,6 +90,10 @@ else if (_progress.Count == 0)
 }
 else
 {
+    @if (_overdueCount > 0)
+    {
+        <p><span class="badge badge-danger">納期超過 @_overdueCount 件</span></p>
+    }
     <table class="table">
         <thead>
             <tr>
@@ -54,11 +130,67 @@ else
 }
 
 @code {
+    private BusinessDateResponse? _businessDate;
     private List<OrderProgressResponse>? _progress;
+    private bool _loading = true;
+    private string? _error;
+
+    private decimal _goodQuantity;
+    private decimal _defectQuantity;
+    private decimal _runningHours;
+    private decimal _recordedHours;
+    private int _inspectionPassCount;
+    private int _inspectionFailCount;
+    private int _openNonconformanceCount;
+    private int _overdueCount;
+
+    private decimal DefectRate => _goodQuantity + _defectQuantity == 0
+        ? 0
+        : _defectQuantity / (_goodQuantity + _defectQuantity) * 100m;
+
+    private decimal UtilizationRate => _recordedHours == 0 ? 0 : _runningHours / _recordedHours * 100m;
 
     protected override async Task OnInitializedAsync()
     {
         _progress = await Http.GetFromJsonAsync<List<OrderProgressResponse>>(
             "api/manufacturing-orders/progress");
+        _overdueCount = _progress?.Count(p => p.IsOverdue) ?? 0;
+
+        try
+        {
+            // 「当日」は暦日ではなく製造日（Spec.md 3.9）。境界時刻の判断はサーバーが持つ
+            _businessDate = await Http.GetFromJsonAsync<BusinessDateResponse>("api/business-date");
+            var today = _businessDate!.Today.ToString("yyyy-MM-dd");
+
+            // 集計はAPI側で行う（Spec.md 7.5。一覧を全件取って画面で数えない）
+            var quality = await Http.GetFromJsonAsync<QualitySummaryResponse>(
+                $"api/quality/summary?from={today}&to={today}");
+            if (quality is not null)
+            {
+                _goodQuantity = quality.ByProduct.Sum(r => r.GoodQuantity);
+                _defectQuantity = quality.ByProduct.Sum(r => r.DefectQuantity);
+                _inspectionPassCount = quality.InspectionPassCount;
+                _inspectionFailCount = quality.InspectionFailCount;
+                _openNonconformanceCount = quality.OpenNonconformanceCount;
+            }
+
+            var utilization = await Http.GetFromJsonAsync<List<EquipmentUtilizationRow>>(
+                $"api/equipment-logs/summary?from={today}&to={today}");
+            if (utilization is not null)
+            {
+                _runningHours = utilization.Sum(r => r.RunningHours);
+                _recordedHours = utilization.Sum(r =>
+                    r.RunningHours + r.StoppedHours + r.SetupHours + r.FailureHours + r.IdleHours);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            // KPIが取れなくても進捗一覧は見せる（ダッシュボードが丸ごと落ちないようにする）
+            _error = "当日実績の集計を取得できませんでした。時間をおいて再読込してください。";
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 }

@@ -113,7 +113,8 @@
 | 出荷判定ゲート | `Api/Policies/ShipmentGatePolicy.cs` | Spec.md 3.9。承認済みの「可／特採」判定の条件はここだけに置く |
 | ロット在庫ステータス変更（＋状態履歴） | `Api/Services/LotStatusService.cs`<br>`Core/Entities/Production.cs`: LotStatusHistory | Spec.md 5.3。`Lot.StockStatus` を**直接代入しない**。呼び先は `InventoryController`／`InspectionOrdersController`／`NonconformanceController`／`ReceivingController` |
 | ロット系譜（分割・統合・振替） | `Core/Entities/Production.cs`: LotGenealogy<br>`InventoryController.AddGenealogy` | Spec.md 5.3・5.7。追跡の正は `Lot.ParentLotId` ではなくこちら。`TraceabilityController` はこの関係を辿る |
-| 製造日（業務日付）境界 | `Core/Abstractions/IBusinessDateService.cs`<br>`Api/Services/BusinessDateService.cs` | Spec.md 7章 |
+| 製造日（業務日付）境界 | `Core/Abstractions/IBusinessDateService.cs`<br>`Api/Services/BusinessDateService.cs`<br>`Api/Controllers/BusinessDateController.cs` `api/business-date`（現在の製造日と境界時刻） | Spec.md 3.9。**画面は境界時刻を知らないので「当日」を暦日で代用しない**（境界をまたぐ時間帯に夜勤の実績が前日・当日へずれる）。`Tests/BusinessDateTests.cs` |
+| ダッシュボード（当日KPI） | `Web/Pages/Home.razor`（`/`） | Spec.md 3.8。集計は既存APIを製造日で絞って呼ぶだけで、**画面では数えない**（`api/quality/summary`・`api/equipment-logs/summary`・`api/manufacturing-orders/progress`）。KPIが取れなくても進捗一覧は出す |
 | DB・DbContext・スキーマ | `Infra/MesAppDbContext.cs`（653行）<br>`Infra/DependencyInjection.cs`（起動時 `MigrateAsync`）<br>`Infra/DatabaseOptions.cs` | SQLite。`Infra/Migrations/` は**読まない** |
 | 列挙型（全業務共通） | `Core/Entities/Enums.cs`（36種） | ステータス追加はここ。UI表示名は `Web/Shared/Labels.cs` |
 | DTO | `Core/Contracts/{Auth,Execution,Inventory,Maintenance,Masters,Production,Quality,Setup,Users}/` | すべて `record`。エンティティを直接返さない |

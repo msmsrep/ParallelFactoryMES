@@ -1,4 +1,6 @@
+﻿using System.Net.Http.Json;
 using MesApp.Api.Services;
+using MesApp.Core.Contracts.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -20,6 +22,34 @@ public class BusinessDateTests
             })
             .Build();
         return new BusinessDateService(configuration, NullLogger<BusinessDateService>.Instance);
+    }
+
+    [Fact]
+    public async Task 製造日APIが当日と境界時刻を返す()
+    {
+        // 境界0時なら製造日は暦日と一致するので、実行時刻に依存せず期待値を組み立てられる
+        using var factory = new ApiFactory(
+            new Dictionary<string, string> { ["BusinessDay:BoundaryHour"] = "0" });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var before = DateOnly.FromDateTime(DateTime.Now);
+        var body = await admin.GetFromJsonAsync<BusinessDateResponse>("/api/business-date");
+        var after = DateOnly.FromDateTime(DateTime.Now);
+
+        Assert.Equal(0, body!.BoundaryHour);
+        // 日付をまたぐ瞬間に実行された場合だけ、前後どちらの暦日も正しい
+        Assert.True(body.Today == before || body.Today == after);
+    }
+
+    [Fact]
+    public async Task 製造日APIの境界時刻は既定で6時()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var body = await admin.GetFromJsonAsync<BusinessDateResponse>("/api/business-date");
+
+        Assert.Equal(6, body!.BoundaryHour);
     }
 
     [Fact]
