@@ -77,7 +77,9 @@ public class InventoryTests
         Assert.False(missing.Succeeded);
         Assert.Contains("LocationCode", Assert.Single(missing.Errors).Message);
 
-        // 取込の権限は単票の受入APIと同じ（作業者は受入できない）
+        // 取込の権限は単票の受入APIと同じ（作業者は受入できない）。画面が取込欄を隠すのに使うロールも同じ定数を返す
+        var kinds = await admin.GetFromJsonAsync<List<CsvKindInfo>>("/api/actuals/csv/kinds");
+        Assert.Equal(MesRoleGroups.InventoryManage, kinds!.Single(k => k.Kind == "receiving").WriteRoles);
         using var operator_ = await TestAuth.CreateUserClientAsync(
             factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
         var forbidden = await Phase3TestData.PostActualCsvAsync(operator_, "receiving", header + "RM-01,1,LOC-M,,,\n");

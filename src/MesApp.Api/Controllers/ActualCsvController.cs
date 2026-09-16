@@ -18,7 +18,8 @@ public class ActualCsvController(ActualCsvService service) : ControllerBase
 {
     /// <summary>CSV取込に対応する実績種別と列定義</summary>
     [HttpGet("kinds")]
-    public ActionResult<List<CsvKindInfo>> Kinds() => ActualCsvKinds.All.Select(k => k.Info).ToList();
+    public ActionResult<List<CsvKindInfo>> Kinds() =>
+        ActualCsvKinds.All.Select(k => k.Info with { WriteRoles = k.WriteRoles }).ToList();
 
     /// <summary>ヘッダーのみのテンプレートCSV</summary>
     [HttpGet("{kind}/template")]

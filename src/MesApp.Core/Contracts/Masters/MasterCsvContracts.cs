@@ -29,6 +29,12 @@ public record CsvKindInfo(
     /// （片方だけ緩いと、フォームでは登録できないマスタがCSVからは書き換えられる）。
     /// </summary>
     public bool UserAdminWrite { get; init; }
+
+    /// <summary>
+    /// 取込に必要なロールグループ（実績CSVのみ。種別ごとに単票APIと同じ定数を返す）。
+    /// 画面は取込欄の表示制御にこの値を使い、APIと画面で別々にロールを書かない
+    /// </summary>
+    public string? WriteRoles { get; init; }
 }
 
 /// <summary>CSVの列定義</summary>
