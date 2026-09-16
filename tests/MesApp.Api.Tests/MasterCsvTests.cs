@@ -1032,4 +1032,193 @@ public class MasterCsvTests
         Assert.Contains(invalid.Errors, e => e.Message.Contains("LOC-X"));
     }
 
+    // ---- ZIPによる一括取込・一括出力 ----
+
+    [Fact]
+    public async Task サンプルのマスタと実績をそれぞれZIPで一括取込できる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        // README.md などCSV以外のファイルは無視される
+        var masters = ZipDirectory(FindSampleDirectory());
+        var actuals = ZipDirectory(FindSampleDirectory("actual-csv"));
+
+        // 検証のみでは何も残らない
+        var dry = await PostBundleAsync(client, "masters", masters, dryRun: true);
+        Assert.True(dry.Succeeded, Describe(dry));
+        Assert.Equal(19, dry.Files.Count);
+        Assert.Empty((await client.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!);
+
+        var imported = await PostBundleAsync(client, "masters", masters);
+        Assert.True(imported.Succeeded, Describe(imported));
+        Assert.Equal(["01_work-centers.csv", "02_processes.csv"], imported.Files.Take(2).Select(f => f.FileName));
+        var pump = (await client.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!.Single(p => p.Code == "FG-1000");
+        Assert.Equal(7, (await client.GetFromJsonAsync<List<BomItemResponse>>($"/api/products/{pump.Id}/bom"))!.Count);
+
+        // 実績は同じ種別を番号違いで複数含む（05_consumptions と 07_consumptions）
+        var actualResult = await PostBundleAsync(client, "actuals", actuals);
+        Assert.True(actualResult.Succeeded, Describe(actualResult));
+        Assert.Equal(12, actualResult.Files.Count);
+
+        // マスタと実績が混ざったZIPはどちらの一括取込でも受け付けない
+        var mixed = ZipFiles(("01_processes.csv", "Code,Name\nPR-99,検査\n"), ("02_receiving.csv", "ProductCode,Quantity,LocationCode\nRM-3001,1,WH-M01\n"));
+        var mixedToMasters = await PostBundleRawAsync(client, "masters", mixed);
+        Assert.Equal(HttpStatusCode.BadRequest, mixedToMasters.StatusCode);
+        Assert.Contains("02_receiving.csv", await mixedToMasters.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostBundleRawAsync(client, "actuals", mixed)).StatusCode);
+    }
+
+    [Fact]
+    public async Task 一括取込は1ファイルでもエラーがあれば全ファイルを取り消す()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        var zip = ZipFiles(
+            ("01_processes.csv", "Code,Name\nPR-01,組立\n"),
+            ("02_products.csv", "Code,Name,Unit,Type\nP-001,部材,個,Material\nP-002,部材,個,NoSuchType\n"),
+            ("03_locations.csv", "Code,AreaType\nLOC-1,MaterialWarehouse\n"));
+        var result = await PostBundleAsync(client, "masters", zip);
+        Assert.False(result.Succeeded);
+        Assert.True(result.Files[0].Result.Succeeded);
+        var failed = result.Files[1];
+        Assert.Equal("02_products.csv", failed.FileName);
+        Assert.Contains(failed.Result.Errors, e => e.Line == 3 && e.Message.Contains("NoSuchType"));
+        Assert.Equal(["03_locations.csv"], result.NotProcessed);
+        // 先に成功した 01_processes.csv も取り消されている
+        Assert.Empty((await client.GetFromJsonAsync<List<ProcessResponse>>("/api/processes"))!);
+
+        // ZIPでないもの・CSVの無いZIP・種別が分からないファイルは、取り込む前に拒否する
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await PostBundleRawAsync(client, "masters", Encoding.UTF8.GetBytes("Code,Name\n"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await PostBundleRawAsync(client, "masters", ZipFiles(("README.md", "# x")))).StatusCode);
+        var unknown = await PostBundleRawAsync(client, "masters", ZipFiles(("01_processes.csv", "Code,Name\nPR-01,組立\n"), ("02_unknown.csv", "A\n1\n")));
+        Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
+        Assert.Empty((await client.GetFromJsonAsync<List<ProcessResponse>>("/api/processes"))!);
+
+        // 展開すると大きすぎるファイル（ZIP爆弾）は展開の途中で打ち切る
+        var bomb = ZipFiles(("01_processes.csv", "Code,Name\n" + new string('x', 6 * 1024 * 1024)));
+        var bombResponse = await PostBundleRawAsync(client, "masters", bomb);
+        Assert.Equal(HttpStatusCode.BadRequest, bombResponse.StatusCode);
+        Assert.Contains("大きすぎ", await bombResponse.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task 一括取込はZIP内の全種別の権限が必要()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "manager1", "Passw0rd123", MesRoles.ProductionManager);
+
+        // 生産管理担当者は工程を取り込めるが、ユーザーは取り込めない。混ざったZIPは1件も反映しない
+        var zip = ZipFiles(
+            ("01_processes.csv", "Code,Name\nPR-01,組立\n"),
+            ("02_users.csv", "UserName,DisplayName,InitialPassword\nop9,作業者,Passw0rd123\n"));
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostBundleRawAsync(manager, "masters", zip)).StatusCode);
+        Assert.Empty((await admin.GetFromJsonAsync<List<ProcessResponse>>("/api/processes"))!);
+        Assert.True((await PostBundleAsync(manager, "masters", ZipFiles(("01_processes.csv", "Code,Name\nPR-01,組立\n")))).Succeeded);
+
+        // 実績も同じ（作業者は受入を取り込めない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(
+            factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostBundleRawAsync(operator_, "actuals",
+            ZipFiles(("01_receiving.csv", "ProductCode,Quantity,LocationCode\nX,1,Y\n")))).StatusCode);
+    }
+
+    [Fact]
+    public async Task 全マスタを番号付きZIPで出力しそのまま別のDBへ取り込める()
+    {
+        // 番号の順は全種別を網羅している（種別を追加したら ImportOrder にも入れる）
+        Assert.Equal(
+            MesApp.Api.Services.MasterCsvKinds.All.Select(k => k.Kind).Order(),
+            MesApp.Api.Services.MasterCsvKinds.ImportOrder.Order());
+
+        byte[] exported;
+        using (var source = new ApiFactory())
+        {
+            using var admin = await TestAuth.CreateAdminClientAsync(source);
+            Assert.True((await PostBundleAsync(admin, "masters", ZipDirectory(FindSampleDirectory()))).Succeeded);
+            var response = await admin.GetAsync("/api/masters/csv/bundle");
+            response.EnsureSuccessStatusCode();
+            Assert.Equal("application/zip", response.Content.Headers.ContentType!.MediaType);
+            exported = await response.Content.ReadAsByteArrayAsync();
+
+            // 参照を絞っている種別（ユーザー等）は、管理者以外の出力には入らない
+            using var manager = await TestAuth.CreateUserClientAsync(
+                source, admin, "manager1", "Passw0rd123", MesRoles.ProductionManager);
+            var managerNames = EntryNames(await manager.GetByteArrayAsync("/api/masters/csv/bundle"));
+            Assert.DoesNotContain("18_users.csv", managerNames);
+            Assert.Contains("04_products.csv", managerNames);
+        }
+        var names = EntryNames(exported);
+        Assert.Equal(19, names.Count);
+        Assert.Equal("01_work-centers.csv", names[0]);
+
+        // パスワードは出力しないため、ユーザー系を除けば空のDBへそのまま取り込める
+        using var target = new ApiFactory();
+        using var targetAdmin = await TestAuth.CreateAdminClientAsync(target);
+        var roundTrip = await PostBundleAsync(targetAdmin, "masters", ExcludeEntries(exported, "18_users.csv", "19_user-skills.csv"));
+        Assert.True(roundTrip.Succeeded, Describe(roundTrip));
+        var products = (await targetAdmin.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!;
+        Assert.Equal(12, products.Count);
+        Assert.Equal("WH-P01", products.Single(p => p.Code == "FG-1000").DefaultLocationCode);
+    }
+
+    private static string Describe(CsvBundleImportResult result) =>
+        string.Join(" / ", result.Files.SelectMany(f => f.Result.Errors.Select(e => $"{f.FileName} {e.Line}行目 {e.Message}")));
+
+    private static async Task<CsvBundleImportResult> PostBundleAsync(
+        HttpClient client, string area, byte[] zip, bool dryRun = false)
+    {
+        var response = await PostBundleRawAsync(client, area, zip, dryRun);
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        return (await response.Content.ReadFromJsonAsync<CsvBundleImportResult>())!;
+    }
+
+    private static Task<HttpResponseMessage> PostBundleRawAsync(
+        HttpClient client, string area, byte[] zip, bool dryRun = false)
+    {
+        var content = new MultipartFormDataContent();
+        var file = new ByteArrayContent(zip);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        content.Add(file, "file", "bundle.zip");
+        return client.PostAsync($"/api/{area}/csv/bundle?dryRun={(dryRun ? "true" : "false")}", content);
+    }
+
+    private static byte[] ZipDirectory(string directory) =>
+        ZipFiles([.. Directory.GetFiles(directory).Select(f => (Path.GetFileName(f), File.ReadAllText(f)))]);
+
+    private static byte[] ZipFiles(params (string Name, string Content)[] files)
+    {
+        using var buffer = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(buffer, System.IO.Compression.ZipArchiveMode.Create, true))
+        {
+            foreach (var (name, text) in files)
+            {
+                using var stream = archive.CreateEntry(name).Open();
+                stream.Write(Encoding.UTF8.GetBytes(text));
+            }
+        }
+        return buffer.ToArray();
+    }
+
+    private static List<string> EntryNames(byte[] zip)
+    {
+        using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(zip));
+        return [.. archive.Entries.Select(e => e.FullName).Order(StringComparer.Ordinal)];
+    }
+
+    private static byte[] ExcludeEntries(byte[] zip, params string[] excluded)
+    {
+        using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(zip));
+        return ZipFiles([.. archive.Entries
+            .Where(e => !excluded.Contains(e.FullName))
+            .Select(e =>
+            {
+                using var reader = new StreamReader(e.Open());
+                return (e.FullName, reader.ReadToEnd());
+            })]);
+    }
 }

@@ -21,99 +21,93 @@ public sealed partial class MasterCsvService
     public async Task<CsvImportResult> ImportAsync(
         CsvKindInfo kind, string csvText, bool dryRun, CancellationToken ct)
     {
-        var errors = new List<CsvImportError>();
-        var table = CsvImport.Prepare(kind, csvText, errors);
-        if (table is null)
-        {
-            return CsvImport.Result(kind, 0, 0, 0, dryRun, errors);
-        }
+        var bundle = await ImportBundleAsync([new CsvBundleFile<CsvKindInfo>(kind.Kind, kind, csvText)], dryRun, ct);
+        return bundle.Files[0].Result;
+    }
 
+    /// <summary>
+    /// 複数ファイルの一括取込。全ファイルを1つのトランザクションで順に取り込み、
+    /// どれか1つでもエラーがあれば全ファイルを取り消す（<see cref="CsvBundle"/>）
+    /// </summary>
+    public Task<CsvBundleImportResult> ImportBundleAsync(
+        IReadOnlyList<CsvBundleFile<CsvKindInfo>> files, bool dryRun, CancellationToken ct) =>
+        CsvBundle.ImportAsync(db, files, kind => kind, dryRun, ImportOneAsync, ct);
+
+    /// <summary>1ファイル分を取り込み、エラーが無ければ保存して監査ログを残す（トランザクションは呼び出し側）</summary>
+    private async Task<CsvFileImportCount> ImportOneAsync(
+        CsvKindInfo kind, CsvTable table, List<CsvImportError> errors, CancellationToken ct)
+    {
         var counter = new ImportCounter();
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        try
+        switch (kind.Kind)
         {
-            switch (kind.Kind)
-            {
-                case MasterCsvKinds.Products:
-                    await ImportProductsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Processes:
-                    await ImportProcessesAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Equipments:
-                    await ImportEquipmentsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.EquipmentParts:
-                    await ImportEquipmentPartsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Tools:
-                    await ImportToolsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.WorkCenters:
-                    await ImportWorkCentersAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Locations:
-                    await ImportLocationsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.InspectionItems:
-                    await ImportInspectionItemsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.ControlItems:
-                    await ImportControlItemsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Checklists:
-                    await ImportChecklistsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.DefectReasons:
-                    await ImportDefectReasonsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Skills:
-                    await ImportSkillsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Bom:
-                    await ImportBomAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Routing:
-                    await ImportRoutingAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.WorkProcedures:
-                    await ImportWorkProceduresAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.InspectionDevices:
-                    await ImportInspectionDevicesAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Shifts:
-                    await ImportShiftsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Users:
-                    await ImportUsersAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.UserSkills:
-                    await ImportUserSkillsAsync(table, errors, counter, ct);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(kind));
-            }
-
-            if (errors.Count == 0 && !dryRun)
-            {
-                await db.SaveChangesAsync(ct);
-                await auditLogger.LogAsync("Master", "CsvImport", kind.Kind, null,
-                    detail: $"rows={table.Rows.Count}, created={counter.Created}, updated={counter.Updated}", ct: ct);
-                await transaction.CommitAsync(ct);
-            }
-            else
-            {
-                await transaction.RollbackAsync(ct);
-            }
-        }
-        catch (DbUpdateException ex)
-        {
-            await transaction.RollbackAsync(ct);
-            errors.Add(new CsvImportError(0, $"DBへの反映に失敗しました：{ex.InnerException?.Message ?? ex.Message}"));
+            case MasterCsvKinds.Products:
+                await ImportProductsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Processes:
+                await ImportProcessesAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Equipments:
+                await ImportEquipmentsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.EquipmentParts:
+                await ImportEquipmentPartsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Tools:
+                await ImportToolsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.WorkCenters:
+                await ImportWorkCentersAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Locations:
+                await ImportLocationsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.InspectionItems:
+                await ImportInspectionItemsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.ControlItems:
+                await ImportControlItemsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Checklists:
+                await ImportChecklistsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.DefectReasons:
+                await ImportDefectReasonsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Skills:
+                await ImportSkillsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Bom:
+                await ImportBomAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Routing:
+                await ImportRoutingAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.WorkProcedures:
+                await ImportWorkProceduresAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.InspectionDevices:
+                await ImportInspectionDevicesAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Shifts:
+                await ImportShiftsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Users:
+                await ImportUsersAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.UserSkills:
+                await ImportUserSkillsAsync(table, errors, counter, ct);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind));
         }
 
-        return CsvImport.Result(kind, table.Rows.Count, counter.Created, counter.Updated, dryRun, errors);
+        if (errors.Count == 0)
+        {
+            await db.SaveChangesAsync(ct);
+            await auditLogger.LogAsync("Master", "CsvImport", kind.Kind, null,
+                detail: $"rows={table.Rows.Count}, created={counter.Created}, updated={counter.Updated}", ct: ct);
+        }
+        return new CsvFileImportCount(counter.Created, counter.Updated);
     }
 
     // ---- 単票マスタ ----

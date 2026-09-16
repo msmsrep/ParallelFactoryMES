@@ -72,7 +72,11 @@ public static class CsvImport
     /// アップロードされたCSVを文字列にする（multipart/form-data のファイル、またはボディそのもの）。
     /// 空なら null を返す。
     /// </summary>
-    public static async Task<string?> ReadUploadAsync(HttpRequest request, CancellationToken ct)
+    public static async Task<string?> ReadUploadAsync(HttpRequest request, CancellationToken ct) =>
+        await ReadUploadBytesAsync(request, ct) is { } bytes ? CsvFile.Decode(bytes) : null;
+
+    /// <summary>アップロードされたファイル（またはボディ）をバイト列で読む。空なら null（ZIPの一括取込で使う）</summary>
+    public static async Task<byte[]?> ReadUploadBytesAsync(HttpRequest request, CancellationToken ct)
     {
         using var buffer = new MemoryStream();
         if (request.HasFormContentType)
@@ -88,6 +92,6 @@ public static class CsvImport
         {
             await request.Body.CopyToAsync(buffer, ct);
         }
-        return buffer.Length == 0 ? null : CsvFile.Decode(buffer.ToArray());
+        return buffer.Length == 0 ? null : buffer.ToArray();
     }
 }

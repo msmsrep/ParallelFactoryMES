@@ -19,7 +19,7 @@ namespace MesApp.Api.Services;
 /// 直接写すと、判定や監査ログの付け忘れがそのまま迂回経路になる。
 /// </para>
 /// <para>
-/// 全行を1つのトランザクションで処理し、<b>1行でもエラーがあれば全件ロールバック</b>する。
+/// 全行を1つのトランザクションで処理し、<b>1行でもエラーがあれば全件ロールバック</b>する（ZIPの一括取込では全ファイルで1つ）。
 /// 行は保存しながら進めるため、後の行は前の行の結果（採番済みロット等）を前提にできる。
 /// 検証のみ（dryRun）も実際に登録してからロールバックする——ロット番号の重複のように
 /// 前の行を登録しないと判定できない条件があるため。
@@ -38,50 +38,44 @@ public sealed class ActualCsvService(
     public async Task<CsvImportResult> ImportAsync(
         ActualCsvKind kind, string csvText, bool dryRun, string? userId, CancellationToken ct)
     {
-        var errors = new List<CsvImportError>();
-        var table = CsvImport.Prepare(kind.Info, csvText, errors);
-        if (table is null)
-        {
-            return CsvImport.Result(kind.Info, 0, 0, 0, dryRun, errors);
-        }
+        var bundle = await ImportBundleAsync(
+            [new CsvBundleFile<ActualCsvKind>(kind.Info.Kind, kind, csvText)], dryRun, userId, ct);
+        return bundle.Files[0].Result;
+    }
 
-        var created = 0;
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        try
-        {
-            created = kind.Info.Kind switch
-            {
-                ActualCsvKinds.Receiving => await ImportReceivingAsync(table, errors, userId, ct),
-                ActualCsvKinds.ManufacturingOrders => await ImportManufacturingOrdersAsync(table, errors, userId, ct),
-                ActualCsvKinds.SetupRecords => await ImportSetupRecordsAsync(table, errors, userId!, ct),
-                ActualCsvKinds.ChecklistRecords => await ImportChecklistRecordsAsync(table, errors, userId!, ct),
-                ActualCsvKinds.Consumptions => await ImportConsumptionsAsync(table, errors, userId, ct),
-                ActualCsvKinds.ProductionRecords => await ImportProductionRecordsAsync(table, errors, userId!, ct),
-                ActualCsvKinds.DataRecords => await ImportDataRecordsAsync(table, errors, userId, ct),
-                ActualCsvKinds.Inspections => await ImportInspectionsAsync(table, errors, userId!, ct),
-                ActualCsvKinds.WorkTimeRecords => await ImportWorkTimeRecordsAsync(table, errors, userId!, ct),
-                ActualCsvKinds.TroubleReports => await ImportTroubleReportsAsync(table, errors, userId!, ct),
-                _ => throw new ArgumentOutOfRangeException(nameof(kind)),
-            };
+    /// <summary>
+    /// 複数ファイルの一括取込。全ファイルを1つのトランザクションで順に取り込み、
+    /// どれか1つでもエラーがあれば全ファイルを取り消す（<see cref="CsvBundle"/>）
+    /// </summary>
+    public Task<CsvBundleImportResult> ImportBundleAsync(
+        IReadOnlyList<CsvBundleFile<ActualCsvKind>> files, bool dryRun, string? userId, CancellationToken ct) =>
+        CsvBundle.ImportAsync(db, files, kind => kind.Info, dryRun,
+            (kind, table, errors, token) => ImportOneAsync(kind, table, errors, userId, token), ct);
 
-            if (errors.Count == 0 && !dryRun)
-            {
-                await auditLogger.LogAsync("Actual", "CsvImport", kind.Info.Kind, null,
-                    detail: $"rows={table.Rows.Count}, created={created}", ct: ct);
-                await transaction.CommitAsync(ct);
-            }
-            else
-            {
-                await transaction.RollbackAsync(ct);
-            }
-        }
-        catch (DbUpdateException ex)
+    /// <summary>1ファイル分を取り込み、エラーが無ければ監査ログを残す（行は保存しながら進む。トランザクションは呼び出し側）</summary>
+    private async Task<CsvFileImportCount> ImportOneAsync(
+        ActualCsvKind kind, CsvTable table, List<CsvImportError> errors, string? userId, CancellationToken ct)
+    {
+        var created = kind.Info.Kind switch
         {
-            await transaction.RollbackAsync(ct);
-            errors.Add(new CsvImportError(0, $"DBへの反映に失敗しました：{ex.InnerException?.Message ?? ex.Message}"));
+            ActualCsvKinds.Receiving => await ImportReceivingAsync(table, errors, userId, ct),
+            ActualCsvKinds.ManufacturingOrders => await ImportManufacturingOrdersAsync(table, errors, userId, ct),
+            ActualCsvKinds.SetupRecords => await ImportSetupRecordsAsync(table, errors, userId!, ct),
+            ActualCsvKinds.ChecklistRecords => await ImportChecklistRecordsAsync(table, errors, userId!, ct),
+            ActualCsvKinds.Consumptions => await ImportConsumptionsAsync(table, errors, userId, ct),
+            ActualCsvKinds.ProductionRecords => await ImportProductionRecordsAsync(table, errors, userId!, ct),
+            ActualCsvKinds.DataRecords => await ImportDataRecordsAsync(table, errors, userId, ct),
+            ActualCsvKinds.Inspections => await ImportInspectionsAsync(table, errors, userId!, ct),
+            ActualCsvKinds.WorkTimeRecords => await ImportWorkTimeRecordsAsync(table, errors, userId!, ct),
+            ActualCsvKinds.TroubleReports => await ImportTroubleReportsAsync(table, errors, userId!, ct),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        if (errors.Count == 0)
+        {
+            await auditLogger.LogAsync("Actual", "CsvImport", kind.Info.Kind, null,
+                detail: $"rows={table.Rows.Count}, created={created}", ct: ct);
         }
-
-        return CsvImport.Result(kind.Info, table.Rows.Count, created, 0, dryRun, errors);
+        return new CsvFileImportCount(created, 0);
     }
 
     /// <summary>受入（D-10-10-02）。1行＝1ロットの受入登録</summary>

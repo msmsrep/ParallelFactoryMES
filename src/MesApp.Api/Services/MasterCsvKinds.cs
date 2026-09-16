@@ -228,6 +228,18 @@ public static class MasterCsvKinds
         ]),
     ];
 
+    /// <summary>
+    /// 一括出力で付ける番号の順（＝取り込む順）。後の種別が前の種別のコードを参照する
+    /// （ロケーション→品目の既定ロケーション、作業区→設備・工順、手順書→工順、直→ユーザー など）。
+    /// 種別を追加したら、参照先より後ろに置く
+    /// </summary>
+    public static readonly IReadOnlyList<string> ImportOrder =
+    [
+        WorkCenters, Processes, Locations, Products, Skills, Shifts, Equipments, EquipmentParts, Tools,
+        Checklists, DefectReasons, InspectionItems, ControlItems, InspectionDevices, Bom, WorkProcedures,
+        Routing, Users, UserSkills,
+    ];
+
     public static CsvKindInfo? Find(string kind) =>
         All.FirstOrDefault(k => string.Equals(k.Kind, kind, StringComparison.OrdinalIgnoreCase));
 
