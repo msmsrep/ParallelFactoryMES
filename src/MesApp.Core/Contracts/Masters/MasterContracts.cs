@@ -255,3 +255,34 @@ public record SkillRequest(
     bool RequiresExpiry);
 
 public record SkillResponse(int Id, string Code, string Name, SkillType Type, bool RequiresExpiry, bool IsActive);
+
+// ---- 検査機・測定器（C-20-50-03）----
+
+public record InspectionDeviceRequest(
+    [Required, MaxLength(30)] string Code,
+    [Required, MaxLength(200)] string Name,
+    [MaxLength(100)] string? SerialNo,
+    [MaxLength(200)] string? Location,
+    DateOnly? CalibratedOn,
+    DateOnly? CalibrationDueOn,
+    [Range(1, 3650)] int? CalibrationCycleDays,
+    [MaxLength(500)] string? Note);
+
+public record InspectionDeviceResponse(
+    int Id, string Code, string Name, string? SerialNo, string? Location,
+    DateOnly? CalibratedOn, DateOnly? CalibrationDueOn, int? CalibrationCycleDays,
+    string? Note, bool IsActive,
+    /// <summary>業務日付時点で校正期限が切れているか（検査実績には使えない）</summary>
+    bool IsCalibrationExpired,
+    /// <summary>期限までの残り日数（期限なしはnull。負数は超過日数）</summary>
+    int? DaysUntilDue);
+
+/// <summary>校正の実施（C-20-50-03）。次回期限は指定が無ければ校正周期から自動で置く</summary>
+public record InspectionDeviceCalibrationRequest(
+    DateOnly CalibratedOn,
+    DateOnly? NextDueOn,
+    [MaxLength(500)] string? Result);
+
+public record InspectionDeviceCalibrationResponse(
+    int Id, int InspectionDeviceId, DateOnly CalibratedOn, DateOnly? NextDueOn,
+    string? Result, string? PerformedByUserName, DateTimeOffset CreatedAt);

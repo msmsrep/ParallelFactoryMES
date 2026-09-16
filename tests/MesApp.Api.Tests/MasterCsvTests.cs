@@ -869,6 +869,41 @@ public class MasterCsvTests
     }
 
     [Fact]
+    public async Task 検査機をCSVで登録し校正期限を入出力できる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        var imported = await ImportAsync(client, "inspection-devices", """
+            Code,Name,SerialNo,Location,CalibratedOn,CalibrationDueOn,CalibrationCycleDays,Note,IsActive
+            MD-01,ノギス,SN-100,検査室,2026-01-10,2027-01-10,365,,true
+            MD-02,三次元測定機,SN-200,検査室,2025-01-10,2026-01-10,365,期限切れ,true
+            """);
+        Assert.True(imported.Succeeded, string.Join(" / ", imported.Errors.Select(e => e.Message)));
+        Assert.Equal(2, imported.Created);
+
+        var devices = (await client.GetFromJsonAsync<List<InspectionDeviceResponse>>(
+            "/api/inspection-devices"))!;
+        Assert.False(devices.Single(d => d.Code == "MD-01").IsCalibrationExpired);
+        // 2026-01-10 期限の機器は、業務日付（2026-09-16 以降のテスト実行時点）から見て期限切れ
+        Assert.True(devices.Single(d => d.Code == "MD-02").IsCalibrationExpired);
+
+        // 日付の書式違いは行番号付きで拒否される
+        var badDate = await ImportAsync(client, "inspection-devices", """
+            Code,Name,CalibrationDueOn
+            MD-03,マイクロメータ,2026年1月10日
+            """);
+        Assert.False(badDate.Succeeded);
+        Assert.Equal(2, badDate.Errors[0].Line);
+
+        // 出力にも校正期限が出る
+        var export = await client.GetAsync("/api/masters/csv/inspection-devices");
+        export.EnsureSuccessStatusCode();
+        var exported = Encoding.UTF8.GetString(await export.Content.ReadAsByteArrayAsync());
+        Assert.Contains("2027-01-10", exported, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task 勤務シフトをCSVで登録し従業員の所属と直をCSVで設定できる()
     {
         using var factory = new ApiFactory();

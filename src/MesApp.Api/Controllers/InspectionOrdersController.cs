@@ -1,4 +1,5 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
+using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Common;
@@ -23,7 +24,8 @@ public class InspectionOrdersController(
     MesAppDbContext db,
     NumberingService numbering,
     LotStatusService lotStatus,
-    IAuditLogger auditLogger) : ControllerBase
+    IAuditLogger auditLogger,
+    IBusinessDateService businessDate) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -206,6 +208,26 @@ public class InspectionOrdersController(
         }
 
         var itemById = order.Items.ToDictionary(i => i.InspectionItemId);
+
+        // 校正期限を過ぎた検査機で測った結果は品質保証の根拠にならないため、記録させない
+        // （判定は InspectionDeviceCalibrationPolicy。期限接近の一覧と同じ条件を使う）
+        var deviceIds = requests.Where(r => r.InspectionDeviceId is not null)
+            .Select(r => r.InspectionDeviceId!.Value).Distinct().ToList();
+        var devices = await db.InspectionDevices.AsNoTracking()
+            .Where(d => deviceIds.Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, ct);
+        foreach (var deviceId in deviceIds)
+        {
+            if (!devices.TryGetValue(deviceId, out var device))
+            {
+                return BadRequest(new ProblemDetails { Title = $"検査機ID {deviceId} は登録されていません。" });
+            }
+            if (InspectionDeviceCalibrationPolicy.CheckUsable(device, businessDate.Today) is { } reason)
+            {
+                return Conflict(new ProblemDetails { Title = reason });
+            }
+        }
+
         foreach (var request in requests)
         {
             if (!itemById.TryGetValue(request.InspectionItemId, out var item))
@@ -230,6 +252,7 @@ public class InspectionOrdersController(
                 TextValue = request.TextValue,
                 Judgment = judgment.Value,
                 InspectedByUserId = CurrentUserId!,
+                InspectionDeviceId = request.InspectionDeviceId,
             });
         }
         order.Status = InspectionOrderStatus.InProgress;
@@ -474,7 +497,8 @@ public class InspectionOrdersController(
             .Include(o => o.TargetWorkOrder)
             .Include(o => o.Items).ThenInclude(i => i.InspectionItem)
             .Include(o => o.Results).ThenInclude(r => r.InspectionItem)
-            .Include(o => o.Results).ThenInclude(r => r.InspectedBy);
+            .Include(o => o.Results).ThenInclude(r => r.InspectedBy)
+            .Include(o => o.Results).ThenInclude(r => r.InspectionDevice);
 
     /// <summary>
     /// 訂正履歴付きの応答を組み立てる。訂正履歴は指示に属する業務履歴として返し、
@@ -533,7 +557,8 @@ public class InspectionOrdersController(
                 SnapshotOf(o, r.InspectionItemId)?.ItemCode ?? r.InspectionItem!.Code,
                 SnapshotOf(o, r.InspectionItemId)?.ItemName ?? r.InspectionItem!.Name,
                 r.SampleNo, r.MeasuredValue, r.TextValue, r.Judgment,
-                r.InspectedByUserId, r.InspectedBy?.DisplayName, r.InspectedAt, r.CorrectionNote)).ToList(),
+                r.InspectedByUserId, r.InspectedBy?.DisplayName, r.InspectedAt, r.CorrectionNote,
+                r.InspectionDeviceId, r.InspectionDevice?.Code, r.InspectionDevice?.Name)).ToList(),
             // 訂正履歴は ToResponseWithCorrectionsAsync で詰める（一覧では取得しない）
             []);
 

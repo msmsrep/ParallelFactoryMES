@@ -1,4 +1,4 @@
-using MesApp.Core.Contracts.Masters;
+﻿using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Services;
@@ -25,6 +25,7 @@ public static class MasterCsvKinds
     public const string Routing = "routing";
     public const string WorkProcedures = "work-procedures";
     public const string Shifts = "shifts";
+    public const string InspectionDevices = "inspection-devices";
     public const string Users = "users";
     public const string UserSkills = "user-skills";
 
@@ -190,6 +191,18 @@ public static class MasterCsvKinds
             new("Name", "名称", true, "昼勤 / 夜勤 など"),
             new("StartTime", "開始時刻", true, "HH:mm"),
             new("EndTime", "終了時刻", true, "HH:mm。開始時刻以下なら翌日にまたぐ夜勤として扱う"),
+            new("IsActive", "有効", false, "true / false"),
+        ]),
+        new(InspectionDevices, "検査機・測定器", true,
+        [
+            new("Code", "検査機コード", true, "既存と一致すれば更新、無ければ新規登録"),
+            new("Name", "名称", true, null),
+            new("SerialNo", "製造番号・管理番号", false, null),
+            new("Location", "設置場所", false, null),
+            new("CalibratedOn", "最終校正日", false, "yyyy-MM-dd"),
+            new("CalibrationDueOn", "次回校正期限", false, "yyyy-MM-dd。空欄なら期限の判定を行わない"),
+            new("CalibrationCycleDays", "校正周期（日）", false, "校正の記録時に次回期限を置くのに使う"),
+            new("Note", "備考", false, null),
             new("IsActive", "有効", false, "true / false"),
         ]),
         new(Users, "ユーザー", true,

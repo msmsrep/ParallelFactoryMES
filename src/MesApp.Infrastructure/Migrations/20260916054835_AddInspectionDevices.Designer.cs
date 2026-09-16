@@ -3,6 +3,7 @@ using System;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MesApp.Infrastructure.Migrations
 {
     [DbContext(typeof(MesAppDbContext))]
-    partial class MesAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260916054835_AddInspectionDevices")]
+    partial class AddInspectionDevices
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
@@ -823,9 +826,6 @@ namespace MesApp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("InspectionDeviceId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("InspectionItemId")
                         .HasColumnType("INTEGER");
 
@@ -850,8 +850,6 @@ namespace MesApp.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("InspectedByUserId");
-
-                    b.HasIndex("InspectionDeviceId");
 
                     b.HasIndex("InspectionItemId");
 
@@ -3390,11 +3388,6 @@ namespace MesApp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("MesApp.Core.Entities.InspectionDevice", "InspectionDevice")
-                        .WithMany()
-                        .HasForeignKey("InspectionDeviceId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("MesApp.Core.Entities.InspectionItem", "InspectionItem")
                         .WithMany()
                         .HasForeignKey("InspectionItemId")
@@ -3408,8 +3401,6 @@ namespace MesApp.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("InspectedBy");
-
-                    b.Navigation("InspectionDevice");
 
                     b.Navigation("InspectionItem");
                 });

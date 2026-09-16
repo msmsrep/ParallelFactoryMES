@@ -716,4 +716,57 @@ public class MasterTests
         var list = await admin.GetFromJsonAsync<List<InspectionItemResponse>>("/api/inspection-items");
         Assert.Equal("INS-PR-01", Assert.Single(list!).TargetProcessCode);
     }
+
+    [Fact]
+    public async Task 検査機の校正を記録すると次回期限が更新され履歴が残る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        // 期限切れの機器として登録する（校正周期は365日）
+        var created = await admin.PostAsJsonAsync("/api/inspection-devices",
+            new InspectionDeviceRequest("MD-01", "ノギス", "SN-100", "検査室",
+                new DateOnly(2025, 1, 10), new DateOnly(2026, 1, 10), 365, null));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var device = (await created.Content.ReadFromJsonAsync<InspectionDeviceResponse>())!;
+        Assert.True(device.IsCalibrationExpired);
+        Assert.True(device.DaysUntilDue < 0);
+
+        // コードの重複は409
+        var duplicate = await admin.PostAsJsonAsync("/api/inspection-devices",
+            new InspectionDeviceRequest("MD-01", "別の機器", null, null, null, null, null, null));
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+
+        // 期限が近い・過ぎている機器の一覧（C-20-50-03）
+        var expiring = await admin.GetFromJsonAsync<List<InspectionDeviceResponse>>(
+            "/api/inspection-devices/expiring");
+        Assert.Contains(expiring!, d => d.Code == "MD-01");
+
+        // 校正を記録すると、次回期限は校正周期から自動で置かれる
+        var calibratedOn = DateOnly.FromDateTime(DateTime.Today);
+        var calibration = await admin.PostAsJsonAsync(
+            $"/api/inspection-devices/{device.Id}/calibrations",
+            new InspectionDeviceCalibrationRequest(calibratedOn, null, "合格（社内校正）"));
+        calibration.EnsureSuccessStatusCode();
+        var calibrationBody = (await calibration.Content
+            .ReadFromJsonAsync<InspectionDeviceCalibrationResponse>())!;
+        Assert.Equal(calibratedOn.AddDays(365), calibrationBody.NextDueOn);
+
+        // マスタの現在値が更新され、期限切れが解消する
+        var after = await admin.GetFromJsonAsync<InspectionDeviceResponse>(
+            $"/api/inspection-devices/{device.Id}");
+        Assert.Equal(calibratedOn, after!.CalibratedOn);
+        Assert.Equal(calibratedOn.AddDays(365), after.CalibrationDueOn);
+        Assert.False(after.IsCalibrationExpired);
+
+        // 実施の経緯は履歴に残る（現在値の上書きだけでは「いつ誰が」が分からない）
+        var history = await admin.GetFromJsonAsync<List<InspectionDeviceCalibrationResponse>>(
+            $"/api/inspection-devices/{device.Id}/calibrations");
+        Assert.Equal("合格（社内校正）", Assert.Single(history!).Result);
+
+        // 期限が近くなくなったので一覧から外れる
+        var expiringAfter = await admin.GetFromJsonAsync<List<InspectionDeviceResponse>>(
+            "/api/inspection-devices/expiring");
+        Assert.DoesNotContain(expiringAfter!, d => d.Code == "MD-01");
+    }
 }

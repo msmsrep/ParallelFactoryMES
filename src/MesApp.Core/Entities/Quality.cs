@@ -1,4 +1,4 @@
-namespace MesApp.Core.Entities;
+﻿namespace MesApp.Core.Entities;
 
 /// <summary>検査指示（Spec.md 5.4 InspectionOrder。C-20）</summary>
 public class InspectionOrder
@@ -108,6 +108,13 @@ public class InspectionResult
 
     public string InspectedByUserId { get; set; } = string.Empty;
     public AppUser? InspectedBy { get; set; }
+
+    /// <summary>
+    /// 測定に使った検査機（C-20-50-03。任意）。
+    /// 校正期限を過ぎた機器は登録時に弾くため、ここに残るのは当時有効だった機器に限られる
+    /// </summary>
+    public int? InspectionDeviceId { get; set; }
+    public InspectionDevice? InspectionDevice { get; set; }
 
     public DateTimeOffset InspectedAt { get; set; } = DateTimeOffset.UtcNow;
 

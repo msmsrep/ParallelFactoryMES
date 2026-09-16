@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using MesApp.Core.Entities;
 
 namespace MesApp.Core.Contracts.Quality;
@@ -23,7 +23,9 @@ public record InspectionResultRequest(
     /// <summary>定性検査の記録</summary>
     string? TextValue,
     /// <summary>判定（測定値からの自動判定ができない場合は必須）</summary>
-    InspectionJudgment? Judgment);
+    InspectionJudgment? Judgment,
+    /// <summary>測定に使った検査機（任意。校正期限切れの機器は登録できない。C-20-50-03）</summary>
+    int? InspectionDeviceId = null);
 
 /// <summary>検査実績の訂正（C-20-50-07。理由必須・監査ログ記録）</summary>
 public record InspectionResultCorrectionRequest(
@@ -50,7 +52,10 @@ public record InspectionResultResponse(
     int Id, int InspectionItemId, string ItemCode, string ItemName, int SampleNo,
     decimal? MeasuredValue, string? TextValue, InspectionJudgment Judgment,
     string InspectedByUserId, string? InspectedByName, DateTimeOffset InspectedAt,
-    string? CorrectionNote);
+    string? CorrectionNote,
+    /// <summary>測定に使った検査機（C-20-50-03。成績書に出す）</summary>
+    int? InspectionDeviceId = null, string? InspectionDeviceCode = null,
+    string? InspectionDeviceName = null);
 
 /// <summary>
 /// 検査実績の訂正履歴1件（C-20-50-07）。訂正前の記録を残したまま、

@@ -61,6 +61,56 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 校正期限切れの検査機では検査実績を登録できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        var expired = await admin.PostAsJsonAsync("/api/inspection-devices",
+            new InspectionDeviceRequest("MD-OLD", "期限切れノギス", null, null,
+                new DateOnly(2025, 1, 10), new DateOnly(2026, 1, 10), 365, null));
+        expired.EnsureSuccessStatusCode();
+        var expiredDevice = (await expired.Content.ReadFromJsonAsync<InspectionDeviceResponse>())!;
+
+        var valid = await admin.PostAsJsonAsync("/api/inspection-devices",
+            new InspectionDeviceRequest("MD-OK", "校正済みノギス", null, null,
+                DateOnly.FromDateTime(DateTime.Today), DateOnly.FromDateTime(DateTime.Today).AddYears(1),
+                365, null));
+        valid.EnsureSuccessStatusCode();
+        var validDevice = (await valid.Content.ReadFromJsonAsync<InspectionDeviceResponse>())!;
+
+        var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+        created.EnsureSuccessStatusCode();
+        var order = (await created.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+
+        // 校正期限を過ぎた機器で測った結果は品質保証の根拠にならないため拒否する（C-20-50-03）
+        var rejected = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.0m, null, null, expiredDevice.Id) });
+        Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
+
+        // 存在しない検査機は400
+        var missing = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.0m, null, null, 9999) });
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+
+        // 校正済みの機器なら登録でき、どの機器で測ったかが実績に残る（成績書に出す）
+        var accepted = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.0m, null, null, validDevice.Id) });
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        var body = (await accepted.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+        Assert.Equal("MD-OK", body.Results[0].InspectionDeviceCode);
+
+        // 検査機を指定しない従来どおりの登録も引き続きできる
+        var withoutDevice = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 2, 10.0m, null, null) });
+        Assert.Equal(HttpStatusCode.OK, withoutDevice.StatusCode);
+    }
+
+    [Fact]
     public async Task 検査指示から実績登録判定承認まで通しで動作しロットステータスへ反映される()
     {
         using var factory = new ApiFactory();

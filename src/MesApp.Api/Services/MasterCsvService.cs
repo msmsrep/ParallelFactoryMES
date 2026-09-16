@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -43,6 +43,7 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.Routing => await ExportRoutingAsync(ct),
             MasterCsvKinds.WorkProcedures => await ExportWorkProceduresAsync(includeInactive, ct),
             MasterCsvKinds.Shifts => await ExportShiftsAsync(includeInactive, ct),
+            MasterCsvKinds.InspectionDevices => await ExportInspectionDevicesAsync(includeInactive, ct),
             MasterCsvKinds.Users => await ExportUsersAsync(includeInactive, ct),
             MasterCsvKinds.UserSkills => await ExportUserSkillsAsync(ct),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
@@ -275,6 +276,19 @@ public sealed partial class MasterCsvService(
             {
                 s.Code, s.Name, s.StartTime.ToString("HH:mm"), s.EndTime.ToString("HH:mm"), Bool(s.IsActive),
             })];
+    }
+
+    private async Task<List<string?[]>> ExportInspectionDevicesAsync(bool includeInactive, CancellationToken ct)
+    {
+        var devices = await db.InspectionDevices.AsNoTracking()
+            .Where(d => includeInactive || d.IsActive)
+            .OrderBy(d => d.Code)
+            .ToListAsync(ct);
+        return [.. devices.Select(d => new string?[]
+        {
+            d.Code, d.Name, d.SerialNo, d.Location, Date(d.CalibratedOn), Date(d.CalibrationDueOn),
+            d.CalibrationCycleDays?.ToString(CultureInfo.InvariantCulture), d.Note, Bool(d.IsActive),
+        })];
     }
 
     private async Task<List<string?[]>> ExportUserSkillsAsync(CancellationToken ct)

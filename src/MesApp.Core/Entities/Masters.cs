@@ -1,4 +1,4 @@
-namespace MesApp.Core.Entities;
+﻿namespace MesApp.Core.Entities;
 
 /// <summary>品目マスタ（Spec.md 5.1 Product）</summary>
 public class Product
@@ -285,6 +285,76 @@ public class Shift
     public TimeOnly EndTime { get; set; }
 
     public bool IsActive { get; set; } = true;
+}
+
+/// <summary>
+/// 検査機・測定器マスタ（Spec.md 5.1 InspectionDevice。C-20-50-03 検査機の校正管理・有効期限確認）。
+/// <para>
+/// 校正期限を過ぎた機器で測った結果は、規格に合っていても品質保証の根拠にならない。
+/// そのため検査実績の記録時に期限を判定し、期限切れの機器は使わせない。
+/// </para>
+/// <para>
+/// 現在の校正状態（<see cref="CalibratedOn"/>／<see cref="CalibrationDueOn"/>）はこのマスタが持ち、
+/// 過去の校正の経緯は <see cref="InspectionDeviceCalibration"/> に残す。
+/// 治工具（<see cref="Tool"/>）と分けているのは、治工具が寿命（使用回数・時間）で管理されるのに対し、
+/// 検査機は日付で管理され、期限切れの影響が「使えない」ではなく「測定結果を信用できない」だからである。
+/// </para>
+/// </summary>
+public class InspectionDevice
+{
+    public int Id { get; set; }
+
+    /// <summary>検査機コード（一意）</summary>
+    public string Code { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>製造番号・管理番号</summary>
+    public string? SerialNo { get; set; }
+
+    /// <summary>設置場所（自由記述）</summary>
+    public string? Location { get; set; }
+
+    /// <summary>最終校正日</summary>
+    public DateOnly? CalibratedOn { get; set; }
+
+    /// <summary>次回校正期限（この日を過ぎると検査実績に使えない）</summary>
+    public DateOnly? CalibrationDueOn { get; set; }
+
+    /// <summary>校正周期（日数。校正実施時に次回期限を自動で置くために使う）</summary>
+    public int? CalibrationCycleDays { get; set; }
+
+    public string? Note { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>
+/// 検査機の校正実施記録（Spec.md 5.1 InspectionDeviceCalibration。C-20-50-03）。
+/// マスタの現在値を上書きするだけでは「いつ誰がどの結果で校正したか」が残らないため、
+/// 実施のたびに1レコードを追加する（保全実績と同じ考え方）
+/// </summary>
+public class InspectionDeviceCalibration
+{
+    public int Id { get; set; }
+
+    public int InspectionDeviceId { get; set; }
+    public InspectionDevice? InspectionDevice { get; set; }
+
+    /// <summary>校正日</summary>
+    public DateOnly CalibratedOn { get; set; }
+
+    /// <summary>この校正で設定した次回校正期限</summary>
+    public DateOnly? NextDueOn { get; set; }
+
+    /// <summary>校正の結果・所見（合格／調整の内容など）</summary>
+    public string? Result { get; set; }
+
+    /// <summary>実施者（社内校正の場合。外部委託なら委託先を Result に書く）</summary>
+    public string? PerformedByUserId { get; set; }
+    public AppUser? PerformedBy { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>治工具マスタ（Spec.md 5.1 Tool。E-60）</summary>

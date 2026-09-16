@@ -105,6 +105,9 @@ public sealed partial class MasterCsvService
                 case MasterCsvKinds.WorkProcedures:
                     await ImportWorkProceduresAsync(table, errors, counter, ct);
                     break;
+                case MasterCsvKinds.InspectionDevices:
+                    await ImportInspectionDevicesAsync(table, errors, counter, ct);
+                    break;
                 case MasterCsvKinds.Shifts:
                     await ImportShiftsAsync(table, errors, counter, ct);
                     break;
@@ -1200,6 +1203,59 @@ public sealed partial class MasterCsvService
             }
         }
         return result;
+    }
+
+    private async Task ImportInspectionDevicesAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.InspectionDevices.ToDictionaryAsync(d => d.Code, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 30);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "検査機コード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var device);
+            device ??= new InspectionDevice { Code = code };
+
+            var name = reader.RequiredText("Name", 200);
+            var serialNo = reader.Text("SerialNo", device.SerialNo, 100);
+            var location = reader.Text("Location", device.Location, 200);
+            var calibratedOn = reader.DateOrNull("CalibratedOn", device.CalibratedOn);
+            var dueOn = reader.DateOrNull("CalibrationDueOn", device.CalibrationDueOn);
+            var cycle = reader.IntOrNull("CalibrationCycleDays", device.CalibrationCycleDays, 1);
+            var note = reader.Text("Note", device.Note, 500);
+            var isActive = reader.Bool("IsActive", device.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            device.Name = name;
+            device.SerialNo = serialNo;
+            device.Location = location;
+            device.CalibratedOn = calibratedOn;
+            device.CalibrationDueOn = dueOn;
+            device.CalibrationCycleDays = cycle;
+            device.Note = note;
+            device.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.InspectionDevices.Add(device);
+                byCode[code] = device;
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
     }
 
     private async Task ImportShiftsAsync(

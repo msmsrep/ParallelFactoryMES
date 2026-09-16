@@ -1,4 +1,4 @@
-@page "/inspections/{Id:int}"
+﻿@page "/inspections/{Id:int}"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -68,6 +68,26 @@ else
                         }
                     </tbody>
                 </table>
+                @* 使用した検査機（C-20-50-03）。校正期限切れの機器はAPIが拒否するので、選択肢から外しておく *@
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>使用した検査機（任意）</label>
+                        <select @bind="_deviceId">
+                            <option value="0">選択しない</option>
+                            @foreach (var device in _devices)
+                            {
+                                <option value="@device.Id">@device.Code @device.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                @if (_expiredDevices.Count > 0)
+                {
+                    <p class="text-muted">
+                        校正期限切れのため選べない検査機：@string.Join("、", _expiredDevices.Select(d => $"{d.Code} {d.Name}"))。
+                        マスタ管理の検査機・測定器で校正を記録してください。
+                    </p>
+                }
                 <button class="btn mt-2" disabled="@_busy" @onclick="SubmitResultsAsync">検査実績を登録</button>
             </div>
 
@@ -112,7 +132,7 @@ else
         {
             <table class="table">
                 <thead>
-                    <tr><th>検査項目</th><th>サンプルNo</th><th>測定値</th><th>記録</th><th>判定</th><th>検査者</th><th>検査日時</th><th>訂正</th></tr>
+                    <tr><th>検査項目</th><th>サンプルNo</th><th>測定値</th><th>記録</th><th>判定</th><th>検査機</th><th>検査者</th><th>検査日時</th><th>訂正</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var result in _order.Results)
@@ -127,6 +147,7 @@ else
                                     @(result.Judgment == InspectionJudgment.Pass ? "合格" : "不合格")
                                 </span>
                             </td>
+                            <td>@(result.InspectionDeviceCode ?? "-")</td>
                             <td>@result.InspectedByName</td>
                             <td>@result.InspectedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                             <td>
@@ -228,6 +249,9 @@ else
     private InspectionJudgment _correctJudgment = InspectionJudgment.Pass;
     private string? _correctReason;
     private string? _grade;
+    private int _deviceId;
+    private List<InspectionDeviceResponse> _devices = [];
+    private List<InspectionDeviceResponse> _expiredDevices = [];
     private string? _error;
     private string? _message;
     private bool _busy;
@@ -238,6 +262,12 @@ else
     {
         _order = await Http.GetFromJsonAsync<InspectionOrderResponse>($"api/inspection-orders/{Id}");
         _entries.Clear();
+
+        // 校正期限切れの機器はAPIが拒否するため選択肢から外し、外した事実は画面に出す
+        // （黙って消すと「登録した機器が無い」と見える）
+        var devices = await Http.GetFromJsonAsync<List<InspectionDeviceResponse>>("api/inspection-devices") ?? [];
+        _devices = devices.Where(d => !d.IsCalibrationExpired).ToList();
+        _expiredDevices = devices.Where(d => d.IsCalibrationExpired).ToList();
     }
 
     private ResultEntry GetEntry(int itemId)
@@ -266,7 +296,8 @@ else
                 itemId, null,
                 decimal.TryParse(entry.Measured, out var measured) ? measured : null,
                 string.IsNullOrWhiteSpace(entry.Text) ? null : entry.Text,
-                Enum.TryParse<InspectionJudgment>(entry.Judgment, out var judgment) ? judgment : null));
+                Enum.TryParse<InspectionJudgment>(entry.Judgment, out var judgment) ? judgment : null,
+                _deviceId == 0 ? null : _deviceId));
         }
         if (requests.Count == 0)
         {

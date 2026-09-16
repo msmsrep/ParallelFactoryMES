@@ -1,4 +1,4 @@
-using MesApp.Core.Entities;
+﻿using MesApp.Core.Entities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +31,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<DefectReason> DefectReasons => Set<DefectReason>();
     public DbSet<SkillMaster> Skills => Set<SkillMaster>();
     public DbSet<Shift> Shifts => Set<Shift>();
+    public DbSet<InspectionDevice> InspectionDevices => Set<InspectionDevice>();
+    public DbSet<InspectionDeviceCalibration> InspectionDeviceCalibrations => Set<InspectionDeviceCalibration>();
     public DbSet<UserSkill> UserSkills => Set<UserSkill>();
 
     // 指図・実績系（Spec.md 5.2）／在庫系（5.3。Lotは産出ロット採番のため先行導入）
@@ -278,6 +280,33 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.HasIndex(x => x.Code).IsUnique();
             e.Property(x => x.Code).HasMaxLength(20);
             e.Property(x => x.Name).HasMaxLength(100);
+        });
+
+        builder.Entity<InspectionResult>(e =>
+        {
+            // 検査機は実績から参照されている間も無効化できる（マスタからの除外と記録の保持は別）
+            e.HasOne(x => x.InspectionDevice).WithMany()
+                .HasForeignKey(x => x.InspectionDeviceId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<InspectionDevice>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(30);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.SerialNo).HasMaxLength(100);
+            e.Property(x => x.Location).HasMaxLength(200);
+            e.Property(x => x.Note).HasMaxLength(500);
+        });
+
+        builder.Entity<InspectionDeviceCalibration>(e =>
+        {
+            e.HasIndex(x => new { x.InspectionDeviceId, x.CalibratedOn });
+            e.Property(x => x.Result).HasMaxLength(500);
+            e.HasOne(x => x.InspectionDevice).WithMany()
+                .HasForeignKey(x => x.InspectionDeviceId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.PerformedBy).WithMany()
+                .HasForeignKey(x => x.PerformedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Tool>(e =>

@@ -1,0 +1,321 @@
+@inject HttpClient Http
+
+@* 検査機・測定器マスタと校正管理（Spec.md 5.1 InspectionDevice。C-20-50-03） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? "検査機の登録" : $"編集（{_code}）")</h2>
+        <p class="text-muted">
+            校正期限を過ぎた検査機で測った結果は品質保証の根拠にならないため、期限切れの機器は検査実績に使えない。
+            校正周期を入れておくと、校正の記録時に次回期限を自動で置く。期限を空にすると期限の判定を行わない。
+        </p>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>検査機コード</label>
+                <input @bind="_code" placeholder="MD-01 など" />
+            </div>
+            <div class="form-field">
+                <label>名称</label>
+                <input @bind="_name" placeholder="ノギス / 三次元測定機" />
+            </div>
+            <div class="form-field">
+                <label>製造番号・管理番号</label>
+                <input @bind="_serialNo" />
+            </div>
+            <div class="form-field">
+                <label>設置場所</label>
+                <input @bind="_location" />
+            </div>
+            <div class="form-field">
+                <label>最終校正日</label>
+                <input type="date" @bind="_calibratedOn" />
+            </div>
+            <div class="form-field">
+                <label>次回校正期限</label>
+                <input type="date" @bind="_calibrationDueOn" />
+            </div>
+            <div class="form-field">
+                <label>校正周期（日）</label>
+                <input type="number" @bind="_cycleDays" />
+            </div>
+            <div class="form-field">
+                <label>備考</label>
+                <input @bind="_note" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<CsvIoPanel Kind="inspection-devices" Label="検査機・測定器" KeyLabel="検査機コード" OnImported="LoadAsync" />
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>コード</th><th>名称</th><th>製造番号</th><th>設置場所</th>
+                    <th>最終校正日</th><th>次回期限</th><th>状態</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@item.Code</td>
+                        <td>@item.Name</td>
+                        <td>@(item.SerialNo ?? "-")</td>
+                        <td>@(item.Location ?? "-")</td>
+                        <td>@(item.CalibratedOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                        <td>
+                            @(item.CalibrationDueOn?.ToString("yyyy-MM-dd") ?? "-")
+                            @if (item.IsCalibrationExpired)
+                            {
+                                <span class="badge badge-danger">校正期限切れ</span>
+                            }
+                            else if (item.DaysUntilDue is { } days && days <= 30)
+                            {
+                                <span class="badge badge-warning">あと@(days)日</span>
+                            }
+                        </td>
+                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="qc">
+                                <button class="btn btn-secondary btn-sm"
+                                        @onclick="() => OpenCalibration(item)">校正を記録</button>
+                            </AuthorizeView>
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="mw">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@* 校正の記録（C-20-50-03）。マスタの現在値を更新しつつ、実施の経緯を履歴に残す *@
+@if (_calibrationTarget is not null)
+{
+    <div class="card">
+        <h2 style="margin-top:0;">校正の記録（@_calibrationTarget.Code @_calibrationTarget.Name）</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>校正日</label>
+                <input type="date" @bind="_calibrationDate" />
+            </div>
+            <div class="form-field">
+                <label>次回校正期限（空欄なら校正周期から自動）</label>
+                <input type="date" @bind="_nextDueOn" />
+            </div>
+            <div class="form-field">
+                <label>結果・所見</label>
+                <input @bind="_calibrationResult" placeholder="合格 / 調整実施 / 外部委託先 など" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveCalibrationAsync">記録</button>
+            <button class="btn btn-secondary" @onclick="() => _calibrationTarget = null">閉じる</button>
+        </div>
+
+        @if (_calibrations is not null && _calibrations.Count > 0)
+        {
+            <table class="table">
+                <thead><tr><th>校正日</th><th>次回期限</th><th>結果</th><th>実施者</th></tr></thead>
+                <tbody>
+                    @foreach (var log in _calibrations)
+                    {
+                        <tr>
+                            <td>@log.CalibratedOn.ToString("yyyy-MM-dd")</td>
+                            <td>@(log.NextDueOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td>@(log.Result ?? "-")</td>
+                            <td>@(log.PerformedByUserName ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else if (_calibrations is not null)
+        {
+            <p class="text-muted">校正の記録はまだありません。</p>
+        }
+    </div>
+}
+
+@code {
+    private List<InspectionDeviceResponse>? _items;
+
+    private int? _editingId;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private string? _serialNo;
+    private string? _location;
+    private DateTime? _calibratedOn;
+    private DateTime? _calibrationDueOn;
+    private int? _cycleDays;
+    private string? _note;
+
+    private InspectionDeviceResponse? _calibrationTarget;
+    private List<InspectionDeviceCalibrationResponse>? _calibrations;
+    private DateTime? _calibrationDate = DateTime.Today;
+    private DateTime? _nextDueOn;
+    private string? _calibrationResult;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() =>
+        _items = await Http.GetFromJsonAsync<List<InspectionDeviceResponse>>(
+            "api/inspection-devices?includeInactive=true");
+
+    private void Edit(InspectionDeviceResponse item)
+    {
+        _editingId = item.Id;
+        _code = item.Code;
+        _name = item.Name;
+        _serialNo = item.SerialNo;
+        _location = item.Location;
+        _calibratedOn = item.CalibratedOn?.ToDateTime(TimeOnly.MinValue);
+        _calibrationDueOn = item.CalibrationDueOn?.ToDateTime(TimeOnly.MinValue);
+        _cycleDays = item.CalibrationCycleDays;
+        _note = item.Note;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _code = string.Empty;
+        _name = string.Empty;
+        _serialNo = null;
+        _location = null;
+        _calibratedOn = null;
+        _calibrationDueOn = null;
+        _cycleDays = null;
+        _note = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "検査機コードと名称を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new InspectionDeviceRequest(
+                _code, _name, _serialNo, _location,
+                _calibratedOn is null ? null : DateOnly.FromDateTime(_calibratedOn.Value),
+                _calibrationDueOn is null ? null : DateOnly.FromDateTime(_calibrationDueOn.Value),
+                _cycleDays, _note);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/inspection-devices", request)
+                : await Http.PutAsJsonAsync($"api/inspection-devices/{_editingId}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                return;
+            }
+            _message = "保存しました。";
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task OpenCalibration(InspectionDeviceResponse item)
+    {
+        _calibrationTarget = item;
+        _calibrationDate = DateTime.Today;
+        _nextDueOn = null;
+        _calibrationResult = null;
+        _calibrations = await Http.GetFromJsonAsync<List<InspectionDeviceCalibrationResponse>>(
+            $"api/inspection-devices/{item.Id}/calibrations");
+    }
+
+    private async Task SaveCalibrationAsync()
+    {
+        if (_calibrationTarget is null || _calibrationDate is null)
+        {
+            _error = "校正日を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new InspectionDeviceCalibrationRequest(
+                DateOnly.FromDateTime(_calibrationDate.Value),
+                _nextDueOn is null ? null : DateOnly.FromDateTime(_nextDueOn.Value),
+                _calibrationResult);
+            var response = await Http.PostAsJsonAsync(
+                $"api/inspection-devices/{_calibrationTarget.Id}/calibrations", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                return;
+            }
+            _message = "校正を記録しました。";
+            await LoadAsync();
+            var target = _items?.FirstOrDefault(d => d.Id == _calibrationTarget.Id);
+            if (target is not null)
+            {
+                await OpenCalibration(target);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/inspection-devices/{id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                return;
+            }
+            _message = "無効化しました。";
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
