@@ -1,4 +1,4 @@
-@inject HttpClient Http
+﻿@inject HttpClient Http
 
 @* 品目マスタ＋MBOM＋工順（BOP）（Spec.md 5.1、A-40-10／A-40-20） *@
 <Notice Error="@_error" Message="@_message" />
@@ -274,6 +274,98 @@
     </div>
 }
 
+@* 設計変更の影響確認（J-40-40-01/03）。改訂を保存する前に、届く指図と届かない指図を見せる *@
+@if (_selected is not null && _impact is not null)
+{
+    <div class="card">
+        <h2 style="margin-top:0;">@_selected.Code の 設計変更の影響（J-40-40-01/03）</h2>
+        <p class="text-muted">
+            指図は展開した時点のMBOM・工順を写し取って持つため、<strong>展開済みの指図に上の改訂は届かない</strong>。
+            改訂後の条件で作り直すなら、その指図を取り消して作り直す必要がある。
+        </p>
+
+        <h3>進行中の製造指図</h3>
+        @if (_impact.Orders.Count == 0)
+        {
+            <p class="text-muted">進行中の指図はない。改訂の影響を受ける指図はない。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>指図番号</th><th>状態</th><th>数量</th><th>納期</th>
+                        <th>作業指示</th><th>着手済</th><th>改訂の反映</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in _impact.Orders)
+                    {
+                        <tr>
+                            <td>@order.OrderNo</td>
+                            <td><StatusBadge Status="@order.Status.ToString()" /></td>
+                            <td>@order.Quantity.ToString("0.##")</td>
+                            <td>@(order.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td>@order.WorkOrderCount</td>
+                            <td>@order.StartedWorkOrderCount</td>
+                            <td>
+                                @if (order.IsSnapshotFixed)
+                                {
+                                    <span class="badge badge-warning">届かない（展開済）</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-info">展開時に反映される</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <h3>部材の在庫と所要</h3>
+        @if (_impact.Materials.Count == 0)
+        {
+            <p class="text-muted">部材がない。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>部材</th><th>名称</th><th>現行の原単位</th>
+                        <th>進行中指図の予定数量</th><th>現在庫</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var material in _impact.Materials)
+                    {
+                        <tr>
+                            <td>
+                                @material.Code
+                                @if (!material.InCurrentBom)
+                                {
+                                    <span>&nbsp;</span>
+                                    <span class="badge badge-warning">現行MBOMに無い</span>
+                                }
+                            </td>
+                            <td>@material.Name</td>
+                            <td>@(material.QuantityPer?.ToString("0.####") ?? "-")</td>
+                            <td>@material.PlannedQuantityInProgress.ToString("0.##")</td>
+                            <td>@material.StockQuantity.ToString("0.##") @material.Unit</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="text-muted">
+                「現行MBOMに無い」部材は、改訂で外したが進行中の指図がまだ必要としているもの。
+                その在庫を先に使い切るか、指図を作り直すかを判断する材料になる。
+            </p>
+        }
+    </div>
+}
+
 @code {
     private List<ProductResponse>? _products;
     private List<ProcessResponse> _processes = [];
@@ -288,6 +380,8 @@
     private ProductResponse? _selected;
     private readonly List<BomItemRequest> _bomLines = [];
     private readonly List<RoutingStepRequest> _routingSteps = [];
+    /// <summary>設計変更の影響（J-40-40-01/03）。品目を選ぶたびに読み直す</summary>
+    private DesignChangeImpactResponse? _impact;
 
     private int? _editingId;
     private string _code = string.Empty;
@@ -424,6 +518,7 @@
         _selected = product;
         _bomLines.Clear();
         _routingSteps.Clear();
+        _impact = null;
 
         var bom = await Http.GetFromJsonAsync<List<BomItemResponse>>($"api/products/{product.Id}/bom") ?? [];
         _bomLines.AddRange(bom.Select(b =>
@@ -437,6 +532,9 @@
             r.RequiredSkillId, r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId,
             r.WorkCenterId, r.EquipmentIds, r.WorkProcedureId)));
         _stepSequence = _routingSteps.Count == 0 ? 1 : _routingSteps.Max(s => s.Sequence) + 1;
+
+        _impact = await Http.GetFromJsonAsync<DesignChangeImpactResponse>(
+            $"api/products/{product.Id}/change-impact");
     }
 
     private void AddBomLine()
@@ -471,6 +569,8 @@
                 return;
             }
             _message = "MBOMを保存しました。";
+            _impact = await Http.GetFromJsonAsync<DesignChangeImpactResponse>(
+                $"api/products/{_selected.Id}/change-impact");
         }
         finally
         {
@@ -551,6 +651,8 @@
                 return;
             }
             _message = "工順（BOP）を保存しました。";
+            _impact = await Http.GetFromJsonAsync<DesignChangeImpactResponse>(
+                $"api/products/{_selected.Id}/change-impact");
         }
         finally
         {

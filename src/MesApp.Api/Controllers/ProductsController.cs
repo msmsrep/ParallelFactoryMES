@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Entities;
@@ -291,6 +291,84 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         await auditLogger.LogAsync("Master", "Update", "Routing", id.ToString(),
             detail: $"steps={steps.Count}", ct: ct);
         return await GetRouting(id, ct);
+    }
+
+
+    // ---- 設計変更の影響確認（J-40-40-01/03）----
+
+    /// <summary>
+    /// 設計変更（MBOM・工順の改訂）の影響範囲（J-40-40-01/03）。
+    /// <para>
+    /// 指図展開時のスナップショット方式（Spec.md 5.7）のため、**マスタを直しても展開済みの指図は変わらない**。
+    /// 改訂前にこれを見せ、改訂がどの指図に届き／届かないか、外した部材の在庫がどれだけ残るかを把握させる。
+    /// 改訂そのものを止める判定は入れない（止めるべきかは業務側の判断で、機械的には決まらない）
+    /// </para>
+    /// </summary>
+    [HttpGet("{id:int}/change-impact")]
+    public async Task<ActionResult<DesignChangeImpactResponse>> GetChangeImpact(int id, CancellationToken ct)
+    {
+        var product = await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        // 完了・取消は設計変更の影響を受けない（作り終わっている）
+        var orders = await db.ManufacturingOrders.AsNoTracking()
+            .Where(o => o.ProductId == id
+                        && o.Status != ManufacturingOrderStatus.Completed
+                        && o.Status != ManufacturingOrderStatus.Canceled)
+            .OrderBy(o => o.OrderNo)
+            .Select(o => new DesignChangeOrderRow(
+                o.Id, o.OrderNo, o.Status, o.Quantity, o.DueDate,
+                db.WorkOrders.Count(w => w.ManufacturingOrderId == o.Id
+                                         && w.Status != WorkOrderStatus.Canceled),
+                db.WorkOrders.Count(w => w.ManufacturingOrderId == o.Id
+                                         && w.Status == WorkOrderStatus.Started),
+                o.Status == ManufacturingOrderStatus.Released))
+            .ToListAsync(ct);
+
+        var orderIds = orders.Select(o => o.OrderId).ToList();
+
+        // 現行MBOMの部材と、進行中指図がスナップショットで持っている部材は一致するとは限らない。
+        // 一致しない部材こそ改訂者が見たいもの（外した部材の在庫・まだ要る部材）なので和集合にする
+        var bom = await db.BomItems.AsNoTracking()
+            .Where(b => b.ParentProductId == id)
+            .Select(b => new { b.ChildProductId, b.QuantityPer })
+            .ToListAsync(ct);
+        var planned = await db.ManufacturingOrderMaterials.AsNoTracking()
+            .Where(m => orderIds.Contains(m.ManufacturingOrderId))
+            .GroupBy(m => m.ChildProductId)
+            .Select(g => new { ChildProductId = g.Key, Quantity = g.Sum(m => m.PlannedQuantity) })
+            .ToListAsync(ct);
+
+        var materialIds = bom.Select(b => b.ChildProductId)
+            .Union(planned.Select(p => p.ChildProductId)).ToList();
+        var products = await db.Products.AsNoTracking()
+            .Where(p => materialIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Code, p.Name, p.Unit })
+            .ToListAsync(ct);
+        var stocks = await db.InventoryStocks.AsNoTracking()
+            .Where(s => materialIds.Contains(s.ProductId))
+            .GroupBy(s => s.ProductId)
+            .Select(g => new { ProductId = g.Key, Quantity = g.Sum(s => s.Quantity) })
+            .ToListAsync(ct);
+
+        var materials = products
+            .Select(p =>
+            {
+                var line = bom.FirstOrDefault(b => b.ChildProductId == p.Id);
+                return new DesignChangeMaterialRow(
+                    p.Id, p.Code, p.Name, p.Unit,
+                    line is not null, line?.QuantityPer,
+                    planned.FirstOrDefault(x => x.ChildProductId == p.Id)?.Quantity ?? 0m,
+                    stocks.FirstOrDefault(x => x.ProductId == p.Id)?.Quantity ?? 0m);
+            })
+            .OrderBy(m => m.Code)
+            .ToList();
+
+        return new DesignChangeImpactResponse(
+            product.Id, product.Code, product.Name, orders, materials);
     }
 
     /// <summary>

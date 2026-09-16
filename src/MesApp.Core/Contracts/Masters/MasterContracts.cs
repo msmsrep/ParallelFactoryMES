@@ -286,3 +286,49 @@ public record InspectionDeviceCalibrationRequest(
 public record InspectionDeviceCalibrationResponse(
     int Id, int InspectionDeviceId, DateOnly CalibratedOn, DateOnly? NextDueOn,
     string? Result, string? PerformedByUserName, DateTimeOffset CreatedAt);
+
+// ---- 設計変更の影響確認（J-40-40-01/03）----
+
+/// <summary>
+/// 設計変更（MBOM・工順の改訂）の影響範囲（J-40-40-01/03）。
+/// 指図展開時のスナップショット方式（Spec.md 5.7）を採っているため、
+/// マスタを直しても展開済みの指図は変わらない。その事実を改訂者に見せるための集計
+/// </summary>
+public record DesignChangeImpactResponse(
+    int ProductId,
+    string ProductCode,
+    string ProductName,
+    /// <summary>進行中（未完了・未取消）の製造指図</summary>
+    List<DesignChangeOrderRow> Orders,
+    /// <summary>現行MBOMの部材と、進行中指図が必要としている部材の和集合</summary>
+    List<DesignChangeMaterialRow> Materials);
+
+public record DesignChangeOrderRow(
+    int OrderId,
+    string OrderNo,
+    ManufacturingOrderStatus Status,
+    decimal Quantity,
+    DateOnly? DueDate,
+    int WorkOrderCount,
+    /// <summary>着手済み（未完了でない）作業指示の件数</summary>
+    int StartedWorkOrderCount,
+    /// <summary>
+    /// 展開済みでスナップショットが固定されているか。
+    /// true＝この改訂は届かない（作り直すなら指図の取消と再作成が要る）、
+    /// false＝未展開のため展開時に改訂後のMBOM・工順が使われる
+    /// </summary>
+    bool IsSnapshotFixed);
+
+public record DesignChangeMaterialRow(
+    int ProductId,
+    string Code,
+    string Name,
+    string Unit,
+    /// <summary>現行MBOMに載っているか（false＝進行中指図だけが使っている＝改訂で外した部材）</summary>
+    bool InCurrentBom,
+    /// <summary>現行MBOMの原単位（載っていなければnull）</summary>
+    decimal? QuantityPer,
+    /// <summary>進行中指図の予定数量の合計（スナップショット側の値）</summary>
+    decimal PlannedQuantityInProgress,
+    /// <summary>現在庫（全ロケーション合計）</summary>
+    decimal StockQuantity);

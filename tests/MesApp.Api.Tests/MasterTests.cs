@@ -769,4 +769,46 @@ public class MasterTests
             "/api/inspection-devices/expiring");
         Assert.DoesNotContain(expiringAfter!, d => d.Code == "MD-01");
     }
+    [Fact]
+    public async Task 設計変更の影響確認は展開済み指図と外した部材の在庫を示す()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var context = await Phase3TestData.SetupAsync(admin);
+
+        // 部材 RM-01 を100受け入れ、FG-01 の指図を10だけ展開する（RM-01 の予定数量は 10×2＝20）
+        await Phase3TestData.ReceiveAsync(admin, context.MaterialId, 100m, context.MaterialLocationId);
+        await Phase3TestData.CreateReleasedOrderAsync(admin, context.ProductId, 10m);
+
+        // 設計変更：RM-01 を外して RM-02 に差し替える
+        var newMaterial = await CreateProductAsync(admin, "RM-02", "新部材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{context.ProductId}/bom",
+            new List<BomItemRequest> { new(newMaterial.Id, 1m, MakeOrBuy.InHouse, null) }))
+            .EnsureSuccessStatusCode();
+
+        var impact = await admin.GetFromJsonAsync<DesignChangeImpactResponse>(
+            $"/api/products/{context.ProductId}/change-impact");
+
+        // 展開済みの指図はスナップショットを持つため、この改訂は届かない
+        var order = Assert.Single(impact!.Orders);
+        Assert.Equal(ManufacturingOrderStatus.Released, order.Status);
+        Assert.True(order.IsSnapshotFixed);
+        Assert.Equal(2, order.WorkOrderCount);
+        Assert.Equal(0, order.StartedWorkOrderCount);
+
+        // 外した RM-01 は現行MBOMに無いが、進行中指図がまだ必要としており在庫も残っている
+        var removed = Assert.Single(impact.Materials, m => m.Code == "RM-01");
+        Assert.False(removed.InCurrentBom);
+        Assert.Null(removed.QuantityPer);
+        Assert.Equal(20m, removed.PlannedQuantityInProgress);
+        Assert.Equal(100m, removed.StockQuantity);
+
+        // 差し替え先は現行MBOMにあるが、進行中指図はまだ要求していない
+        var added = Assert.Single(impact.Materials, m => m.Code == "RM-02");
+        Assert.True(added.InCurrentBom);
+        Assert.Equal(1m, added.QuantityPer);
+        Assert.Equal(0m, added.PlannedQuantityInProgress);
+        Assert.Equal(0m, added.StockQuantity);
+    }
+
 }
