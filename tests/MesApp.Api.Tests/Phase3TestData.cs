@@ -1,4 +1,6 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Contracts.Masters;
@@ -87,5 +89,22 @@ internal static class Phase3TestData
         // 1ロット分の在庫行はページに収まる前提（テストデータの規模）
         var stocks = await client.GetFromJsonAsync<PagedResult<StockResponse>>(url);
         return stocks!.Items.Sum(s => s.Quantity);
+    }
+
+    /// <summary>実績CSVを取り込み、結果を返す（HTTPエラーは例外）</summary>
+    public static async Task<CsvImportResult> ImportActualCsvAsync(
+        HttpClient client, string kind, string csv, bool dryRun = false)
+    {
+        var response = await PostActualCsvAsync(client, kind, csv, dryRun);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<CsvImportResult>())!;
+    }
+
+    public static Task<HttpResponseMessage> PostActualCsvAsync(
+        HttpClient client, string kind, string csv, bool dryRun = false)
+    {
+        var content = new StringContent(csv, Encoding.UTF8);
+        content.Headers.ContentType = new MediaTypeHeaderValue("text/csv") { CharSet = "utf-8" };
+        return client.PostAsync($"/api/actuals/csv/{kind}?dryRun={(dryRun ? "true" : "false")}", content);
     }
 }

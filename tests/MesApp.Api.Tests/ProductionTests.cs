@@ -28,6 +28,67 @@ public class ProductionTests
         return (product.Id, process.Id);
     }
 
+    [Fact]
+    public async Task 製造指図をCSVで登録し承認と工程展開まで進められる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        await Phase3TestData.SetupAsync(admin);
+        const string header = "OrderNo,ProductCode,Quantity,DueDate,OrderType,SourceOrderNo,Note,Approve,Expand,OutputLotNumber\n";
+
+        var result = await Phase3TestData.ImportActualCsvAsync(admin, "manufacturing-orders",
+            header
+            + "CSV-MO-1,FG-01,10,2026-10-31,通常,,初回,true,true,FG-LOT-1\n"
+            + "CSV-MO-2,FG-01,5,,Spot,,,true,false,\n"
+            + "CSV-MO-3,FG-01,2,,Rework,CSV-MO-1,同じファイルの前の行を元指図にする,false,false,\n"
+            + ",FG-01,1,,,,,,,\n");
+        Assert.True(result.Succeeded, string.Join(" / ", result.Errors.Select(e => $"{e.Line}行目 {e.Message}")));
+        Assert.Equal(4, result.Created);
+
+        var orders = (await admin.GetFromJsonAsync<PagedResult<ManufacturingOrderResponse>>(
+            "/api/manufacturing-orders"))!.Items;
+        Assert.Equal(4, orders.Count);
+        var expanded = orders.Single(o => o.OrderNo == "CSV-MO-1");
+        Assert.Equal(ManufacturingOrderStatus.Released, expanded.Status);
+        Assert.Equal("FG-LOT-1", expanded.OutputLotNumber);
+        Assert.Equal(new DateOnly(2026, 10, 31), expanded.DueDate);
+        var detail = await admin.GetFromJsonAsync<ManufacturingOrderDetailResponse>(
+            $"/api/manufacturing-orders/{expanded.Id}");
+        // 後続の実績CSVは「指図番号＋工程順序」で作業指示を指す
+        Assert.Equal(["CSV-MO-1-01", "CSV-MO-1-02"], detail!.WorkOrders.Select(w => w.WorkOrderNo));
+        Assert.Equal(ManufacturingOrderStatus.Approved, orders.Single(o => o.OrderNo == "CSV-MO-2").Status);
+        var rework = orders.Single(o => o.OrderNo == "CSV-MO-3");
+        Assert.Equal(ManufacturingOrderStatus.Draft, rework.Status);
+        Assert.Equal(expanded.Id, rework.SourceOrderId);
+        Assert.StartsWith("MO", Assert.Single(orders, o => !o.OrderNo.StartsWith("CSV-")).OrderNo);
+
+        // 不正な行は行番号付きで返り、正しい行も含めて1件も登録されない
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "manufacturing-orders",
+            header
+            + "CSV-MO-4,FG-01,1,,,,,true,true,\n"
+            + "CSV-MO-1,FG-01,1,,,,,,,\n"
+            + "MO-MANUAL,FG-01,1,,,,,,,\n"
+            + "CSV-MO-5,FG-01,1,,,,,false,true,\n"
+            + "CSV-MO-6,FG-01,1,,Rework,NO-SUCH,,,,\n"
+            + "CSV-MO-7,RM-01,1,,,,,true,true,\n"
+            + "CSV-MO-8,FG-01,1,,,,,true,true,FG-LOT-1\n");
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("既に存在"));
+        Assert.Contains(invalid.Errors, e => e.Line == 4 && e.Message.Contains("自動採番"));
+        Assert.Contains(invalid.Errors, e => e.Line == 5 && e.Message.Contains("Approve"));
+        Assert.Contains(invalid.Errors, e => e.Line == 6 && e.Message.Contains("NO-SUCH"));
+        Assert.Contains(invalid.Errors, e => e.Line == 7 && e.Message.Contains("工順"));
+        Assert.Contains(invalid.Errors, e => e.Line == 8 && e.Message.Contains("FG-LOT-1"));
+        Assert.Equal(4, (await admin.GetFromJsonAsync<PagedResult<ManufacturingOrderResponse>>(
+            "/api/manufacturing-orders"))!.Total);
+
+        // 取込の権限は単票の指図APIと同じ（作業者は指図を発行できない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(
+            factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(
+            operator_, "manufacturing-orders", header + ",FG-01,1,,,,,,,\n")).StatusCode);
+    }
+
     private static async Task<ManufacturingOrderResponse> CreateOrderAsync(
         HttpClient admin, int productId, decimal quantity = 100m, DateOnly? dueDate = null)
     {

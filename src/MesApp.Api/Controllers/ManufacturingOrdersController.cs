@@ -21,7 +21,7 @@ namespace MesApp.Api.Controllers;
 public class ManufacturingOrdersController(
     MesAppDbContext db,
     WorkOrderStatusService workOrderStatus,
-    NumberingService numbering,
+    ManufacturingOrderService orders,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
 {
@@ -97,46 +97,11 @@ public class ManufacturingOrdersController(
     public async Task<ActionResult<ManufacturingOrderResponse>> Create(
         CreateManufacturingOrderRequest request, CancellationToken ct)
     {
-        var product = await db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, ct);
-        if (product is null || !product.IsActive)
+        var outcome = await orders.CreateAsync(request, null, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        if (outcome.Order is not { } order)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）品目IDです。" });
+            return ToProblem(outcome);
         }
-
-        ManufacturingOrder? source = null;
-        if (request.OrderType == ManufacturingOrderType.Rework)
-        {
-            if (request.SourceOrderId is null)
-            {
-                return BadRequest(new ProblemDetails { Title = "リワーク指図には元指図ID（sourceOrderId）が必要です。" });
-            }
-            source = await db.ManufacturingOrders.FindAsync([request.SourceOrderId.Value], ct);
-            if (source is null)
-            {
-                return BadRequest(new ProblemDetails { Title = "元指図が存在しません。" });
-            }
-        }
-        else if (request.SourceOrderId is not null)
-        {
-            return BadRequest(new ProblemDetails { Title = "元指図IDはリワーク指図でのみ指定できます。" });
-        }
-
-        var order = new ManufacturingOrder
-        {
-            OrderNo = await numbering.NextOrderNoAsync(ct),
-            ProductId = product.Id,
-            Quantity = request.Quantity,
-            DueDate = request.DueDate,
-            OrderType = request.OrderType,
-            SourceOrderId = source?.Id,
-            Note = request.Note,
-            CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-        };
-        db.ManufacturingOrders.Add(order);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Production", "Create", nameof(ManufacturingOrder), order.Id.ToString(),
-            detail: $"orderNo={order.OrderNo}, type={order.OrderType}", ct: ct);
-        order.Product = product;
         return CreatedAtAction(nameof(Get), new { id = order.Id }, ToResponse(order));
     }
 
@@ -188,19 +153,8 @@ public class ManufacturingOrdersController(
         {
             return NotFound();
         }
-        if (order.Status != ManufacturingOrderStatus.Draft)
-        {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の指図は承認できません。" });
-        }
-
-        order.Status = ManufacturingOrderStatus.Approved;
-        order.ApprovedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        order.ApprovedAt = DateTimeOffset.UtcNow;
-        order.UpdatedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Production", "Approve", nameof(ManufacturingOrder), id.ToString(),
-            detail: $"orderNo={order.OrderNo}", ct: ct);
-        return ToResponse(order);
+        var outcome = await orders.ApproveAsync(order, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        return outcome.Order is null ? ToProblem(outcome) : ToResponse(order);
     }
 
     /// <summary>指図取消（A-20-20-02。取消時は未完了の作業指示も取消する）</summary>
@@ -250,128 +204,14 @@ public class ManufacturingOrdersController(
         {
             return NotFound();
         }
-        if (order.Status != ManufacturingOrderStatus.Approved)
-        {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の指図は展開できません（承認済みの指図のみ）。" });
-        }
+        var outcome = await orders.ExpandAsync(order, request.LotNumber, ct);
+        return outcome.Order is null ? ToProblem(outcome) : await Get(id, ct);
+    }
 
-        var routing = await db.Routings
-            .Include(r => r.WorkProcedure)
-            .Where(r => r.ProductId == order.ProductId)
-            .OrderBy(r => r.Sequence)
-            .ToListAsync(ct);
-        if (routing.Count == 0)
-        {
-            return BadRequest(new ProblemDetails { Title = $"品目 '{order.Product!.Code}' に工順（BOP）が登録されていません。" });
-        }
-
-        // 産出ロット採番（手入力があれば一意性を確認して使用）
-        var lotNumber = request.LotNumber;
-        if (string.IsNullOrWhiteSpace(lotNumber))
-        {
-            lotNumber = await numbering.NextLotNumberAsync(order.Product!.Code, ct);
-        }
-        else if (await db.Lots.AnyAsync(l => l.LotNumber == lotNumber, ct))
-        {
-            return Conflict(new ProblemDetails { Title = $"ロット番号 '{lotNumber}' は既に存在します。" });
-        }
-
-        var lot = new Lot
-        {
-            LotNumber = lotNumber,
-            ProductId = order.ProductId,
-            InitialQuantity = 0, // 実績計上（Phase 3）で確定
-            OriginType = LotOriginType.Production,
-            ManufacturedOn = businessDate.Today,
-            StockStatus = LotStockStatus.Normal,
-        };
-        db.Lots.Add(lot);
-
-        // 工順（BOP）は展開時点の値を作業指示へ写して固定する（Spec.md 5.7）。
-        // 以降に工順が改訂されても、この指図の標準時間・必要スキル・管理項目は変わらない
-        // 工程管理項目も同じ理由で展開時点の値を写す（B-30-30-04）。検査基準のスナップショットと同じ方針で、
-        // 対象品目/工程に合致する有効な項目を自動選択する（工順に明示的な紐付けを持たせない）
-        var controlItems = await db.ControlItems.AsNoTracking()
-            .Where(i => i.IsActive && i.TargetProductId == order.ProductId)
-            .ToListAsync(ct);
-        var processControlItems = await db.ControlItems.AsNoTracking()
-            .Where(i => i.IsActive && i.TargetProcessId != null)
-            .ToListAsync(ct);
-
-        foreach (var step in routing)
-        {
-            var workOrder = new WorkOrder
-            {
-                WorkOrderNo = $"{order.OrderNo}-{step.Sequence:00}",
-                ManufacturingOrder = order,
-                ProductId = order.ProductId,
-                ProcessId = step.ProcessId,
-                RoutingSequence = step.Sequence,
-                PlannedQuantity = order.Quantity,
-                StandardWorkMinutes = step.StandardWorkMinutes,
-                StandardSetupMinutes = step.StandardSetupMinutes,
-                RequiredSkillId = step.RequiredSkillId,
-                WorkCenterId = step.WorkCenterId,
-                ControlItems = step.ControlItems,
-                RoutingChecklistId = step.ChecklistId,
-                WorkProcedureId = step.WorkProcedureId,
-                // 手順の本文は写さない。改訂した手順は仕掛中の指示にも届くべきなので
-                // 表示はマスタの現在値を使い、ここには「計画時の版数」だけを残す
-                WorkProcedureVersion = step.WorkProcedure?.Version,
-            };
-            // 品目単位の項目と、この工程を対象にした項目を合わせる（同じ項目は1回だけ）
-            workOrder.ControlItemSnapshots =
-            [
-                .. controlItems
-                    .Concat(processControlItems.Where(i => i.TargetProcessId == step.ProcessId))
-                    .DistinctBy(i => i.Id)
-                    .OrderBy(i => i.Code)
-                    .Select(i => new WorkOrderControlItem
-                    {
-                        ControlItemId = i.Id,
-                        ItemCode = i.Code,
-                        ItemName = i.Name,
-                        Unit = i.Unit,
-                        ItemVersion = i.Version,
-                        TargetValue = i.TargetValue,
-                        LowerLimit = i.LowerLimit,
-                        UpperLimit = i.UpperLimit,
-                    }),
-            ];
-            db.WorkOrders.Add(workOrder);
-        }
-
-        // MBOMも展開時点で予定材料として固定する。以降の投入照合（B-30-20-01）と
-        // バックフラッシュ（B-40-10-09）はこの予定材料を基準にする
-        var bom = await db.BomItems
-            .Where(b => b.ParentProductId == order.ProductId)
-            .ToListAsync(ct);
-        foreach (var item in bom)
-        {
-            db.ManufacturingOrderMaterials.Add(new ManufacturingOrderMaterial
-            {
-                ManufacturingOrder = order,
-                ChildProductId = item.ChildProductId,
-                QuantityPer = item.QuantityPer,
-                PlannedQuantity = item.QuantityPer * order.Quantity,
-                AlternativeGroup = item.AlternativeGroup,
-                IsAlternative = item.IsAlternative,
-            });
-        }
-
-        order.OutputLot = lot;
-        order.Status = ManufacturingOrderStatus.Released;
-        order.UpdatedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Production", "Expand", nameof(ManufacturingOrder), id.ToString(),
-            detail: new
-            {
-                orderNo = order.OrderNo,
-                lot = lotNumber,
-                workOrders = routing.Count,
-                materials = bom.Count,
-            }, ct: ct);
-        return await Get(id, ct);
+    private ActionResult ToProblem(OrderOutcome outcome)
+    {
+        var problem = new ProblemDetails { Title = outcome.Error };
+        return outcome.IsConflict ? Conflict(problem) : BadRequest(problem);
     }
 
     private static ManufacturingOrderResponse ToResponse(ManufacturingOrder o) =>

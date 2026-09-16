@@ -1,0 +1,5 @@
+﻿OrderNo,ProductCode,Quantity,DueDate,OrderType,SourceOrderNo,Note,Approve,Expand,OutputLotNumber
+SMP-SF-001,SF-2000,20,2026-10-09,Normal,,ハウジング加工（外注の表面処理を含む）,true,true,SF2000-S001
+SMP-FG-001,FG-1000,10,2026-10-16,Normal,,ギアポンプ初回生産,true,true,FG1000-S001
+SMP-FG-002,FG-1000,5,2026-10-30,Normal,,承認まで（展開は画面から試す）,true,false,
+SMP-FG-003,FG-1000,3,,Spot,,突発指図（未承認のまま）,false,false,

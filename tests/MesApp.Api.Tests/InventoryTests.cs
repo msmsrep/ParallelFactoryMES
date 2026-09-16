@@ -40,12 +40,12 @@ public class InventoryTests
         const string header = "ProductCode,Quantity,LocationCode,LotNumber,ExpiresOn,Note\n";
 
         // 検証のみではDBが変わらない
-        var dry = await ImportActualCsvAsync(admin, "receiving",
+        var dry = await Phase3TestData.ImportActualCsvAsync(admin, "receiving",
             header + "RM-01,100,LOC-M,CSV-LOT-1,2027-01-31,初回\nRM-01,30,LOC-M,,,\n", dryRun: true);
         Assert.True(dry.Succeeded);
         Assert.Equal(0m, await StockOfProductAsync(admin, "RM-01"));
 
-        var result = await ImportActualCsvAsync(admin, "receiving",
+        var result = await Phase3TestData.ImportActualCsvAsync(admin, "receiving",
             header + "RM-01,100,LOC-M,CSV-LOT-1,2027-01-31,初回\nRM-01,30,LOC-M,,,\n");
         Assert.True(result.Succeeded);
         Assert.Equal(2, result.Created);
@@ -56,7 +56,7 @@ public class InventoryTests
 
         // 同じファイル内のロット番号重複・既存ロットとの重複・未登録コード・数量0は行番号付きで返り、
         // 正しい行（2行目）も含めて1件も登録されない
-        var invalid = await ImportActualCsvAsync(admin, "receiving",
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "receiving",
             header
             + "RM-01,10,LOC-M,CSV-LOT-2,,\n"
             + "RM-01,10,LOC-M,CSV-LOT-2,,\n"
@@ -73,39 +73,23 @@ public class InventoryTests
         Assert.Equal(130m, await StockOfProductAsync(admin, "RM-01"));
 
         // 必須列が無いファイルは行を読む前に拒否する
-        var missing = await ImportActualCsvAsync(admin, "receiving", "ProductCode,Quantity\nRM-01,1\n");
+        var missing = await Phase3TestData.ImportActualCsvAsync(admin, "receiving", "ProductCode,Quantity\nRM-01,1\n");
         Assert.False(missing.Succeeded);
         Assert.Contains("LocationCode", Assert.Single(missing.Errors).Message);
 
         // 取込の権限は単票の受入APIと同じ（作業者は受入できない）
         using var operator_ = await TestAuth.CreateUserClientAsync(
             factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
-        var forbidden = await PostActualCsvAsync(operator_, "receiving", header + "RM-01,1,LOC-M,,,\n");
+        var forbidden = await Phase3TestData.PostActualCsvAsync(operator_, "receiving", header + "RM-01,1,LOC-M,,,\n");
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
-            (await PostActualCsvAsync(admin, "unknown", header)).StatusCode);
+            (await Phase3TestData.PostActualCsvAsync(admin, "unknown", header)).StatusCode);
     }
 
     private static async Task<decimal> StockOfProductAsync(HttpClient client, string productCode)
     {
         var stocks = await client.GetFromJsonAsync<PagedResult<StockResponse>>("/api/inventory/stocks");
         return stocks!.Items.Where(s => s.ProductCode == productCode).Sum(s => s.Quantity);
-    }
-
-    private static async Task<CsvImportResult> ImportActualCsvAsync(
-        HttpClient client, string kind, string csv, bool dryRun = false)
-    {
-        var response = await PostActualCsvAsync(client, kind, csv, dryRun);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<CsvImportResult>())!;
-    }
-
-    private static Task<HttpResponseMessage> PostActualCsvAsync(
-        HttpClient client, string kind, string csv, bool dryRun = false)
-    {
-        var content = new StringContent(csv, System.Text.Encoding.UTF8);
-        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/csv") { CharSet = "utf-8" };
-        return client.PostAsync($"/api/actuals/csv/{kind}?dryRun={(dryRun ? "true" : "false")}", content);
     }
 
     [Fact]

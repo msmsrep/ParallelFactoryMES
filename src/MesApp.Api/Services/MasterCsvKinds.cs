@@ -243,6 +243,10 @@ public static class CsvEnumLabels
         ("半製品・中間品", ProductType.SemiFinished),
         ("部材", ProductType.Material));
 
+    public static readonly IReadOnlyDictionary<string, ManufacturingOrderType> OrderTypes = Build(
+        ("通常", ManufacturingOrderType.Normal), ("突発", ManufacturingOrderType.Spot),
+        ("リワーク", ManufacturingOrderType.Rework));
+
     public static readonly IReadOnlyDictionary<string, MakeOrBuy> MakeOrBuys = Build(
         ("内製", MakeOrBuy.InHouse), ("外注", MakeOrBuy.Outsourced));
 
