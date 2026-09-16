@@ -288,9 +288,11 @@ public sealed class WorkOrderExecutionService(
             // バックフラッシュ（B-40-10-09）：MBOM×完了数量の部材を自動消費
             if (request.Backflush)
             {
-                // 消費量の基準は展開時に固定した予定材料の原単位（Spec.md 5.7）
+                // 消費量の基準は展開時に固定した予定材料の原単位（Spec.md 5.7）。
+                // 代替部品の行は除く：主材料の代わりに使う部材なので、両方を原単位ぶん引くと二重に減る。
+                // 代替の投入には理由が要る（Spec.md 3.9）ため、代替部品は手動の部材投入で理由とともに記録する
                 var bom = await db.ManufacturingOrderMaterials
-                    .Where(m => m.ManufacturingOrderId == workOrder.ManufacturingOrderId)
+                    .Where(m => m.ManufacturingOrderId == workOrder.ManufacturingOrderId && !m.IsAlternative)
                     .ToListAsync(ct);
                 if (bom.Count == 0)
                 {

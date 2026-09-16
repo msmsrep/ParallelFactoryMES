@@ -382,6 +382,33 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task バックフラッシュは代替部品を消費しない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        // RM-01（主材料）と RM-02（代替部品）を同じ代替部品グループにする
+        var substitute = await MasterTests.CreateProductAsync(admin, "RM-02", "代替部材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom", new List<BomItemRequest>
+        {
+            new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "GRP-1"),
+            new(substitute.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "GRP-1", IsAlternative: true),
+        })).EnsureSuccessStatusCode();
+        var mainLot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var substituteLot = await Phase3TestData.ReceiveAsync(admin, substitute.Id, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        // 代替部品は主材料の代わりなので、両方を原単位ぶん消費すると部材が二重に減る。
+        // 代替の投入には理由が要る（Spec.md 3.9）ため、理由を持たないバックフラッシュでは主材料だけを引く
+        var record = await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+            new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now,
+                ctx.ProductLocationId, Backflush: true));
+        Assert.Equal(HttpStatusCode.OK, record.StatusCode);
+        Assert.Equal(80m, await Phase3TestData.GetStockQuantityAsync(admin, mainLot.Id));
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, substituteLot.Id));
+    }
+
+    [Fact]
     public async Task 実績は分割して報告でき産出数と部材消費が積み上がる()
     {
         using var factory = new ApiFactory();
