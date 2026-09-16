@@ -1,7 +1,8 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Common;
+using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Users;
@@ -515,5 +516,68 @@ public class ProductionTests
         (await admin.PostAsync($"/api/work-orders/{order.WorkOrders[0].Id}/start", null)).EnsureSuccessStatusCode();
         var after = await admin.GetFromJsonAsync<List<ProcessProgressRow>>("/api/work-orders/process-summary");
         Assert.Equal(1, Assert.Single(after!).Started);
+    }
+
+    [Fact]
+    public async Task 生産性モニタリングで歩留まり直行率と標準時間予実を集計できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 通常指図10個：良品8・不良2（工順1段目は 作業30分/個・段取り10分）
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrder = order.WorkOrders.First();
+        var started = DateTimeOffset.Now.AddHours(-2);
+        (await admin.PostAsJsonAsync($"/api/work-orders/{workOrder.Id}/production-records",
+                new ProductionRecordRequest(8m, 2m, started, started.AddHours(1), ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+
+        // 直接作業時間60分（予定は 段取り10 + 作業30×10 = 310分）
+        (await admin.PostAsJsonAsync("/api/work-time-records",
+                new WorkTimeRequest(WorkTimeType.Direct, null, workOrder.Id, started, started.AddMinutes(60), null)))
+            .EnsureSuccessStatusCode();
+
+        // リワーク指図で不良2個を救済する（別指図なので分母には入らない）
+        var reworkCreated = await admin.PostAsJsonAsync("/api/manufacturing-orders",
+            new CreateManufacturingOrderRequest(ctx.ProductId, 2m, null,
+                ManufacturingOrderType.Rework, order.Order.Id, null));
+        reworkCreated.EnsureSuccessStatusCode();
+        var rework = (await reworkCreated.Content.ReadFromJsonAsync<ManufacturingOrderResponse>())!;
+        (await admin.PostAsync($"/api/manufacturing-orders/{rework.Id}/approve", null)).EnsureSuccessStatusCode();
+        var reworkExpanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{rework.Id}/expand", new ExpandRequest(null));
+        reworkExpanded.EnsureSuccessStatusCode();
+        var reworkDetail = (await reworkExpanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+        (await admin.PostAsJsonAsync(
+                $"/api/work-orders/{reworkDetail.WorkOrders.First().Id}/production-records",
+                new ProductionRecordRequest(2m, 0m, started, started.AddHours(1), ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+
+        var summary = await admin.GetFromJsonAsync<ProductivitySummaryResponse>("/api/productivity");
+
+        // 直行率は手直しを経ずに通った割合＝8/10、歩留まりは救済を含めて(8+2)/10
+        Assert.Equal(8m, summary!.Total.GoodQuantity);
+        Assert.Equal(2m, summary.Total.DefectQuantity);
+        Assert.Equal(2m, summary.Total.ReworkGoodQuantity);
+        Assert.Equal(80m, summary.Total.FirstPassRate);
+        Assert.Equal(100m, summary.Total.YieldRate);
+
+        var product = Assert.Single(summary.ByProduct);
+        Assert.Equal("FG-01", product.Key);
+        Assert.Equal(80m, product.FirstPassRate);
+
+        // 標準時間の予実：予定310分に対し実績60分
+        var variance = Assert.Single(summary.TimeVariances, v => v.WorkOrderNo == workOrder.WorkOrderNo);
+        Assert.Equal(310m, variance.PlannedMinutes);
+        Assert.Equal(60m, variance.ActualMinutes);
+        Assert.Equal(-80.65m, variance.VarianceRate);
+
+        // 期間外を指定すれば空になる（期間は製造日基準）
+        var empty = await admin.GetFromJsonAsync<ProductivitySummaryResponse>(
+            "/api/productivity?from=2020-01-01&to=2020-01-01");
+        Assert.Equal(0m, empty!.Total.GoodQuantity);
+        Assert.Empty(empty.ByProduct);
+        Assert.Empty(empty.TimeVariances);
     }
 }

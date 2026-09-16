@@ -1,0 +1,144 @@
+@* 生産性モニタリング（Spec.md 3.2 工程進捗管理。歩留まり・直行率・標準時間予実。B-60-10-05） *@
+@page "/productivity"
+@attribute [Authorize]
+@inject HttpClient Http
+
+<PageTitle>生産性モニタリング - Parallel Factory MES</PageTitle>
+
+<h1>生産性モニタリング</h1>
+<p class="text-muted">
+    歩留まり・直行率・標準時間の予実（B-60-10-05）。期間は製造日（業務日付）基準。
+    直行率は手直しを経ずに一度で良品になった割合、歩留まりはリワークでの救済を含めた最終的な良品の割合。
+</p>
+
+<div class="card">
+    <div class="form-grid">
+        <div class="form-field">
+            <label>開始日（製造日）</label>
+            <input type="date" @bind="_from" />
+        </div>
+        <div class="form-field">
+            <label>終了日（製造日）</label>
+            <input type="date" @bind="_to" />
+        </div>
+    </div>
+    <button class="btn" @onclick="LoadAsync">集計</button>
+</div>
+
+@if (_summary is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    <div class="card">
+        <h2 style="margin-top:0;">合計</h2>
+        @if (_summary.Total.GoodQuantity + _summary.Total.DefectQuantity == 0)
+        {
+            <p class="text-muted">対象期間の生産実績はありません。</p>
+        }
+        else
+        {
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <th>良品数</th>
+                        <td>@_summary.Total.GoodQuantity</td>
+                        <th>不良数</th>
+                        <td>@_summary.Total.DefectQuantity</td>
+                        <th>リワークでの救済</th>
+                        <td>@_summary.Total.ReworkGoodQuantity</td>
+                    </tr>
+                    <tr>
+                        <th>直行率</th>
+                        <td>
+                            @_summary.Total.FirstPassRate %
+                            <BarMeter Value="@_summary.Total.FirstPassRate" HighIsBad="false" />
+                        </td>
+                        <th>歩留まり</th>
+                        <td>
+                            @_summary.Total.YieldRate %
+                            <BarMeter Value="@_summary.Total.YieldRate" HighIsBad="false" />
+                        </td>
+                        <th></th>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">品目別</h2>
+        <ProductivityTable Rows="_summary.ByProduct" KeyLabel="品目" />
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">工程別</h2>
+        <ProductivityTable Rows="_summary.ByProcess" KeyLabel="工程" />
+    </div>
+
+    @* 標準時間の予実。予定は指図展開時に固定した工順の値で、マスタの現在値では引き直さない *@
+    <div class="card">
+        <h2 style="margin-top:0;">標準時間の予実</h2>
+        @if (_summary.TimeVariances.Count == 0)
+        {
+            <p class="text-muted">対象期間の生産実績はありません。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>作業指示</th><th>品目</th><th>工程</th><th>計画数量</th>
+                        <th>予定（分）</th><th>実績（分）</th><th>超過率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _summary.TimeVariances)
+                    {
+                        <tr>
+                            <td><a href="work-orders/@row.WorkOrderId/record">@row.WorkOrderNo</a></td>
+                            <td>@row.ProductCode</td>
+                            <td>@row.ProcessCode</td>
+                            <td>@row.PlannedQuantity</td>
+                            <td>@row.PlannedMinutes.ToString("0.##")</td>
+                            <td>@row.ActualMinutes.ToString("0.##")</td>
+                            <td class="@(row.VarianceRate > 0 ? "text-danger" : "")">
+                                @(row.VarianceRate is null ? "-" : $"{row.VarianceRate:+0.##;-0.##;0} %")
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="text-muted">
+                予定＝標準段取り時間＋標準作業時間×計画数量（指図展開時に固定した工順の値）。
+                実績＝直接作業時間＋段取り実績時間（いずれも終了済みの記録のみ）。
+                作業時間を記録していない作業指示は実績0分として並ぶ。
+            </p>
+        }
+    </div>
+}
+
+@code {
+    private ProductivitySummaryResponse? _summary;
+    private DateTime? _from;
+    private DateTime? _to;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var query = new List<string>();
+        if (_from is not null)
+        {
+            query.Add($"from={DateOnly.FromDateTime(_from.Value):yyyy-MM-dd}");
+        }
+        if (_to is not null)
+        {
+            query.Add($"to={DateOnly.FromDateTime(_to.Value):yyyy-MM-dd}");
+        }
+        var url = "api/productivity" + (query.Count > 0 ? "?" + string.Join("&", query) : string.Empty);
+        _summary = await Http.GetFromJsonAsync<ProductivitySummaryResponse>(url);
+    }
+}

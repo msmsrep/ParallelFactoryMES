@@ -115,3 +115,46 @@ public record OrderProgressResponse(
     int WorkOrderCount, int CompletedWorkOrderCount,
     /// <summary>納期超過（未完了かつ納期が業務日付を過ぎている）</summary>
     bool IsOverdue);
+
+// ---- 生産性モニタリング（B-60-10-05）----
+
+/// <summary>
+/// 品目別・工程別の生産性（歩留まり・直行率）。
+/// <para>
+/// 直行率は「手直しを経ずに一度で良品になった割合」、歩留まりは「リワークでの救済を含めた
+/// 最終的な良品の割合」。リワークは別の指図（<see cref="ManufacturingOrderType.Rework"/>）として
+/// 実績が付くため、通常・突発の産出を分母に、リワークの良品を歩留まりの分子にだけ足す。
+/// </para>
+/// </summary>
+public record ProductivityRow(
+    string Key,
+    /// <summary>通常・突発指図の良品数</summary>
+    decimal GoodQuantity,
+    /// <summary>通常・突発指図の不良数</summary>
+    decimal DefectQuantity,
+    /// <summary>リワーク指図で良品になった数（歩留まりの分子にだけ入る）</summary>
+    decimal ReworkGoodQuantity,
+    /// <summary>直行率（%）＝ 良品数 ÷ (良品数＋不良数)</summary>
+    decimal FirstPassRate,
+    /// <summary>歩留まり（%）＝ (良品数＋リワーク良品数) ÷ (良品数＋不良数)</summary>
+    decimal YieldRate);
+
+/// <summary>
+/// 標準時間の予実（作業指示単位）。予定＝標準段取り時間＋標準作業時間×計画数量で、
+/// いずれも指図展開時に固定した工順の値を使う（マスタの現在値で引き直さない）
+/// </summary>
+public record StandardTimeVarianceRow(
+    int WorkOrderId, string WorkOrderNo, string ProductCode, string ProcessCode,
+    decimal PlannedQuantity,
+    decimal PlannedMinutes,
+    /// <summary>実績時間（分）＝ 直接作業時間＋段取り実績時間（いずれも終了済みの記録のみ）</summary>
+    decimal ActualMinutes,
+    /// <summary>予定に対する超過率（%）。予定が0分の工程では判定できないためnull</summary>
+    decimal? VarianceRate);
+
+public record ProductivitySummaryResponse(
+    ProductivityRow Total,
+    List<ProductivityRow> ByProduct,
+    List<ProductivityRow> ByProcess,
+    /// <summary>期間内に実績のあった作業指示の予実（超過率の大きい順）</summary>
+    List<StandardTimeVarianceRow> TimeVariances);

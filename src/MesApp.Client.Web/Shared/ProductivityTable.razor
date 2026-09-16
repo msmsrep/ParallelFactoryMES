@@ -1,0 +1,36 @@
+@* 生産性の集計表（品目別・工程別で同じ形。B-60-10-05） *@
+@if (Rows.Count == 0)
+{
+    <p class="text-muted">対象期間の生産実績はありません。</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>@KeyLabel</th><th>良品数</th><th>不良数</th><th>リワークでの救済</th>
+                <th>直行率</th><th>歩留まり</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Rows)
+            {
+                <tr>
+                    <td>@row.Key</td>
+                    <td>@row.GoodQuantity</td>
+                    <td>@row.DefectQuantity</td>
+                    <td>@row.ReworkGoodQuantity</td>
+                    <td>@row.FirstPassRate %</td>
+                    <td>@row.YieldRate %</td>
+                    <td><BarMeter Value="@row.YieldRate" HighIsBad="false" /></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<ProductivityRow> Rows { get; set; } = [];
+
+    [Parameter, EditorRequired] public string KeyLabel { get; set; } = string.Empty;
+}
