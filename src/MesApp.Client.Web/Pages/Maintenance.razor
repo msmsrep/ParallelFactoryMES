@@ -1,4 +1,4 @@
-@page "/maintenance"
+﻿@page "/maintenance"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -101,6 +101,58 @@
                     }
                 </tbody>
             </table>
+        }
+    </div>
+
+    @* 設備総合効率（E-20-30-03）。稼働サマリの素の時間区分に対し、こちらは製造実績と突き合わせた評価指標 *@
+    <div class="card">
+        <h2 style="margin-top:0;">設備総合効率 OEE（E-20-30-03）</h2>
+        @if (_oee is null)
+        {
+            <p class="text-muted">読み込み中...</p>
+        }
+        else if (_oee.Count == 0)
+        {
+            <p class="text-muted">終了時刻まで記録された稼働実績がありません。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>設備</th><th>負荷(h)</th><th>稼働(h)</th><th>時間稼働率</th>
+                        <th>産出数</th><th>性能稼働率</th><th>良品率</th><th>OEE</th><th>カバー率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _oee)
+                    {
+                        <tr>
+                            <td>@row.AssetNo @row.EquipmentName</td>
+                            <td>@row.LoadHours.ToString("0.##")</td>
+                            <td>@row.RunningHours.ToString("0.##")</td>
+                            <td>@Rate(row.AvailabilityRate)</td>
+                            <td>@row.ProducedQuantity.ToString("0.##")</td>
+                            <td>@Rate(row.PerformanceRate)</td>
+                            <td>@Rate(row.QualityRate)</td>
+                            <td>
+                                @Rate(row.Oee)
+                                @if (row.Oee is not null)
+                                {
+                                    <BarMeter Value="@row.Oee.Value" HighIsBad="false" />
+                                }
+                            </td>
+                            <td>@Rate(row.CoverageRate)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="text-muted">
+                OEE＝時間稼働率×性能稼働率×良品率。性能稼働率と良品率は<b>作業指示に紐づけて記録した稼働</b>からしか出せないため、
+                紐付けのない稼働は対象外にしています（どれだけを見られているかがカバー率）。
+                算出できない項目は「-」で、0%としては扱いません。
+                理論サイクルタイムは指図展開時に固定した標準作業時間（1個あたり）で、標準より速ければ性能稼働率は100%を超えます。
+            </p>
         }
     </div>
 
@@ -595,6 +647,7 @@ else
     private List<ToolResponse> _tools = [];
     private PagedResult<EquipmentLogResponse>? _logs;
     private List<EquipmentUtilizationRow>? _utilization;
+    private List<EquipmentOeeRow>? _oee;
     private List<MaintenancePlanResponse>? _plans;
     private PagedResult<MaintenanceOrderResponse>? _orders;
     private List<MaintenanceProcedureResponse> _procedures = [];
@@ -622,6 +675,9 @@ else
     }
 
     private string TabClass(string tab) => _tab == tab ? "active" : string.Empty;
+
+    /// <summary>算出できない指標は0%ではなく「-」で見せる（記録漏れを悪い評価に化けさせない）</summary>
+    private static string Rate(decimal? value) => value is null ? "-" : $"{value:0.##} %";
 
     private static DateTime ToDateTime(object? value) =>
         DateTime.TryParse(value?.ToString(), out var result) ? result : DateTime.Now;
@@ -683,6 +739,7 @@ else
     {
         await LoadEquipmentLogsAsync(1);
         _utilization = await Http.GetFromJsonAsync<List<EquipmentUtilizationRow>>("api/equipment-logs/summary");
+        _oee = await Http.GetFromJsonAsync<List<EquipmentOeeRow>>("api/oee");
     }
 
     private async Task AddLogAsync()

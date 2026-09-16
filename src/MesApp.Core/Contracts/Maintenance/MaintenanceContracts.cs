@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using MesApp.Core.Entities;
 
 namespace MesApp.Core.Contracts.Maintenance;
@@ -44,6 +44,37 @@ public record EquipmentUtilizationRow(
     int FailureCount,
     /// <summary>時間稼働率（%。稼働時間 ÷ 記録済み総時間）</summary>
     decimal UtilizationRate);
+
+/// <summary>
+/// 設備総合効率（OEE。E-20-30-03）＝ 時間稼働率 × 性能稼働率 × 良品率。
+/// <para>
+/// 性能稼働率と良品率は<b>作業指示に紐づいた稼働区間</b>（<c>EquipmentLog.WorkOrderId</c>）からしか
+/// 導けない。紐付けのない稼働は「何個作ったか」が分からないため対象外にし、
+/// どれだけを見られているかを <see cref="CoverageRate"/> で併記する。
+/// 産出0として扱うと記録漏れが設備の悪い評価に化けるため、算出できないものは null を返す（0にしない）。
+/// </para>
+/// </summary>
+public record EquipmentOeeRow(
+    int EquipmentId, string AssetNo, string EquipmentName,
+    /// <summary>負荷時間（h）＝記録済み総時間。計画休止の区分は持たないため除外しない（Spec.md 5.7）</summary>
+    decimal LoadHours,
+    /// <summary>稼働時間（h）</summary>
+    decimal RunningHours,
+    /// <summary>時間稼働率（%）＝稼働時間÷負荷時間。記録が無ければnull</summary>
+    decimal? AvailabilityRate,
+    /// <summary>作業指示に紐づいた稼働時間（h。重なる区間は按分する）</summary>
+    decimal CoveredRunningHours,
+    /// <summary>カバー率（%）＝紐づいた稼働時間÷稼働時間。指標をどれだけ信用してよいかを示す</summary>
+    decimal? CoverageRate,
+    /// <summary>対象稼働区間の産出数（良品＋不良。作業指示の実績を稼働時間で按分した値）</summary>
+    decimal ProducedQuantity,
+    decimal GoodQuantity,
+    /// <summary>性能稼働率（%）＝(標準作業時間×産出数)÷紐づいた稼働時間。100%を超えることがある（標準より速い）</summary>
+    decimal? PerformanceRate,
+    /// <summary>良品率（%）＝良品数÷産出数</summary>
+    decimal? QualityRate,
+    /// <summary>OEE（%）。3要素のいずれかが算出できなければnull</summary>
+    decimal? Oee);
 
 // ---- 保全計画（E-30-10）----
 

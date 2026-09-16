@@ -280,6 +280,84 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task OEEを三要素で算出し紐付けのない稼働は対象外にする()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var equipment = await CreateEquipmentAsync(admin);
+        var other = await admin.PostAsJsonAsync("/api/equipments",
+            new EquipmentRequest("EQ-02", "検査機", null, EquipmentStatus.Available,
+                MaintenanceType.Calendar, null, null));
+        other.EnsureSuccessStatusCode();
+        var otherEquipment = (await other.Content.ReadFromJsonAsync<EquipmentResponse>())!;
+
+        // 工順は1段目が作業30分/個、2段目が15分/個（Phase3TestData）
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var first = order.WorkOrders[0];
+        var second = order.WorkOrders[1];
+
+        // 実行時刻に依存しないよう固定日で組み立てる（製造日の境界をまたがない10時台）
+        var day = new DateOnly(2026, 1, 20);
+        DateTimeOffset At(int hour) =>
+            new(day.ToDateTime(new TimeOnly(hour, 0)),
+                TimeZoneInfo.Local.GetUtcOffset(day.ToDateTime(new TimeOnly(hour, 0))));
+
+        // 同じ設備の同じ時間帯に2つの作業指示が紐づく（まとめ処理）。按分して二重に数えない
+        foreach (var workOrderId in new[] { first.Id, second.Id })
+        {
+            (await admin.PostAsJsonAsync("/api/equipment-logs",
+                    new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running,
+                        At(10), At(16), null, null, workOrderId)))
+                .EnsureSuccessStatusCode();
+        }
+        (await admin.PostAsJsonAsync("/api/equipment-logs",
+                new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Stopped,
+                    At(16), At(18), "材料待ち", null)))
+            .EnsureSuccessStatusCode();
+
+        // 作業指示に紐づかない稼働（EQ-02）は性能・良品率を出せない
+        (await admin.PostAsJsonAsync("/api/equipment-logs",
+                new EquipmentLogRequest(otherEquipment.Id, EquipmentLogStatus.Running,
+                    At(10), At(14), null, null)))
+            .EnsureSuccessStatusCode();
+
+        (await admin.PostAsJsonAsync($"/api/work-orders/{first.Id}/production-records",
+                new ProductionRecordRequest(8m, 2m, At(10), At(16), ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync($"/api/work-orders/{second.Id}/production-records",
+                new ProductionRecordRequest(10m, 0m, At(10), At(16), ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+
+        var rows = await admin.GetFromJsonAsync<List<EquipmentOeeRow>>("/api/oee");
+        var press = Assert.Single(rows!, r => r.AssetNo == "EQ-01");
+
+        // 負荷14h（稼働6h×2＋停止2h）に対し稼働12h
+        Assert.Equal(14m, press.LoadHours);
+        Assert.Equal(12m, press.RunningHours);
+        Assert.Equal(85.71m, press.AvailabilityRate);
+
+        // 重なる2区間は按分され、紐づいた稼働は実時間の6hに収まる（12hにならない）
+        Assert.Equal(6m, press.CoveredRunningHours);
+        Assert.Equal(50m, press.CoverageRate);
+
+        // 理論時間 30分×10個 + 15分×10個 = 450分 ÷ 紐づいた稼働360分
+        Assert.Equal(20m, press.ProducedQuantity);
+        Assert.Equal(18m, press.GoodQuantity);
+        Assert.Equal(125m, press.PerformanceRate);
+        Assert.Equal(90m, press.QualityRate);
+        Assert.Equal(96.42m, press.Oee);
+
+        // 紐付けのない稼働だけの設備は、0%ではなくnullで返す
+        var inspector = Assert.Single(rows!, r => r.AssetNo == "EQ-02");
+        Assert.Equal(100m, inspector.AvailabilityRate);
+        Assert.Equal(0m, inspector.CoverageRate);
+        Assert.Null(inspector.PerformanceRate);
+        Assert.Null(inspector.QualityRate);
+        Assert.Null(inspector.Oee);
+    }
+
+    [Fact]
     public async Task 稼働サマリを製造日の期間で絞り込める()
     {
         using var factory = new ApiFactory();
