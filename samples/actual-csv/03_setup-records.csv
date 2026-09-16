@@ -1,0 +1,4 @@
+﻿OrderNo,Sequence,Type,StartedAt,EndedAt,AbnormalityNote
+SMP-SF-001,10,Pre,2026-09-01 20:30,2026-09-01 20:50,
+SMP-FG-001,10,Pre,2026-09-02 08:00,2026-09-02 08:10,
+SMP-FG-001,30,Post,2026-09-02 14:00,2026-09-02 14:20,シールヒーターの温度上昇が遅い

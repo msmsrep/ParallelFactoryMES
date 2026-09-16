@@ -202,6 +202,35 @@ public sealed class CsvRowReader(CsvTable table, CsvRecord row, List<CsvImportEr
         return current;
     }
 
+    /// <summary>
+    /// 日時列。オフセット付き（2026-09-17T08:30:00+09:00）はそのまま、オフセットの無い値
+    /// （2026-09-17 08:30）は工場の時刻として localOffset を付けて読む
+    /// </summary>
+    public DateTimeOffset? DateTimeOrNull(string column, TimeSpan localOffset)
+    {
+        var value = table.Value(row, column);
+        if (value is null)
+        {
+            return null;
+        }
+        if (System.Text.RegularExpressions.Regex.IsMatch(value, @"(Z|[+-]\d{2}:?\d{2})$")
+            && DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var withOffset))
+        {
+            return withOffset;
+        }
+        string[] formats =
+        [
+            "yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss",
+            "yyyy/M/d H:mm", "yyyy/M/d H:mm:ss",
+        ];
+        if (DateTime.TryParseExact(value, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
+        {
+            return new DateTimeOffset(local, localOffset);
+        }
+        Fail($"{column} は日時（yyyy-MM-dd HH:mm）で指定してください（'{value}'）。");
+        return null;
+    }
+
     /// <summary>コード列から関連マスタのIDを解決する（空欄はnull、未登録はエラー）</summary>
     public int? Reference(string column, int? current, IReadOnlyDictionary<string, int> byCode, string label)
     {

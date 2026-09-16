@@ -1,0 +1,9 @@
+﻿OrderNo,Sequence,ChecklistCode,ItemSequence,IsChecked,Note
+SMP-SF-001,10,CL-01,1,true,
+SMP-SF-001,10,CL-01,2,true,
+SMP-SF-001,10,CL-01,3,false,切りくずは終業時に除去
+SMP-FG-001,10,CL-02,1,true,
+SMP-FG-001,10,CL-02,2,true,
+SMP-FG-001,30,CL-03,1,true,
+SMP-FG-001,30,CL-03,2,true,
+SMP-FG-001,30,CL-03,3,true,

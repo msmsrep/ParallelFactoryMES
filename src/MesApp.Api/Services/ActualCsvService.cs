@@ -1,4 +1,6 @@
+using System.Globalization;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
@@ -26,6 +28,8 @@ public sealed class ActualCsvService(
     MesAppDbContext db,
     ReceivingService receiving,
     ManufacturingOrderService orders,
+    WorkOrderExecutionService execution,
+    IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
     public async Task<CsvImportResult> ImportAsync(
@@ -46,6 +50,11 @@ public sealed class ActualCsvService(
             {
                 ActualCsvKinds.Receiving => await ImportReceivingAsync(table, errors, userId, ct),
                 ActualCsvKinds.ManufacturingOrders => await ImportManufacturingOrdersAsync(table, errors, userId, ct),
+                ActualCsvKinds.SetupRecords => await ImportSetupRecordsAsync(table, errors, userId!, ct),
+                ActualCsvKinds.ChecklistRecords => await ImportChecklistRecordsAsync(table, errors, userId!, ct),
+                ActualCsvKinds.Consumptions => await ImportConsumptionsAsync(table, errors, userId, ct),
+                ActualCsvKinds.ProductionRecords => await ImportProductionRecordsAsync(table, errors, userId!, ct),
+                ActualCsvKinds.DataRecords => await ImportDataRecordsAsync(table, errors, userId, ct),
                 _ => throw new ArgumentOutOfRangeException(nameof(kind)),
             };
 
@@ -105,7 +114,7 @@ public sealed class ActualCsvService(
                 userId, ct);
             if (outcome.Error is not null)
             {
-                reader.Fail(outcome.Error);
+                FailRow(reader, outcome.Error);
                 continue;
             }
             created++;
@@ -181,11 +190,352 @@ public sealed class ActualCsvService(
             }
             if (outcome.Error is not null)
             {
-                reader.Fail(outcome.Error);
+                FailRow(reader, outcome.Error);
                 continue;
             }
             created++;
         }
         return created;
+    }
+
+    // ---- 作業指示の実行記録（B-20-50 / B-30-10 / B-30-20 / B-40-10 / B-30-30-04）----
+
+    /// <summary>段取り実績。1行＝1記録</summary>
+    private async Task<int> ImportSetupRecordsAsync(
+        CsvTable table, List<CsvImportError> errors, string userId, CancellationToken ct)
+    {
+        var workOrders = await WorkOrderKeysAsync(ct);
+        var created = 0;
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var workOrderId = ResolveWorkOrder(reader, workOrders);
+            reader.RequiredText("Type");
+            var type = reader.Enum("Type", SetupType.Pre, CsvEnumLabels.SetupTypes);
+            var startedAt = RequiredDateTime(reader, "StartedAt");
+            var endedAt = reader.DateTimeOrNull("EndedAt", FactoryOffset);
+            var note = reader.Text("AbnormalityNote", null, 1000);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            var outcome = await execution.AddSetupRecordAsync(
+                workOrderId!.Value, new SetupRecordRequest(type, startedAt!.Value, endedAt, note), userId, ct);
+            if (outcome.Failed)
+            {
+                FailRow(reader, outcome.Error!);
+                continue;
+            }
+            created++;
+        }
+        return created;
+    }
+
+    /// <summary>
+    /// チェックリスト実施。指図番号・工程順序・チェックリストコードが同じ行を1回の実施としてまとめる
+    /// （マスタCSVのチェックリストと同じく、1行＝1項目）
+    /// </summary>
+    private async Task<int> ImportChecklistRecordsAsync(
+        CsvTable table, List<CsvImportError> errors, string userId, CancellationToken ct)
+    {
+        var workOrders = await WorkOrderKeysAsync(ct);
+        var checklists = await db.Checklists.AsNoTracking().Include(c => c.Items)
+            .ToDictionaryAsync(c => c.Code, StringComparer.Ordinal, ct);
+
+        var groups = table.Rows
+            .GroupBy(row => (table.Value(row, "OrderNo"), table.Value(row, "Sequence"), table.Value(row, "ChecklistCode")))
+            .Select(g => g.ToList())
+            .ToList();
+
+        var created = 0;
+        foreach (var group in groups)
+        {
+            var head = new CsvRowReader(table, group[0], errors);
+            var workOrderId = ResolveWorkOrder(head, workOrders);
+            var code = head.RequiredText("ChecklistCode");
+            if (head.Failed)
+            {
+                continue;
+            }
+            if (!checklists.TryGetValue(code, out var checklist))
+            {
+                head.Fail($"チェックリスト '{code}' は登録されていません（ChecklistCode）。");
+                continue;
+            }
+
+            var results = new List<ChecklistResultRequest>();
+            var failed = false;
+            foreach (var row in group)
+            {
+                var reader = new CsvRowReader(table, row, errors);
+                var itemSequence = reader.IntOrNull("ItemSequence", null, 1);
+                var isChecked = reader.Bool("IsChecked", true);
+                var note = reader.Text("Note", null, 500);
+                if (itemSequence is null && !reader.Failed)
+                {
+                    reader.Fail("ItemSequence（項目の表示順）は必須です。");
+                }
+                var item = checklist.Items.FirstOrDefault(i => i.Sequence == itemSequence);
+                if (itemSequence is not null && item is null)
+                {
+                    reader.Fail($"チェックリスト '{code}' に表示順 {itemSequence} の項目はありません。");
+                }
+                else if (item is not null && results.Any(r => r.ChecklistItemId == item.Id))
+                {
+                    reader.Fail($"チェックリスト '{code}' の表示順 {itemSequence} が重複しています。");
+                }
+                if (reader.Failed)
+                {
+                    failed = true;
+                    continue;
+                }
+                results.Add(new ChecklistResultRequest(item!.Id, isChecked, note));
+            }
+            if (failed)
+            {
+                continue;
+            }
+
+            var outcome = await execution.AddChecklistRecordAsync(
+                workOrderId!.Value, new ChecklistRecordRequest(checklist.Id, results), userId, ct);
+            if (outcome.Failed)
+            {
+                FailRow(head, outcome.Error!);
+                continue;
+            }
+            created++;
+        }
+        return created;
+    }
+
+    /// <summary>部材投入。1行＝1ロットの投入（在庫の払出と同時）</summary>
+    private async Task<int> ImportConsumptionsAsync(
+        CsvTable table, List<CsvImportError> errors, string? userId, CancellationToken ct)
+    {
+        var workOrders = await WorkOrderKeysAsync(ct);
+        var locationIds = await db.Locations.AsNoTracking()
+            .ToDictionaryAsync(l => l.Code, l => l.Id, StringComparer.Ordinal, ct);
+
+        var created = 0;
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var workOrderId = ResolveWorkOrder(reader, workOrders);
+            var lotNumber = reader.RequiredText("LotNumber");
+            reader.RequiredText("LocationCode");
+            var locationId = reader.Reference("LocationCode", null, locationIds, "ロケーション");
+            var quantity = reader.NumberOrNull("Quantity", null, 0.000001m);
+            var substituteReason = reader.Text("SubstituteReason", null, 500);
+            if (quantity is null && !reader.Failed)
+            {
+                reader.Fail("Quantity（投入数量）は必須です。");
+            }
+            // 前のファイル（受入・工程展開）や前の行で作られたロットも指せるよう、行ごとにDBを引く
+            int? lotId = null;
+            if (lotNumber.Length > 0)
+            {
+                lotId = await db.Lots.Where(l => l.LotNumber == lotNumber)
+                    .Select(l => (int?)l.Id).FirstOrDefaultAsync(ct);
+                if (lotId is null)
+                {
+                    reader.Fail($"ロット '{lotNumber}' は登録されていません（LotNumber）。");
+                }
+            }
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            var outcome = await execution.AddConsumptionAsync(workOrderId!.Value,
+                new ConsumptionRequest(lotId!.Value, locationId!.Value, quantity!.Value, substituteReason), userId, ct);
+            if (outcome.Failed)
+            {
+                FailRow(reader, outcome.Error!);
+                continue;
+            }
+            created++;
+        }
+        return created;
+    }
+
+    /// <summary>生産実績。1行＝1回の実績報告（分割報告は行を分ける）</summary>
+    private async Task<int> ImportProductionRecordsAsync(
+        CsvTable table, List<CsvImportError> errors, string userId, CancellationToken ct)
+    {
+        var workOrders = await WorkOrderKeysAsync(ct);
+        var locationIds = await db.Locations.AsNoTracking()
+            .ToDictionaryAsync(l => l.Code, l => l.Id, StringComparer.Ordinal, ct);
+        var defectReasonIds = await db.DefectReasons.AsNoTracking()
+            .ToDictionaryAsync(r => r.Code, r => r.Id, StringComparer.Ordinal, ct);
+
+        var created = 0;
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var workOrderId = ResolveWorkOrder(reader, workOrders);
+            reader.RequiredText("GoodQuantity");
+            var good = reader.Number("GoodQuantity", 0m, 0);
+            var defect = reader.Number("DefectQuantity", 0m, 0);
+            var scrap = reader.Number("ScrapQuantity", 0m, 0);
+            var rework = reader.Number("ReworkQuantity", 0m, 0);
+            var startedAt = RequiredDateTime(reader, "StartedAt");
+            var endedAt = reader.DateTimeOrNull("EndedAt", FactoryOffset);
+            var locationId = reader.Reference("OutputLocationCode", null, locationIds, "入庫先ロケーション");
+            var backflush = reader.Bool("Backflush", false);
+            var defects = ParseDefects(reader, table.Value(row, "Defects"), defectReasonIds);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            var outcome = await execution.AddProductionRecordAsync(workOrderId!.Value,
+                new ProductionRecordRequest(good, defect, startedAt!.Value, endedAt, locationId, backflush,
+                    scrap, rework, defects), userId, ct);
+            if (outcome.Failed)
+            {
+                FailRow(reader, outcome.Error!);
+                continue;
+            }
+            created++;
+        }
+        return created;
+    }
+
+    /// <summary>製造条件データ。1行＝1項目の記録</summary>
+    private async Task<int> ImportDataRecordsAsync(
+        CsvTable table, List<CsvImportError> errors, string? userId, CancellationToken ct)
+    {
+        var workOrders = await WorkOrderKeysAsync(ct);
+
+        var created = 0;
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var workOrderId = ResolveWorkOrder(reader, workOrders);
+            var controlItemCode = reader.Text("ControlItemCode", null);
+            var numericValue = reader.NumberOrNull("NumericValue", null);
+            var item = reader.Text("Item", null, 100);
+            var value = reader.Text("Value", null, 500);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            int? instructionId = null;
+            if (controlItemCode is not null)
+            {
+                // 展開時に作業指示へ写した指示（スナップショット）を引く。マスタの現在値では判定しない（Spec.md 5.7）
+                var instruction = await db.WorkOrderControlItems.AsNoTracking()
+                    .FirstOrDefaultAsync(i => i.WorkOrderId == workOrderId && i.ItemCode == controlItemCode, ct);
+                if (instruction is null)
+                {
+                    reader.Fail($"工程管理項目 '{controlItemCode}' はこの作業指示に展開されていません（ControlItemCode）。");
+                    continue;
+                }
+                if (numericValue is null)
+                {
+                    reader.Fail("ControlItemCode を指定した行には NumericValue（数値）が必要です。");
+                    continue;
+                }
+                instructionId = instruction.Id;
+                item ??= instruction.ItemName;
+                value ??= $"{numericValue}{instruction.Unit}";
+            }
+            if (item is null || value is null)
+            {
+                reader.Fail("ControlItemCode を省略した行には Item（項目）と Value（値）が必要です。");
+                continue;
+            }
+
+            var outcome = await execution.AddDataRecordsAsync(workOrderId!.Value,
+                [new DataRecordRequest(item, value, instructionId, numericValue)], userId, ct);
+            if (outcome.Failed)
+            {
+                FailRow(reader, outcome.Error!);
+                continue;
+            }
+            created++;
+        }
+        return created;
+    }
+
+    // ---- 共通 ----
+
+    /// <summary>オフセットの無い日時を工場の時刻として読むためのオフセット</summary>
+    private TimeSpan FactoryOffset => businessDate.ToFactoryTime(DateTimeOffset.UtcNow).Offset;
+
+    /// <summary>
+    /// 業務サービスが失敗を返した行をエラーにし、未保存の変更を捨てる。
+    /// バックフラッシュの途中で在庫不足になった場合などに払出が追跡中に残り、
+    /// 次の行の保存に混ざるのを防ぐ（成功した行は保存済みなので捨てても失われない）
+    /// </summary>
+    private void FailRow(CsvRowReader reader, string error)
+    {
+        reader.Fail(error);
+        db.ChangeTracker.Clear();
+    }
+
+    /// <summary>「指図番号＋工程順序」→作業指示ID（取消済みの作業指示は含めない）</summary>
+    private async Task<Dictionary<(string OrderNo, int Sequence), int>> WorkOrderKeysAsync(CancellationToken ct) =>
+        (await db.WorkOrders.AsNoTracking()
+            .Where(w => w.Status != WorkOrderStatus.Canceled)
+            .Select(w => new { w.ManufacturingOrder!.OrderNo, w.RoutingSequence, w.Id })
+            .ToListAsync(ct))
+        .ToDictionary(x => (x.OrderNo, x.RoutingSequence), x => x.Id);
+
+    private static int? ResolveWorkOrder(CsvRowReader reader, Dictionary<(string OrderNo, int Sequence), int> workOrders)
+    {
+        var orderNo = reader.RequiredText("OrderNo");
+        var sequence = reader.IntOrNull("Sequence", null, 1);
+        if (sequence is null && !reader.Failed)
+        {
+            reader.Fail("Sequence（工程順序）は必須です。");
+        }
+        if (reader.Failed)
+        {
+            return null;
+        }
+        if (workOrders.TryGetValue((orderNo, sequence!.Value), out var id))
+        {
+            return id;
+        }
+        reader.Fail($"指図 '{orderNo}' の工程順序 {sequence} の作業指示はありません（展開済みか、工程順序を確認してください）。");
+        return null;
+    }
+
+    private DateTimeOffset? RequiredDateTime(CsvRowReader reader, string column)
+    {
+        var text = reader.RequiredText(column);
+        return text.Length == 0 ? null : reader.DateTimeOrNull(column, FactoryOffset);
+    }
+
+    /// <summary>不良理由別の内訳（DR-02=2;DR-03=1）を読む</summary>
+    private static List<ProductionDefectRequest>? ParseDefects(
+        CsvRowReader reader, string? raw, IReadOnlyDictionary<string, int> reasonIds)
+    {
+        if (raw is null)
+        {
+            return null;
+        }
+        var result = new List<ProductionDefectRequest>();
+        foreach (var part in raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var pair = part.Split('=', 2, StringSplitOptions.TrimEntries);
+            if (pair.Length != 2
+                || !decimal.TryParse(pair[1], NumberStyles.Number, CultureInfo.InvariantCulture, out var quantity)
+                || quantity < 0)
+            {
+                reader.Fail($"Defects は 不良理由コード=数量 をセミコロンで区切って指定してください（'{part}'）。");
+                continue;
+            }
+            if (!reasonIds.TryGetValue(pair[0], out var reasonId))
+            {
+                reader.Fail($"不良理由 '{pair[0]}' は登録されていません（Defects）。");
+                continue;
+            }
+            result.Add(new ProductionDefectRequest(reasonId, quantity));
+        }
+        return result;
     }
 }

@@ -247,6 +247,9 @@ public static class CsvEnumLabels
         ("通常", ManufacturingOrderType.Normal), ("突発", ManufacturingOrderType.Spot),
         ("リワーク", ManufacturingOrderType.Rework));
 
+    public static readonly IReadOnlyDictionary<string, SetupType> SetupTypes = Build(
+        ("前段取り", SetupType.Pre), ("後段取り", SetupType.Post));
+
     public static readonly IReadOnlyDictionary<string, MakeOrBuy> MakeOrBuys = Build(
         ("内製", MakeOrBuy.InHouse), ("外注", MakeOrBuy.Outsourced));
 

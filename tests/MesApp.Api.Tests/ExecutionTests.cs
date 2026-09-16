@@ -60,6 +60,97 @@ public class ExecutionTests
     }
 
     [Fact]
+    public async Task 実行記録をCSVで取り込むと単票APIと同じ判定と在庫計上を通る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        async Task ImportAsync(string path, string csv)
+        {
+            var result = await Phase3TestData.ImportCsvAsync(admin, path, csv);
+            Assert.True(result.Succeeded, $"{path}: " + string.Join(" / ", result.Errors.Select(e => $"{e.Line}行目 {e.Message}")));
+        }
+        await ImportAsync("masters/csv/checklists",
+            "Code,Name,Category,IsActive,Sequence,Text,IsRequired\n" +
+            "CL-T,段取り確認,Setup,true,1,治具の確認,true\nCL-T,段取り確認,Setup,true,2,清掃,false\n");
+        await ImportAsync("masters/csv/defect-reasons", "Code,Name,Category\nDR-01,寸法不良,Process\n");
+        await ImportAsync("masters/csv/control-items",
+            "Code,Name,Unit,TargetProductCode,TargetValue,LowerLimit,UpperLimit\nCI-T,温度,℃,FG-01,100,90,110\n");
+        await ImportAsync("actuals/csv/receiving", "ProductCode,Quantity,LocationCode,LotNumber\nRM-01,100,LOC-M,RM-LOT-1\n");
+        await ImportAsync("actuals/csv/manufacturing-orders",
+            "OrderNo,ProductCode,Quantity,Approve,Expand\nORD-1,FG-01,10,true,true\n");
+
+        await ImportAsync("actuals/csv/setup-records",
+            "OrderNo,Sequence,Type,StartedAt,EndedAt,AbnormalityNote\nORD-1,1,前段取り,2026-09-17 08:00,2026-09-17T08:20:00+09:00,\n");
+        await ImportAsync("actuals/csv/checklist-records",
+            "OrderNo,Sequence,ChecklistCode,ItemSequence,IsChecked,Note\nORD-1,1,CL-T,1,true,\nORD-1,1,CL-T,2,false,時間切れ\n");
+        await ImportAsync("actuals/csv/consumptions",
+            "OrderNo,Sequence,LotNumber,LocationCode,Quantity\nORD-1,1,RM-LOT-1,LOC-M,20\n");
+        await ImportAsync("actuals/csv/production-records",
+            "OrderNo,Sequence,GoodQuantity,DefectQuantity,ScrapQuantity,StartedAt,EndedAt,OutputLocationCode,Backflush,Defects\n" +
+            "ORD-1,1,10,0,,2026-09-17 08:30,2026-09-17 09:30,,false,\n" +
+            "ORD-1,2,9,1,1,2026-09-17 10:00,,LOC-P,false,DR-01=1\n");
+        await ImportAsync("actuals/csv/data-records",
+            "OrderNo,Sequence,ControlItemCode,NumericValue,Item,Value\n" +
+            "ORD-1,1,CI-T,120,,\nORD-1,1,CI-T,100,,\nORD-1,1,,,外観メモ,良好\n");
+
+        var orders = await admin.GetFromJsonAsync<MesApp.Core.Contracts.Common.PagedResult<ManufacturingOrderResponse>>(
+            "/api/manufacturing-orders");
+        var detail = (await admin.GetFromJsonAsync<ManufacturingOrderDetailResponse>(
+            $"/api/manufacturing-orders/{orders!.Items.Single().Id}"))!;
+        var (first, final) = (detail.WorkOrders[0], detail.WorkOrders[1]);
+        Assert.All(detail.WorkOrders, w => Assert.Equal(WorkOrderStatus.Completed, w.Status));
+
+        var setup = Assert.Single((await admin.GetFromJsonAsync<List<SetupRecordResponse>>(
+            $"/api/work-orders/{first.Id}/setup-records"))!);
+        Assert.Equal(SetupType.Pre, setup.Type);
+        Assert.Equal(TimeSpan.FromMinutes(20), setup.EndedAt - setup.StartedAt);
+        var checklist = Assert.Single((await admin.GetFromJsonAsync<List<ChecklistRecordResponse>>(
+            $"/api/work-orders/{first.Id}/checklist-records"))!);
+        Assert.Equal([true, false], checklist.Results.Select(r => r.IsChecked));
+        // 投入は在庫から払い出され、最終工程の良品は産出ロットへ計上される
+        var lots = await admin.GetFromJsonAsync<MesApp.Core.Contracts.Common.PagedResult<MesApp.Core.Contracts.Inventory.StockResponse>>(
+            "/api/inventory/stocks");
+        Assert.Equal(80m, lots!.Items.Single(s => s.LotNumber == "RM-LOT-1").Quantity);
+        Assert.Equal(9m, lots.Items.Single(s => s.LotNumber == detail.Order.OutputLotNumber).Quantity);
+        var finalRecord = Assert.Single((await admin.GetFromJsonAsync<List<ProductionRecordResponse>>(
+            $"/api/work-orders/{final.Id}/production-records"))!);
+        Assert.Equal("DR-01", Assert.Single(finalRecord.Defects!).DefectReasonCode);
+        // 製造条件は展開時の指示（90〜110）と照合される
+        var data = (await admin.GetFromJsonAsync<List<DataRecordResponse>>(
+            $"/api/work-orders/{first.Id}/data-records"))!;
+        Assert.Equal([true, false, null], data.Select(d => d.IsDeviation));
+        Assert.Equal("120℃", data[0].Value);
+
+        // 不正な行は行番号付きで返り、同じファイルの正しい行も含めて取り消される
+        var checklistError = await Phase3TestData.ImportCsvAsync(admin, "actuals/csv/checklist-records",
+            "OrderNo,Sequence,ChecklistCode,ItemSequence,IsChecked\nORD-1,2,CL-T,2,true\nORD-1,9,CL-T,1,true\n");
+        Assert.Contains(checklistError.Errors, e => e.Line == 2 && e.Message.Contains("必須項目"));
+        Assert.Contains(checklistError.Errors, e => e.Line == 3 && e.Message.Contains("工程順序 9"));
+        var consumptionError = await Phase3TestData.ImportCsvAsync(admin, "actuals/csv/consumptions",
+            "OrderNo,Sequence,LotNumber,LocationCode,Quantity\n" +
+            "ORD-1,2,RM-LOT-1,LOC-M,5\nORD-1,2,RM-LOT-1,LOC-M,999\nORD-1,2,NO-LOT,LOC-M,1\nORD-1,2,RM-LOT-1,LOC-M,5\n");
+        Assert.False(consumptionError.Succeeded);
+        Assert.Contains(consumptionError.Errors, e => e.Line == 3);
+        Assert.Contains(consumptionError.Errors, e => e.Line == 4 && e.Message.Contains("NO-LOT"));
+        Assert.Equal(2, consumptionError.Errors.Count); // 在庫不足の払出が次の行に持ち越されない
+        var productionError = await Phase3TestData.ImportCsvAsync(admin, "actuals/csv/production-records",
+            "OrderNo,Sequence,GoodQuantity,StartedAt,Defects\nORD-1,2,1,2026-09-17 11:00,\nORD-1,1,1,あした,DR-99=1\n");
+        Assert.Contains(productionError.Errors, e => e.Line == 2 && e.Message.Contains("入庫先"));
+        Assert.Contains(productionError.Errors, e => e.Line == 3 && e.Message.Contains("StartedAt"));
+        Assert.Contains(productionError.Errors, e => e.Line == 3 && e.Message.Contains("DR-99"));
+        lots = await admin.GetFromJsonAsync<MesApp.Core.Contracts.Common.PagedResult<MesApp.Core.Contracts.Inventory.StockResponse>>(
+            "/api/inventory/stocks");
+        Assert.Equal(80m, lots!.Items.Single(s => s.LotNumber == "RM-LOT-1").Quantity);
+
+        // 実行記録の取込は現場記録の権限（物流担当は不可）
+        using var logistics = await TestAuth.CreateUserClientAsync(
+            factory, admin, "logistics1", "Passw0rd123", MesApp.Core.Constants.MesRoles.Logistics);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(logistics, "production-records",
+            "OrderNo,Sequence,GoodQuantity,StartedAt\nORD-1,1,1,2026-09-17 11:00\n")).StatusCode);
+    }
+
+    [Fact]
     public async Task 作業指示の状態遷移が履歴として残る()
     {
         using var factory = new ApiFactory();
@@ -75,7 +166,7 @@ public class ExecutionTests
             .EnsureSuccessStatusCode();
         (await admin.PostAsync($"/api/work-orders/{workOrderId}/approve", null)).EnsureSuccessStatusCode();
 
-        var history = await admin.GetFromJsonAsync<List<Core.Contracts.Production.WorkOrderStatusHistoryEntry>>(
+        var history = await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Production.WorkOrderStatusHistoryEntry>>(
             $"/api/work-orders/{workOrderId}/status-history");
         Assert.Equal(3, history!.Count);
 
@@ -101,7 +192,7 @@ public class ExecutionTests
         // RM-01を主材料、RM-02を代替部品としてMBOMに登録する
         var alt = await MasterTests.CreateProductAsync(admin, "RM-02", "代替部材", ProductType.Material);
         (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom",
-            new List<Core.Contracts.Masters.BomItemRequest>
+            new List<MesApp.Core.Contracts.Masters.BomItemRequest>
             {
                 new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1", false),
                 new(alt.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1", true),
@@ -189,7 +280,7 @@ public class ExecutionTests
 
         // 代替部品としてMBOMへ登録しても、展開済みの指図の予定材料は変わらない（Spec.md 5.7）
         (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom",
-            new List<Core.Contracts.Masters.BomItemRequest>
+            new List<MesApp.Core.Contracts.Masters.BomItemRequest>
             {
                 new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
                 new(other.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
@@ -217,7 +308,7 @@ public class ExecutionTests
         // MBOMを持たない品目（工順のみ）を作る
         var noBom = await MasterTests.CreateProductAsync(admin, "FG-02", "MBOM未登録品", ProductType.Product);
         (await admin.PutAsJsonAsync($"/api/products/{noBom.Id}/routing",
-            new List<Core.Contracts.Masters.RoutingStepRequest>
+            new List<MesApp.Core.Contracts.Masters.RoutingStepRequest>
             {
                 new(1, ctx.ProcessId, 30m, 10m, null, null, null, null, null),
             })).EnsureSuccessStatusCode();
@@ -378,7 +469,7 @@ public class ExecutionTests
         Assert.Equal(1m, correctedBody.ScrapQuantity);
         Assert.Equal(2m, correctedBody.ReworkQuantity);
 
-        var history = await admin.GetFromJsonAsync<Core.Contracts.Quality.LotHistoryResponse>(
+        var history = await admin.GetFromJsonAsync<MesApp.Core.Contracts.Quality.LotHistoryResponse>(
             $"/api/traceability/{record.OutputLotId.Value}/history");
         var entry = Assert.Single(history!.CorrectionHistory);
         Assert.Equal(2m, entry.BeforeScrapQuantity);
@@ -428,13 +519,13 @@ public class ExecutionTests
     }
 
     /// <summary>不良理由マスタを1件登録する</summary>
-    private static async Task<Core.Contracts.Masters.DefectReasonResponse> CreateDefectReasonAsync(
+    private static async Task<MesApp.Core.Contracts.Masters.DefectReasonResponse> CreateDefectReasonAsync(
         HttpClient admin, string code, string name, DefectReasonCategory category)
     {
         var response = await admin.PostAsJsonAsync("/api/defect-reasons",
             new Core.Contracts.Masters.DefectReasonRequest(code, name, category));
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<Core.Contracts.Masters.DefectReasonResponse>())!;
+        return (await response.Content.ReadFromJsonAsync<MesApp.Core.Contracts.Masters.DefectReasonResponse>())!;
     }
 
     [Fact]
@@ -530,14 +621,14 @@ public class ExecutionTests
         Assert.Equal(HttpStatusCode.OK, unrestricted.StatusCode);
     }
 
-    private static async Task<Core.Contracts.Masters.EquipmentResponse> CreateEquipmentAsync(
+    private static async Task<MesApp.Core.Contracts.Masters.EquipmentResponse> CreateEquipmentAsync(
         HttpClient admin, string assetNo, string name)
     {
         var response = await admin.PostAsJsonAsync("/api/equipments",
             new Core.Contracts.Masters.EquipmentRequest(
                 assetNo, name, null, EquipmentStatus.Available, MaintenanceType.None, null, null));
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<Core.Contracts.Masters.EquipmentResponse>())!;
+        return (await response.Content.ReadFromJsonAsync<MesApp.Core.Contracts.Masters.EquipmentResponse>())!;
     }
 
     [Fact]
@@ -661,7 +752,7 @@ public class ExecutionTests
         Assert.Equal(8m, await Phase3TestData.GetStockQuantityAsync(admin, record.OutputLotId.Value));
 
         // 訂正前の値は業務履歴として残り、トレース画面の履歴から参照できる（B-70-30-01）
-        var history = await admin.GetFromJsonAsync<Core.Contracts.Quality.LotHistoryResponse>(
+        var history = await admin.GetFromJsonAsync<MesApp.Core.Contracts.Quality.LotHistoryResponse>(
             $"/api/traceability/{record.OutputLotId.Value}/history");
         var correction = Assert.Single(history!.CorrectionHistory);
         Assert.Equal(10m, correction.BeforeGoodQuantity);
@@ -707,7 +798,7 @@ public class ExecutionTests
         var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
         var finalWo = order.WorkOrders[1];
         using var operator_ = await TestAuth.CreateUserClientAsync(
-            factory, admin, "operator1", "Passw0rd123", Core.Constants.MesRoles.Operator);
+            factory, admin, "operator1", "Passw0rd123", MesApp.Core.Constants.MesRoles.Operator);
 
         // 作業者による実績記録は可能（B-40-10-01）
         var posted = await operator_.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
@@ -735,7 +826,7 @@ public class ExecutionTests
         var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
         var finalWo = order.WorkOrders[1];
         using var qc = await TestAuth.CreateUserClientAsync(
-            factory, admin, "qc1", "Passw0rd123", Core.Constants.MesRoles.QualityControl);
+            factory, admin, "qc1", "Passw0rd123", MesApp.Core.Constants.MesRoles.QualityControl);
 
         // 製造実行の記録は現場作業者・生産管理・システム管理者のみ（Spec.md 7.4）
         var start = await qc.PostAsync($"/api/work-orders/{finalWo.Id}/start", null);

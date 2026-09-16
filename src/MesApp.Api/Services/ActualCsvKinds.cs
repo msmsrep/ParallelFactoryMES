@@ -18,6 +18,15 @@ public static class ActualCsvKinds
 {
     public const string Receiving = "receiving";
     public const string ManufacturingOrders = "manufacturing-orders";
+    public const string SetupRecords = "setup-records";
+    public const string ChecklistRecords = "checklist-records";
+    public const string Consumptions = "consumptions";
+    public const string ProductionRecords = "production-records";
+    public const string DataRecords = "data-records";
+
+    private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
+    private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
+    private const string DateTimeNote = "yyyy-MM-dd HH:mm（工場の時刻）。+09:00 などのオフセット付きも可";
 
     public static readonly List<ActualCsvKind> All =
     [
@@ -44,6 +53,58 @@ public static class ActualCsvKinds
             new("Expand", "工程展開する", false, "true で承認に続けて作業指示へ展開する（Approve も true が必要）"),
             new("OutputLotNumber", "産出ロット番号", false, "工程展開するときのロット番号。空欄なら自動採番"),
         ]), MesRoleGroups.ProductionManage),
+        new(new CsvKindInfo(SetupRecords, "段取り実績", false,
+        [
+            new("OrderNo", "指図番号", true, OrderNoNote),
+            new("Sequence", "工程順序", true, SequenceNote),
+            new("Type", "段取り区分", true, "Pre（前段取り）/ Post（後段取り）"),
+            new("StartedAt", "開始日時", true, DateTimeNote),
+            new("EndedAt", "終了日時", false, DateTimeNote),
+            new("AbnormalityNote", "異常内容", false, null),
+        ]), MesRoleGroups.ShopFloorRecord),
+        new(new CsvKindInfo(ChecklistRecords, "チェックリスト実施", false,
+        [
+            new("OrderNo", "指図番号", true, OrderNoNote),
+            new("Sequence", "工程順序", true, SequenceNote),
+            new("ChecklistCode", "チェックリストコード", true,
+                "指図番号・工程順序・チェックリストコードが同じ行を1回の実施としてまとめる"),
+            new("ItemSequence", "項目の表示順", true, "チェックリストマスタの項目の表示順。書かなかった項目は未チェック扱い"),
+            new("IsChecked", "チェック済み", false, "true / false。省略時は true。必須項目が未チェックだと登録できない"),
+            new("Note", "メモ", false, null),
+        ]), MesRoleGroups.ShopFloorRecord),
+        new(new CsvKindInfo(Consumptions, "部材投入", false,
+        [
+            new("OrderNo", "指図番号", true, OrderNoNote),
+            new("Sequence", "工程順序", true, SequenceNote),
+            new("LotNumber", "投入ロット番号", true, "登録済みのロット番号"),
+            new("LocationCode", "払出元ロケーションコード", true, null),
+            new("Quantity", "投入数量", true, "0より大きい数値"),
+            new("SubstituteReason", "代替部品の投入理由", false, "予定材料の代替部品を投入するときは必須"),
+        ]), MesRoleGroups.ShopFloorRecord),
+        new(new CsvKindInfo(ProductionRecords, "生産実績", false,
+        [
+            new("OrderNo", "指図番号", true, OrderNoNote),
+            new("Sequence", "工程順序", true, SequenceNote),
+            new("GoodQuantity", "良品数", true, "0以上"),
+            new("DefectQuantity", "不良数", false, "0以上。省略時0"),
+            new("ScrapQuantity", "廃棄数", false, "不良数の内訳。省略時0"),
+            new("ReworkQuantity", "再作業待ち数", false, "不良数の内訳。省略時0"),
+            new("StartedAt", "開始日時", true, DateTimeNote + "。この時刻で直を決める"),
+            new("EndedAt", "終了日時", false, DateTimeNote),
+            new("OutputLocationCode", "入庫先ロケーションコード", false, "最終工程で良品があるときは必須"),
+            new("Backflush", "バックフラッシュ", false, "true で予定材料×(良品+不良)を先入れ先出しで自動消費"),
+            new("Defects", "不良理由別の内訳", false, "不良理由コード=数量 をセミコロン区切り（DR-02=2;DR-03=1）。合計は不良数以下"),
+        ]), MesRoleGroups.ShopFloorRecord),
+        new(new CsvKindInfo(DataRecords, "製造条件データ", false,
+        [
+            new("OrderNo", "指図番号", true, OrderNoNote),
+            new("Sequence", "工程順序", true, SequenceNote),
+            new("ControlItemCode", "工程管理項目コード", false,
+                "展開時に作業指示へ写した工程管理項目のコード。指定すると指示値・許容範囲と照合して逸脱を判定する"),
+            new("NumericValue", "数値", false, "ControlItemCode を指定したときは必須"),
+            new("Item", "項目", false, "ControlItemCode を省略したときは必須（指定時の既定は項目名）"),
+            new("Value", "値（表示用）", false, "省略時は 数値＋単位"),
+        ]), MesRoleGroups.ShopFloorRecord),
     ];
 
     public static ActualCsvKind? Find(string kind) =>
