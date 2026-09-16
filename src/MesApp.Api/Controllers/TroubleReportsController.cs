@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
@@ -16,7 +17,7 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/trouble-reports")]
 [Authorize]
-public class TroubleReportsController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
+public class TroubleReportsController(MesAppDbContext db, ShopFloorReportService reports, IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<TroubleReportResponse>>> List(
@@ -50,30 +51,11 @@ public class TroubleReportsController(MesAppDbContext db, IAuditLogger auditLogg
     [HttpPost]
     public async Task<ActionResult<TroubleReportResponse>> Create(TroubleReportRequest request, CancellationToken ct)
     {
-        if (request.WorkOrderId is int workOrderId
-            && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
+        var outcome = await reports.AddTroubleReportAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!, ct);
+        if (outcome.Value is not { } report)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない作業指示IDです。" });
+            return BadRequest(new ProblemDetails { Title = outcome.Error });
         }
-        if (request.EquipmentId is int equipmentId
-            && !await db.Equipments.AnyAsync(e => e.Id == equipmentId, ct))
-        {
-            return BadRequest(new ProblemDetails { Title = "存在しない設備IDです。" });
-        }
-
-        var report = new TroubleReport
-        {
-            OccurredAt = request.OccurredAt,
-            Category = request.Category,
-            WorkOrderId = request.WorkOrderId,
-            EquipmentId = request.EquipmentId,
-            Content = request.Content,
-            ReportedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-        };
-        db.TroubleReports.Add(report);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Execution", "TroubleReport", nameof(TroubleReport), report.Id.ToString(),
-            detail: $"category={request.Category}", ct: ct);
         return CreatedAtAction(nameof(Get), new { id = report.Id }, await GetResponseAsync(report.Id, ct));
     }
 

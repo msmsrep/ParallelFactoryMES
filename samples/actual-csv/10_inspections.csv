@@ -1,0 +1,7 @@
+﻿InspectionKey,Type,LotNumber,OrderNo,Sequence,ItemCode,SampleNo,MeasuredValue,TextValue,Judgment,DeviceCode,Judge,Grade,Note
+RCV-3001,Receiving,R3001-260901,,,INS-03,1,,巣・欠けなし,Pass,,true,,鋳造品の受入検査
+IPQC-SF,InProcess,,SMP-SF-001,10,INS-01,1,50.01,,,DV-01,true,,ハウジング内径の工程内検査
+IPQC-SF,,,,,INS-01,2,49.98,,,DV-01,,,
+IPQC-SF,,,,,INS-02,1,,キズなし,Pass,,,,
+FQC-FG,FinalProduct,FG1000-S001,,,INS-04,1,20.3,,,DV-02,true,A,完成品検査（グレードA）
+FQC-FG,,,,,INS-05,1,,漏れなし,Pass,,,,

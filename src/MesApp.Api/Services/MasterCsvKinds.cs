@@ -250,6 +250,22 @@ public static class CsvEnumLabels
     public static readonly IReadOnlyDictionary<string, SetupType> SetupTypes = Build(
         ("前段取り", SetupType.Pre), ("後段取り", SetupType.Post));
 
+    public static readonly IReadOnlyDictionary<string, InspectionOrderType> InspectionOrderTypes = Build(
+        ("受入検査", InspectionOrderType.Receiving), ("工程内検査", InspectionOrderType.InProcess),
+        ("製品完成品検査", InspectionOrderType.FinalProduct), ("完成品検査", InspectionOrderType.FinalProduct),
+        ("サンプル検査", InspectionOrderType.Sample), ("再検査", InspectionOrderType.Reinspection));
+
+    public static readonly IReadOnlyDictionary<string, InspectionJudgment> InspectionJudgments = Build(
+        ("合格", InspectionJudgment.Pass), ("不合格", InspectionJudgment.Fail));
+
+    public static readonly IReadOnlyDictionary<string, WorkTimeType> WorkTimeTypes = Build(
+        ("直接作業", WorkTimeType.Direct), ("直接", WorkTimeType.Direct),
+        ("間接作業", WorkTimeType.Indirect), ("間接", WorkTimeType.Indirect));
+
+    public static readonly IReadOnlyDictionary<string, TroubleCategory> TroubleCategories = Build(
+        ("品質", TroubleCategory.Quality), ("コスト", TroubleCategory.Cost),
+        ("納期", TroubleCategory.Delivery), ("安全", TroubleCategory.Safety));
+
     public static readonly IReadOnlyDictionary<string, MakeOrBuy> MakeOrBuys = Build(
         ("内製", MakeOrBuy.InHouse), ("外注", MakeOrBuy.Outsourced));
 

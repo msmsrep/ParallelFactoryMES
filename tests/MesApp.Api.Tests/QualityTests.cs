@@ -11,6 +11,80 @@ namespace MesApp.Api.Tests;
 
 public class QualityTests
 {
+    [Fact]
+    public async Task 検査と作業時間とトラブル報告をCSVで取り込める()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        await Phase3TestData.SetupAsync(admin);
+        async Task ImportAsync(string path, string csv)
+        {
+            var result = await Phase3TestData.ImportCsvAsync(admin, path, csv);
+            Assert.True(result.Succeeded, $"{path}: " + string.Join(" / ", result.Errors.Select(e => $"{e.Line}行目 {e.Message}")));
+        }
+        await ImportAsync("masters/csv/inspection-items",
+            "Code,Name,TargetProductCode,Type,LowerLimit,UpperLimit\nINS-R,受入寸法,RM-01,Receiving,9.5,10.5\nINS-P,工程内外観,FG-01,InProcess,,\n");
+        await ImportAsync("masters/csv/inspection-devices",
+            "Code,Name,CalibrationDueOn\nDV-OK,ノギス,2099-12-31\nDV-NG,期限切れノギス,2020-01-31\n");
+        await ImportAsync("actuals/csv/receiving", "ProductCode,Quantity,LocationCode,LotNumber\nRM-01,100,LOC-M,RM-LOT-1\n");
+        await ImportAsync("actuals/csv/manufacturing-orders", "OrderNo,ProductCode,Quantity,Approve,Expand\nORD-1,FG-01,10,true,true\n");
+
+        const string inspectionHeader =
+            "InspectionKey,Type,LotNumber,OrderNo,Sequence,ItemCode,SampleNo,MeasuredValue,TextValue,Judgment,DeviceCode,Judge,Grade,Note\n";
+        await ImportAsync("actuals/csv/inspections", inspectionHeader
+            + "K1,受入検査,RM-LOT-1,,,INS-R,1,10.0,,,DV-OK,true,A,初回受入\n"
+            + "K1,,,,,INS-R,2,10.5,,,DV-OK,,,\n"
+            + "K2,InProcess,,ORD-1,1,INS-P,1,,外観良好,合格,,false,,\n");
+        var orders = (await admin.GetFromJsonAsync<PagedResult<InspectionOrderResponse>>("/api/inspection-orders"))!.Items;
+        var receiving = orders.Single(o => o.Type == InspectionOrderType.Receiving);
+        Assert.Equal(InspectionOrderStatus.Judged, receiving.Status);
+        Assert.Equal(InspectionJudgment.Pass, receiving.OverallJudgment);
+        Assert.Equal(2, receiving.Results.Count);
+        Assert.Equal("初回受入", receiving.Note);
+        var inProcess = orders.Single(o => o.Type == InspectionOrderType.InProcess);
+        Assert.Equal("ORD-1-01", inProcess.TargetWorkOrderNo);
+        Assert.Equal(InspectionOrderStatus.InProgress, inProcess.Status); // Judge=false は実績の登録まで
+
+        // 校正期限切れの検査機・未登録ロット・作業指示の無い工程内検査・未登録の検査項目は行番号付きで返り、1件も登録されない
+        var invalid = await Phase3TestData.ImportCsvAsync(admin, "actuals/csv/inspections", inspectionHeader
+            + "E1,Receiving,RM-LOT-1,,,INS-R,1,10,,,DV-NG,true,,\n"
+            + "E2,Receiving,NO-LOT,,,INS-R,1,10,,,,,,\n"
+            + "E3,InProcess,,,,INS-P,1,,,合格,,,,\n"
+            + "E4,Receiving,RM-LOT-1,,,INS-X,1,10,,,,,,\n");
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 2 && e.Message.Contains("校正"));
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("NO-LOT"));
+        Assert.Contains(invalid.Errors, e => e.Line == 4 && e.Message.Contains("OrderNo"));
+        Assert.Contains(invalid.Errors, e => e.Line == 5 && e.Message.Contains("INS-X"));
+        Assert.Equal(2, (await admin.GetFromJsonAsync<PagedResult<InspectionOrderResponse>>("/api/inspection-orders"))!.Total);
+
+        await ImportAsync("actuals/csv/work-time-records",
+            "Type,IndirectCategory,OrderNo,Sequence,StartedAt,EndedAt,Note\n"
+            + "Direct,,ORD-1,1,2026-09-17 08:00,2026-09-17 09:00,\n"
+            + "間接作業,部材準備,,,2026-09-17 09:00,2026-09-17 09:30,\n");
+        var workTimes = (await admin.GetFromJsonAsync<List<Core.Contracts.Execution.WorkTimeResponse>>("/api/work-time-records"))!;
+        Assert.Equal(2, workTimes.Count);
+        Assert.Contains(workTimes, w => w.WorkOrderNo == "ORD-1-01" && w.Type == WorkTimeType.Direct);
+        var workTimeError = await Phase3TestData.ImportCsvAsync(admin, "actuals/csv/work-time-records",
+            "Type,StartedAt\nDirect,2026-09-17 10:00\n");
+        Assert.Contains("直接作業", Assert.Single(workTimeError.Errors).Message);
+
+        // トラブル報告は単票APIと同じく誰でも取り込める（検査は品質管理の権限が要る）
+        using var operator_ = await TestAuth.CreateUserClientAsync(
+            factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
+        var trouble = await Phase3TestData.ImportActualCsvAsync(operator_, "trouble-reports",
+            "OccurredAt,Category,OrderNo,Sequence,EquipmentAssetNo,Content\n2026-09-17 10:15,品質,ORD-1,1,,バリの発生\n");
+        Assert.True(trouble.Succeeded);
+        var reports = (await admin.GetFromJsonAsync<PagedResult<Core.Contracts.Execution.TroubleReportResponse>>(
+            "/api/trouble-reports"))!.Items;
+        Assert.Equal("ORD-1-01", Assert.Single(reports).WorkOrderNo);
+        var troubleError = await Phase3TestData.ImportActualCsvAsync(operator_, "trouble-reports",
+            "OccurredAt,Category,EquipmentAssetNo,Content\n2026-09-17 10:15,Safety,EQ-X,転倒\n");
+        Assert.Contains("EQ-X", Assert.Single(troubleError.Errors).Message);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(
+            operator_, "inspections", inspectionHeader + "K9,Receiving,RM-LOT-1,,,INS-R,1,10,,,,,,\n")).StatusCode);
+    }
+
     /// <summary>完成品FG-01の完成品検査基準（外径9.5〜10.5）を登録する</summary>
     private static async Task<InspectionItemResponse> CreateFinalInspectionItemAsync(
         HttpClient admin, int productId, decimal lower = 9.5m, decimal upper = 10.5m)

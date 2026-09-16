@@ -1,3 +1,4 @@
+using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
 
 namespace MesApp.Api.Services;
@@ -23,6 +24,9 @@ public static class ActualCsvKinds
     public const string Consumptions = "consumptions";
     public const string ProductionRecords = "production-records";
     public const string DataRecords = "data-records";
+    public const string Inspections = "inspections";
+    public const string WorkTimeRecords = "work-time-records";
+    public const string TroubleReports = "trouble-reports";
 
     private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
     private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
@@ -105,7 +109,50 @@ public static class ActualCsvKinds
             new("Item", "項目", false, "ControlItemCode を省略したときは必須（指定時の既定は項目名）"),
             new("Value", "値（表示用）", false, "省略時は 数値＋単位"),
         ]), MesRoleGroups.ShopFloorRecord),
+        new(new CsvKindInfo(Inspections, "検査（指示・実績・判定）", false,
+        [
+            new("InspectionKey", "検査のまとまり", true,
+                "同じ値の行を1件の検査指示にまとめる（このファイルの中だけで使う名前。DBには残らない）"),
+            new("Type", "検査種別", true, "Receiving / InProcess / FinalProduct / Sample / Reinspection。まとまりの最初の行の値を使う"),
+            new("LotNumber", "対象ロット番号", false, "工程内検査以外で必須"),
+            new("OrderNo", "指図番号", false, "工程内検査で必須（工程順序と合わせて作業指示を指す）"),
+            new("Sequence", "工程順序", false, "工程内検査で必須"),
+            new("ItemCode", "検査項目コード", true, "登録済みの検査項目。まとまりに含まれる項目がこの検査の対象になる"),
+            new("SampleNo", "サンプル番号", false, "省略時は1"),
+            new("MeasuredValue", "測定値", false, "規格値があれば自動判定する"),
+            new("TextValue", "定性の記録", false, null),
+            new("Judgment", "判定", false, "Pass（合格）/ Fail（不合格）。測定値で自動判定できない項目は必須"),
+            new("DeviceCode", "検査機コード", false, "校正期限切れ・無効の検査機は使えない"),
+            new("Judge", "総合判定する", false, "true で実績の登録に続けて総合判定する（まとまりの最初の行の値）"),
+            new("Grade", "グレード", false, "総合判定でロットに付けるグレード（まとまりの最初の行の値）"),
+            new("Note", "備考", false, "検査指示の備考（まとまりの最初の行の値）"),
+        ]), MesRoleGroups.QualityManage),
+        new(new CsvKindInfo(WorkTimeRecords, "作業時間", false,
+        [
+            new("Type", "作業区分", true, "Direct（直接作業）/ Indirect（間接作業）"),
+            new("IndirectCategory", "間接作業の分類", false, "段取り・部材準備・設備メンテ など"),
+            new("OrderNo", "指図番号", false, "直接作業で必須（工程順序と合わせて作業指示を指す）"),
+            new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
+            new("StartedAt", "開始日時", true, DateTimeNote),
+            new("EndedAt", "終了日時", false, DateTimeNote),
+            new("Note", "備考", false, null),
+        ]), MesRoleGroups.ShopFloorRecord),
+        new(new CsvKindInfo(TroubleReports, "製造トラブル報告", false,
+        [
+            new("OccurredAt", "発生日時", true, DateTimeNote),
+            new("Category", "区分", true, "Quality（品質）/ Cost（コスト）/ Delivery（納期）/ Safety（安全）"),
+            new("OrderNo", "指図番号", false, "作業指示に紐づける場合（工程順序と合わせて指す）"),
+            new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
+            new("EquipmentAssetNo", "設備の資産番号", false, null),
+            new("Content", "内容", true, null),
+        ]), AnyRole),
     ];
+
+    /// <summary>
+    /// 認証済みの全ロール。トラブル報告は単票APIもロールで絞っていない
+    /// （異常は気づいた人がその場で上げられることを優先する。MesRoleGroups の方針）
+    /// </summary>
+    private static string AnyRole => string.Join(",", MesRoles.All);
 
     public static ActualCsvKind? Find(string kind) =>
         All.FirstOrDefault(k => string.Equals(k.Info.Kind, kind, StringComparison.OrdinalIgnoreCase));
