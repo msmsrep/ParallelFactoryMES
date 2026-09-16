@@ -572,10 +572,12 @@ public class InventoryController(
                 .Where(x => !x.Canceled && x.CreatedAt >= start && x.CreatedAt <= end)
                 .ToList();
             var open = items.Where(x => x.Open).ToList();
+            // 経過日数は製造日同士で引く。作成日時をUTCの暦日にすると、工場の時刻とUTCで日付がずれる
+            // 時間帯（日本なら0〜9時）の指示が1日古く数えられ、境界時刻（既定6時）とも食い違う
             var oldest = open.Count == 0
                 ? (int?)null
-                : (int)(businessDate.Today.DayNumber
-                        - DateOnly.FromDateTime(open.Min(x => x.CreatedAt).UtcDateTime).DayNumber);
+                : businessDate.Today.DayNumber
+                  - businessDate.GetBusinessDate(open.Min(x => x.CreatedAt)).DayNumber;
             return new WarehouseProgressRow(
                 kind, items.Count, items.Count - open.Count, open.Count, oldest);
         }

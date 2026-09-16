@@ -6,6 +6,8 @@ using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MesApp.Api.Tests;
 
@@ -650,6 +652,21 @@ public class InventoryTests
 
         // 受入は「指示」を持たないため進捗の対象にしない
         Assert.DoesNotContain(progress.Rows, r => r.Kind == "受入");
+
+        // 経過日数は製造日で数える。2製造日前の始まり直後（日本では境界6時の直後＝UTCでは前日）に作った
+        // 指示は2日になる。作成日時をUTCの暦日で数えると3日になる（実行時刻によらず差が出る時刻を選ぶ）
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesApp.Infrastructure.MesAppDbContext>();
+            var businessDate = scope.ServiceProvider.GetRequiredService<MesApp.Core.Abstractions.IBusinessDateService>();
+            var twoDaysAgo = businessDate.Today.AddDays(-2);
+            var open = await db.TransferOrders.SingleAsync(t => t.Status == TransferOrderStatus.Instructed);
+            open.CreatedAt = businessDate.GetRange(twoDaysAgo).Start.AddMinutes(30);
+            await db.SaveChangesAsync();
+            progress = await admin.GetFromJsonAsync<WarehouseProgressResponse>(
+                $"/api/inventory/warehouse-progress?from={twoDaysAgo:yyyy-MM-dd}");
+        }
+        Assert.Equal(2, progress!.Rows.Single(r => r.Kind == "在庫移動").OldestOpenAgeDays);
     }
 
 }
