@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Maintenance;
@@ -277,6 +277,46 @@ public class MaintenanceTests
         Assert.DoesNotContain(history.EquipmentHistory, h => h.Contains("アイドル"));
         // 状態は日本語で出す（履歴は人が読む前提。CLAUDE.md のUI文言の方針）
         Assert.Contains(history.EquipmentHistory, h => h.Contains("[稼働]"));
+    }
+
+    [Fact]
+    public async Task 稼働サマリを製造日の期間で絞り込める()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+
+        // 製造日の境界（既定6時）を避けるため、どちらもローカル10時に始める。
+        // 実行時刻に依存しない固定日で組み立てる（現在時刻から相対に取ると、
+        // 境界前に走らせたときだけ前日へ寄って落ちる）
+        var oldDay = new DateOnly(2026, 1, 10);
+        var newDay = new DateOnly(2026, 1, 20);
+        DateTimeOffset At(DateOnly day, int hour) =>
+            new(day.ToDateTime(new TimeOnly(hour, 0)), TimeZoneInfo.Local.GetUtcOffset(
+                day.ToDateTime(new TimeOnly(hour, 0))));
+
+        (await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running,
+                At(oldDay, 10), At(oldDay, 12), null, null)))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running,
+                At(newDay, 10), At(newDay, 16), null, null)))
+            .EnsureSuccessStatusCode();
+
+        // 省略時は従来どおり全期間（2+6時間）
+        var all = await admin.GetFromJsonAsync<List<EquipmentUtilizationRow>>("/api/equipment-logs/summary");
+        Assert.Equal(8m, Assert.Single(all!).RunningHours);
+
+        // 期間を指定すると、その製造日に始まった稼働だけを集計する
+        var narrowed = await admin.GetFromJsonAsync<List<EquipmentUtilizationRow>>(
+            $"/api/equipment-logs/summary?from={newDay:yyyy-MM-dd}&to={newDay:yyyy-MM-dd}");
+        Assert.Equal(6m, Assert.Single(narrowed!).RunningHours);
+
+        // 稼働のない期間は行ごと出ない（0時間の設備を並べない）
+        var empty = await admin.GetFromJsonAsync<List<EquipmentUtilizationRow>>(
+            "/api/equipment-logs/summary?from=2026-02-01&to=2026-02-01");
+        Assert.Empty(empty!);
     }
 
     [Fact]

@@ -33,7 +33,7 @@
 | 作業時間記録（直接/間接） | B-30-30-02 / F-30-20-02 | `WorkTimeRecordsController.cs` `api/work-time-records` | Execution.cs: WorkTimeRecord | `/work-time` `WorkTime.razor` | `Tests/ExecutionTests.cs` |
 | 製造トラブル報告 | B-40-10-06 / B-60-10 | `TroubleReportsController.cs` `api/trouble-reports` | Execution.cs: TroubleReport | `ProcessProgress.razor` 内 | `Tests/ExecutionTests.cs` |
 | 工程間搬送・移動指示 | B-50-10 / D-30-10-04 | `TransferOrdersController.cs` `api/transfer-orders`（更新系は在庫権限） | Execution.cs: TransferOrder | `/transfer-orders` `TransferOrders.razor`（`Inventory.razor` の「振替」は別機能の `api/inventory/transfer`） | `Tests/InventoryTests.cs` |
-| 設備稼働報告・稼働監視 | B-40-20 / E-20-10 | `EquipmentLogsController.cs` `api/equipment-logs`（`?workOrderId=` で絞り込み） | `Core/Entities/Maintenance.cs`: EquipmentLog（`WorkOrderId` 任意＝**PQC×EQCの交差点**。ロット履歴 H-30-10-04 はこれを辿る。`EquipmentLogStatus` への追加は**末尾のみ**：JSONが数値） | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
+| 設備稼働報告・稼働監視 | B-40-20 / E-20-10 | `EquipmentLogsController.cs` `api/equipment-logs`（`?workOrderId=` で絞り込み）<br>稼働サマリは `GET summary?from=&to=`（**製造日基準**。稼働の開始時刻が属する製造日で振り分ける。省略時は全期間） | `Core/Entities/Maintenance.cs`: EquipmentLog（`WorkOrderId` 任意＝**PQC×EQCの交差点**。ロット履歴 H-30-10-04 はこれを辿る。`EquipmentLogStatus` への追加は**末尾のみ**：JSONが数値） | `/maintenance` `Maintenance.razor` | `Tests/MaintenanceTests.cs` |
 
 ## C. 品質管理
 

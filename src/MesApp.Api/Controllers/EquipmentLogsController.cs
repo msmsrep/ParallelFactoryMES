@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using System.Security.Claims;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
@@ -21,7 +21,8 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/equipment-logs")]
 [Authorize]
-public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
+public class EquipmentLogsController(
+    MesAppDbContext db, IAuditLogger auditLogger, IBusinessDateService businessDate) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<EquipmentLogResponse>>> List(
@@ -112,10 +113,21 @@ public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogge
     /// <summary>
     /// 設備別の稼働サマリ（E-20-10-03、E-20-30-03）。終了時刻が記録済みのログを集計し、
     /// 時間稼働率＝稼働時間÷記録済み総時間を返す。
+    /// <para>
+    /// 期間は製造日（業務日付）基準で、稼働の<b>開始時刻</b>が属する製造日で振り分ける
+    /// （Spec.md 3.9。夜勤の日跨ぎ稼働を1つの製造日に寄せるため、終了時刻では分けない）。
+    /// 省略時は全期間を集計する。
+    /// </para>
     /// </summary>
     [HttpGet("summary")]
-    public async Task<ActionResult<List<EquipmentUtilizationRow>>> Summary(CancellationToken ct)
+    public async Task<ActionResult<List<EquipmentUtilizationRow>>> Summary(
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null,
+        CancellationToken ct = default)
     {
+        var fromStart = from is null ? (DateTimeOffset?)null : businessDate.GetRange(from.Value).Start;
+        var toEnd = to is null ? (DateTimeOffset?)null : businessDate.GetRange(to.Value).End;
+
         // SQLiteはDateTimeOffsetの演算を翻訳できないため、集計はクライアント側で行う
         var logs = await db.EquipmentLogs.AsNoTracking()
             .Where(l => l.EndedAt != null)
@@ -131,6 +143,8 @@ public class EquipmentLogsController(MesAppDbContext db, IAuditLogger auditLogge
             .ToListAsync(ct);
 
         var rows = logs
+            .Where(l => (fromStart is null || l.StartedAt >= fromStart)
+                        && (toEnd is null || l.StartedAt < toEnd))
             .GroupBy(l => new { l.EquipmentId, l.AssetNo, l.EquipmentName })
             .OrderBy(g => g.Key.AssetNo)
             .Select(g =>
