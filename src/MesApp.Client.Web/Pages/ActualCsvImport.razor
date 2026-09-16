@@ -21,7 +21,7 @@
         製造指図の指図番号と、後で投入するロットのロット番号は、CSVで指定しておいてください（自動採番の番号は取り込むまで分かりません）。
     </p>
     <p class="text-muted">
-        <strong>1行でもエラーがあると、そのファイルの全件が取り消されます。</strong>
+        <strong>1行でもエラーがあると、そのファイル（ZIPの一括取込ではZIPの全ファイル）が取り消されます。</strong>
         最初は「検証のみ」で確認してから取り込むと安全です。
         書き方の見本は、リポジトリの <code>samples/actual-csv</code> にあります（<code>samples/master-csv</code> のマスタを取り込んだ後に使えます）。
     </p>
@@ -33,6 +33,10 @@
 }
 else
 {
+    @* 取込欄はどれか1種別でも取り込めるロールに出す。ZIP内の全種別の可否はAPIが判定する *@
+    <CsvBundlePanel BaseUrl="api/actuals/csv" Label="実績" Example="01_receiving.csv"
+                    Roles="@string.Join(",", _kinds.Select(k => k.WriteRoles).OfType<string>().Distinct())" />
+
     @foreach (var kind in _kinds)
     {
         <CsvIoPanel @key="kind.Kind" Kind="@kind.Kind" Label="@kind.Label" Info="@kind"
