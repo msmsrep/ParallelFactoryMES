@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -100,6 +100,15 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
         var prefix = $"SJ{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.ShipmentJudgments.Where(j => j.JudgmentNo.StartsWith(prefix)).Select(j => j.JudgmentNo),
+            prefix, ct);
+        return $"{prefix}{seq:0000}";
+    }
+
+    public async Task<string> NextSampleNoAsync(CancellationToken ct = default)
+    {
+        var prefix = $"SP{businessDate.Today:yyyyMMdd}-";
+        var seq = await NextSequenceAsync(
+            db.SampleStorages.Where(x => x.SampleNo.StartsWith(prefix)).Select(x => x.SampleNo),
             prefix, ct);
         return $"{prefix}{seq:0000}";
     }

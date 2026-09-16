@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Common;
@@ -509,4 +509,83 @@ public class InventoryTests
             new PickingOrderCreateRequest(PickingOrderType.ProcessIssue, null, null, []));
         Assert.Equal(HttpStatusCode.Forbidden, picking.StatusCode);
     }
+    [Fact]
+    public async Task サンプル採取で在庫から抜け保管期限と廃棄が記録される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        var today = (await admin.GetFromJsonAsync<BusinessDateResponse>("/api/business-date"))!.Today;
+
+        // 採取した分は在庫から抜ける（保管棚へ移り、出荷・投入には使えないため）
+        var created = await admin.PostAsJsonAsync("/api/sample-storages",
+            new SampleCollectRequest(lot.Id, ctx.ProductLocationId, 3m, today.AddDays(30), null, "受入検査分"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var sample = (await created.Content.ReadFromJsonAsync<SampleStorageResponse>())!;
+        Assert.StartsWith("SP", sample.SampleNo);
+        Assert.Equal(SampleStorageStatus.Stored, sample.Status);
+        Assert.Equal(30, sample.DaysUntilRetentionEnd);
+        Assert.False(sample.IsRetentionOver);
+        Assert.Equal(97m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 保管期限を過ぎたものだけの一覧には出ない
+        var over = await admin.GetFromJsonAsync<List<SampleStorageResponse>>(
+            "/api/sample-storages?retentionOverOnly=true");
+        Assert.Empty(over!);
+
+        // 在庫を超える採取はできない
+        var tooMuch = await admin.PostAsJsonAsync("/api/sample-storages",
+            new SampleCollectRequest(lot.Id, ctx.ProductLocationId, 1000m, null, null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, tooMuch.StatusCode);
+
+        // 廃棄しても在庫は動かない（採取時に既に抜いてある）
+        var closed = await admin.PostAsJsonAsync($"/api/sample-storages/{sample.Id}/close",
+            new SampleCloseRequest(SampleStorageStatus.Disposed, "期限前だが試験で使い切り"));
+        Assert.Equal(HttpStatusCode.OK, closed.StatusCode);
+        var disposed = (await closed.Content.ReadFromJsonAsync<SampleStorageResponse>())!;
+        Assert.Equal(SampleStorageStatus.Disposed, disposed.Status);
+        Assert.Equal(today, disposed.ClosedOn);
+        Assert.Equal(97m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 保管を終えたものは二度閉じられない
+        var again = await admin.PostAsJsonAsync($"/api/sample-storages/{sample.Id}/close",
+            new SampleCloseRequest(SampleStorageStatus.Consumed, null));
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task 倉庫業務進捗は指示と完了を業務種別ごとに数える()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        // 搬送指示を2件作り、片方だけ実行する
+        var first = await admin.PostAsJsonAsync("/api/transfer-orders",
+            new TransferOrderRequest(lot.Id, 10m, ctx.MaterialLocationId, ctx.ProductLocationId));
+        var firstOrder = (await first.Content.ReadFromJsonAsync<TransferOrderResponse>())!;
+        (await admin.PostAsync($"/api/transfer-orders/{firstOrder.Id}/execute", null))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/transfer-orders",
+            new TransferOrderRequest(lot.Id, 10m, ctx.MaterialLocationId, ctx.ProductLocationId)))
+            .EnsureSuccessStatusCode();
+
+        var progress = await admin.GetFromJsonAsync<WarehouseProgressResponse>(
+            "/api/inventory/warehouse-progress");
+        var transfer = progress!.Rows.Single(r => r.Kind == "在庫移動");
+        Assert.Equal(2, transfer.TotalCount);
+        Assert.Equal(1, transfer.CompletedCount);
+        Assert.Equal(1, transfer.OpenCount);
+        Assert.Equal(0, transfer.OldestOpenAgeDays);
+
+        // 指示の無い業務は0件で並ぶ（行そのものは消さない）
+        Assert.Equal(0, progress.Rows.Single(r => r.Kind == "棚卸").TotalCount);
+
+        // 受入は「指示」を持たないため進捗の対象にしない
+        Assert.DoesNotContain(progress.Rows, r => r.Kind == "受入");
+    }
+
 }

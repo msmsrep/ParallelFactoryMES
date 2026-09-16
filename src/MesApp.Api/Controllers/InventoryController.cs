@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Common;
@@ -513,6 +513,72 @@ public class InventoryController(
         await auditLogger.LogAsync("Inventory", auditAction, nameof(Lot), lot.Id.ToString(),
             detail: $"lot={lot.LotNumber}, qty={quantity}, reason={reason}", ct: ct);
         return NoContent();
+    }
+
+
+    // ---- 倉庫業務進捗（D-50-30-07）----
+
+    /// <summary>
+    /// 倉庫業務の進捗（D-50-30-07）。指示したものがどれだけ片付いたかを業務種別ごとに返す。
+    /// <para>
+    /// 新しいエンティティは持たず、既存の指示を数え直すだけにする（実績は既に貯まっている）。
+    /// **受入は対象にしない**——受入には「指示」が無く実施の記録だけなので、
+    /// 件数を並べても進捗にならず、他の行と同じ意味で読めなくなる。
+    /// 滞留を見るため、未完了のうち最も古いものの経過日数を併記する。
+    /// </para>
+    /// </summary>
+    [HttpGet("warehouse-progress")]
+    public async Task<ActionResult<WarehouseProgressResponse>> WarehouseProgress(
+        [FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null,
+        CancellationToken ct = default)
+    {
+        var fromDate = from ?? businessDate.Today.AddDays(-6);
+        var toDate = to ?? businessDate.Today;
+        var start = businessDate.GetRange(fromDate).Start;
+        var end = businessDate.GetRange(toDate).End;
+
+        // SQLiteはDateTimeOffsetの比較を翻訳できないため、取得してから絞る（Spec.md 7.5 の例外）
+        var picking = await db.PickingOrders.AsNoTracking()
+            .Select(x => new { x.CreatedAt, Open = x.Status == PickingOrderStatus.Instructed,
+                               Canceled = x.Status == PickingOrderStatus.Canceled })
+            .ToListAsync(ct);
+        var shipping = await db.ShippingOrders.AsNoTracking()
+            .Select(x => new { x.CreatedAt, Open = x.Status == ShippingOrderStatus.Instructed,
+                               Canceled = x.Status == ShippingOrderStatus.Canceled })
+            .ToListAsync(ct);
+        var transfer = await db.TransferOrders.AsNoTracking()
+            .Select(x => new { x.CreatedAt, Open = x.Status == TransferOrderStatus.Instructed,
+                               Canceled = x.Status == TransferOrderStatus.Canceled })
+            .ToListAsync(ct);
+        var stocktake = await db.Stocktakes.AsNoTracking()
+            .Select(x => new { x.CreatedAt, Open = x.Status == StocktakeStatus.Instructed,
+                               Canceled = x.Status == StocktakeStatus.Canceled })
+            .ToListAsync(ct);
+
+        List<WarehouseProgressRow> rows =
+        [
+            Row("出庫ピッキング", picking.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
+            Row("出荷", shipping.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
+            Row("在庫移動", transfer.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
+            Row("棚卸", stocktake.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
+        ];
+        return new WarehouseProgressResponse(fromDate, toDate, rows);
+
+        WarehouseProgressRow Row(
+            string kind, IEnumerable<(DateTimeOffset CreatedAt, bool Open, bool Canceled)> source)
+        {
+            // 取消は指示が無かったのと同じ扱いにする（分母にも完了にも数えない）
+            var items = source
+                .Where(x => !x.Canceled && x.CreatedAt >= start && x.CreatedAt <= end)
+                .ToList();
+            var open = items.Where(x => x.Open).ToList();
+            var oldest = open.Count == 0
+                ? (int?)null
+                : (int)(businessDate.Today.DayNumber
+                        - DateOnly.FromDateTime(open.Min(x => x.CreatedAt).UtcDateTime).DayNumber);
+            return new WarehouseProgressRow(
+                kind, items.Count, items.Count - open.Count, open.Count, oldest);
+        }
     }
 
     /// <summary>

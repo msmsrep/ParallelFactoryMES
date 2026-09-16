@@ -59,7 +59,6 @@ public enum ToolStatus
     Retired,
 }
 
-/// <summary>資源階層の段（Spec.md 5.1 WorkCenter。上から 工場 → ライン → エリア → 作業区）</summary>
 /// <summary>治工具の引当・払出の状態（Spec.md 5.5 ToolIssue。B-20-30）</summary>
 public enum ToolIssueStatus
 {
@@ -73,6 +72,7 @@ public enum ToolIssueStatus
     Canceled,
 }
 
+/// <summary>資源階層の段（Spec.md 5.1 WorkCenter。上から 工場 → ライン → エリア → 作業区）</summary>
 public enum WorkCenterLevel
 {
     /// <summary>工場</summary>
@@ -357,6 +357,20 @@ public enum InventoryTransactionType
     /// DBは文字列で保存するので保存済みデータへの影響はない。
     /// </remarks>
     MaintenanceIssue,
+
+    /// <summary>サンプル採取（保管サンプルとして在庫から抜く。D-40-50-01）</summary>
+    SampleRetention,
+}
+
+/// <summary>サンプル品の保管状態（Spec.md 5.3 SampleStorage。D-40-50-01）</summary>
+public enum SampleStorageStatus
+{
+    /// <summary>保管中</summary>
+    Stored,
+    /// <summary>払出済（再試験などで使用した）</summary>
+    Consumed,
+    /// <summary>廃棄済（保管期限を終えて処分した）</summary>
+    Disposed,
 }
 
 /// <summary>ピッキング指示区分（Spec.md 5.3 PickingOrder）</summary>

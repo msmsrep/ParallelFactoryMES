@@ -63,6 +63,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<PickingOrder> PickingOrders => Set<PickingOrder>();
     public DbSet<ShippingOrder> ShippingOrders => Set<ShippingOrder>();
     public DbSet<Stocktake> Stocktakes => Set<Stocktake>();
+    public DbSet<SampleStorage> SampleStorages => Set<SampleStorage>();
 
     // 品質系（Spec.md 5.4）
     public DbSet<InspectionOrder> InspectionOrders => Set<InspectionOrder>();
@@ -342,6 +343,24 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             // 上位の資源は削除しない（無効化で運用する）ため、参照が残っている親を消せないようにする
             e.HasOne(x => x.Parent).WithMany().HasForeignKey(x => x.ParentId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<SampleStorage>(e =>
+        {
+            e.HasIndex(x => x.SampleNo).IsUnique();
+            e.Property(x => x.SampleNo).HasMaxLength(50);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.Quantity).HasPrecision(18, 4);
+            // 採取元ロット・保管場所・品目は履歴として残すため消させない
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Lot).WithMany().HasForeignKey(x => x.LotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.StorageLocation).WithMany().HasForeignKey(x => x.StorageLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.InspectionOrder).WithMany().HasForeignKey(x => x.InspectionOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => new { x.Status, x.RetainUntil });
         });
 
         builder.Entity<Location>(e =>

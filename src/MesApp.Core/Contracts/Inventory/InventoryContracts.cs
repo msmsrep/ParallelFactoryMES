@@ -159,3 +159,53 @@ public record StocktakeResponse(
     int Id, string StocktakeNo, int? TargetLocationId, StocktakeStatus Status,
     DateTimeOffset CreatedAt, DateTimeOffset? FinalizedAt,
     List<StocktakeLineResponse> Lines);
+
+// ---- サンプル品保管（D-40-50-01）----
+
+/// <summary>サンプルの採取登録。採取した分は在庫から抜く（保管棚へ移り、出荷・投入には使えないため）</summary>
+public record SampleCollectRequest(
+    int LotId,
+    int StorageLocationId,
+    [Range(0.000001, double.MaxValue)] decimal Quantity,
+    /// <summary>保管期限（未指定なら期限の判定を行わない）</summary>
+    DateOnly? RetainUntil,
+    int? InspectionOrderId,
+    [MaxLength(500)] string? Note);
+
+/// <summary>保管の終了（払出・廃棄）。どちらかを明示させる（黙って消えると保管の証跡が残らない）</summary>
+public record SampleCloseRequest(
+    SampleStorageStatus Status,
+    [MaxLength(500)] string? Note);
+
+public record SampleStorageResponse(
+    int Id, string SampleNo,
+    int ProductId, string ProductCode, string ProductName, string Unit,
+    int LotId, string LotNumber,
+    int? InspectionOrderId, string? InspectionOrderNo,
+    decimal Quantity,
+    int StorageLocationId, string StorageLocationCode,
+    DateOnly CollectedOn, DateOnly? RetainUntil,
+    SampleStorageStatus Status,
+    DateOnly? ClosedOn, string? Note,
+    /// <summary>業務日付時点で保管期限を過ぎているか（＝処分してよい）</summary>
+    bool IsRetentionOver,
+    /// <summary>期限までの残り日数（期限なしはnull。負数は超過日数）</summary>
+    int? DaysUntilRetentionEnd);
+
+// ---- 倉庫業務進捗（D-50-30-07）----
+
+/// <summary>
+/// 倉庫業務の進捗（D-50-30-07）。業務の種別ごとに、指示したものがどれだけ片付いたかを見る。
+/// 新しいエンティティは持たず、既存の指示（受入・ピッキング・出荷・移動・棚卸）を数え直す
+/// </summary>
+public record WarehouseProgressRow(
+    /// <summary>業務種別（受入・出庫ピッキング・出荷・在庫移動・棚卸）</summary>
+    string Kind,
+    int TotalCount,
+    int CompletedCount,
+    int OpenCount,
+    /// <summary>未完了のうち最も古いものの経過日数（無ければnull）。滞留を見るための値</summary>
+    int? OldestOpenAgeDays);
+
+public record WarehouseProgressResponse(
+    DateOnly From, DateOnly To, List<WarehouseProgressRow> Rows);
