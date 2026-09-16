@@ -811,4 +811,53 @@ public class MasterTests
         Assert.Equal(0m, added.StockQuantity);
     }
 
+    [Fact]
+    public async Task 推奨ロケーションは既定ロケーション在庫のある場所エリア種別の順に返る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var context = await Phase3TestData.SetupAsync(admin);
+
+        // 部材倉庫をもう1つ作り、既定ロケーションに指定する
+        var defaultLoc = await admin.PostAsJsonAsync("/api/locations",
+            new LocationRequest("LOC-D", LocationAreaType.MaterialWarehouse, "A-01"));
+        defaultLoc.EnsureSuccessStatusCode();
+        var defaultLocation = (await defaultLoc.Content.ReadFromJsonAsync<LocationResponse>())!;
+
+        // 在庫は LOC-M にだけある（既定ロケーションには無い）
+        await Phase3TestData.ReceiveAsync(admin, context.MaterialId, 40m, context.MaterialLocationId);
+
+        // 既定ロケーション未設定なら、在庫のある場所が先頭に来る
+        var before = await admin.GetFromJsonAsync<List<LocationRecommendationResponse>>(
+            $"/api/locations/recommendations?productId={context.MaterialId}");
+        Assert.Equal(context.MaterialLocationId, before![0].LocationId);
+        Assert.Equal(40m, before[0].CurrentQuantity);
+        Assert.Contains("在庫", before[0].Reason);
+
+        // 既定ロケーションを設定すると、在庫が無くてもそちらが先頭になる
+        (await admin.PutAsJsonAsync($"/api/products/{context.MaterialId}",
+            new ProductRequest("RM-01", "部材", "個", null, ProductType.Material, 0m, defaultLocation.Id)))
+            .EnsureSuccessStatusCode();
+
+        var after = await admin.GetFromJsonAsync<List<LocationRecommendationResponse>>(
+            $"/api/locations/recommendations?productId={context.MaterialId}");
+        Assert.Equal(defaultLocation.Id, after![0].LocationId);
+        Assert.Equal("品目マスタの既定ロケーション", after[0].Reason);
+        Assert.Equal(0m, after[0].CurrentQuantity);
+
+        // 同じロケーションが2つの理由で重複しない。在庫のある LOC-M は2番目に残る
+        Assert.Equal(context.MaterialLocationId, after[1].LocationId);
+        Assert.Equal(after.Select(r => r.LocationId).Distinct().Count(), after.Count);
+
+        // 製品は製品倉庫が推奨される（在庫も既定ロケーションも無い品目）
+        var forProduct = await admin.GetFromJsonAsync<List<LocationRecommendationResponse>>(
+            $"/api/locations/recommendations?productId={context.ProductId}");
+        Assert.All(forProduct!, r => Assert.Equal(LocationAreaType.ProductWarehouse, r.AreaType));
+
+        // 実在しない・無効なロケーションは既定にできない
+        var invalid = await admin.PutAsJsonAsync($"/api/products/{context.MaterialId}",
+            new ProductRequest("RM-01", "部材", "個", null, ProductType.Material, 0m, 9999));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
 }

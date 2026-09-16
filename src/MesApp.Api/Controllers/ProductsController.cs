@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using System.Linq.Expressions;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Entities;
@@ -32,7 +33,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         {
             query = query.Where(p => p.Code.Contains(search) || p.Name.Contains(search));
         }
-        return await query.OrderBy(p => p.Code).Select(p => ToResponse(p)).ToListAsync(ct);
+        return await query.OrderBy(p => p.Code).Select(Projection).ToListAsync(ct);
     }
 
     /// <summary>
@@ -48,15 +49,16 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         {
             query = query.Where(p => p.Code.Contains(keyword) || p.Name.Contains(keyword));
         }
-        return await query.OrderBy(p => p.Code).Select(p => ToResponse(p))
+        return await query.OrderBy(p => p.Code).Select(Projection)
             .ToOptionsResultAsync(options, ct);
     }
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ProductResponse>> Get(int id, CancellationToken ct)
     {
-        var product = await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
-        return product is null ? NotFound() : ToResponse(product);
+        var product = await db.Products.AsNoTracking()
+            .Where(p => p.Id == id).Select(Projection).FirstOrDefaultAsync(ct);
+        return product is null ? NotFound() : product;
     }
 
     [HttpPost]
@@ -67,6 +69,10 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         {
             return Conflict(new ProblemDetails { Title = $"品目コード '{request.Code}' は既に存在します。" });
         }
+        if (await CheckDefaultLocationAsync(request.DefaultLocationId, ct) is { } invalid)
+        {
+            return BadRequest(new ProblemDetails { Title = invalid });
+        }
 
         var product = new Product
         {
@@ -76,12 +82,13 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             Specification = request.Specification,
             Type = request.Type,
             StandardDefectRate = request.StandardDefectRate,
+            DefaultLocationId = request.DefaultLocationId,
         };
         db.Products.Add(product);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Master", "Create", nameof(Product), product.Id.ToString(),
             detail: $"code={product.Code}", ct: ct);
-        return CreatedAtAction(nameof(Get), new { id = product.Id }, ToResponse(product));
+        return CreatedAtAction(nameof(Get), new { id = product.Id }, await LoadAsync(product.Id, ct));
     }
 
     [HttpPut("{id:int}")]
@@ -97,6 +104,10 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         {
             return Conflict(new ProblemDetails { Title = $"品目コード '{request.Code}' は既に存在します。" });
         }
+        if (await CheckDefaultLocationAsync(request.DefaultLocationId, ct) is { } invalid)
+        {
+            return BadRequest(new ProblemDetails { Title = invalid });
+        }
 
         product.Code = request.Code;
         product.Name = request.Name;
@@ -104,11 +115,12 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         product.Specification = request.Specification;
         product.Type = request.Type;
         product.StandardDefectRate = request.StandardDefectRate;
+        product.DefaultLocationId = request.DefaultLocationId;
         product.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Master", "Update", nameof(Product), id.ToString(),
             detail: $"code={product.Code}", ct: ct);
-        return ToResponse(product);
+        return await LoadAsync(id, ct);
     }
 
     [HttpDelete("{id:int}")]
@@ -380,6 +392,27 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             .Concat(step.EquipmentId is { } id ? [id] : [])
             .Distinct();
 
-    private static ProductResponse ToResponse(Product p) =>
-        new(p.Id, p.Code, p.Name, p.Unit, p.Specification, p.Type, p.StandardDefectRate, p.IsActive);
+    /// <summary>既定ロケーションの実在チェック（無効なロケーションは推奨に出せないため弾く）</summary>
+    private async Task<string?> CheckDefaultLocationAsync(int? locationId, CancellationToken ct)
+    {
+        if (locationId is not { } id)
+        {
+            return null;
+        }
+        return await db.Locations.AnyAsync(l => l.Id == id && l.IsActive, ct)
+            ? null
+            : $"既定ロケーション（ID {id}）が見つからないか無効です。";
+    }
+
+    private async Task<ProductResponse> LoadAsync(int id, CancellationToken ct) =>
+        await db.Products.AsNoTracking().Where(p => p.Id == id).Select(Projection).FirstAsync(ct);
+
+    /// <summary>
+    /// 一覧・単票で共通の射影。既定ロケーションのコードを添えるため**式として持つ**
+    /// （EF Core はメソッド呼び出しをSQLへ翻訳できない）
+    /// </summary>
+    private static readonly Expression<Func<Product, ProductResponse>> Projection =
+        p => new ProductResponse(
+            p.Id, p.Code, p.Name, p.Unit, p.Specification, p.Type, p.StandardDefectRate, p.IsActive,
+            p.DefaultLocationId, p.DefaultLocation == null ? null : p.DefaultLocation.Code);
 }

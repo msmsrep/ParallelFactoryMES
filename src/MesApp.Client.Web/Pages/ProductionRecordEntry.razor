@@ -73,6 +73,22 @@ else
                             <option value="@location.Id">@location.Code</option>
                         }
                     </select>
+                    @* 推奨ロケーション指示（D-40-40-03）。押し付けず、理由を添えて候補を出す *@
+                    @if (_locationRecommendations is { Count: > 0 })
+                    {
+                        <p class="text-muted">
+                            推奨：
+                            @foreach (var r in _locationRecommendations)
+                            {
+                                <button class="btn btn-secondary btn-sm"
+                                        @onclick="() => _outputLocationId = r.LocationId">@r.Code</button>
+                                <span>&nbsp;</span>
+                            }
+                        </p>
+                        <p class="text-muted">
+                            @_locationRecommendations[0].Code：@_locationRecommendations[0].Reason
+                        </p>
+                    }
                 </div>
                 <div class="form-field">
                     <label>
@@ -460,6 +476,8 @@ else
     private WorkOrderResponse? _workOrder;
     private List<ProductionRecordResponse> _records = [];
     private List<LocationOption> _locations = [];
+    /// <summary>産出品の推奨入庫先（D-40-40-03）。作業指示の品目から引く</summary>
+    private List<LocationRecommendationResponse>? _locationRecommendations;
     private List<ConsumptionResponse> _consumptions = [];
     private List<DataRecordResponse> _dataRecords = [];
     private List<WorkOrderStatusHistoryEntry> _statusHistory = [];
@@ -530,6 +548,11 @@ else
     private async Task LoadAsync()
     {
         _workOrder = await Http.GetFromJsonAsync<WorkOrderResponse>($"api/work-orders/{Id}");
+        if (_workOrder is not null)
+        {
+            _locationRecommendations = await Http.GetFromJsonAsync<List<LocationRecommendationResponse>>(
+                $"api/locations/recommendations?productId={_workOrder.ProductId}");
+        }
         _records = await Http.GetFromJsonAsync<List<ProductionRecordResponse>>(
             $"api/work-orders/{Id}/production-records") ?? [];
         _consumptions = await Http.GetFromJsonAsync<List<ConsumptionResponse>>(

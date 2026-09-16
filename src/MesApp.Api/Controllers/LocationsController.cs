@@ -1,4 +1,4 @@
-using MesApp.Api.Policies;
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -120,6 +120,84 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
         id is { } value
             ? await db.WorkCenters.AsNoTracking().FirstOrDefaultAsync(w => w.Id == value, ct)
             : null;
+
+    /// <summary>
+    /// 推奨ロケーション（D-10-30-03、D-40-40-03）。入庫先の候補を優先度順に返す。
+    /// <para>
+    /// 推奨の根拠は3段階で、上から順に強い。
+    /// ①品目マスタの既定ロケーション（固定ロケーション運用）
+    /// ②同じ品目の在庫が既にあるロケーション（数量の多い順。散らばると探せなくなる）
+    /// ③品目区分に対応するエリアのロケーション（製品→製品倉庫、それ以外→部材倉庫）。
+    /// **強制はしない**——実地では棚が埋まっていることがあり、機械が決められるのは「どこが妥当か」まで。
+    /// </para>
+    /// </summary>
+    [HttpGet("recommendations")]
+    public async Task<ActionResult<List<LocationRecommendationResponse>>> Recommendations(
+        [FromQuery] int productId, [FromQuery] int limit = 5, CancellationToken ct = default)
+    {
+        var product = await db.Products.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == productId, ct);
+        if (product is null)
+        {
+            return NotFound(new ProblemDetails { Title = $"品目ID {productId} は登録されていません。" });
+        }
+
+        // その品目が今どこにどれだけあるか（②の並び順と、全候補に添える現在庫）
+        var stocks = await db.InventoryStocks.AsNoTracking()
+            .Where(s => s.ProductId == productId && s.Quantity > 0)
+            .GroupBy(s => s.LocationId)
+            .Select(g => new { LocationId = g.Key, Quantity = g.Sum(s => s.Quantity) })
+            .ToListAsync(ct);
+        var quantityByLocation = stocks.ToDictionary(x => x.LocationId, x => x.Quantity);
+
+        var defaultArea = product.Type == ProductType.Product
+            ? LocationAreaType.ProductWarehouse
+            : LocationAreaType.MaterialWarehouse;
+        var locations = await db.Locations.AsNoTracking()
+            .Where(l => l.IsActive)
+            .OrderBy(l => l.Code)
+            .ToListAsync(ct);
+        var byId = locations.ToDictionary(l => l.Id);
+
+        // 同じロケーションが複数の理由に当たることがある。最初（＝最も強い理由）だけを残す
+        var result = new List<LocationRecommendationResponse>();
+        void Add(Location location, string reason)
+        {
+            if (result.Any(r => r.LocationId == location.Id))
+            {
+                return;
+            }
+            result.Add(new LocationRecommendationResponse(
+                location.Id, location.Code, location.AreaType, location.ShelfNo, reason,
+                quantityByLocation.GetValueOrDefault(location.Id)));
+        }
+
+        if (product.DefaultLocationId is { } defaultId && byId.TryGetValue(defaultId, out var defaultLocation))
+        {
+            Add(defaultLocation, "品目マスタの既定ロケーション");
+        }
+        foreach (var stock in stocks.OrderByDescending(s => s.Quantity))
+        {
+            if (byId.TryGetValue(stock.LocationId, out var location))
+            {
+                Add(location, $"同じ品目の在庫がある（{stock.Quantity:0.##} {product.Unit}）");
+            }
+        }
+        foreach (var location in locations.Where(l => l.AreaType == defaultArea))
+        {
+            Add(location, $"品目区分「{ProductTypeLabel(product.Type)}」の既定エリア");
+        }
+
+        return result.Take(Math.Clamp(limit, 1, 20)).ToList();
+    }
+
+    /// <summary>推奨理由に出す品目区分の日本語（画面と同じ語を使う）</summary>
+    private static string ProductTypeLabel(ProductType type) => type switch
+    {
+        ProductType.Product => "製品",
+        ProductType.SemiFinished => "半製品・中間品",
+        _ => "部材",
+    };
 
     /// <summary>作業区は未設定でもよいため、コード・名称はnull許容のまま返す</summary>
     private static LocationResponse ToResponse(Location l, WorkCenter? workCenter = null)

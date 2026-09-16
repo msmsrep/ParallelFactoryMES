@@ -164,6 +164,8 @@ public sealed partial class MasterCsvService
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var byCode = await db.Products.ToDictionaryAsync(p => p.Code, StringComparer.Ordinal, ct);
+        var locationIds = await db.Locations.AsNoTracking().Where(l => l.IsActive)
+            .ToDictionaryAsync(l => l.Code, l => l.Id, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var row in table.Rows)
@@ -183,6 +185,8 @@ public sealed partial class MasterCsvService
             var specification = reader.Text("Specification", product.Specification);
             var type = reader.Enum("Type", product.Type, CsvEnumLabels.ProductTypes);
             var defectRate = reader.Number("StandardDefectRate", product.StandardDefectRate, 0, 100);
+            var defaultLocationId = reader.Reference(
+                "DefaultLocationCode", product.DefaultLocationId, locationIds, "ロケーション");
             var isActive = reader.Bool("IsActive", product.IsActive);
             if (reader.Failed)
             {
@@ -194,6 +198,7 @@ public sealed partial class MasterCsvService
             product.Specification = specification;
             product.Type = type;
             product.StandardDefectRate = defectRate;
+            product.DefaultLocationId = defaultLocationId;
             product.IsActive = isActive;
             product.UpdatedAt = DateTimeOffset.UtcNow;
 

@@ -11,11 +11,14 @@ public record ProductRequest(
     [Required, MaxLength(20)] string Unit,
     string? Specification,
     ProductType Type,
-    [Range(0, 100)] decimal StandardDefectRate);
+    [Range(0, 100)] decimal StandardDefectRate,
+    /// <summary>既定の入庫先ロケーション（推奨ロケーション指示の第一候補。D-10-30-03、D-40-40-03）</summary>
+    int? DefaultLocationId = null);
 
 public record ProductResponse(
     int Id, string Code, string Name, string Unit, string? Specification,
-    ProductType Type, decimal StandardDefectRate, bool IsActive);
+    ProductType Type, decimal StandardDefectRate, bool IsActive,
+    int? DefaultLocationId = null, string? DefaultLocationCode = null);
 
 // ---- MBOM（BomItem）----
 
@@ -165,6 +168,19 @@ public record WorkCenterResponse(
     int? ParentId, string? ParentCode, string? ParentName, bool IsActive);
 
 // ---- ロケーション（Location）----
+
+/// <summary>
+/// 推奨ロケーション（D-10-30-03、D-40-40-03）。優先度順に並ぶ。
+/// <see cref="Reason"/> は「なぜそこか」を現場に見せるためのもので、根拠を伏せると従われない
+/// </summary>
+public record LocationRecommendationResponse(
+    int LocationId,
+    string Code,
+    LocationAreaType AreaType,
+    string? ShelfNo,
+    string Reason,
+    /// <summary>そのロケーションにあるこの品目の現在庫（まとめるかどうかの判断材料）</summary>
+    decimal CurrentQuantity);
 
 public record LocationRequest(
     [Required, MaxLength(50)] string Code,

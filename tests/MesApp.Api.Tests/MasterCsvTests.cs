@@ -39,8 +39,8 @@ public class MasterCsvTests
         var bytes = await export.Content.ReadAsByteArrayAsync();
         Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, bytes.Take(3));
         var text = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
-        Assert.StartsWith("Code,Name,Unit,Specification,Type,StandardDefectRate,IsActive\r\n", text);
-        Assert.Contains("P-001,テスト製品,個,規格A,Product,1.5,true", text);
+        Assert.StartsWith("Code,Name,Unit,Specification,Type,StandardDefectRate,DefaultLocationCode,IsActive\r\n", text);
+        Assert.Contains("P-001,テスト製品,個,規格A,Product,1.5,,true", text);
         Assert.Contains("\"カンマ, と \"\"引用符\"\" を含む名前\"", text);
     }
 
@@ -990,4 +990,30 @@ public class MasterCsvTests
         content.Headers.ContentType = new MediaTypeHeaderValue("text/csv") { CharSet = "utf-8" };
         return await client.PostAsync($"/api/masters/csv/{kind}?dryRun={(dryRun ? "true" : "false")}", content);
     }
+    [Fact]
+    public async Task 品目CSVで既定ロケーションをコード参照できる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        (await client.PostAsJsonAsync("/api/locations",
+            new LocationRequest("LOC-A", LocationAreaType.MaterialWarehouse, null))).EnsureSuccessStatusCode();
+
+        var result = await ImportAsync(client, "products", """
+            Code,Name,Unit,Type,DefaultLocationCode
+            P-001,部材A,個,Material,LOC-A
+            """);
+        Assert.True(result.Succeeded, string.Join(" / ", result.Errors.Select(e => e.Message)));
+        var product = (await client.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!
+            .Single(p => p.Code == "P-001");
+        Assert.Equal("LOC-A", product.DefaultLocationCode);
+
+        // 登録の無いロケーションは行ごと弾く（推奨に出せない参照を通さない）
+        var invalid = await ImportAsync(client, "products", """
+            Code,Name,Unit,Type,DefaultLocationCode
+            P-001,部材A,個,Material,LOC-X
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Message.Contains("LOC-X"));
+    }
+
 }

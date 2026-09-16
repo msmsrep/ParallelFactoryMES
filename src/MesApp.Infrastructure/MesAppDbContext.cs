@@ -178,6 +178,9 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.Unit).HasMaxLength(20);
             e.Property(x => x.Specification).HasMaxLength(500);
+            // 既定ロケーションを参照している品目があるうちはロケーションを消させない
+            e.HasOne(x => x.DefaultLocation).WithMany().HasForeignKey(x => x.DefaultLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<BomItem>(e =>

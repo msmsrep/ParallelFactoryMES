@@ -35,7 +35,21 @@
                 <label>標準不良率(%)</label>
                 <input type="number" step="any" @bind="_defectRate" />
             </div>
+            <div class="form-field">
+                <label>既定ロケーション（入庫先の推奨。D-10-30-03）</label>
+                <select @bind="_defaultLocationId">
+                    <option value="0">指定しない</option>
+                    @foreach (var location in _locations)
+                    {
+                        <option value="@location.Id">@location.Code</option>
+                    }
+                </select>
+            </div>
         </div>
+        <p class="text-muted">
+            既定ロケーションを決めておくと、受入・完成品入庫でそこを第一候補として推奨する。
+            未指定でも、同じ品目の在庫がある場所と品目区分の既定エリアから推奨を出す。
+        </p>
         <div class="actions">
             <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
             @if (_editingId is not null)
@@ -376,6 +390,8 @@
     private List<WorkProcedureResponse> _workProcedures = [];
     /// <summary>工順の作業区は最下段のみ（Spec.md 5.7 資源階層への紐付け）</summary>
     private List<WorkCenterResponse> _workCenters = [];
+    /// <summary>既定ロケーションの選択肢（推奨ロケーション指示 D-10-30-03 の第一候補）</summary>
+    private List<LocationResponse> _locations = [];
 
     private ProductResponse? _selected;
     private readonly List<BomItemRequest> _bomLines = [];
@@ -390,6 +406,7 @@
     private string? _specification;
     private ProductType _type = ProductType.Product;
     private decimal _defectRate;
+    private int _defaultLocationId;
 
     private int _bomChildId;
     private decimal _bomQuantity = 1;
@@ -424,6 +441,7 @@
         _workProcedures = await Http.GetFromJsonAsync<List<WorkProcedureResponse>>("api/work-procedures") ?? [];
         _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>(
             $"api/work-centers?level={WorkCenterLevel.WorkCenter}") ?? [];
+        _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
         await LoadAsync();
     }
 
@@ -439,6 +457,7 @@
         _specification = product.Specification;
         _type = product.Type;
         _defectRate = product.StandardDefectRate;
+        _defaultLocationId = product.DefaultLocationId ?? 0;
     }
 
     private void ResetForm()
@@ -450,6 +469,7 @@
         _specification = null;
         _type = ProductType.Product;
         _defectRate = 0;
+        _defaultLocationId = 0;
     }
 
     private async Task SaveAsync()
@@ -464,7 +484,8 @@
         _message = null;
         try
         {
-            var request = new ProductRequest(_code, _name, _unit, _specification, _type, _defectRate);
+            var request = new ProductRequest(_code, _name, _unit, _specification, _type, _defectRate,
+                _defaultLocationId == 0 ? null : _defaultLocationId);
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/products", request)
                 : await Http.PutAsJsonAsync($"api/products/{_editingId}", request);

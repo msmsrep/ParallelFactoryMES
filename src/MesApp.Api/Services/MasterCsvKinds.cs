@@ -39,6 +39,7 @@ public static class MasterCsvKinds
             new("Specification", "規格", false, null),
             new("Type", "品目区分", false, "Product（製品）/ SemiFinished（半製品）/ Material（部材）"),
             new("StandardDefectRate", "標準不良率(%)", false, "0〜100"),
+            new("DefaultLocationCode", "既定ロケーション", false, "推奨ロケーションの第一候補。空欄で解除"),
             new("IsActive", "有効", false, "true / false。falseで無効化"),
         ]),
         new(Processes, "工程", false,

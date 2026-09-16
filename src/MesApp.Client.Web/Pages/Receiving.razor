@@ -1,4 +1,4 @@
-@page "/receiving"
+﻿@page "/receiving"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -16,7 +16,8 @@
         <div class="form-field">
             <label>品目</label>
             <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
-                          @bind-Value="_form.ProductId"
+                          Value="_form.ProductId"
+                          ValueChanged="OnProductChangedAsync"
                           EmptyLabel="選択してください"
                           ValueOf="p => p.Id"
                           LabelOf='@(p => $"{p.Code} {p.Name}")' />
@@ -34,6 +35,21 @@
                     <option value="@location.Id">@location.Code</option>
                 }
             </select>
+            @* 推奨ロケーション指示（D-10-30-03）。選ぶのは人で、押し付けない *@
+            @if (_recommendations is { Count: > 0 })
+            {
+                <p class="text-muted">
+                    推奨：
+                    @foreach (var r in _recommendations)
+                    {
+                        <button class="btn btn-secondary btn-sm" @onclick="() => _form.LocationId = r.LocationId">
+                            @r.Code
+                        </button>
+                        <span>&nbsp;</span>
+                    }
+                </p>
+                <p class="text-muted">@_recommendations[0].Code：@_recommendations[0].Reason</p>
+            }
         </div>
         <div class="form-field">
             <label>ロット番号（空欄で自動採番）</label>
@@ -106,6 +122,8 @@
 
     private readonly ReceivingForm _form = new();
     private List<LocationResponse> _locations = [];
+    /// <summary>推奨ロケーション（D-10-30-03）。品目を選ぶたびに取り直す</summary>
+    private List<LocationRecommendationResponse>? _recommendations;
     private PagedResult<StockResponse>? _stocks;
     private string? _error;
     private string? _message;
@@ -115,6 +133,23 @@
     {
         _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
         await LoadAsync();
+    }
+
+    /// <summary>品目が決まって初めて推奨が出せる。先頭候補は既定の入庫先として置いておく</summary>
+    private async Task OnProductChangedAsync(int productId)
+    {
+        _form.ProductId = productId;
+        _recommendations = null;
+        if (productId == 0)
+        {
+            return;
+        }
+        _recommendations = await Http.GetFromJsonAsync<List<LocationRecommendationResponse>>(
+            $"api/locations/recommendations?productId={productId}");
+        if (_form.LocationId == 0 && _recommendations is { Count: > 0 })
+        {
+            _form.LocationId = _recommendations[0].LocationId;
+        }
     }
 
     private Task LoadAsync() => LoadPageAsync(1);

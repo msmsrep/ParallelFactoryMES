@@ -53,12 +53,13 @@ public sealed partial class MasterCsvService(
 
     private async Task<List<string?[]>> ExportProductsAsync(bool includeInactive, CancellationToken ct)
     {
-        var items = await db.Products.AsNoTracking()
+        var items = await db.Products.AsNoTracking().Include(p => p.DefaultLocation)
             .Where(p => includeInactive || p.IsActive)
             .OrderBy(p => p.Code).ToListAsync(ct);
         return [.. items.Select(p => new string?[]
         {
-            p.Code, p.Name, p.Unit, p.Specification, p.Type.ToString(), Num(p.StandardDefectRate), Bool(p.IsActive),
+            p.Code, p.Name, p.Unit, p.Specification, p.Type.ToString(), Num(p.StandardDefectRate),
+            p.DefaultLocation?.Code, Bool(p.IsActive),
         })];
     }
 

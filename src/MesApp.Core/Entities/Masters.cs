@@ -21,6 +21,13 @@ public class Product
     /// <summary>標準不良率（%。A-40-10-04）</summary>
     public decimal StandardDefectRate { get; set; }
 
+    /// <summary>
+    /// 既定の入庫先ロケーション（推奨ロケーション指示の第一候補。D-10-30-03、D-40-40-03）。
+    /// 固定ロケーション運用のための項目で、未設定なら在庫実績とエリア種別から推奨を導く
+    /// </summary>
+    public int? DefaultLocationId { get; set; }
+    public Location? DefaultLocation { get; set; }
+
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

@@ -61,6 +61,7 @@
 | 出荷（出荷判定ゲート付き） | D-40 / H-10-10 | `ShippingOrdersController.cs` `api/shipping-orders` | Inventory.cs: ShippingOrder / ShippingLine | `/shipping` `Shipping.razor`<br>`/print/shipping/{id}` `Print/ShippingSlip.razor` | `Tests/InventoryTests.cs` |
 | 棚卸（スナップショット→実棚→差異→確定） | D-50-10 | `StocktakesController.cs` `api/stocktakes` | Inventory.cs: Stocktake / StocktakeLine | `/stocktakes` `Stocktakes.razor`<br>`/print/stocktake/{id}` `Print/StocktakeSheet.razor` | `Tests/InventoryTests.cs` |
 | ロケーション・棚番管理 | D-50-20-01 | `LocationsController.cs` `api/locations` | Masters.cs: Location（`WorkCenterId`＝所属する資源。**段は問わない**） | `/masters` `Masters/LocationsTab.razor` | `Tests/MasterTests.cs` |
+| 推奨ロケーション指示（**理由を添えて出すだけ**。強制しない） | D-10-30-03 / D-40-40-03 | `LocationsController.cs` `api/locations/recommendations?productId=`（①品目の既定ロケーション ②同じ品目の在庫がある場所 ③品目区分の既定エリア の順） | Masters.cs: Product.**DefaultLocationId**（既定の入庫先）<br>在庫の集計は InventoryStock | `/receiving` `Receiving.razor`<br>`ProductionRecordEntry.razor`（入庫先）<br>既定の設定は `Masters/ProductsTab.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
 
 ## E. 設備保全
 
