@@ -14,9 +14,6 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class MasterCsvController(MasterCsvService service) : ControllerBase
 {
-    /// <summary>アップロード上限（5MB）</summary>
-    private const long MaxUploadBytes = 5 * 1024 * 1024;
-
     /// <summary>CSV入出力に対応するマスタ種別と列定義</summary>
     [HttpGet("kinds")]
     public ActionResult<List<CsvKindInfo>> Kinds() => MasterCsvKinds.All;
@@ -57,7 +54,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
     /// dryRun=true で検証のみ（DBには反映しない）。
     /// </summary>
     [HttpPost("{kind}")]
-    [RequestSizeLimit(MaxUploadBytes)]
+    [RequestSizeLimit(CsvImport.MaxUploadBytes)]
     public async Task<ActionResult<CsvImportResult>> Import(
         string kind, [FromQuery] bool dryRun = false, CancellationToken ct = default)
     {
@@ -71,31 +68,11 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
             return Forbid();
         }
 
-        byte[] bytes;
-        if (Request.HasFormContentType)
+        var csv = await CsvImport.ReadUploadAsync(Request, ct);
+        if (csv is null)
         {
-            var file = Request.Form.Files.FirstOrDefault();
-            if (file is null || file.Length == 0)
-            {
-                return BadRequest(new ProblemDetails { Title = "CSVファイルが選択されていません。" });
-            }
-            using var buffer = new MemoryStream();
-            await file.CopyToAsync(buffer, ct);
-            bytes = buffer.ToArray();
+            return BadRequest(new ProblemDetails { Title = "CSVファイルが選択されていないか、内容が空です。" });
         }
-        else
-        {
-            using var buffer = new MemoryStream();
-            await Request.Body.CopyToAsync(buffer, ct);
-            bytes = buffer.ToArray();
-        }
-
-        if (bytes.Length == 0)
-        {
-            return BadRequest(new ProblemDetails { Title = "CSVの内容が空です。" });
-        }
-
-        var csv = CsvFile.Decode(bytes);
         return await service.ImportAsync(info, csv, dryRun, ct);
     }
 

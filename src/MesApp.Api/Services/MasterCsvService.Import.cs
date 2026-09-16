@@ -12,12 +12,6 @@ namespace MesApp.Api.Services;
 /// </summary>
 public sealed partial class MasterCsvService
 {
-    /// <summary>取込可能な最大データ行数</summary>
-    public const int MaxRows = 20000;
-
-    /// <summary>応答に含めるエラーの最大件数</summary>
-    private const int MaxReportedErrors = 200;
-
     private sealed class ImportCounter
     {
         public int Created { get; set; }
@@ -28,30 +22,10 @@ public sealed partial class MasterCsvService
         CsvKindInfo kind, string csvText, bool dryRun, CancellationToken ct)
     {
         var errors = new List<CsvImportError>();
-        var table = CsvTable.Create(CsvFile.Parse(csvText));
+        var table = CsvImport.Prepare(kind, csvText, errors);
         if (table is null)
         {
-            errors.Add(new CsvImportError(1, "CSVが空です。1行目にヘッダー行が必要です。"));
-            return Result(kind, 0, new ImportCounter(), dryRun, errors);
-        }
-
-        var missing = kind.Columns.Where(c => c.Required && !table.HasColumn(c.Name)).Select(c => c.Name).ToList();
-        if (missing.Count > 0)
-        {
-            errors.Add(new CsvImportError(table.Header.Line,
-                $"必須の列がありません：{string.Join(", ", missing)}。テンプレートCSVの1行目をそのまま使ってください。"));
-            return Result(kind, 0, new ImportCounter(), dryRun, errors);
-        }
-        if (table.Rows.Count == 0)
-        {
-            errors.Add(new CsvImportError(table.Header.Line, "データ行がありません。"));
-            return Result(kind, 0, new ImportCounter(), dryRun, errors);
-        }
-        if (table.Rows.Count > MaxRows)
-        {
-            errors.Add(new CsvImportError(table.Header.Line,
-                $"1回に取り込めるのは{MaxRows}行までです（{table.Rows.Count}行）。ファイルを分割してください。"));
-            return Result(kind, 0, new ImportCounter(), dryRun, errors);
+            return CsvImport.Result(kind, 0, 0, 0, dryRun, errors);
         }
 
         var counter = new ImportCounter();
@@ -139,23 +113,7 @@ public sealed partial class MasterCsvService
             errors.Add(new CsvImportError(0, $"DBへの反映に失敗しました：{ex.InnerException?.Message ?? ex.Message}"));
         }
 
-        return Result(kind, table.Rows.Count, counter, dryRun, errors);
-    }
-
-    private static CsvImportResult Result(
-        CsvKindInfo kind, int dataRows, ImportCounter counter, bool dryRun, List<CsvImportError> errors)
-    {
-        var succeeded = errors.Count == 0;
-        if (errors.Count > MaxReportedErrors)
-        {
-            var omitted = errors.Count - MaxReportedErrors;
-            errors = [.. errors.Take(MaxReportedErrors), new CsvImportError(0, $"他 {omitted} 件のエラーは省略しました。")];
-        }
-        return new CsvImportResult(
-            kind.Kind, dataRows,
-            succeeded ? counter.Created : 0,
-            succeeded ? counter.Updated : 0,
-            dryRun, succeeded, errors);
+        return CsvImport.Result(kind, table.Rows.Count, counter.Created, counter.Updated, dryRun, errors);
     }
 
     // ---- 単票マスタ ----

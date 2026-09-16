@@ -81,6 +81,8 @@ public static class MesAppHost
         builder.Services.AddScoped<LotStatusService>();
         builder.Services.AddScoped<WorkOrderStatusService>();
         builder.Services.AddScoped<MasterCsvService>();
+        builder.Services.AddScoped<ReceivingService>();
+        builder.Services.AddScoped<ActualCsvService>();
 
         builder.Services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

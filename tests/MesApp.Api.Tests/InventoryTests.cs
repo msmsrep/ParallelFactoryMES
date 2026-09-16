@@ -4,6 +4,7 @@ using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Inventory;
+using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Tests;
@@ -28,6 +29,83 @@ public class InventoryTests
             $"/api/inventory/transactions?lotId={lot.Id}");
         Assert.Equal(1, transactions!.Total);
         Assert.Equal(InventoryTransactionType.Receipt, Assert.Single(transactions.Items).Type);
+    }
+
+    [Fact]
+    public async Task 受入をCSVで一括取込でき_1行でも不正なら全件取り消される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        await Phase3TestData.SetupAsync(admin);
+        const string header = "ProductCode,Quantity,LocationCode,LotNumber,ExpiresOn,Note\n";
+
+        // 検証のみではDBが変わらない
+        var dry = await ImportActualCsvAsync(admin, "receiving",
+            header + "RM-01,100,LOC-M,CSV-LOT-1,2027-01-31,初回\nRM-01,30,LOC-M,,,\n", dryRun: true);
+        Assert.True(dry.Succeeded);
+        Assert.Equal(0m, await StockOfProductAsync(admin, "RM-01"));
+
+        var result = await ImportActualCsvAsync(admin, "receiving",
+            header + "RM-01,100,LOC-M,CSV-LOT-1,2027-01-31,初回\nRM-01,30,LOC-M,,,\n");
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.Created);
+        Assert.Equal(130m, await StockOfProductAsync(admin, "RM-01"));
+        var stocks = await admin.GetFromJsonAsync<PagedResult<StockResponse>>("/api/inventory/stocks");
+        Assert.Equal(new DateOnly(2027, 1, 31), stocks!.Items.Single(s => s.LotNumber == "CSV-LOT-1").ExpiresOn);
+        Assert.Contains(stocks.Items, s => s.LotNumber.StartsWith("RM-01-") && s.Quantity == 30m); // 空欄は自動採番
+
+        // 同じファイル内のロット番号重複・既存ロットとの重複・未登録コード・数量0は行番号付きで返り、
+        // 正しい行（2行目）も含めて1件も登録されない
+        var invalid = await ImportActualCsvAsync(admin, "receiving",
+            header
+            + "RM-01,10,LOC-M,CSV-LOT-2,,\n"
+            + "RM-01,10,LOC-M,CSV-LOT-2,,\n"
+            + "RM-01,10,LOC-M,CSV-LOT-1,,\n"
+            + "RM-99,10,LOC-M,,,\n"
+            + "RM-01,0,LOC-X,,,\n");
+        Assert.False(invalid.Succeeded);
+        Assert.Equal(0, invalid.Created);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("CSV-LOT-2"));
+        Assert.Contains(invalid.Errors, e => e.Line == 4 && e.Message.Contains("CSV-LOT-1"));
+        Assert.Contains(invalid.Errors, e => e.Line == 5 && e.Message.Contains("RM-99"));
+        Assert.Contains(invalid.Errors, e => e.Line == 6 && e.Message.Contains("Quantity"));
+        Assert.Contains(invalid.Errors, e => e.Line == 6 && e.Message.Contains("LOC-X"));
+        Assert.Equal(130m, await StockOfProductAsync(admin, "RM-01"));
+
+        // 必須列が無いファイルは行を読む前に拒否する
+        var missing = await ImportActualCsvAsync(admin, "receiving", "ProductCode,Quantity\nRM-01,1\n");
+        Assert.False(missing.Succeeded);
+        Assert.Contains("LocationCode", Assert.Single(missing.Errors).Message);
+
+        // 取込の権限は単票の受入APIと同じ（作業者は受入できない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(
+            factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
+        var forbidden = await PostActualCsvAsync(operator_, "receiving", header + "RM-01,1,LOC-M,,,\n");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await PostActualCsvAsync(admin, "unknown", header)).StatusCode);
+    }
+
+    private static async Task<decimal> StockOfProductAsync(HttpClient client, string productCode)
+    {
+        var stocks = await client.GetFromJsonAsync<PagedResult<StockResponse>>("/api/inventory/stocks");
+        return stocks!.Items.Where(s => s.ProductCode == productCode).Sum(s => s.Quantity);
+    }
+
+    private static async Task<CsvImportResult> ImportActualCsvAsync(
+        HttpClient client, string kind, string csv, bool dryRun = false)
+    {
+        var response = await PostActualCsvAsync(client, kind, csv, dryRun);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<CsvImportResult>())!;
+    }
+
+    private static Task<HttpResponseMessage> PostActualCsvAsync(
+        HttpClient client, string kind, string csv, bool dryRun = false)
+    {
+        var content = new StringContent(csv, System.Text.Encoding.UTF8);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/csv") { CharSet = "utf-8" };
+        return client.PostAsync($"/api/actuals/csv/{kind}?dryRun={(dryRun ? "true" : "false")}", content);
     }
 
     [Fact]

@@ -158,4 +158,5 @@ tests/
   MesApp.Api.Tests       APIの統合テスト
 samples/
   master-csv             マスタ一括登録用のサンプルCSV（取込順にファイル名を採番）
+  actual-csv             実績一括登録用のサンプルCSV（master-csv の取込後に番号順で取り込む）
 ```

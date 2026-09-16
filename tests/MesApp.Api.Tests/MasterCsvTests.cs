@@ -412,22 +412,37 @@ public class MasterCsvTests
         Assert.Equal(0, again.Created);
         var reloaded = await client.GetFromJsonAsync<List<ProductResponse>>("/api/products");
         Assert.Equal(products.Count, reloaded!.Count);
+
+        // 続けて実績のサンプル（samples/actual-csv）もファイル名の順に取り込める
+        foreach (var file in Directory.GetFiles(FindSampleDirectory("actual-csv"), "*.csv")
+                     .OrderBy(f => f, StringComparer.Ordinal))
+        {
+            var kind = Path.GetFileNameWithoutExtension(file).Split('_', 2)[1];
+            var content = new StringContent(await File.ReadAllTextAsync(file), Encoding.UTF8);
+            content.Headers.ContentType = new MediaTypeHeaderValue("text/csv") { CharSet = "utf-8" };
+            var response = await client.PostAsync($"/api/actuals/csv/{kind}", content);
+            response.EnsureSuccessStatusCode();
+            var result = (await response.Content.ReadFromJsonAsync<CsvImportResult>())!;
+            Assert.True(result.Succeeded,
+                $"{Path.GetFileName(file)}: {string.Join(" / ", result.Errors.Select(e => $"{e.Line}行目 {e.Message}"))}");
+            Assert.Equal(result.DataRows, result.Created);
+        }
     }
 
-    /// <summary>テスト実行ディレクトリから遡って samples/master-csv を探す</summary>
-    private static string FindSampleDirectory()
+    /// <summary>テスト実行ディレクトリから遡って samples/{name} を探す</summary>
+    private static string FindSampleDirectory(string name = "master-csv")
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            var samples = Path.Combine(directory.FullName, "samples", "master-csv");
+            var samples = Path.Combine(directory.FullName, "samples", name);
             if (Directory.Exists(samples))
             {
                 return samples;
             }
             directory = directory.Parent;
         }
-        throw new DirectoryNotFoundException("samples/master-csv が見つかりません。");
+        throw new DirectoryNotFoundException($"samples/{name} が見つかりません。");
     }
 
     [Fact]

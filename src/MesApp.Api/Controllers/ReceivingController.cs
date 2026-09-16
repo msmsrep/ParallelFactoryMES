@@ -19,9 +19,8 @@ namespace MesApp.Api.Controllers;
 public class ReceivingController(
     MesAppDbContext db,
     InventoryService inventory,
-    NumberingService numbering,
+    ReceivingService receiving,
     LotStatusService lotStatus,
-    IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
 {
     /// <summary>受入登録（D-10-10-02。ロット生成＋在庫計上）</summary>
@@ -29,51 +28,18 @@ public class ReceivingController(
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<LotResponse>> Receive(ReceivingRequest request, CancellationToken ct)
     {
-        var product = await db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, ct);
-        if (product is null || !product.IsActive)
-        {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）品目IDです。" });
-        }
-        if (!await db.Locations.AnyAsync(l => l.Id == request.LocationId && l.IsActive, ct))
-        {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）ロケーションIDです。" });
-        }
-
-        var lotNumber = request.LotNumber;
-        if (string.IsNullOrWhiteSpace(lotNumber))
-        {
-            lotNumber = await numbering.NextLotNumberAsync(product.Code, ct);
-        }
-        else if (await db.Lots.AnyAsync(l => l.LotNumber == lotNumber, ct))
-        {
-            return Conflict(new ProblemDetails { Title = $"ロット番号 '{lotNumber}' は既に存在します。" });
-        }
-
-        var lot = new Lot
-        {
-            LotNumber = lotNumber,
-            ProductId = product.Id,
-            InitialQuantity = request.Quantity,
-            OriginType = LotOriginType.Receiving,
-            ManufacturedOn = businessDate.Today,
-            ExpiresOn = request.ExpiresOn,
-            StockStatus = LotStockStatus.Normal,
-        };
-        db.Lots.Add(lot);
-
         // Lot.Idの確定に一度SaveChangesが要るため保存が2回に分かれる。
         // 途中で失敗すると「在庫のないロット」が残るので、明示的なトランザクションでまとめる
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await db.SaveChangesAsync(ct); // Lot.Idの確定
-
-        await inventory.AddAsync(lot, request.LocationId, request.Quantity,
-            InventoryTransactionType.Receipt, User.FindFirstValue(ClaimTypes.NameIdentifier),
-            note: request.Note, ct: ct);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "Receive", nameof(Lot), lot.Id.ToString(),
-            detail: $"lot={lotNumber}, product={product.Code}, qty={request.Quantity}", ct: ct);
+        var outcome = await receiving.ReceiveAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        if (outcome.Error is not null)
+        {
+            var problem = new ProblemDetails { Title = outcome.Error };
+            return outcome.IsConflict ? Conflict(problem) : BadRequest(problem);
+        }
         await transaction.CommitAsync(ct);
 
+        var (lot, product) = (outcome.Lot!, outcome.Product!);
         return new LotResponse(lot.Id, lot.LotNumber, product.Id, product.Code, product.Name,
             lot.InitialQuantity, lot.OriginType, lot.StockStatus,
             lot.ManufacturedOn, lot.ExpiresOn, lot.Grade, lot.ParentLotId);
