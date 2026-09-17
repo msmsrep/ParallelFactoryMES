@@ -22,10 +22,7 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class WorkOrderExecutionController(
     MesAppDbContext db,
-    WorkOrderStatusService workOrderStatus,
-    WorkOrderExecutionService execution,
-    ManufacturingOrderService orders,
-    IAuditLogger auditLogger) : ControllerBase
+    WorkOrderExecutionService execution) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -34,21 +31,8 @@ public class WorkOrderExecutionController(
     [Authorize(Roles = MesRoleGroups.ShopFloorRecord)]
     public async Task<IActionResult> Start(int id, CancellationToken ct)
     {
-        var workOrder = await db.WorkOrders.FindAsync([id], ct);
-        if (workOrder is null)
-        {
-            return NotFound();
-        }
-        if (workOrder.Status is not (WorkOrderStatus.Created or WorkOrderStatus.Dispatched))
-        {
-            return this.ConflictProblem($"状態 '{workOrder.Status}' の作業指示は着手できません。");
-        }
-        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Started,
-            WorkOrderStatusChangeSource.Start, CurrentUserId);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Execution", "Start", nameof(WorkOrder), id.ToString(),
-            detail: $"workOrderNo={workOrder.WorkOrderNo}", ct: ct);
-        return NoContent();
+        var outcome = await execution.StartAsync(id, CurrentUserId, ct);
+        return outcome.Failed ? ToProblem(outcome) : NoContent();
     }
 
     // ---- 段取り実績（B-20-50 前段取り／B-40-40 後段取り）----
@@ -218,33 +202,8 @@ public class WorkOrderExecutionController(
     [Authorize(Roles = MesRoleGroups.ProductionManage)]
     public async Task<IActionResult> Approve(int id, CancellationToken ct)
     {
-        var workOrder = await db.WorkOrders.Include(w => w.ManufacturingOrder)
-            .FirstOrDefaultAsync(w => w.Id == id, ct);
-        if (workOrder is null)
-        {
-            return NotFound();
-        }
-        if (workOrder.Status != WorkOrderStatus.Completed)
-        {
-            return this.ConflictProblem($"状態 '{workOrder.Status}' の作業指示は承認できません（完了済みのみ）。");
-        }
-
-        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Approved,
-            WorkOrderStatusChangeSource.Approval, CurrentUserId);
-        var now = DateTimeOffset.UtcNow;
-        await db.ProductionRecords
-            .Where(r => r.WorkOrderId == id && r.ApprovedAt == null)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(r => r.ApprovedByUserId, CurrentUserId)
-                .SetProperty(r => r.ApprovedAt, now), ct);
-
-        // 指図の完了判定：全作業指示が承認済み（または取消）なら指図完了
-        var allDone = await orders.CompleteIfAllWorkOrdersDoneAsync(workOrder.ManufacturingOrder!, id, now, ct);
-
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Execution", "ApproveWorkOrder", nameof(WorkOrder), id.ToString(),
-            detail: $"workOrderNo={workOrder.WorkOrderNo}, orderCompleted={allDone}", ct: ct);
-        return NoContent();
+        var outcome = await execution.ApproveAsync(id, CurrentUserId, ct);
+        return outcome.Failed ? ToProblem(outcome) : NoContent();
     }
 
     // ---- 製造条件データ（B-30-30-04。手入力/CSV由来の値を記録）----

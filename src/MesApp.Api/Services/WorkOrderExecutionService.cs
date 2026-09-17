@@ -31,7 +31,7 @@ public sealed record Outcome<T>(T? Value, OutcomeError Kind = OutcomeError.None,
 public sealed record ProductionRecordResult(ProductionRecord Record, WorkOrder WorkOrder, Lot? OutputLot, Shift? Shift);
 
 /// <summary>
-/// 作業指示の実行記録（Spec.md 3.2 製造実行）：段取り実績（B-20-50、B-40-40）、チェックリスト実施（B-30-10）、
+/// 作業指示の実行記録（Spec.md 3.2 製造実行）：着手（B-30-30-01）・製造完了承認（B-40-10-10）、段取り実績（B-20-50、B-40-40）、チェックリスト実施（B-30-10）、
 /// 部材投入（B-30-20）、生産実績＋バックフラッシュ（B-40-10）、製造条件データ（B-30-30-04）。
 /// 単票API（<c>WorkOrderExecutionController</c>）と実績CSV取込（<c>ActualCsvService</c>）の両方から呼ぶ。
 /// <para>
@@ -44,9 +44,62 @@ public sealed class WorkOrderExecutionService(
     MesAppDbContext db,
     WorkOrderStatusService workOrderStatus,
     InventoryService inventory,
+    ManufacturingOrderService orders,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
+    /// <summary>着手（B-30-30-01）。未配布でも着手可能（差立を省略する小規模運用を許容）</summary>
+    public async Task<Outcome<WorkOrder>> StartAsync(int workOrderId, string? userId, CancellationToken ct)
+    {
+        var workOrder = await db.WorkOrders.FindAsync([workOrderId], ct);
+        if (workOrder is null)
+        {
+            return Outcome<WorkOrder>.NotFound("作業指示が存在しません。");
+        }
+        if (workOrder.Status is not (WorkOrderStatus.Created or WorkOrderStatus.Dispatched))
+        {
+            return Outcome<WorkOrder>.Conflict($"状態 '{workOrder.Status}' の作業指示は着手できません。");
+        }
+        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Started,
+            WorkOrderStatusChangeSource.Start, userId);
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Execution", "Start", nameof(WorkOrder), workOrderId.ToString(),
+            detail: $"workOrderNo={workOrder.WorkOrderNo}", ct: ct);
+        return Outcome<WorkOrder>.Ok(workOrder);
+    }
+
+    /// <summary>製造完了承認（B-40-10-10）。全作業指示が承認/取消済みになると指図も完了になる</summary>
+    public async Task<Outcome<WorkOrder>> ApproveAsync(int workOrderId, string? userId, CancellationToken ct)
+    {
+        var workOrder = await db.WorkOrders.Include(w => w.ManufacturingOrder)
+            .FirstOrDefaultAsync(w => w.Id == workOrderId, ct);
+        if (workOrder is null)
+        {
+            return Outcome<WorkOrder>.NotFound("作業指示が存在しません。");
+        }
+        if (workOrder.Status != WorkOrderStatus.Completed)
+        {
+            return Outcome<WorkOrder>.Conflict($"状態 '{workOrder.Status}' の作業指示は承認できません（完了済みのみ）。");
+        }
+
+        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Approved,
+            WorkOrderStatusChangeSource.Approval, userId);
+        var now = DateTimeOffset.UtcNow;
+        await db.ProductionRecords
+            .Where(r => r.WorkOrderId == workOrderId && r.ApprovedAt == null)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.ApprovedByUserId, userId)
+                .SetProperty(r => r.ApprovedAt, now), ct);
+
+        // 指図の完了判定：全作業指示が承認済み（または取消）なら指図完了
+        var allDone = await orders.CompleteIfAllWorkOrdersDoneAsync(workOrder.ManufacturingOrder!, workOrderId, now, ct);
+
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Execution", "ApproveWorkOrder", nameof(WorkOrder), workOrderId.ToString(),
+            detail: $"workOrderNo={workOrder.WorkOrderNo}, orderCompleted={allDone}", ct: ct);
+        return Outcome<WorkOrder>.Ok(workOrder);
+    }
+
     /// <summary>段取り実績（B-20-50 前段取り／B-40-40 後段取り）</summary>
     public async Task<Outcome<SetupRecord>> AddSetupRecordAsync(
         int workOrderId, SetupRecordRequest request, string userId, CancellationToken ct)
