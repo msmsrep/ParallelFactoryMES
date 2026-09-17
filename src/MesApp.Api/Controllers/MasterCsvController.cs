@@ -26,7 +26,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var info = MasterCsvKinds.Find(kind);
         if (info is null)
         {
-            return NotFound(new ProblemDetails { Title = $"CSV出力に対応していないマスタです：{kind}" });
+            return this.NotFoundProblem($"CSV出力に対応していないマスタです：{kind}");
         }
         if (info.UserAdminOnly && !MesRoleGroups.IsInGroup(User, MesRoleGroups.UserAdmin))
         {
@@ -44,7 +44,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var info = MasterCsvKinds.Find(kind);
         if (info is null)
         {
-            return NotFound(new ProblemDetails { Title = $"CSV出力に対応していないマスタです：{kind}" });
+            return this.NotFoundProblem($"CSV出力に対応していないマスタです：{kind}");
         }
         return CsvFileResult(MasterCsvService.Template(info), $"{info.Kind}_template.csv");
     }
@@ -61,7 +61,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var info = MasterCsvKinds.Find(kind);
         if (info is null)
         {
-            return NotFound(new ProblemDetails { Title = $"CSV取込に対応していないマスタです：{kind}" });
+            return this.NotFoundProblem($"CSV取込に対応していないマスタです：{kind}");
         }
         if (!CanWrite(info))
         {
@@ -71,7 +71,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var csv = await CsvImport.ReadUploadAsync(Request, ct);
         if (csv is null)
         {
-            return BadRequest(new ProblemDetails { Title = "CSVファイルが選択されていないか、内容が空です。" });
+            return this.BadRequestProblem("CSVファイルが選択されていないか、内容が空です。");
         }
         return await service.ImportAsync(info, csv, dryRun, ct);
     }
@@ -93,24 +93,22 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var bytes = await CsvImport.ReadUploadBytesAsync(Request, ct);
         if (bytes is null)
         {
-            return BadRequest(new ProblemDetails { Title = "ZIPファイルが選択されていないか、内容が空です。" });
+            return this.BadRequestProblem("ZIPファイルが選択されていないか、内容が空です。");
         }
         if (CsvBundle.ReadZip(bytes, out var zipError) is not { } entries)
         {
-            return BadRequest(new ProblemDetails { Title = zipError });
+            return this.BadRequestProblem(zipError);
         }
 
         var unknown = entries.Where(e => MasterCsvKinds.Find(e.Kind) is null).ToList();
         if (unknown.Count > 0)
         {
             var actual = unknown.Where(e => ActualCsvKinds.Find(e.Kind) is not null).ToList();
-            return BadRequest(new ProblemDetails
-            {
-                Title = actual.Count > 0
+            return this.BadRequestProblem(
+                actual.Count > 0
                     ? $"実績のCSVが含まれています：{string.Join("、", actual.Select(e => e.FileName))}。実績は実績CSV取込で別のZIPとして取り込んでください。"
                     : $"取込に対応していないマスタのCSVが含まれています：{string.Join("、", unknown.Select(e => e.FileName))}" +
-                      "（ファイル名は「番号_種別.csv」。例 01_work-centers.csv）。",
-            });
+                      "（ファイル名は「番号_種別.csv」。例 01_work-centers.csv）。");
         }
         var files = entries
             .Select(e => new CsvBundleFile<CsvKindInfo>(e.FileName, MasterCsvKinds.Find(e.Kind)!, e.Text))

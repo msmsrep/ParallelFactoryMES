@@ -83,7 +83,7 @@ public class InspectionDevicesController(
     {
         if (await db.InspectionDevices.AnyAsync(d => d.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"検査機コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"検査機コード '{request.Code}' は既に存在します。");
         }
 
         var device = new InspectionDevice();
@@ -107,7 +107,7 @@ public class InspectionDevicesController(
         }
         if (await db.InspectionDevices.AnyAsync(d => d.Code == request.Code && d.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"検査機コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"検査機コード '{request.Code}' は既に存在します。");
         }
 
         Apply(device, request);

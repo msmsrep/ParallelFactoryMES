@@ -117,7 +117,7 @@ public class InspectionOrdersController(
         }
         if (order.Status == InspectionOrderStatus.Approved)
         {
-            return Conflict(new ProblemDetails { Title = "承認済みの検査は訂正できません。" });
+            return this.ConflictProblem("承認済みの検査は訂正できません。");
         }
         var result = await db.InspectionResults
             .FirstOrDefaultAsync(r => r.Id == resultId && r.InspectionOrderId == id, ct);
@@ -213,7 +213,7 @@ public class InspectionOrdersController(
         }
         if (order.Status != InspectionOrderStatus.Judged)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の検査指示は承認できません（判定済みのみ）。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の検査指示は承認できません（判定済みのみ）。");
         }
         order.Status = InspectionOrderStatus.Approved;
         order.ApprovedByUserId = CurrentUserId;
@@ -237,7 +237,7 @@ public class InspectionOrdersController(
         }
         if (order.Status is InspectionOrderStatus.Approved or InspectionOrderStatus.Canceled)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の検査指示は取消できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の検査指示は取消できません。");
         }
         order.Status = InspectionOrderStatus.Canceled;
         // 検査待ちで拘束していたロットを解放する
@@ -255,8 +255,8 @@ public class InspectionOrdersController(
     private ActionResult ToProblem<T>(Outcome<T> outcome) => outcome.Kind switch
     {
         OutcomeError.NotFound => NotFound(),
-        OutcomeError.Conflict => Conflict(new ProblemDetails { Title = outcome.Error }),
-        _ => BadRequest(new ProblemDetails { Title = outcome.Error }),
+        OutcomeError.Conflict => this.ConflictProblem(outcome.Error),
+        _ => this.BadRequestProblem(outcome.Error),
     };
 
     private IQueryable<InspectionOrder> BaseQuery() =>

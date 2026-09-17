@@ -45,11 +45,11 @@ public class WorkProceduresController(MesAppDbContext db, IAuditLogger auditLogg
     {
         if (await db.WorkProcedures.AnyAsync(p => p.ProcedureNo == request.ProcedureNo, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"手順書番号 '{request.ProcedureNo}' は既に存在します。" });
+            return this.ConflictProblem($"手順書番号 '{request.ProcedureNo}' は既に存在します。");
         }
         if (Validate(request) is { } error)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         var procedure = new WorkProcedure
@@ -78,11 +78,11 @@ public class WorkProceduresController(MesAppDbContext db, IAuditLogger auditLogg
         }
         if (await db.WorkProcedures.AnyAsync(p => p.ProcedureNo == request.ProcedureNo && p.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"手順書番号 '{request.ProcedureNo}' は既に存在します。" });
+            return this.ConflictProblem($"手順書番号 '{request.ProcedureNo}' は既に存在します。");
         }
         if (Validate(request) is { } error)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         procedure.ProcedureNo = request.ProcedureNo;
@@ -114,7 +114,7 @@ public class WorkProceduresController(MesAppDbContext db, IAuditLogger auditLogg
             .ToListAsync(ct);
         if (MasterDeactivationPolicy.CheckWorkProcedure(procedure.ProcedureNo, referencing) is { } error)
         {
-            return Conflict(new ProblemDetails { Title = error });
+            return this.ConflictProblem(error);
         }
 
         procedure.IsActive = false;

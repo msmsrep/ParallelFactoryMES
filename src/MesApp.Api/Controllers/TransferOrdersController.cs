@@ -57,16 +57,16 @@ public class TransferOrdersController(
     {
         if (!await db.Lots.AnyAsync(l => l.Id == request.LotId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         if (request.FromLocationId == request.ToLocationId)
         {
-            return BadRequest(new ProblemDetails { Title = "移動元と移動先が同一です。" });
+            return this.BadRequestProblem("移動元と移動先が同一です。");
         }
         var locationIds = new[] { request.FromLocationId, request.ToLocationId };
         if (await db.Locations.CountAsync(l => locationIds.Contains(l.Id) && l.IsActive, ct) != 2)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）ロケーションが含まれています。" });
+            return this.BadRequestProblem("存在しない（または無効な）ロケーションが含まれています。");
         }
 
         var order = new TransferOrder
@@ -97,7 +97,7 @@ public class TransferOrdersController(
         }
         if (order.Status != TransferOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の搬送指示は実行できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の搬送指示は実行できません。");
         }
 
         try
@@ -108,7 +108,7 @@ public class TransferOrdersController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
 
         order.Status = TransferOrderStatus.Completed;
@@ -130,7 +130,7 @@ public class TransferOrdersController(
         }
         if (order.Status != TransferOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の搬送指示は取消できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の搬送指示は取消できません。");
         }
         var before = order.Status;
         order.Status = TransferOrderStatus.Canceled;

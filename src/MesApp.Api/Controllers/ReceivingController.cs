@@ -34,8 +34,7 @@ public class ReceivingController(
         var outcome = await receiving.ReceiveAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
         if (outcome.Error is not null)
         {
-            var problem = new ProblemDetails { Title = outcome.Error };
-            return outcome.IsConflict ? Conflict(problem) : BadRequest(problem);
+            return outcome.IsConflict ? this.ConflictProblem(outcome.Error) : this.BadRequestProblem(outcome.Error);
         }
         await transaction.CommitAsync(ct);
 
@@ -60,13 +59,13 @@ public class ReceivingController(
         }
         if (lot.OriginType != LotOriginType.Receiving)
         {
-            return BadRequest(new ProblemDetails { Title = "受入由来のロットではありません。" });
+            return this.BadRequestProblem("受入由来のロットではありません。");
         }
 
         var transactions = await db.InventoryTransactions.Where(t => t.LotId == lotId).ToListAsync(ct);
         if (transactions.Count != 1 || transactions[0].Type != InventoryTransactionType.Receipt)
         {
-            return Conflict(new ProblemDetails { Title = "受入後に在庫が変動しているため取消できません（数量調整で対応してください）。" });
+            return this.ConflictProblem("受入後に在庫が変動しているため取消できません（数量調整で対応してください）。");
         }
 
         var receipt = transactions[0];
@@ -78,7 +77,7 @@ public class ReceivingController(
         }
         catch (InventoryException ex)
         {
-            return Conflict(new ProblemDetails { Title = ex.Message });
+            return this.ConflictProblem(ex.Message);
         }
         lot.InitialQuantity = 0;
         lotStatus.ChangeStatus(lot, LotStockStatus.ToBeDiscarded, LotStatusChangeSource.Receiving,

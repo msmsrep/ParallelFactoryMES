@@ -30,7 +30,7 @@ public class AuthController(
         if (user is null || !user.IsActive)
         {
             await auditLogger.LogAsync("Auth", "LoginFailed", detail: $"userName={request.UserName}", ct: ct);
-            return Unauthorized(new ProblemDetails { Title = "ユーザー名またはパスワードが正しくありません。" });
+            return this.UnauthorizedProblem("ユーザー名またはパスワードが正しくありません。");
         }
 
         // lockoutOnFailure: true → 連続失敗でロックアウト（総当たり対策。Spec.md 7.4）
@@ -38,12 +38,12 @@ public class AuthController(
         if (result.IsLockedOut)
         {
             await auditLogger.LogAsync("Auth", "LoginLockedOut", "User", user.Id, ct: ct);
-            return Unauthorized(new ProblemDetails { Title = "アカウントが一時的にロックされています。しばらく待って再試行してください。" });
+            return this.UnauthorizedProblem("アカウントが一時的にロックされています。しばらく待って再試行してください。");
         }
         if (!result.Succeeded)
         {
             await auditLogger.LogAsync("Auth", "LoginFailed", "User", user.Id, ct: ct);
-            return Unauthorized(new ProblemDetails { Title = "ユーザー名またはパスワードが正しくありません。" });
+            return this.UnauthorizedProblem("ユーザー名またはパスワードが正しくありません。");
         }
 
         var response = await IssueTokensAsync(user, ct);
@@ -57,7 +57,7 @@ public class AuthController(
     {
         if (!Request.Cookies.TryGetValue(RefreshCookieName, out var plainToken) || string.IsNullOrEmpty(plainToken))
         {
-            return Unauthorized(new ProblemDetails { Title = "リフレッシュトークンがありません。再ログインしてください。" });
+            return this.UnauthorizedProblem("リフレッシュトークンがありません。再ログインしてください。");
         }
 
         var validation = await refreshTokenService.ValidateAsync(plainToken, ct);
@@ -68,15 +68,13 @@ public class AuthController(
             await refreshTokenService.RevokeAllForUserAsync(validation.ReusedByUserId!, ct);
             await auditLogger.LogAsync("Auth", "RefreshTokenReuse", "User", validation.ReusedByUserId, ct: ct);
             DeleteRefreshCookie();
-            return Unauthorized(new ProblemDetails
-            {
-                Title = "セッションを失効させました。お手数ですが再ログインしてください。",
-            });
+            return this.UnauthorizedProblem(
+                "セッションを失効させました。お手数ですが再ログインしてください。");
         }
         if (validation.Token is not { } current)
         {
             DeleteRefreshCookie();
-            return Unauthorized(new ProblemDetails { Title = "リフレッシュトークンが無効です。再ログインしてください。" });
+            return this.UnauthorizedProblem("リフレッシュトークンが無効です。再ログインしてください。");
         }
 
         // ローテーション：旧トークンは即失効、新トークンをCookieで再設定

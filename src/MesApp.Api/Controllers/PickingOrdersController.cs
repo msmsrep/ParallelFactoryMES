@@ -62,20 +62,20 @@ public class PickingOrdersController(
     {
         if (request.Lines.Count == 0)
         {
-            return BadRequest(new ProblemDetails { Title = "明細がありません。" });
+            return this.BadRequestProblem("明細がありません。");
         }
         if (request.Type == PickingOrderType.ProcessIssue)
         {
             if (request.WorkOrderId is null
                 || !await db.WorkOrders.AnyAsync(w => w.Id == request.WorkOrderId, ct))
             {
-                return BadRequest(new ProblemDetails { Title = "工程払出には有効な作業指示ID（workOrderId）が必要です。" });
+                return this.BadRequestProblem("工程払出には有効な作業指示ID（workOrderId）が必要です。");
             }
         }
         else if (request.ShippingOrderId is null
                  || !await db.ShippingOrders.AnyAsync(s => s.Id == request.ShippingOrderId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "出荷ピッキングには有効な出荷指示ID（shippingOrderId）が必要です。" });
+            return this.BadRequestProblem("出荷ピッキングには有効な出荷指示ID（shippingOrderId）が必要です。");
         }
 
         var order = new PickingOrder
@@ -103,7 +103,7 @@ public class PickingOrdersController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
 
         db.PickingOrders.Add(order);
@@ -128,7 +128,7 @@ public class PickingOrdersController(
         }
         if (order.Status != PickingOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' のピッキング指示は実行できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' のピッキング指示は実行できません。");
         }
 
         var type = order.Type == PickingOrderType.ProcessIssue
@@ -147,7 +147,7 @@ public class PickingOrdersController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
 
         order.Status = PickingOrderStatus.Completed;
@@ -171,7 +171,7 @@ public class PickingOrdersController(
         }
         if (order.Status != PickingOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' のピッキング指示は取消できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' のピッキング指示は取消できません。");
         }
         var before = order.Status;
         order.Status = PickingOrderStatus.Canceled;

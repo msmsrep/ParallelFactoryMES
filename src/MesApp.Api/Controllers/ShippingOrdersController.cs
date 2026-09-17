@@ -60,12 +60,12 @@ public class ShippingOrdersController(
     {
         if (request.Lines.Count == 0)
         {
-            return BadRequest(new ProblemDetails { Title = "明細がありません。" });
+            return this.BadRequestProblem("明細がありません。");
         }
         var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
         if (await db.Products.CountAsync(p => productIds.Contains(p.Id), ct) != productIds.Count)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない品目IDが含まれています。" });
+            return this.BadRequestProblem("存在しない品目IDが含まれています。");
         }
 
         var order = new ShippingOrder
@@ -103,11 +103,11 @@ public class ShippingOrdersController(
         }
         if (order.Status != ShippingOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の出荷指示は実行できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の出荷指示は実行できません。");
         }
         if (request.Lines.Count == 0)
         {
-            return BadRequest(new ProblemDetails { Title = "出荷明細がありません。" });
+            return this.BadRequestProblem("出荷明細がありません。");
         }
 
         // 出荷判定ゲート（H-10-10、Spec.md 5.3 出荷判定参照）：
@@ -116,7 +116,7 @@ public class ShippingOrdersController(
             .AnyAsync(ShipmentGatePolicy.ValidJudgment(id), ct);
         if (ShipmentGatePolicy.CheckJudgment(hasApprovedJudgment) is string judgmentReason)
         {
-            return Conflict(new ProblemDetails { Title = judgmentReason });
+            return this.ConflictProblem(judgmentReason);
         }
 
         var lotIds = request.Lines.Select(l => l.LotId).Distinct().ToList();
@@ -129,13 +129,13 @@ public class ShippingOrdersController(
         {
             if (!lots.TryGetValue(line.LotId, out var lot))
             {
-                return BadRequest(new ProblemDetails { Title = "存在しないロットIDが含まれています。" });
+                return this.BadRequestProblem("存在しないロットIDが含まれています。");
             }
             // 出荷判定の承認後に保留・不良になったロットを出荷させない（判定書の存在だけでは不十分）。
             // 特採は不適合承認時にステータスが正常へ戻るため、ここでは正常のみを許可すればよい
             if (LotUsabilityPolicy.CheckShippable(lot, today) is string reason)
             {
-                return Conflict(new ProblemDetails { Title = reason });
+                return this.ConflictProblem(reason);
             }
             shipTotals[lot.ProductId] = shipTotals.GetValueOrDefault(lot.ProductId) + line.Quantity;
         }
@@ -144,14 +144,12 @@ public class ShippingOrdersController(
             var orderLine = order.Lines.FirstOrDefault(l => l.ProductId == productId);
             if (orderLine is null)
             {
-                return BadRequest(new ProblemDetails { Title = "出荷指示に含まれない品目のロットが指定されています。" });
+                return this.BadRequestProblem("出荷指示に含まれない品目のロットが指定されています。");
             }
             if (orderLine.ShippedQuantity + qty > orderLine.Quantity)
             {
-                return BadRequest(new ProblemDetails
-                {
-                    Title = $"出荷数量が指示数量を超えています（指示 {orderLine.Quantity}、出荷済 {orderLine.ShippedQuantity}、今回 {qty}）。",
-                });
+                return this.BadRequestProblem(
+                    $"出荷数量が指示数量を超えています（指示 {orderLine.Quantity}、出荷済 {orderLine.ShippedQuantity}、今回 {qty}）。");
             }
         }
 
@@ -166,7 +164,7 @@ public class ShippingOrdersController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
 
         foreach (var (productId, qty) in shipTotals)
@@ -197,7 +195,7 @@ public class ShippingOrdersController(
         }
         if (order.Status != ShippingOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の出荷指示は取消できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の出荷指示は取消できません。");
         }
         var before = order.Status;
         order.Status = ShippingOrderStatus.Canceled;

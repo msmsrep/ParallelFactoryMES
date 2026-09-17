@@ -103,10 +103,8 @@ public class AuditLogsController(
         var cutoff = RetentionCutoff();
         if (request.To > cutoff)
         {
-            return BadRequest(new ProblemDetails
-            {
-                Title = $"保持期間内の監査ログは削除できません（{cutoff:yyyy-MM-dd} 以前が対象です）。",
-            });
+            return this.BadRequestProblem(
+                $"保持期間内の監査ログは削除できません（{cutoff:yyyy-MM-dd} 以前が対象です）。");
         }
 
         var target = db.AuditLogs.Where(a => a.RecordedOn <= request.To);

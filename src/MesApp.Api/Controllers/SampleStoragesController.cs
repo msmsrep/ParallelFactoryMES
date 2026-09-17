@@ -77,16 +77,16 @@ public class SampleStoragesController(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
-            return NotFound(new ProblemDetails { Title = $"ロットID {request.LotId} は登録されていません。" });
+            return this.NotFoundProblem($"ロットID {request.LotId} は登録されていません。");
         }
         if (!await db.Locations.AnyAsync(l => l.Id == request.StorageLocationId && l.IsActive, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "保管場所が見つからないか無効です。" });
+            return this.BadRequestProblem("保管場所が見つからないか無効です。");
         }
         if (request.InspectionOrderId is { } inspectionId
             && !await db.InspectionOrders.AnyAsync(i => i.Id == inspectionId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = $"検査指示ID {inspectionId} は登録されていません。" });
+            return this.BadRequestProblem($"検査指示ID {inspectionId} は登録されていません。");
         }
 
         // 採取元の在庫は、サンプルの保管場所ではなく現物があった場所から抜く
@@ -97,10 +97,8 @@ public class SampleStoragesController(
             .FirstOrDefaultAsync(ct);
         if (from is null)
         {
-            return BadRequest(new ProblemDetails
-            {
-                Title = $"ロット {lot.LotNumber} の在庫がありません。",
-            });
+            return this.BadRequestProblem(
+                $"ロット {lot.LotNumber} の在庫がありません。");
         }
 
         var sample = new SampleStorage
@@ -127,7 +125,7 @@ public class SampleStoragesController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
 
         await db.SaveChangesAsync(ct);
@@ -154,14 +152,12 @@ public class SampleStoragesController(
         }
         if (sample.Status != SampleStorageStatus.Stored)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = $"サンプル {sample.SampleNo} は既に保管を終えています。",
-            });
+            return this.ConflictProblem(
+                $"サンプル {sample.SampleNo} は既に保管を終えています。");
         }
         if (request.Status is not (SampleStorageStatus.Consumed or SampleStorageStatus.Disposed))
         {
-            return BadRequest(new ProblemDetails { Title = "払出済か廃棄済かを指定してください。" });
+            return this.BadRequestProblem("払出済か廃棄済かを指定してください。");
         }
 
         var before = sample.Status;

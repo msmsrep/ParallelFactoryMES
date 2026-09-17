@@ -66,17 +66,17 @@ public class NonconformanceController(
     {
         if (request.LotId is int lotId && !await db.Lots.AnyAsync(l => l.Id == lotId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         if (request.WorkOrderId is int workOrderId
             && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない作業指示IDです。" });
+            return this.BadRequestProblem("存在しない作業指示IDです。");
         }
         if (request.InspectionOrderId is int inspectionOrderId
             && !await db.InspectionOrders.AnyAsync(i => i.Id == inspectionOrderId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない検査指示IDです。" });
+            return this.BadRequestProblem("存在しない検査指示IDです。");
         }
 
         var report = new NonconformanceReport
@@ -117,7 +117,7 @@ public class NonconformanceController(
         }
         if (report.Status is NonconformanceStatus.Closed)
         {
-            return Conflict(new ProblemDetails { Title = "クローズ済みの不適合には対応指示できません。" });
+            return this.ConflictProblem("クローズ済みの不適合には対応指示できません。");
         }
 
         report.Action = request.Action;
@@ -181,7 +181,7 @@ public class NonconformanceController(
         }
         if (report.Status != NonconformanceStatus.ActionInstructed)
         {
-            return Conflict(new ProblemDetails { Title = "対応指示済みの不適合のみ対応実績を記録できます。" });
+            return this.ConflictProblem("対応指示済みの不適合のみ対応実績を記録できます。");
         }
 
         report.ActionRecord = request.Record;
@@ -210,11 +210,11 @@ public class NonconformanceController(
         }
         if (report.Status is NonconformanceStatus.Open)
         {
-            return Conflict(new ProblemDetails { Title = "対応指示前の不適合は承認できません。" });
+            return this.ConflictProblem("対応指示前の不適合は承認できません。");
         }
         if (report.Status is NonconformanceStatus.Closed)
         {
-            return Conflict(new ProblemDetails { Title = "既にクローズ済みです。" });
+            return this.ConflictProblem("既にクローズ済みです。");
         }
 
         report.ApprovedByUserId = CurrentUserId;

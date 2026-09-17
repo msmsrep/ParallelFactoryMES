@@ -105,7 +105,7 @@ public class WorkOrdersController(
             var all = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
             if (all.All(x => x.Id != rootId))
             {
-                return BadRequest(new ProblemDetails { Title = $"作業区（ID {rootId}）が見つかりません。" });
+                return this.BadRequestProblem($"作業区（ID {rootId}）が見つかりません。");
             }
             var targets = WorkCenterHierarchyPolicy.SelfAndDescendantIds(rootId, all);
             query = query.Where(w => w.WorkCenterId != null && targets.Contains(w.WorkCenterId.Value));
@@ -284,7 +284,7 @@ public class WorkOrdersController(
         }
         if (workOrder.WorkProcedureId is not int procedureId)
         {
-            return NotFound(new ProblemDetails { Title = "この作業指示には作業手順書が紐付いていません。" });
+            return this.NotFoundProblem("この作業指示には作業手順書が紐付いていません。");
         }
         var procedure = await db.WorkProcedures.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == procedureId, ct);
@@ -333,7 +333,7 @@ public class WorkOrdersController(
         }
         if (workOrder.Status is not (WorkOrderStatus.Created or WorkOrderStatus.Dispatched))
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{workOrder.Status}' の作業指示は差立できません。" });
+            return this.ConflictProblem($"状態 '{workOrder.Status}' の作業指示は差立できません。");
         }
 
         // 作業員割当：スキル・資格照合（F-20-30-01）
@@ -342,7 +342,7 @@ public class WorkOrdersController(
             var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.AssignedUserId, ct);
             if (user is null || !user.IsActive)
             {
-                return BadRequest(new ProblemDetails { Title = "割当作業者が存在しないか無効です。" });
+                return this.BadRequestProblem("割当作業者が存在しないか無効です。");
             }
 
             // 必要スキルは工順マスタの現在値ではなく、展開時点のスナップショットを使う（Spec.md 5.7）
@@ -355,17 +355,13 @@ public class WorkOrdersController(
                     ?? await db.Skills.Where(s => s.Id == skillId).Select(s => s.Name).FirstAsync(ct);
                 if (userSkill is null)
                 {
-                    return BadRequest(new ProblemDetails
-                    {
-                        Title = $"作業者 '{user.DisplayName}' は必要スキル '{skillName}' を保有していません。",
-                    });
+                    return this.BadRequestProblem(
+                        $"作業者 '{user.DisplayName}' は必要スキル '{skillName}' を保有していません。");
                 }
                 if (userSkill.Skill!.RequiresExpiry && (userSkill.ExpiresOn is null || userSkill.ExpiresOn < today))
                 {
-                    return BadRequest(new ProblemDetails
-                    {
-                        Title = $"作業者 '{user.DisplayName}' のスキル '{skillName}' は有効期限切れです。",
-                    });
+                    return this.BadRequestProblem(
+                        $"作業者 '{user.DisplayName}' のスキル '{skillName}' は有効期限切れです。");
                 }
             }
         }
@@ -376,7 +372,7 @@ public class WorkOrdersController(
             var equipment = await db.Equipments.FindAsync([equipmentId], ct);
             if (equipment is null || !equipment.IsActive)
             {
-                return BadRequest(new ProblemDetails { Title = "割当設備が存在しないか無効です。" });
+                return this.BadRequestProblem("割当設備が存在しないか無効です。");
             }
 
             // 工順に候補設備が登録されていれば、その中からしか選べない。
@@ -390,11 +386,9 @@ public class WorkOrdersController(
                 .ToListAsync(ct);
             if (candidates.Count > 0 && candidates.All(c => c.EquipmentId != equipmentId))
             {
-                return BadRequest(new ProblemDetails
-                {
-                    Title = $"設備 '{equipment.AssetNo}' はこの工程の候補設備ではありません" +
-                            $"（候補：{string.Join("、", candidates.Select(c => c.AssetNo))}）。",
-                });
+                return this.BadRequestProblem(
+                    $"設備 '{equipment.AssetNo}' はこの工程の候補設備ではありません" +
+                    $"（候補：{string.Join("、", candidates.Select(c => c.AssetNo))}）。");
             }
         }
 

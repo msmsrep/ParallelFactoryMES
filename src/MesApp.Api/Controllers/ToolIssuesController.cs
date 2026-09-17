@@ -71,18 +71,18 @@ public class ToolIssuesController(MesAppDbContext db, IAuditLogger auditLogger) 
         var tool = await db.Tools.FindAsync([request.ToolId], ct);
         if (tool is null)
         {
-            return NotFound(new ProblemDetails { Title = $"治工具ID {request.ToolId} は登録されていません。" });
+            return this.NotFoundProblem($"治工具ID {request.ToolId} は登録されていません。");
         }
         var workOrder = await db.WorkOrders.AsNoTracking()
             .FirstOrDefaultAsync(w => w.Id == request.WorkOrderId, ct);
         if (workOrder is null)
         {
-            return NotFound(new ProblemDetails { Title = $"作業指示ID {request.WorkOrderId} は登録されていません。" });
+            return this.NotFoundProblem($"作業指示ID {request.WorkOrderId} は登録されていません。");
         }
 
         if (await CheckIssuableAsync(tool, ct) is { } reason)
         {
-            return Conflict(new ProblemDetails { Title = reason });
+            return this.ConflictProblem(reason);
         }
 
         var issue = new ToolIssue
@@ -116,19 +116,19 @@ public class ToolIssuesController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (issue.Status != ToolIssueStatus.Allocated)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{issue.Status}' の引当は払い出せません。" });
+            return this.ConflictProblem($"状態 '{issue.Status}' の引当は払い出せません。");
         }
 
         // 引当てから払出までの間に寿命へ達している／メンテへ入っていることがある
         if (await CheckIssuableAsync(issue.Tool!, ct, ignoreIssueId: issue.Id) is { } reason)
         {
-            return Conflict(new ProblemDetails { Title = reason });
+            return this.ConflictProblem(reason);
         }
 
         var receivedBy = request.IssuedToUserId ?? CurrentUserId;
         if (receivedBy is not null && !await db.Users.AnyAsync(u => u.Id == receivedBy, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "受領者が登録されていません。" });
+            return this.BadRequestProblem("受領者が登録されていません。");
         }
 
         issue.Status = ToolIssueStatus.Issued;
@@ -154,7 +154,7 @@ public class ToolIssuesController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (issue.Status is not (ToolIssueStatus.Allocated or ToolIssueStatus.Issued))
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{issue.Status}' の引当は返却できません。" });
+            return this.ConflictProblem($"状態 '{issue.Status}' の引当は返却できません。");
         }
 
         issue.Status = ToolIssueStatus.Returned;
@@ -182,10 +182,8 @@ public class ToolIssuesController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (issue.Status != ToolIssueStatus.Allocated)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = "払出済みの引当は取り消せません。返却で戻してください。",
-            });
+            return this.ConflictProblem(
+                "払出済みの引当は取り消せません。返却で戻してください。");
         }
 
         issue.Status = ToolIssueStatus.Canceled;

@@ -56,7 +56,7 @@ public class WorkTimeRecordsController(MesAppDbContext db, ShopFloorReportServic
         var outcome = await reports.AddWorkTimeAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!, ct);
         if (outcome.Value is not { } record)
         {
-            return BadRequest(new ProblemDetails { Title = outcome.Error });
+            return this.BadRequestProblem(outcome.Error);
         }
 
         var saved = await db.WorkTimeRecords.AsNoTracking()

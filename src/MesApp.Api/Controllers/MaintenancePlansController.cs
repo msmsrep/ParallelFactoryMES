@@ -59,7 +59,7 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
         var equipment = await db.Equipments.FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
         if (equipment is null || !equipment.IsActive)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）設備IDです。" });
+            return this.BadRequestProblem("存在しない（または無効な）設備IDです。");
         }
 
         var plan = new MaintenancePlan
@@ -92,11 +92,11 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
         }
         if (plan.Status is not MaintenancePlanStatus.Planned)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{plan.Status}' の保全計画は変更できません。" });
+            return this.ConflictProblem($"状態 '{plan.Status}' の保全計画は変更できません。");
         }
         if (!await db.Equipments.AnyAsync(e => e.Id == request.EquipmentId && e.IsActive, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）設備IDです。" });
+            return this.BadRequestProblem("存在しない（または無効な）設備IDです。");
         }
 
         plan.EquipmentId = request.EquipmentId;
@@ -121,7 +121,7 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
         }
         if (plan.Status is MaintenancePlanStatus.Completed or MaintenancePlanStatus.Canceled)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{plan.Status}' の保全計画は取消できません。" });
+            return this.ConflictProblem($"状態 '{plan.Status}' の保全計画は取消できません。");
         }
         plan.Status = MaintenancePlanStatus.Canceled;
         await db.SaveChangesAsync(ct);

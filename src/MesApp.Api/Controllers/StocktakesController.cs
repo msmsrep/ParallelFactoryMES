@@ -49,7 +49,7 @@ public class StocktakesController(
         if (request.TargetLocationId is int locationId
             && !await db.Locations.AnyAsync(l => l.Id == locationId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロケーションIDです。" });
+            return this.BadRequestProblem("存在しないロケーションIDです。");
         }
 
         var stocksQuery = db.InventoryStocks.AsNoTracking().Where(s => s.Quantity > 0);
@@ -60,7 +60,7 @@ public class StocktakesController(
         var stocks = await stocksQuery.ToListAsync(ct);
         if (stocks.Count == 0)
         {
-            return BadRequest(new ProblemDetails { Title = "対象在庫がありません。" });
+            return this.BadRequestProblem("対象在庫がありません。");
         }
 
         var stocktake = new Stocktake
@@ -98,7 +98,7 @@ public class StocktakesController(
         }
         if (stocktake.Status != StocktakeStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{stocktake.Status}' の棚卸には登録できません。" });
+            return this.ConflictProblem($"状態 '{stocktake.Status}' の棚卸には登録できません。");
         }
 
         var lineById = stocktake.Lines.ToDictionary(l => l.Id);
@@ -108,7 +108,7 @@ public class StocktakesController(
         {
             if (!lineById.TryGetValue(count.LineId, out var line))
             {
-                return BadRequest(new ProblemDetails { Title = $"存在しない明細ID {count.LineId} が含まれています。" });
+                return this.BadRequestProblem($"存在しない明細ID {count.LineId} が含まれています。");
             }
             changes.Add(new
             {
@@ -142,11 +142,11 @@ public class StocktakesController(
         }
         if (stocktake.Status != StocktakeStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{stocktake.Status}' の棚卸は確定できません。" });
+            return this.ConflictProblem($"状態 '{stocktake.Status}' の棚卸は確定できません。");
         }
         if (stocktake.Lines.All(l => l.CountedQuantity is null))
         {
-            return BadRequest(new ProblemDetails { Title = "実棚数が1件も登録されていません。" });
+            return this.BadRequestProblem("実棚数が1件も登録されていません。");
         }
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -198,7 +198,7 @@ public class StocktakesController(
         }
         if (stocktake.Status != StocktakeStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{stocktake.Status}' の棚卸は取消できません。" });
+            return this.ConflictProblem($"状態 '{stocktake.Status}' の棚卸は取消できません。");
         }
         var before = stocktake.Status;
         stocktake.Status = StocktakeStatus.Canceled;

@@ -167,11 +167,11 @@ public class InventoryController(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         if (!await db.Locations.AnyAsync(l => l.Id == request.ToLocationId && l.IsActive, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）移動先ロケーションです。" });
+            return this.BadRequestProblem("存在しない（または無効な）移動先ロケーションです。");
         }
         try
         {
@@ -180,7 +180,7 @@ public class InventoryController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Move", nameof(Lot), lot.Id.ToString(),
@@ -196,7 +196,7 @@ public class InventoryController(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         var stock = await db.InventoryStocks.FirstOrDefaultAsync(
             s => s.LotId == request.LotId && s.LocationId == request.LocationId, ct);
@@ -204,7 +204,7 @@ public class InventoryController(
         var delta = request.NewQuantity - current;
         if (delta == 0)
         {
-            return BadRequest(new ProblemDetails { Title = "現在数量と同じため調整は不要です。" });
+            return this.BadRequestProblem("現在数量と同じため調整は不要です。");
         }
 
         try
@@ -222,7 +222,7 @@ public class InventoryController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Adjust", nameof(Lot), lot.Id.ToString(),
@@ -245,7 +245,7 @@ public class InventoryController(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         var before = lot.StockStatus;
         lotStatus.ChangeStatus(lot, request.Status, LotStatusChangeSource.Manual,
@@ -270,7 +270,7 @@ public class InventoryController(
         var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
 
         var newLotNumber = request.NewLotNumber;
@@ -280,7 +280,7 @@ public class InventoryController(
         }
         else if (await db.Lots.AnyAsync(l => l.LotNumber == newLotNumber, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"ロット番号 '{newLotNumber}' は既に存在します。" });
+            return this.ConflictProblem($"ロット番号 '{newLotNumber}' は既に存在します。");
         }
 
         var newLot = new Lot
@@ -311,7 +311,7 @@ public class InventoryController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Split", nameof(Lot), lot.Id.ToString(),
@@ -332,22 +332,22 @@ public class InventoryController(
         var target = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.TargetLotId, ct);
         if (source is null || target is null)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         if (source.Id == target.Id)
         {
-            return BadRequest(new ProblemDetails { Title = "統合元と統合先が同一ロットです。" });
+            return this.BadRequestProblem("統合元と統合先が同一ロットです。");
         }
         if (source.ProductId != target.ProductId)
         {
-            return BadRequest(new ProblemDetails { Title = "品目が異なるロットは統合できません。" });
+            return this.BadRequestProblem("品目が異なるロットは統合できません。");
         }
 
         var stock = await db.InventoryStocks.FirstOrDefaultAsync(
             s => s.LotId == source.Id && s.LocationId == request.LocationId, ct);
         if (stock is null || stock.Quantity <= 0)
         {
-            return BadRequest(new ProblemDetails { Title = "統合元の在庫がありません。" });
+            return this.BadRequestProblem("統合元の在庫がありません。");
         }
         var quantity = stock.Quantity;
 
@@ -362,7 +362,7 @@ public class InventoryController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Merge", nameof(Lot), target.Id.ToString(),
@@ -377,12 +377,12 @@ public class InventoryController(
     {
         if (request.NewProductId is null && string.IsNullOrWhiteSpace(request.NewLotNumber))
         {
-            return BadRequest(new ProblemDetails { Title = "新品目ID（品目振替）または新ロット番号（ロット振替）を指定してください。" });
+            return this.BadRequestProblem("新品目ID（品目振替）または新ロット番号（ロット振替）を指定してください。");
         }
         var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
 
         var newProduct = lot.Product!;
@@ -391,7 +391,7 @@ public class InventoryController(
             var found = await db.Products.FirstOrDefaultAsync(p => p.Id == newProductId && p.IsActive, ct);
             if (found is null)
             {
-                return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）振替先品目IDです。" });
+                return this.BadRequestProblem("存在しない（または無効な）振替先品目IDです。");
             }
             newProduct = found;
         }
@@ -403,7 +403,7 @@ public class InventoryController(
         }
         else if (await db.Lots.AnyAsync(l => l.LotNumber == newLotNumber, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"ロット番号 '{newLotNumber}' は既に存在します。" });
+            return this.ConflictProblem($"ロット番号 '{newLotNumber}' は既に存在します。");
         }
 
         var newLot = new Lot
@@ -434,7 +434,7 @@ public class InventoryController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "LotTransfer", nameof(Lot), lot.Id.ToString(),
@@ -477,11 +477,11 @@ public class InventoryController(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         if (!await db.Locations.AnyAsync(l => l.Id == request.LocationId && l.IsActive, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）ロケーションIDです。" });
+            return this.BadRequestProblem("存在しない（または無効な）ロケーションIDです。");
         }
         await inventory.AddAsync(lot, request.LocationId, request.Quantity,
             InventoryTransactionType.IssueReturn, CurrentUserId,
@@ -499,7 +499,7 @@ public class InventoryController(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         try
         {
@@ -507,7 +507,7 @@ public class InventoryController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", auditAction, nameof(Lot), lot.Id.ToString(),

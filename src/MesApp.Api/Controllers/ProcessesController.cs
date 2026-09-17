@@ -41,7 +41,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
     {
         if (await db.Processes.AnyAsync(p => p.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"工程コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"工程コード '{request.Code}' は既に存在します。");
         }
         var p = new ProcessMaster { Code = request.Code, Name = request.Name, Category = request.Category };
         db.Processes.Add(p);
@@ -63,7 +63,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
         }
         if (await db.Processes.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"工程コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"工程コード '{request.Code}' は既に存在します。");
         }
         p.Code = request.Code;
         p.Name = request.Name;

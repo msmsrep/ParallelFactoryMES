@@ -41,7 +41,7 @@ public class DefectReasonsController(MesAppDbContext db, IAuditLogger auditLogge
     {
         if (await db.DefectReasons.AnyAsync(r => r.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"不良理由コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"不良理由コード '{request.Code}' は既に存在します。");
         }
         var r = new DefectReason { Code = request.Code, Name = request.Name, Category = request.Category };
         db.DefectReasons.Add(r);
@@ -64,7 +64,7 @@ public class DefectReasonsController(MesAppDbContext db, IAuditLogger auditLogge
         }
         if (await db.DefectReasons.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"不良理由コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"不良理由コード '{request.Code}' は既に存在します。");
         }
         r.Code = request.Code;
         r.Name = request.Name;

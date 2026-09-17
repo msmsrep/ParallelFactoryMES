@@ -43,16 +43,16 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
     {
         if (await db.Locations.AnyAsync(l => l.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"ロケーションコード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"ロケーションコード '{request.Code}' は既に存在します。");
         }
         var workCenter = await FindWorkCenterAsync(request.WorkCenterId, ct);
         if (request.WorkCenterId is { } missing && workCenter is null)
         {
-            return BadRequest(new ProblemDetails { Title = $"作業区（ID {missing}）が見つかりません。" });
+            return this.BadRequestProblem($"作業区（ID {missing}）が見つかりません。");
         }
         if (WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } reason)
         {
-            return BadRequest(new ProblemDetails { Title = reason });
+            return this.BadRequestProblem(reason);
         }
         var l = new Location
         {
@@ -79,16 +79,16 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
         }
         if (await db.Locations.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"ロケーションコード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"ロケーションコード '{request.Code}' は既に存在します。");
         }
         var workCenter = await FindWorkCenterAsync(request.WorkCenterId, ct);
         if (request.WorkCenterId is { } missing && workCenter is null)
         {
-            return BadRequest(new ProblemDetails { Title = $"作業区（ID {missing}）が見つかりません。" });
+            return this.BadRequestProblem($"作業区（ID {missing}）が見つかりません。");
         }
         if (WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } reason)
         {
-            return BadRequest(new ProblemDetails { Title = reason });
+            return this.BadRequestProblem(reason);
         }
         l.Code = request.Code;
         l.AreaType = request.AreaType;
@@ -139,7 +139,7 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
             .FirstOrDefaultAsync(p => p.Id == productId, ct);
         if (product is null)
         {
-            return NotFound(new ProblemDetails { Title = $"品目ID {productId} は登録されていません。" });
+            return this.NotFoundProblem($"品目ID {productId} は登録されていません。");
         }
 
         // その品目が今どこにどれだけあるか（②の並び順と、全候補に添える現在庫）

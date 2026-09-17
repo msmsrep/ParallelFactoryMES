@@ -67,11 +67,11 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
     {
         if (await db.Products.AnyAsync(p => p.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"品目コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"品目コード '{request.Code}' は既に存在します。");
         }
         if (await CheckDefaultLocationAsync(request.DefaultLocationId, ct) is { } invalid)
         {
-            return BadRequest(new ProblemDetails { Title = invalid });
+            return this.BadRequestProblem(invalid);
         }
 
         var product = new Product
@@ -102,11 +102,11 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         }
         if (await db.Products.AnyAsync(p => p.Code == request.Code && p.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"品目コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"品目コード '{request.Code}' は既に存在します。");
         }
         if (await CheckDefaultLocationAsync(request.DefaultLocationId, ct) is { } invalid)
         {
-            return BadRequest(new ProblemDetails { Title = invalid });
+            return this.BadRequestProblem(invalid);
         }
 
         product.Code = request.Code;
@@ -170,11 +170,11 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         }
         if (items.Any(i => i.ChildProductId == id))
         {
-            return BadRequest(new ProblemDetails { Title = "品目自身をMBOMの子品目にはできません。" });
+            return this.BadRequestProblem("品目自身をMBOMの子品目にはできません。");
         }
         if (items.GroupBy(i => i.ChildProductId).Any(g => g.Count() > 1))
         {
-            return BadRequest(new ProblemDetails { Title = "同一の子品目が重複しています。" });
+            return this.BadRequestProblem("同一の子品目が重複しています。");
         }
 
         var childIds = items.Select(i => i.ChildProductId).ToList();
@@ -182,7 +182,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
             .Where(p => childIds.Contains(p.Id)).Select(p => p.Id).ToListAsync(ct);
         if (childIds.Except(validChildIds).Any())
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない子品目IDが含まれています。" });
+            return this.BadRequestProblem("存在しない子品目IDが含まれています。");
         }
 
         var existing = await db.BomItems.Where(b => b.ParentProductId == id).ToListAsync(ct);
@@ -245,14 +245,14 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         }
         if (steps.GroupBy(s => s.Sequence).Any(g => g.Count() > 1))
         {
-            return BadRequest(new ProblemDetails { Title = "工程順序が重複しています。" });
+            return this.BadRequestProblem("工程順序が重複しています。");
         }
 
         var processIds = steps.Select(s => s.ProcessId).Distinct().ToList();
         var validProcessCount = await db.Processes.CountAsync(p => processIds.Contains(p.Id), ct);
         if (validProcessCount != processIds.Count)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない工程IDが含まれています。" });
+            return this.BadRequestProblem("存在しない工程IDが含まれています。");
         }
         foreach (var (ids, set, label) in new[]
         {
@@ -275,7 +275,7 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
                 var found = await set.Where(x => wanted.Contains(x)).CountAsync(ct);
                 if (found != wanted.Count)
                 {
-                    return BadRequest(new ProblemDetails { Title = $"存在しない{label}IDが含まれています。" });
+                    return this.BadRequestProblem($"存在しない{label}IDが含まれています。");
                 }
             }
         }

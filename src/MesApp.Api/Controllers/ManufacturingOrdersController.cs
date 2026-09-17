@@ -119,10 +119,8 @@ public class ManufacturingOrdersController(
         }
         if (order.Status is not (ManufacturingOrderStatus.Draft or ManufacturingOrderStatus.Approved))
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = $"状態 '{order.Status}' の指図は変更できません（展開済み以降は取消のみ可能です）。",
-            });
+            return this.ConflictProblem(
+                $"状態 '{order.Status}' の指図は変更できません（展開済み以降は取消のみ可能です）。");
         }
 
         var reapproval = order.Status == ManufacturingOrderStatus.Approved;
@@ -171,7 +169,7 @@ public class ManufacturingOrdersController(
         }
         if (order.Status is ManufacturingOrderStatus.Completed or ManufacturingOrderStatus.Canceled)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の指図は取消できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の指図は取消できません。");
         }
 
         order.Status = ManufacturingOrderStatus.Canceled;
@@ -210,8 +208,7 @@ public class ManufacturingOrdersController(
 
     private ActionResult ToProblem(OrderOutcome outcome)
     {
-        var problem = new ProblemDetails { Title = outcome.Error };
-        return outcome.IsConflict ? Conflict(problem) : BadRequest(problem);
+        return outcome.IsConflict ? this.ConflictProblem(outcome.Error) : this.BadRequestProblem(outcome.Error);
     }
 
     private static ManufacturingOrderResponse ToResponse(ManufacturingOrder o) =>

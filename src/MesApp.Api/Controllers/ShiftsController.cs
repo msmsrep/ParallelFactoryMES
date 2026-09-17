@@ -51,11 +51,11 @@ public class ShiftsController(
     {
         if (await db.Shifts.AnyAsync(s => s.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"シフトコード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"シフトコード '{request.Code}' は既に存在します。");
         }
         if (await CheckScheduleAsync(request, null, ct) is { } error)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         var shift = new Shift
@@ -83,11 +83,11 @@ public class ShiftsController(
         }
         if (await db.Shifts.AnyAsync(s => s.Code == request.Code && s.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"シフトコード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"シフトコード '{request.Code}' は既に存在します。");
         }
         if (await CheckScheduleAsync(request, id, ct) is { } error)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         shift.Code = request.Code;
@@ -114,7 +114,7 @@ public class ShiftsController(
         var assigned = await db.Users.CountAsync(u => u.ShiftId == id && u.IsActive, ct);
         if (MasterDeactivationPolicy.CheckShift(shift.Code, assigned) is { } error)
         {
-            return Conflict(new ProblemDetails { Title = error });
+            return this.ConflictProblem(error);
         }
 
         shift.IsActive = false;

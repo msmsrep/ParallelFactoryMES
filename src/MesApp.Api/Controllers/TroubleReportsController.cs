@@ -54,7 +54,7 @@ public class TroubleReportsController(MesAppDbContext db, ShopFloorReportService
         var outcome = await reports.AddTroubleReportAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!, ct);
         if (outcome.Value is not { } report)
         {
-            return BadRequest(new ProblemDetails { Title = outcome.Error });
+            return this.BadRequestProblem(outcome.Error);
         }
         return CreatedAtAction(nameof(Get), new { id = report.Id }, await GetResponseAsync(report.Id, ct));
     }

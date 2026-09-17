@@ -40,7 +40,7 @@ public class WorkOrderExecutionController(
         }
         if (workOrder.Status is not (WorkOrderStatus.Created or WorkOrderStatus.Dispatched))
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{workOrder.Status}' の作業指示は着手できません。" });
+            return this.ConflictProblem($"状態 '{workOrder.Status}' の作業指示は着手できません。");
         }
         workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Started,
             WorkOrderStatusChangeSource.Start, CurrentUserId);
@@ -225,7 +225,7 @@ public class WorkOrderExecutionController(
         }
         if (workOrder.Status != WorkOrderStatus.Completed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{workOrder.Status}' の作業指示は承認できません（完了済みのみ）。" });
+            return this.ConflictProblem($"状態 '{workOrder.Status}' の作業指示は承認できません（完了済みのみ）。");
         }
 
         workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Approved,
@@ -287,8 +287,8 @@ public class WorkOrderExecutionController(
     private ActionResult ToProblem<T>(Outcome<T> outcome) => outcome.Kind switch
     {
         OutcomeError.NotFound => NotFound(),
-        OutcomeError.Conflict => Conflict(new ProblemDetails { Title = outcome.Error }),
-        _ => BadRequest(new ProblemDetails { Title = outcome.Error }),
+        OutcomeError.Conflict => this.ConflictProblem(outcome.Error),
+        _ => this.BadRequestProblem(outcome.Error),
     };
 
     private static ChecklistRecordResponse ToChecklistResponse(ChecklistRecord r) =>

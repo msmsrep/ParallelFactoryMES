@@ -59,16 +59,16 @@ public class EquipmentLogsController(
         var equipment = await db.Equipments.FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
         if (equipment is null || !equipment.IsActive)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）設備IDです。" });
+            return this.BadRequestProblem("存在しない（または無効な）設備IDです。");
         }
         if (request.EndedAt is not null && request.EndedAt <= request.StartedAt)
         {
-            return BadRequest(new ProblemDetails { Title = "終了時刻は開始時刻より後である必要があります。" });
+            return this.BadRequestProblem("終了時刻は開始時刻より後である必要があります。");
         }
         if (request.Status is EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure
             && string.IsNullOrWhiteSpace(request.StopCause))
         {
-            return BadRequest(new ProblemDetails { Title = "停止・故障の記録には停止原因（stopCause）が必要です（B-40-20-02）。" });
+            return this.BadRequestProblem("停止・故障の記録には停止原因（stopCause）が必要です（B-40-20-02）。");
         }
 
         // 作業指示に紐づけると、その指示で作ったロットの品質と設備の状態を突き合わせられる
@@ -80,7 +80,7 @@ public class EquipmentLogsController(
                 .FirstOrDefaultAsync(w => w.Id == workOrderId, ct);
             if (workOrder is null)
             {
-                return BadRequest(new ProblemDetails { Title = $"作業指示（ID {workOrderId}）が見つかりません。" });
+                return this.BadRequestProblem($"作業指示（ID {workOrderId}）が見つかりません。");
             }
         }
 

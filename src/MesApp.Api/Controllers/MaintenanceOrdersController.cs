@@ -82,21 +82,21 @@ public class MaintenanceOrdersController(
         }
         if ((request.EquipmentId is null) == (request.ToolId is null))
         {
-            return BadRequest(new ProblemDetails { Title = "対象設備IDまたは対象治工具IDのどちらか一方を指定してください。" });
+            return this.BadRequestProblem("対象設備IDまたは対象治工具IDのどちらか一方を指定してください。");
         }
         if (request.EquipmentId is int equipmentId
             && !await db.Equipments.AnyAsync(e => e.Id == equipmentId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない設備IDです。" });
+            return this.BadRequestProblem("存在しない設備IDです。");
         }
         if (request.ToolId is int toolId && !await db.Tools.AnyAsync(t => t.Id == toolId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない治工具IDです。" });
+            return this.BadRequestProblem("存在しない治工具IDです。");
         }
         if (request.ProcedureId is int procedureId
             && !await db.MaintenanceProcedures.AnyAsync(p => p.Id == procedureId && p.IsActive, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）手順書IDです。" });
+            return this.BadRequestProblem("存在しない（または無効な）手順書IDです。");
         }
 
         MaintenancePlan? plan = null;
@@ -105,11 +105,11 @@ public class MaintenanceOrdersController(
             plan = await db.MaintenancePlans.FirstOrDefaultAsync(p => p.Id == planId, ct);
             if (plan is null)
             {
-                return BadRequest(new ProblemDetails { Title = "存在しない保全計画IDです。" });
+                return this.BadRequestProblem("存在しない保全計画IDです。");
             }
             if (plan.Status is not MaintenancePlanStatus.Planned)
             {
-                return Conflict(new ProblemDetails { Title = $"状態 '{plan.Status}' の保全計画からは指示を作成できません。" });
+                return this.ConflictProblem($"状態 '{plan.Status}' の保全計画からは指示を作成できません。");
             }
             plan.Status = MaintenancePlanStatus.Ordered;
         }
@@ -152,11 +152,11 @@ public class MaintenanceOrdersController(
         }
         if (order.Status != MaintenanceOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の保全指示には実績を登録できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の保全指示には実績を登録できません。");
         }
         if (request.ResetToolLife && order.Tool is null)
         {
-            return BadRequest(new ProblemDetails { Title = "寿命リセットは治工具メンテナンスの指示でのみ指定できます。" });
+            return this.BadRequestProblem("寿命リセットは治工具メンテナンスの指示でのみ指定できます。");
         }
 
         var record = new MaintenanceRecord
@@ -177,16 +177,16 @@ public class MaintenanceOrdersController(
                 .FirstOrDefaultAsync(l => l.Id == line.LotId, ct);
             if (lot is null)
             {
-                return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+                return this.BadRequestProblem("存在しないロットIDです。");
             }
             // 使える現品かの判定は部材投入・出荷と同じ LotUsabilityPolicy を通す
             if (LotUsabilityPolicy.CheckIssuable(lot, businessDate.Today) is string reason)
             {
-                return BadRequest(new ProblemDetails { Title = reason });
+                return this.BadRequestProblem(reason);
             }
             if (await CheckPartCategoryAsync(order, lot, ct) is string categoryError)
             {
-                return BadRequest(new ProblemDetails { Title = categoryError });
+                return this.BadRequestProblem(categoryError);
             }
             try
             {
@@ -196,7 +196,7 @@ public class MaintenanceOrdersController(
             }
             catch (InventoryException ex)
             {
-                return BadRequest(new ProblemDetails { Title = ex.Message });
+                return this.BadRequestProblem(ex.Message);
             }
             record.Parts.Add(new MaintenanceRecordPart
             {
@@ -237,7 +237,7 @@ public class MaintenanceOrdersController(
         }
         if (order.Status != MaintenanceOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の保全指示は取消できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の保全指示は取消できません。");
         }
         order.Status = MaintenanceOrderStatus.Canceled;
         // 元計画を計画中に戻す（再指示できるように）

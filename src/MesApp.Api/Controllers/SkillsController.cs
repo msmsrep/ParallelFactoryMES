@@ -42,7 +42,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
     {
         if (await db.Skills.AnyAsync(s => s.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"スキル・資格コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"スキル・資格コード '{request.Code}' は既に存在します。");
         }
         var s = new SkillMaster
         {
@@ -70,7 +70,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
         }
         if (await db.Skills.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"スキル・資格コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"スキル・資格コード '{request.Code}' は既に存在します。");
         }
         s.Code = request.Code;
         s.Name = request.Name;

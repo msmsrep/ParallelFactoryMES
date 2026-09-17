@@ -54,11 +54,11 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
     {
         if (await db.ControlItems.AnyAsync(i => i.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"工程管理項目コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"工程管理項目コード '{request.Code}' は既に存在します。");
         }
         if (await ValidateAsync(request, ct) is { } error)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         var item = new ControlItem
@@ -91,11 +91,11 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
         }
         if (await db.ControlItems.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"工程管理項目コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"工程管理項目コード '{request.Code}' は既に存在します。");
         }
         if (await ValidateAsync(request, ct) is { } error)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         item.Code = request.Code;

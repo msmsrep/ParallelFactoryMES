@@ -42,16 +42,16 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
     {
         if (await db.Equipments.AnyAsync(e => e.AssetNo == request.AssetNo, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"資産番号 '{request.AssetNo}' は既に存在します。" });
+            return this.ConflictProblem($"資産番号 '{request.AssetNo}' は既に存在します。");
         }
         var workCenter = await FindWorkCenterAsync(request.WorkCenterId, ct);
         if (request.WorkCenterId is { } missing && workCenter is null)
         {
-            return BadRequest(new ProblemDetails { Title = $"作業区（ID {missing}）が見つかりません。" });
+            return this.BadRequestProblem($"作業区（ID {missing}）が見つかりません。");
         }
         if (WorkCenterHierarchyPolicy.CheckEquipmentPlacement(workCenter) is { } reason)
         {
-            return BadRequest(new ProblemDetails { Title = reason });
+            return this.BadRequestProblem(reason);
         }
         var e = new Equipment
         {
@@ -82,16 +82,16 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (await db.Equipments.AnyAsync(x => x.AssetNo == request.AssetNo && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"資産番号 '{request.AssetNo}' は既に存在します。" });
+            return this.ConflictProblem($"資産番号 '{request.AssetNo}' は既に存在します。");
         }
         var workCenter = await FindWorkCenterAsync(request.WorkCenterId, ct);
         if (request.WorkCenterId is { } missing && workCenter is null)
         {
-            return BadRequest(new ProblemDetails { Title = $"作業区（ID {missing}）が見つかりません。" });
+            return this.BadRequestProblem($"作業区（ID {missing}）が見つかりません。");
         }
         if (WorkCenterHierarchyPolicy.CheckEquipmentPlacement(workCenter) is { } reason)
         {
-            return BadRequest(new ProblemDetails { Title = reason });
+            return this.BadRequestProblem(reason);
         }
         e.AssetNo = request.AssetNo;
         e.Name = request.Name;
@@ -154,13 +154,13 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (parts.GroupBy(p => p.ProductId).Any(g => g.Count() > 1))
         {
-            return BadRequest(new ProblemDetails { Title = "同じ品目が複数行あります。" });
+            return this.BadRequestProblem("同じ品目が複数行あります。");
         }
         var productIds = parts.Select(p => p.ProductId).Distinct().ToList();
         if (productIds.Count > 0
             && await db.Products.CountAsync(p => productIds.Contains(p.Id), ct) != productIds.Count)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない品目IDが含まれています。" });
+            return this.BadRequestProblem("存在しない品目IDが含まれています。");
         }
 
         var existing = await db.EquipmentParts.Where(p => p.EquipmentId == id).ToListAsync(ct);

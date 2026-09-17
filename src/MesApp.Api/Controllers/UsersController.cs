@@ -83,13 +83,13 @@ public class UsersController(
         var invalidRoles = request.Roles.Except(MesRoles.All).ToList();
         if (invalidRoles.Count > 0)
         {
-            return BadRequest(new ProblemDetails { Title = $"不明なロールが含まれています: {string.Join(", ", invalidRoles)}" });
+            return this.BadRequestProblem($"不明なロールが含まれています: {string.Join(", ", invalidRoles)}");
         }
 
         // 検証はユーザーを作る前に通す（作成後に弾くと、所属だけ入っていないユーザーが残る）
         if (await CheckAssignmentAsync(request.WorkCenterId, request.ShiftId, ct) is { } assignmentError)
         {
-            return BadRequest(new ProblemDetails { Title = assignmentError });
+            return this.BadRequestProblem(assignmentError);
         }
 
         var user = new AppUser
@@ -131,19 +131,19 @@ public class UsersController(
         var invalidRoles = request.Roles.Except(MesRoles.All).ToList();
         if (invalidRoles.Count > 0)
         {
-            return BadRequest(new ProblemDetails { Title = $"不明なロールが含まれています: {string.Join(", ", invalidRoles)}" });
+            return this.BadRequestProblem($"不明なロールが含まれています: {string.Join(", ", invalidRoles)}");
         }
 
         // 最後のシステム管理者を無効化・降格すると誰も権限操作できなくなる（復旧はDB操作のみ）
         var lastAdmin = await LastAdminPolicy.CheckUpdateAsync(userManager, user, request.IsActive, request.Roles);
         if (lastAdmin is not null)
         {
-            return Conflict(new ProblemDetails { Title = lastAdmin });
+            return this.ConflictProblem(lastAdmin);
         }
 
         if (await CheckAssignmentAsync(request.WorkCenterId, request.ShiftId, ct) is { } assignmentError)
         {
-            return BadRequest(new ProblemDetails { Title = assignmentError });
+            return this.BadRequestProblem(assignmentError);
         }
 
         user.DisplayName = request.DisplayName;
@@ -253,13 +253,13 @@ public class UsersController(
         }
         if (skills.GroupBy(s => s.SkillId).Any(g => g.Count() > 1))
         {
-            return BadRequest(new ProblemDetails { Title = "同一スキルが重複しています。" });
+            return this.BadRequestProblem("同一スキルが重複しています。");
         }
         var skillIds = skills.Select(s => s.SkillId).ToList();
         var found = await db.Skills.CountAsync(s => skillIds.Contains(s.Id), ct);
         if (found != skillIds.Count)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないスキルIDが含まれています。" });
+            return this.BadRequestProblem("存在しないスキルIDが含まれています。");
         }
 
         var existing = await db.UserSkills.Where(s => s.UserId == id).ToListAsync(ct);

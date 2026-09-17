@@ -40,11 +40,9 @@ public class ProductionRecordsController(
 
         if (request.ScrapQuantity + request.ReworkQuantity > request.DefectQuantity)
         {
-            return BadRequest(new ProblemDetails
-            {
-                Title = $"廃棄数と再作業待ち数の合計（{request.ScrapQuantity + request.ReworkQuantity}）が" +
-                        $"不良数（{request.DefectQuantity}）を超えています。",
-            });
+            return this.BadRequestProblem(
+                $"廃棄数と再作業待ち数の合計（{request.ScrapQuantity + request.ReworkQuantity}）が" +
+                $"不良数（{request.DefectQuantity}）を超えています。");
         }
 
         var before = new
@@ -76,7 +74,7 @@ public class ProductionRecordsController(
             }
             catch (InventoryException ex)
             {
-                return BadRequest(new ProblemDetails { Title = ex.Message });
+                return this.BadRequestProblem(ex.Message);
             }
             record.OutputLot.InitialQuantity += goodDelta;
         }

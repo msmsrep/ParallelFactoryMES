@@ -39,7 +39,7 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
     {
         if (await db.Tools.AnyAsync(t => t.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"治工具コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"治工具コード '{request.Code}' は既に存在します。");
         }
         var t = new Tool
         {
@@ -68,7 +68,7 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
         }
         if (await db.Tools.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"治工具コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"治工具コード '{request.Code}' は既に存在します。");
         }
         t.Code = request.Code;
         t.Name = request.Name;

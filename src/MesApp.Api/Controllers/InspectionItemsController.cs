@@ -53,12 +53,12 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
     {
         if (await db.InspectionItems.AnyAsync(i => i.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"検査項目コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"検査項目コード '{request.Code}' は既に存在します。");
         }
         var error = await ValidateTargetsAsync(request, ct);
         if (error is not null)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         var i = new InspectionItem
@@ -93,12 +93,12 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
         }
         if (await db.InspectionItems.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"検査項目コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"検査項目コード '{request.Code}' は既に存在します。");
         }
         var error = await ValidateTargetsAsync(request, ct);
         if (error is not null)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         i.Code = request.Code;

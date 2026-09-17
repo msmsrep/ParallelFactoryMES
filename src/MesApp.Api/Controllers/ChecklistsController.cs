@@ -40,11 +40,11 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
     {
         if (await db.Checklists.AnyAsync(c => c.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"チェックリストコード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"チェックリストコード '{request.Code}' は既に存在します。");
         }
         if (request.Items.GroupBy(i => i.Sequence).Any(g => g.Count() > 1))
         {
-            return BadRequest(new ProblemDetails { Title = "項目の表示順が重複しています。" });
+            return this.BadRequestProblem("項目の表示順が重複しています。");
         }
 
         var c = new Checklist
@@ -75,11 +75,11 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (await db.Checklists.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"チェックリストコード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"チェックリストコード '{request.Code}' は既に存在します。");
         }
         if (request.Items.GroupBy(i => i.Sequence).Any(g => g.Count() > 1))
         {
-            return BadRequest(new ProblemDetails { Title = "項目の表示順が重複しています。" });
+            return this.BadRequestProblem("項目の表示順が重複しています。");
         }
 
         c.Code = request.Code;

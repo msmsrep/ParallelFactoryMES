@@ -54,16 +54,16 @@ public class ToolUsagesController(
         var tool = await db.Tools.FirstOrDefaultAsync(t => t.Id == request.ToolId, ct);
         if (tool is null || !tool.IsActive)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）治工具IDです。" });
+            return this.BadRequestProblem("存在しない（または無効な）治工具IDです。");
         }
         if (request.WorkOrderId is int workOrderId
             && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない作業指示IDです。" });
+            return this.BadRequestProblem("存在しない作業指示IDです。");
         }
         if (request.UsageCount <= 0 && (request.UsageHours is null or <= 0))
         {
-            return BadRequest(new ProblemDetails { Title = "使用回数または使用時間のどちらかを記録してください。" });
+            return this.BadRequestProblem("使用回数または使用時間のどちらかを記録してください。");
         }
 
         var usage = new ToolUsage
