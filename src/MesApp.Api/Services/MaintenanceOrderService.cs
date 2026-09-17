@@ -8,8 +8,9 @@ using Microsoft.EntityFrameworkCore;
 namespace MesApp.Api.Services;
 
 /// <summary>
-/// 保全指示の作成（E-30-20-01 / E-30-30-01）・実績登録（E-40-30-01）・取消。
-/// 保全指示と元の保全計画の状態変更をここに集める（Controller で代入しない）。
+/// 保全指示の作成（E-30-20-01 / E-30-30-01）・実績登録（E-40-30-01）・取消と、保全計画の取消（E-30-10）。
+/// 保全指示と保全計画の状態変更をここに集める（Controller で代入しない）。
+/// 計画の状態は指示の作成・実績・取消に連動するため、計画側の取消も同じ場所で判定する。
 /// 保存・監査ログまで行う。ロールによる作成可否は呼び出し側（Controller）で判定してから呼ぶ。
 /// <para>
 /// 実績登録で消費部材の引落しが途中で失敗したときは、未保存の在庫変更が追跡中に残る。
@@ -209,6 +210,30 @@ public sealed class MaintenanceOrderService(
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Maintenance", "OrderCancel", nameof(MaintenanceOrder), orderId.ToString(), ct: ct);
         return Outcome<MaintenanceOrder>.Ok(order);
+    }
+
+    /// <summary>保全計画の取消（E-30-10）</summary>
+    public async Task<Outcome<MaintenancePlan>> CancelPlanAsync(int planId, CancellationToken ct)
+    {
+        var plan = await db.MaintenancePlans.FindAsync([planId], ct);
+        if (plan is null)
+        {
+            return Outcome<MaintenancePlan>.NotFound("保全計画が見つかりません。");
+        }
+        // 指示発行済みの計画を取り消すと保全指示だけが「指示済み」で残るため、先に指示を取り消させる
+        // （指示の取消で計画は計画中へ戻る）。現場が着手しようとしている指示を計画側の操作で消さない
+        if (plan.Status == MaintenancePlanStatus.Ordered)
+        {
+            return Outcome<MaintenancePlan>.Conflict("保全指示を発行済みの計画は取消できません。先に保全指示を取り消してください。");
+        }
+        if (plan.Status is MaintenancePlanStatus.Completed or MaintenancePlanStatus.Canceled)
+        {
+            return Outcome<MaintenancePlan>.Conflict($"状態 '{plan.Status}' の保全計画は取消できません。");
+        }
+        plan.Status = MaintenancePlanStatus.Canceled;
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Maintenance", "PlanCancel", nameof(MaintenancePlan), planId.ToString(), ct: ct);
+        return Outcome<MaintenancePlan>.Ok(plan);
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
@@ -15,7 +16,8 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/maintenance-plans")]
 [Authorize]
-public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
+public class MaintenancePlansController(
+    MesAppDbContext db, IAuditLogger auditLogger, MaintenanceOrderService maintenanceOrders) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<MaintenancePlanResponse>>> List(
@@ -114,25 +116,13 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
     [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenancePlanResponse>> Cancel(int id, CancellationToken ct)
     {
-        var plan = await db.MaintenancePlans.FindAsync([id], ct);
-        if (plan is null)
+        var outcome = await maintenanceOrders.CancelPlanAsync(id, ct);
+        return outcome.Kind switch
         {
-            return NotFound();
-        }
-        // 指示発行済みの計画を取り消すと保全指示だけが「指示済み」で残るため、先に指示を取り消させる
-        // （指示の取消で計画は計画中へ戻る）。現場が着手しようとしている指示を計画側の操作で消さない
-        if (plan.Status == MaintenancePlanStatus.Ordered)
-        {
-            return this.ConflictProblem("保全指示を発行済みの計画は取消できません。先に保全指示を取り消してください。");
-        }
-        if (plan.Status is MaintenancePlanStatus.Completed or MaintenancePlanStatus.Canceled)
-        {
-            return this.ConflictProblem($"状態 '{plan.Status}' の保全計画は取消できません。");
-        }
-        plan.Status = MaintenancePlanStatus.Canceled;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Maintenance", "PlanCancel", nameof(MaintenancePlan), id.ToString(), ct: ct);
-        return await GetResponseAsync(id, ct);
+            OutcomeError.None => await GetResponseAsync(id, ct),
+            OutcomeError.NotFound => NotFound(),
+            _ => this.ConflictProblem(outcome.Error),
+        };
     }
 
     private async Task<MaintenancePlanResponse> GetResponseAsync(int id, CancellationToken ct) =>
