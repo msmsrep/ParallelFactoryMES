@@ -26,10 +26,7 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class MaintenanceOrdersController(
     MesAppDbContext db,
-    NumberingService numbering,
-    InventoryService inventory,
-    IBusinessDateService businessDate,
-    IAuditLogger auditLogger) : ControllerBase
+    MaintenanceOrderService maintenanceOrders) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -80,58 +77,13 @@ public class MaintenanceOrdersController(
         {
             return Forbid();
         }
-        if ((request.EquipmentId is null) == (request.ToolId is null))
+        var outcome = await maintenanceOrders.CreateAsync(request, CurrentUserId, ct);
+        if (outcome.Failed)
         {
-            return this.BadRequestProblem("対象設備IDまたは対象治工具IDのどちらか一方を指定してください。");
+            return ToProblem(outcome);
         }
-        if (request.EquipmentId is int equipmentId
-            && !await db.Equipments.AnyAsync(e => e.Id == equipmentId, ct))
-        {
-            return this.BadRequestProblem("存在しない設備IDです。");
-        }
-        if (request.ToolId is int toolId && !await db.Tools.AnyAsync(t => t.Id == toolId, ct))
-        {
-            return this.BadRequestProblem("存在しない治工具IDです。");
-        }
-        if (request.ProcedureId is int procedureId
-            && !await db.MaintenanceProcedures.AnyAsync(p => p.Id == procedureId && p.IsActive, ct))
-        {
-            return this.BadRequestProblem("存在しない（または無効な）手順書IDです。");
-        }
-
-        MaintenancePlan? plan = null;
-        if (request.MaintenancePlanId is int planId)
-        {
-            plan = await db.MaintenancePlans.FirstOrDefaultAsync(p => p.Id == planId, ct);
-            if (plan is null)
-            {
-                return this.BadRequestProblem("存在しない保全計画IDです。");
-            }
-            if (plan.Status is not MaintenancePlanStatus.Planned)
-            {
-                return this.ConflictProblem($"状態 '{plan.Status}' の保全計画からは指示を作成できません。");
-            }
-            plan.Status = MaintenancePlanStatus.Ordered;
-        }
-
-        var order = new MaintenanceOrder
-        {
-            OrderNo = await numbering.NextMaintenanceNoAsync(ct),
-            EquipmentId = request.EquipmentId,
-            ToolId = request.ToolId,
-            MaintenancePlanId = plan?.Id,
-            ProcedureId = request.ProcedureId,
-            ScheduledDate = request.ScheduledDate,
-            RequestType = request.RequestType,
-            Note = request.Note,
-            CreatedByUserId = CurrentUserId,
-        };
-        db.MaintenanceOrders.Add(order);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Maintenance", "OrderCreate", nameof(MaintenanceOrder), order.Id.ToString(),
-            detail: $"orderNo={order.OrderNo}, type={order.RequestType}", ct: ct);
-        var saved = await BaseQuery().FirstAsync(o => o.Id == order.Id, ct);
-        return CreatedAtAction(nameof(Get), new { id = order.Id }, ToResponse(saved));
+        var saved = await BaseQuery().FirstAsync(o => o.Id == outcome.Value!.Id, ct);
+        return CreatedAtAction(nameof(Get), new { id = saved.Id }, ToResponse(saved));
     }
 
     /// <summary>
@@ -142,103 +94,10 @@ public class MaintenanceOrdersController(
     public async Task<ActionResult<MaintenanceOrderResponse>> AddRecord(
         int id, MaintenanceRecordRequest request, CancellationToken ct)
     {
-        var order = await db.MaintenanceOrders
-            .Include(o => o.MaintenancePlan)
-            .Include(o => o.Tool)
-            .Include(o => o.Equipment)
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
-        if (order is null)
+        var outcome = await maintenanceOrders.AddRecordAsync(id, request, CurrentUserId!, ct);
+        if (outcome.Failed)
         {
-            return NotFound();
-        }
-        if (order.Status != MaintenanceOrderStatus.Instructed)
-        {
-            return this.ConflictProblem($"状態 '{order.Status}' の保全指示には実績を登録できません。");
-        }
-        if (request.ResetToolLife && order.Tool is null)
-        {
-            return this.BadRequestProblem("寿命リセットは治工具メンテナンスの指示でのみ指定できます。");
-        }
-
-        var record = new MaintenanceRecord
-        {
-            MaintenanceOrderId = id,
-            PerformedByUserId = CurrentUserId!,
-            StartedAt = request.StartedAt,
-            EndedAt = request.EndedAt,
-            PartsUsed = request.PartsUsed,
-            Result = request.Result,
-            Note = request.Note,
-        };
-        // 消費部材の在庫引落し（E-40-30-01）。引落しは InventoryService に一本化してあるので
-        // ここでは在庫を直接触らず、業務判定だけを行って同サービスへ渡す
-        foreach (var line in request.Parts ?? [])
-        {
-            var lot = await db.Lots.Include(l => l.Product)
-                .FirstOrDefaultAsync(l => l.Id == line.LotId, ct);
-            if (lot is null)
-            {
-                return this.BadRequestProblem("存在しないロットIDです。");
-            }
-            // 使える現品かの判定は部材投入・出荷と同じ LotUsabilityPolicy を通す
-            if (LotUsabilityPolicy.CheckIssuable(lot, businessDate.Today) is string reason)
-            {
-                return this.BadRequestProblem(reason);
-            }
-            if (await CheckPartCategoryAsync(order, lot, ct) is string categoryError)
-            {
-                return this.BadRequestProblem(categoryError);
-            }
-            try
-            {
-                await inventory.RemoveAsync(lot, line.LocationId, line.Quantity,
-                    InventoryTransactionType.MaintenanceIssue, CurrentUserId,
-                    note: $"保全消費（{order.OrderNo}）", ct: ct);
-            }
-            catch (InventoryException ex)
-            {
-                return this.BadRequestProblem(ex.Message);
-            }
-            record.Parts.Add(new MaintenanceRecordPart
-            {
-                ProductId = lot.ProductId,
-                LotId = lot.Id,
-                LocationId = line.LocationId,
-                Quantity = line.Quantity,
-                Note = line.Note,
-            });
-        }
-        db.MaintenanceRecords.Add(record);
-        order.Status = MaintenanceOrderStatus.Completed;
-        if (order.MaintenancePlan is not null)
-        {
-            order.MaintenancePlan.Status = MaintenancePlanStatus.Completed;
-        }
-        if (request.ResetToolLife && order.Tool is not null)
-        {
-            order.Tool.LifeResetAt = DateTimeOffset.UtcNow;
-        }
-        // 保全が終わった設備を差立に戻す。保全中へは保全担当が設備マスタで切り替える運用のため、
-        // 戻すのは保全中の設備だけ（停止中・廃棄の判断を保全実績で上書きしない）
-        var restoreEquipment = order.Equipment is { Status: EquipmentStatus.UnderMaintenance };
-        if (restoreEquipment)
-        {
-            order.Equipment!.Status = EquipmentStatus.Available;
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Maintenance", "RecordAdd", nameof(MaintenanceOrder), id.ToString(),
-            detail: $"orderNo={order.OrderNo}, resetToolLife={request.ResetToolLife}, " +
-                    $"parts={record.Parts.Count}", ct: ct);
-        if (restoreEquipment)
-        {
-            await auditLogger.LogAsync("Maintenance", "EquipmentStatusChange", nameof(Equipment),
-                order.Equipment!.Id.ToString(),
-                detail: new
-                {
-                    before = EquipmentStatus.UnderMaintenance,
-                    after = EquipmentStatus.Available,
-                    reason = $"保全指示 {order.OrderNo} の実績登録による復帰",
-                }, ct: ct);
+            return ToProblem(outcome);
         }
         var saved = await BaseQuery().FirstAsync(o => o.Id == id, ct);
         return ToResponse(saved);
@@ -248,24 +107,11 @@ public class MaintenanceOrdersController(
     [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenanceOrderResponse>> Cancel(int id, CancellationToken ct)
     {
-        var order = await db.MaintenanceOrders.Include(o => o.MaintenancePlan)
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
-        if (order is null)
+        var outcome = await maintenanceOrders.CancelAsync(id, ct);
+        if (outcome.Failed)
         {
-            return NotFound();
+            return ToProblem(outcome);
         }
-        if (order.Status != MaintenanceOrderStatus.Instructed)
-        {
-            return this.ConflictProblem($"状態 '{order.Status}' の保全指示は取消できません。");
-        }
-        order.Status = MaintenanceOrderStatus.Canceled;
-        // 元計画を計画中に戻す（再指示できるように）
-        if (order.MaintenancePlan is { Status: MaintenancePlanStatus.Ordered })
-        {
-            order.MaintenancePlan.Status = MaintenancePlanStatus.Planned;
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Maintenance", "OrderCancel", nameof(MaintenanceOrder), id.ToString(), ct: ct);
         var saved = await BaseQuery().FirstAsync(o => o.Id == id, ct);
         return ToResponse(saved);
     }
@@ -339,27 +185,12 @@ public class MaintenanceOrdersController(
             .ToList();
     }
 
-    /// <summary>
-    /// 消費部材の管理区分の確認（Spec.md 5.7 保全部品は品目マスタで持つ）。
-    /// 資産管理部品（金型など）は個体と寿命で管理する対象で、数量在庫の引落しにはなじまない。
-    /// 引き落とせば在庫と実物が合わなくなるため、登録済みの区分が資産管理部品なら拒否する。
-    /// 保全部品として未登録の品目は、突発保全でありうるため通す（記録できない方が在庫がずれる）。
-    /// </summary>
-    private async Task<string?> CheckPartCategoryAsync(MaintenanceOrder order, Lot lot, CancellationToken ct)
+    private ActionResult ToProblem<T>(Outcome<T> outcome) => outcome.Kind switch
     {
-        if (order.EquipmentId is not int equipmentId)
-        {
-            return null;
-        }
-        var part = await db.EquipmentParts.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.EquipmentId == equipmentId && p.ProductId == lot.ProductId, ct);
-        if (part is { Category: MaintenancePartCategory.Asset })
-        {
-            return $"品目 '{lot.Product?.Code}' は資産管理部品のため在庫引落しの対象外です" +
-                   "（個体と寿命は治工具の寿命管理で扱います）。";
-        }
-        return null;
-    }
+        OutcomeError.NotFound => NotFound(),
+        OutcomeError.Conflict => this.ConflictProblem(outcome.Error),
+        _ => this.BadRequestProblem(outcome.Error),
+    };
 
     private IQueryable<MaintenanceOrder> BaseQuery() =>
         db.MaintenanceOrders.AsNoTracking()
