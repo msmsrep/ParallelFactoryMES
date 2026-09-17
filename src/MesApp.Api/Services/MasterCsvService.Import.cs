@@ -116,7 +116,8 @@ public sealed partial class MasterCsvService
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var byCode = await db.Products.ToDictionaryAsync(p => p.Code, StringComparer.Ordinal, ct);
-        var locationIds = await db.Locations.AsNoTracking().Where(l => l.IsActive)
+        // 既定ロケーションの条件は単票APIと共通
+        var locationIds = await ProductStructurePolicy.AssignableDefaultLocations(db.Locations.AsNoTracking())
             .ToDictionaryAsync(l => l.Code, l => l.Id, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
@@ -1047,13 +1048,12 @@ public sealed partial class MasterCsvService
             .ToDictionaryAsync(t => t.Code, t => t.Id, StringComparer.Ordinal, ct);
         var checklistIds = await db.Checklists.AsNoTracking()
             .ToDictionaryAsync(c => c.Code, c => c.Id, StringComparer.Ordinal, ct);
-        // 無効な手順書は候補に入れない（単票APIと同じ条件）
-        var workProcedureIds = await db.WorkProcedures.AsNoTracking().Where(p => p.IsActive)
+        // 無効な手順書は候補に入れない（単票APIと共通の条件）
+        var workProcedureIds = await ProductStructurePolicy.AssignableWorkProcedures(db.WorkProcedures.AsNoTracking())
             .ToDictionaryAsync(p => p.ProcedureNo, p => p.Id, StringComparer.Ordinal, ct);
-        // 工順の作業区は最下段のみ（単票APIと同じ条件。Spec.md 5.7）。
+        // 工順の作業区は最下段のみ（単票APIと共通の条件。Spec.md 5.7）。
         // 候補をここで絞ることで、上位の段を書いた行は「登録されていません」として弾かれる
-        var workCenterIds = await db.WorkCenters.AsNoTracking()
-            .Where(w => w.Level == WorkCenterLevel.WorkCenter && w.IsActive)
+        var workCenterIds = await ProductStructurePolicy.AssignableWorkCenters(db.WorkCenters.AsNoTracking())
             .ToDictionaryAsync(w => w.Code, w => w.Id, StringComparer.Ordinal, ct);
         var existing = await db.Routings.ToListAsync(ct);
 
@@ -1111,10 +1111,9 @@ public sealed partial class MasterCsvService
                     StandardSetupMinutes = setup,
                     RequiredSkillId = skillId,
                     EquipmentId = equipmentId,
-                    // 代表設備も候補の1つとして扱う（候補を書かずに代表だけ指定した工順を移行するため）
                     EquipmentCandidates =
                     [
-                        .. candidateIds.Concat(equipmentId is { } e ? [e] : []).Distinct()
+                        .. ProductStructurePolicy.CandidateEquipmentIds(candidateIds, equipmentId)
                             .Select(x => new RoutingEquipment { EquipmentId = x }),
                     ],
                     ToolId = toolId,

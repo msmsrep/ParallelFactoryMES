@@ -80,6 +80,7 @@ public static class MesAppHost
         builder.Services.AddScoped<InventoryService>();
         builder.Services.AddScoped<LotStatusService>();
         builder.Services.AddScoped<LotOperationService>();
+        builder.Services.AddScoped<ProductStructureService>();
         builder.Services.AddScoped<WorkOrderStatusService>();
         builder.Services.AddScoped<MasterCsvService>();
         builder.Services.AddScoped<ReceivingService>();

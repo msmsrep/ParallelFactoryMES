@@ -1,4 +1,6 @@
 ﻿using System.Linq.Expressions;
+using MesApp.Api.Policies;
+using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Common;
@@ -17,7 +19,8 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/products")]
 [Authorize]
-public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
+public class ProductsController(
+    MesAppDbContext db, IAuditLogger auditLogger, ProductStructureService structure) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<ProductResponse>>> List(
@@ -168,37 +171,10 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         {
             return NotFound();
         }
-        if (items.Any(i => i.ChildProductId == id))
+        if (await structure.ReplaceBomAsync(id, items, ct) is { } error)
         {
-            return this.BadRequestProblem("品目自身をMBOMの子品目にはできません。");
+            return this.BadRequestProblem(error);
         }
-        if (items.GroupBy(i => i.ChildProductId).Any(g => g.Count() > 1))
-        {
-            return this.BadRequestProblem("同一の子品目が重複しています。");
-        }
-
-        var childIds = items.Select(i => i.ChildProductId).ToList();
-        var validChildIds = await db.Products
-            .Where(p => childIds.Contains(p.Id)).Select(p => p.Id).ToListAsync(ct);
-        if (childIds.Except(validChildIds).Any())
-        {
-            return this.BadRequestProblem("存在しない子品目IDが含まれています。");
-        }
-
-        var existing = await db.BomItems.Where(b => b.ParentProductId == id).ToListAsync(ct);
-        db.BomItems.RemoveRange(existing);
-        db.BomItems.AddRange(items.Select(i => new BomItem
-        {
-            ParentProductId = id,
-            ChildProductId = i.ChildProductId,
-            QuantityPer = i.QuantityPer,
-            MakeOrBuy = i.MakeOrBuy,
-            AlternativeGroup = i.AlternativeGroup,
-            IsAlternative = i.IsAlternative,
-        }));
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Update", "Bom", id.ToString(),
-            detail: $"items={items.Count}", ct: ct);
         return await GetBom(id, ct);
     }
 
@@ -243,163 +219,29 @@ public class ProductsController(MesAppDbContext db, IAuditLogger auditLogger) : 
         {
             return NotFound();
         }
-        if (steps.GroupBy(s => s.Sequence).Any(g => g.Count() > 1))
+        if (await structure.ReplaceRoutingAsync(id, steps, ct) is { } error)
         {
-            return this.BadRequestProblem("工程順序が重複しています。");
+            return this.BadRequestProblem(error);
         }
-
-        var processIds = steps.Select(s => s.ProcessId).Distinct().ToList();
-        var validProcessCount = await db.Processes.CountAsync(p => processIds.Contains(p.Id), ct);
-        if (validProcessCount != processIds.Count)
-        {
-            return this.BadRequestProblem("存在しない工程IDが含まれています。");
-        }
-        foreach (var (ids, set, label) in new[]
-        {
-            (steps.Where(s => s.RequiredSkillId != null).Select(s => s.RequiredSkillId!.Value), db.Skills.Select(x => x.Id), "スキル"),
-            (steps.Where(s => s.EquipmentId != null).Select(s => s.EquipmentId!.Value), db.Equipments.Select(x => x.Id), "設備"),
-            (steps.Where(s => s.ToolId != null).Select(s => s.ToolId!.Value), db.Tools.Select(x => x.Id), "治工具"),
-            (steps.Where(s => s.ChecklistId != null).Select(s => s.ChecklistId!.Value), db.Checklists.Select(x => x.Id), "チェックリスト"),
-            // 無効な手順書を紐付けると、作業者が改訂前の手順で作業してしまう
-            (steps.Where(s => s.WorkProcedureId != null).Select(s => s.WorkProcedureId!.Value),
-                db.WorkProcedures.Where(x => x.IsActive).Select(x => x.Id), "作業手順書"),
-            (steps.SelectMany(s => s.EquipmentIds ?? []), db.Equipments.Select(x => x.Id), "候補設備"),
-            // 作業区は最下段に限る（設備と同じ理由。Spec.md 5.7 資源階層への紐付け）
-            (steps.Where(s => s.WorkCenterId != null).Select(s => s.WorkCenterId!.Value),
-                db.WorkCenters.Where(x => x.Level == WorkCenterLevel.WorkCenter && x.IsActive).Select(x => x.Id), "作業区"),
-        })
-        {
-            var wanted = ids.Distinct().ToList();
-            if (wanted.Count > 0)
-            {
-                var found = await set.Where(x => wanted.Contains(x)).CountAsync(ct);
-                if (found != wanted.Count)
-                {
-                    return this.BadRequestProblem($"存在しない{label}IDが含まれています。");
-                }
-            }
-        }
-
-        var existing = await db.Routings.Where(r => r.ProductId == id).ToListAsync(ct);
-        db.Routings.RemoveRange(existing);
-        db.Routings.AddRange(steps.Select(s => new Routing
-        {
-            ProductId = id,
-            Sequence = s.Sequence,
-            ProcessId = s.ProcessId,
-            StandardWorkMinutes = s.StandardWorkMinutes,
-            StandardSetupMinutes = s.StandardSetupMinutes,
-            RequiredSkillId = s.RequiredSkillId,
-            EquipmentId = s.EquipmentId,
-            // 代表設備は候補の1つとして扱う（候補を書かずに代表だけ指定した工順を移行するため）
-            EquipmentCandidates = [.. CandidateIds(s).Select(x => new RoutingEquipment { EquipmentId = x })],
-            ToolId = s.ToolId,
-            WorkCenterId = s.WorkCenterId,
-            ControlItems = s.ControlItems,
-            ChecklistId = s.ChecklistId,
-            WorkProcedureId = s.WorkProcedureId,
-        }));
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Update", "Routing", id.ToString(),
-            detail: $"steps={steps.Count}", ct: ct);
         return await GetRouting(id, ct);
     }
 
 
     // ---- 設計変更の影響確認（J-40-40-01/03）----
 
-    /// <summary>
-    /// 設計変更（MBOM・工順の改訂）の影響範囲（J-40-40-01/03）。
-    /// <para>
-    /// 指図展開時のスナップショット方式（Spec.md 5.7）のため、**マスタを直しても展開済みの指図は変わらない**。
-    /// 改訂前にこれを見せ、改訂がどの指図に届き／届かないか、外した部材の在庫がどれだけ残るかを把握させる。
-    /// 改訂そのものを止める判定は入れない（止めるべきかは業務側の判断で、機械的には決まらない）
-    /// </para>
-    /// </summary>
+    /// <summary>設計変更（MBOM・工順の改訂）の影響範囲。展開済みの指図に改訂が届かないことを改訂者に見せる</summary>
     [HttpGet("{id:int}/change-impact")]
-    public async Task<ActionResult<DesignChangeImpactResponse>> GetChangeImpact(int id, CancellationToken ct)
-    {
-        var product = await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
-        if (product is null)
-        {
-            return NotFound();
-        }
+    public async Task<ActionResult<DesignChangeImpactResponse>> GetChangeImpact(int id, CancellationToken ct) =>
+        await structure.GetChangeImpactAsync(id, ct) is { } impact ? impact : NotFound();
 
-        // 完了・取消は設計変更の影響を受けない（作り終わっている）
-        var orders = await db.ManufacturingOrders.AsNoTracking()
-            .Where(o => o.ProductId == id
-                        && o.Status != ManufacturingOrderStatus.Completed
-                        && o.Status != ManufacturingOrderStatus.Canceled)
-            .OrderBy(o => o.OrderNo)
-            .Select(o => new DesignChangeOrderRow(
-                o.Id, o.OrderNo, o.Status, o.Quantity, o.DueDate,
-                db.WorkOrders.Count(w => w.ManufacturingOrderId == o.Id
-                                         && w.Status != WorkOrderStatus.Canceled),
-                db.WorkOrders.Count(w => w.ManufacturingOrderId == o.Id
-                                         && w.Status == WorkOrderStatus.Started),
-                o.Status == ManufacturingOrderStatus.Released))
-            .ToListAsync(ct);
-
-        var orderIds = orders.Select(o => o.OrderId).ToList();
-
-        // 現行MBOMの部材と、進行中指図がスナップショットで持っている部材は一致するとは限らない。
-        // 一致しない部材こそ改訂者が見たいもの（外した部材の在庫・まだ要る部材）なので和集合にする
-        var bom = await db.BomItems.AsNoTracking()
-            .Where(b => b.ParentProductId == id)
-            .Select(b => new { b.ChildProductId, b.QuantityPer })
-            .ToListAsync(ct);
-        var planned = await db.ManufacturingOrderMaterials.AsNoTracking()
-            .Where(m => orderIds.Contains(m.ManufacturingOrderId))
-            .GroupBy(m => m.ChildProductId)
-            .Select(g => new { ChildProductId = g.Key, Quantity = g.Sum(m => m.PlannedQuantity) })
-            .ToListAsync(ct);
-
-        var materialIds = bom.Select(b => b.ChildProductId)
-            .Union(planned.Select(p => p.ChildProductId)).ToList();
-        var products = await db.Products.AsNoTracking()
-            .Where(p => materialIds.Contains(p.Id))
-            .Select(p => new { p.Id, p.Code, p.Name, p.Unit })
-            .ToListAsync(ct);
-        var stocks = await db.InventoryStocks.AsNoTracking()
-            .Where(s => materialIds.Contains(s.ProductId))
-            .GroupBy(s => s.ProductId)
-            .Select(g => new { ProductId = g.Key, Quantity = g.Sum(s => s.Quantity) })
-            .ToListAsync(ct);
-
-        var materials = products
-            .Select(p =>
-            {
-                var line = bom.FirstOrDefault(b => b.ChildProductId == p.Id);
-                return new DesignChangeMaterialRow(
-                    p.Id, p.Code, p.Name, p.Unit,
-                    line is not null, line?.QuantityPer,
-                    planned.FirstOrDefault(x => x.ChildProductId == p.Id)?.Quantity ?? 0m,
-                    stocks.FirstOrDefault(x => x.ProductId == p.Id)?.Quantity ?? 0m);
-            })
-            .OrderBy(m => m.Code)
-            .ToList();
-
-        return new DesignChangeImpactResponse(
-            product.Id, product.Code, product.Name, orders, materials);
-    }
-
-    /// <summary>
-    /// 工順の候補設備。代表設備（EquipmentId）も候補に含める。
-    /// 候補を書かずに代表だけ指定した既存の工順が、差立で設備を選べなくならないようにするため
-    /// </summary>
-    private static IEnumerable<int> CandidateIds(RoutingStepRequest step) =>
-        (step.EquipmentIds ?? [])
-            .Concat(step.EquipmentId is { } id ? [id] : [])
-            .Distinct();
-
-    /// <summary>既定ロケーションの実在チェック（無効なロケーションは推奨に出せないため弾く）</summary>
+    /// <summary>既定ロケーションの実在チェック（条件は CSV 取込と共通。<see cref="ProductStructurePolicy"/>）</summary>
     private async Task<string?> CheckDefaultLocationAsync(int? locationId, CancellationToken ct)
     {
         if (locationId is not { } id)
         {
             return null;
         }
-        return await db.Locations.AnyAsync(l => l.Id == id && l.IsActive, ct)
+        return await ProductStructurePolicy.AssignableDefaultLocations(db.Locations).AnyAsync(l => l.Id == id, ct)
             ? null
             : $"既定ロケーション（ID {id}）が見つからないか無効です。";
     }
