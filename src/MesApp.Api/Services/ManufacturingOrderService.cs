@@ -15,7 +15,8 @@ public sealed record OrderOutcome(ManufacturingOrder? Order, string? Error, bool
 }
 
 /// <summary>
-/// 製造指図の登録・承認・工程展開（A-20-10-01、A-20-20-01、B-10-10-01/05）。
+/// 製造指図の登録・承認・変更・取消・工程展開・完了判定（A-20-10-01、A-20-20-01/02、B-10-10-01/05、B-40-10-10）。
+/// 指図の状態はここでだけ変更する。
 /// 単票API（<c>ManufacturingOrdersController</c>）と実績CSV取込（<c>ActualCsvService</c>）の両方から呼ぶ。
 /// 保存と監査ログまで行う。トランザクションは呼び出し側が張る（<see cref="ReceivingService"/> と同じ）。
 /// </summary>
@@ -23,6 +24,7 @@ public sealed class ManufacturingOrderService(
     MesAppDbContext db,
     NumberingService numbering,
     IBusinessDateService businessDate,
+    WorkOrderStatusService workOrderStatus,
     IAuditLogger auditLogger)
 {
     /// <summary>自動採番の指図番号の接頭辞（手入力の番号と衝突させないため、手入力では使わせない）</summary>
@@ -109,6 +111,82 @@ public sealed class ManufacturingOrderService(
         await auditLogger.LogAsync("Production", "Approve", nameof(ManufacturingOrder), order.Id.ToString(),
             detail: $"orderNo={order.OrderNo}", ct: ct);
         return OrderOutcome.Ok(order);
+    }
+
+    /// <summary>
+    /// 指図変更（A-20-20-02）。未承認・承認済みの指図のみ変更でき、承認済みを変更したときは
+    /// 承認を取り消して未承認へ戻す（変更後の内容で承認し直させるため）
+    /// </summary>
+    public async Task<OrderOutcome> UpdateAsync(
+        ManufacturingOrder order, UpdateManufacturingOrderRequest request, CancellationToken ct)
+    {
+        if (order.Status is not (ManufacturingOrderStatus.Draft or ManufacturingOrderStatus.Approved))
+        {
+            return OrderOutcome.Conflict(
+                $"状態 '{order.Status}' の指図は変更できません（展開済み以降は取消のみ可能です）。");
+        }
+
+        var reapproval = order.Status == ManufacturingOrderStatus.Approved;
+        order.Quantity = request.Quantity;
+        order.DueDate = request.DueDate;
+        order.Note = request.Note;
+        if (reapproval)
+        {
+            order.Status = ManufacturingOrderStatus.Draft;
+            order.ApprovedByUserId = null;
+            order.ApprovedAt = null;
+        }
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Production", "Update", nameof(ManufacturingOrder), order.Id.ToString(),
+            detail: $"orderNo={order.OrderNo}, reapprovalRequired={reapproval}", ct: ct);
+        return OrderOutcome.Ok(order);
+    }
+
+    /// <summary>
+    /// 指図取消（A-20-20-02）。完了・取消済み以外の指図を取り消し、未完了の作業指示も連動して取り消す。
+    /// order は WorkOrders を読み込んだ追跡中のエンティティを渡す。
+    /// </summary>
+    public async Task<OrderOutcome> CancelAsync(ManufacturingOrder order, string? userId, CancellationToken ct)
+    {
+        if (order.Status is ManufacturingOrderStatus.Completed or ManufacturingOrderStatus.Canceled)
+        {
+            return OrderOutcome.Conflict($"状態 '{order.Status}' の指図は取消できません。");
+        }
+
+        order.Status = ManufacturingOrderStatus.Canceled;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+        foreach (var workOrder in order.WorkOrders.Where(w =>
+                     w.Status is not (WorkOrderStatus.Completed or WorkOrderStatus.Approved)))
+        {
+            workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Canceled,
+                WorkOrderStatusChangeSource.OrderCancel, userId,
+                $"指図 {order.OrderNo} の取消に連動");
+        }
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Production", "Cancel", nameof(ManufacturingOrder), order.Id.ToString(),
+            detail: $"orderNo={order.OrderNo}", ct: ct);
+        return OrderOutcome.Ok(order);
+    }
+
+    /// <summary>
+    /// 作業指示の承認（B-40-10-10）に続く指図の完了判定。承認した作業指示以外がすべて承認済みか取消なら
+    /// 指図を完了にし、完了にしたかどうかを返す。
+    /// 作業指示の承認と同じ保存で反映するため、SaveChanges は呼び出し側が行う。
+    /// </summary>
+    public async Task<bool> CompleteIfAllWorkOrdersDoneAsync(
+        ManufacturingOrder order, int approvedWorkOrderId, DateTimeOffset now, CancellationToken ct)
+    {
+        var allDone = !await db.WorkOrders.AnyAsync(w =>
+            w.ManufacturingOrderId == order.Id
+            && w.Id != approvedWorkOrderId
+            && w.Status != WorkOrderStatus.Approved && w.Status != WorkOrderStatus.Canceled, ct);
+        if (allDone)
+        {
+            order.Status = ManufacturingOrderStatus.Completed;
+            order.UpdatedAt = now;
+        }
+        return allDone;
     }
 
     /// <summary>

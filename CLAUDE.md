@@ -67,7 +67,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 - エラーは `ProblemDetails` + **日本語のメッセージ**。`new ProblemDetails` を直接書かず `ProblemResultExtensions` を使う（例: `return this.ConflictProblem($"ロケーションコード '{request.Code}' は既に存在します。");`）。重複は `ConflictProblem`、未存在は `NotFoundProblem`、入力不正は `BadRequestProblem`
 - 作成・更新・削除の後に `auditLogger.LogAsync(...)` を呼ぶ。**変更前後を追跡する操作（訂正・調整・ステータス変更）は `detail:` に匿名オブジェクト `new { before, after, reason }` を渡す**（JSONで保存される）。要約で足りる操作は文字列でよい
 - **複数の経路で必要になる業務判定は Controller に書かない**。`Api/Policies/` に置き、Controller はそれを呼んで結果を `ProblemDetails` に変換するだけにする（`LotUsabilityPolicy` / `MaterialIssuePolicy` / `ShipmentGatePolicy`）
-- **ロット・作業指示のステータスを直接代入しない**。`LotStatusService` / `WorkOrderStatusService` 経由で変更し、遷移を状態履歴に残す（Spec.md 5.2・5.3）
+- **ロット・作業指示のステータスを直接代入しない**。`LotStatusService` / `WorkOrderStatusService` 経由で変更し、遷移を状態履歴に残す（Spec.md 5.2・5.3）。製造指図・検査指示の状態も Controller で代入せず、`ManufacturingOrderService` / `InspectionService` に集める（状態履歴は持たず監査ログで追う）
 
 ## クライアント側の規約
 

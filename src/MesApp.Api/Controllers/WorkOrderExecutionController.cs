@@ -24,6 +24,7 @@ public class WorkOrderExecutionController(
     MesAppDbContext db,
     WorkOrderStatusService workOrderStatus,
     WorkOrderExecutionService execution,
+    ManufacturingOrderService orders,
     IAuditLogger auditLogger) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -238,15 +239,7 @@ public class WorkOrderExecutionController(
                 .SetProperty(r => r.ApprovedAt, now), ct);
 
         // 指図の完了判定：全作業指示が承認済み（または取消）なら指図完了
-        var allDone = !await db.WorkOrders.AnyAsync(w =>
-            w.ManufacturingOrderId == workOrder.ManufacturingOrderId
-            && w.Id != id
-            && w.Status != WorkOrderStatus.Approved && w.Status != WorkOrderStatus.Canceled, ct);
-        if (allDone)
-        {
-            workOrder.ManufacturingOrder!.Status = ManufacturingOrderStatus.Completed;
-            workOrder.ManufacturingOrder.UpdatedAt = now;
-        }
+        var allDone = await orders.CompleteIfAllWorkOrdersDoneAsync(workOrder.ManufacturingOrder!, id, now, ct);
 
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Execution", "ApproveWorkOrder", nameof(WorkOrder), id.ToString(),

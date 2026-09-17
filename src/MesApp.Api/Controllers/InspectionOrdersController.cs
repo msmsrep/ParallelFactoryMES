@@ -22,9 +22,7 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class InspectionOrdersController(
     MesAppDbContext db,
-    InspectionService inspections,
-    LotStatusService lotStatus,
-    IAuditLogger auditLogger) : ControllerBase
+    InspectionService inspections) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -109,76 +107,11 @@ public class InspectionOrdersController(
     public async Task<ActionResult<InspectionOrderResponse>> CorrectResult(
         int id, int resultId, InspectionResultCorrectionRequest request, CancellationToken ct)
     {
-        var order = await db.InspectionOrders.Include(o => o.TargetLot)
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
-        if (order is null)
+        var outcome = await inspections.CorrectResultAsync(id, resultId, request, CurrentUserId, ct);
+        if (outcome.Failed)
         {
-            return NotFound();
+            return ToProblem(outcome);
         }
-        if (order.Status == InspectionOrderStatus.Approved)
-        {
-            return this.ConflictProblem("承認済みの検査は訂正できません。");
-        }
-        var result = await db.InspectionResults
-            .FirstOrDefaultAsync(r => r.Id == resultId && r.InspectionOrderId == id, ct);
-        if (result is null)
-        {
-            return NotFound();
-        }
-
-        var before = new { value = result.MeasuredValue, text = result.TextValue, judgment = result.Judgment };
-
-        // 訂正前の記録を業務履歴として残す（C-20-50-07）。検査成績書に
-        // 「元の記録＋訂正理由・訂正者」を出せるようにするための正式な記録
-        db.InspectionResultCorrections.Add(new InspectionResultCorrection
-        {
-            InspectionResultId = result.Id,
-            InspectionOrderId = id,
-            BeforeMeasuredValue = result.MeasuredValue,
-            BeforeTextValue = result.TextValue,
-            BeforeJudgment = result.Judgment,
-            AfterMeasuredValue = request.MeasuredValue,
-            AfterTextValue = request.TextValue,
-            AfterJudgment = request.Judgment,
-            Reason = request.Reason,
-            CorrectedByUserId = CurrentUserId,
-        });
-
-        result.MeasuredValue = request.MeasuredValue;
-        result.TextValue = request.TextValue;
-        result.Judgment = request.Judgment;
-        result.CorrectionNote = string.IsNullOrEmpty(result.CorrectionNote)
-            ? request.Reason
-            : $"{result.CorrectionNote}\n{request.Reason}";
-
-        // 判定済みだった場合は再判定を要求し、ロットを検査待ちへ戻す
-        if (order.Status == InspectionOrderStatus.Judged)
-        {
-            order.Status = InspectionOrderStatus.InProgress;
-            order.OverallJudgment = null;
-            order.JudgedAt = null;
-            order.JudgedByUserId = null;
-            if (order.TargetLot is not null && order.Type != InspectionOrderType.Sample)
-            {
-                lotStatus.ChangeStatus(order.TargetLot, LotStockStatus.AwaitingInspection,
-                    LotStatusChangeSource.Inspection, $"検査実績の訂正による再判定待ち（{request.Reason}）",
-                    CurrentUserId, inspectionOrderId: order.Id);
-            }
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Quality", "InspectionCorrect", nameof(InspectionResult), resultId.ToString(),
-            detail: new
-            {
-                orderNo = order.OrderNo,
-                before,
-                after = new
-                {
-                    value = request.MeasuredValue,
-                    text = request.TextValue,
-                    judgment = request.Judgment,
-                },
-                reason = request.Reason,
-            }, ct: ct);
         var saved = await BaseQuery().FirstAsync(o => o.Id == id, ct);
         return await ToResponseWithCorrectionsAsync(saved, ct);
     }
@@ -206,21 +139,11 @@ public class InspectionOrdersController(
     [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<InspectionOrderResponse>> Approve(int id, CancellationToken ct)
     {
-        var order = await db.InspectionOrders.FirstOrDefaultAsync(o => o.Id == id, ct);
-        if (order is null)
+        var outcome = await inspections.ApproveAsync(id, CurrentUserId, ct);
+        if (outcome.Failed)
         {
-            return NotFound();
+            return ToProblem(outcome);
         }
-        if (order.Status != InspectionOrderStatus.Judged)
-        {
-            return this.ConflictProblem($"状態 '{order.Status}' の検査指示は承認できません（判定済みのみ）。");
-        }
-        order.Status = InspectionOrderStatus.Approved;
-        order.ApprovedByUserId = CurrentUserId;
-        order.ApprovedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Quality", "InspectionApprove", nameof(InspectionOrder), id.ToString(),
-            detail: $"orderNo={order.OrderNo}", ct: ct);
         var saved = await BaseQuery().FirstAsync(o => o.Id == id, ct);
         return ToResponse(saved);
     }
@@ -229,25 +152,11 @@ public class InspectionOrdersController(
     [Authorize(Roles = MesRoleGroups.QualityManage)]
     public async Task<ActionResult<InspectionOrderResponse>> Cancel(int id, CancellationToken ct)
     {
-        var order = await db.InspectionOrders.Include(o => o.TargetLot)
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
-        if (order is null)
+        var outcome = await inspections.CancelAsync(id, CurrentUserId, ct);
+        if (outcome.Failed)
         {
-            return NotFound();
+            return ToProblem(outcome);
         }
-        if (order.Status is InspectionOrderStatus.Approved or InspectionOrderStatus.Canceled)
-        {
-            return this.ConflictProblem($"状態 '{order.Status}' の検査指示は取消できません。");
-        }
-        order.Status = InspectionOrderStatus.Canceled;
-        // 検査待ちで拘束していたロットを解放する
-        if (order.TargetLot is { StockStatus: LotStockStatus.AwaitingInspection })
-        {
-            lotStatus.ChangeStatus(order.TargetLot, LotStockStatus.Normal, LotStatusChangeSource.Inspection,
-                $"検査指示 {order.OrderNo} の取消による拘束解除", CurrentUserId, inspectionOrderId: order.Id);
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Quality", "InspectionCancel", nameof(InspectionOrder), id.ToString(), ct: ct);
         var saved = await BaseQuery().FirstAsync(o => o.Id == id, ct);
         return ToResponse(saved);
     }

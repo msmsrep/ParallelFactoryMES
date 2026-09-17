@@ -20,10 +20,8 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class ManufacturingOrdersController(
     MesAppDbContext db,
-    WorkOrderStatusService workOrderStatus,
     ManufacturingOrderService orders,
-    IBusinessDateService businessDate,
-    IAuditLogger auditLogger) : ControllerBase
+    IBusinessDateService businessDate) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ManufacturingOrderResponse>>> List(
@@ -117,27 +115,8 @@ public class ManufacturingOrdersController(
         {
             return NotFound();
         }
-        if (order.Status is not (ManufacturingOrderStatus.Draft or ManufacturingOrderStatus.Approved))
-        {
-            return this.ConflictProblem(
-                $"状態 '{order.Status}' の指図は変更できません（展開済み以降は取消のみ可能です）。");
-        }
-
-        var reapproval = order.Status == ManufacturingOrderStatus.Approved;
-        order.Quantity = request.Quantity;
-        order.DueDate = request.DueDate;
-        order.Note = request.Note;
-        if (reapproval)
-        {
-            order.Status = ManufacturingOrderStatus.Draft;
-            order.ApprovedByUserId = null;
-            order.ApprovedAt = null;
-        }
-        order.UpdatedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Production", "Update", nameof(ManufacturingOrder), id.ToString(),
-            detail: $"orderNo={order.OrderNo}, reapprovalRequired={reapproval}", ct: ct);
-        return ToResponse(order);
+        var outcome = await orders.UpdateAsync(order, request, ct);
+        return outcome.Order is null ? ToProblem(outcome) : ToResponse(order);
     }
 
     /// <summary>指図承認（A-20-20-01。単段階承認：Spec.md 3.9）</summary>
@@ -167,24 +146,8 @@ public class ManufacturingOrdersController(
         {
             return NotFound();
         }
-        if (order.Status is ManufacturingOrderStatus.Completed or ManufacturingOrderStatus.Canceled)
-        {
-            return this.ConflictProblem($"状態 '{order.Status}' の指図は取消できません。");
-        }
-
-        order.Status = ManufacturingOrderStatus.Canceled;
-        order.UpdatedAt = DateTimeOffset.UtcNow;
-        foreach (var workOrder in order.WorkOrders.Where(w =>
-                     w.Status is not (WorkOrderStatus.Completed or WorkOrderStatus.Approved)))
-        {
-            workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Canceled,
-                WorkOrderStatusChangeSource.OrderCancel, User.FindFirstValue(ClaimTypes.NameIdentifier),
-                $"指図 {order.OrderNo} の取消に連動");
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Production", "Cancel", nameof(ManufacturingOrder), id.ToString(),
-            detail: $"orderNo={order.OrderNo}", ct: ct);
-        return ToResponse(order);
+        var outcome = await orders.CancelAsync(order, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        return outcome.Order is null ? ToProblem(outcome) : ToResponse(order);
     }
 
     /// <summary>
