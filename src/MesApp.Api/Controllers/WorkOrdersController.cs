@@ -374,6 +374,13 @@ public class WorkOrdersController(
             {
                 return this.BadRequestProblem("割当設備が存在しないか無効です。");
             }
+            // 停止中・保全中・廃棄の設備には新しく割り当てさせない。既に割り当て済みの設備のまま
+            // 着手順だけを変える差立は通す（保全に入った設備の作業指示を画面から触れなくしないため）
+            if (equipmentId != workOrder.AssignedEquipmentId && equipment.Status != EquipmentStatus.Available)
+            {
+                return this.ConflictProblem(
+                    $"設備 '{equipment.AssetNo}' は{EquipmentStatusLabel(equipment.Status)}のため割り当てられません。");
+            }
 
             // 工順に候補設備が登録されていれば、その中からしか選べない。
             // 候補は工順マスタの現在値を見る（設備は差立で決めるためスナップショットに含めない：Spec.md 5.7）。
@@ -417,6 +424,15 @@ public class WorkOrdersController(
             .AsQueryable();
         return track ? query : query.AsNoTracking();
     }
+
+    private static string EquipmentStatusLabel(EquipmentStatus status) => status switch
+    {
+        EquipmentStatus.Available => "稼働可能",
+        EquipmentStatus.Stopped => "停止中",
+        EquipmentStatus.UnderMaintenance => "保全中",
+        EquipmentStatus.Retired => "廃棄・除却",
+        _ => status.ToString(),
+    };
 
     internal static WorkOrderResponse ToResponse(WorkOrder w, ManufacturingOrder order) =>
         new(w.Id, w.WorkOrderNo, w.ManufacturingOrderId, order.OrderNo,

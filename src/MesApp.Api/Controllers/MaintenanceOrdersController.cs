@@ -145,6 +145,7 @@ public class MaintenanceOrdersController(
         var order = await db.MaintenanceOrders
             .Include(o => o.MaintenancePlan)
             .Include(o => o.Tool)
+            .Include(o => o.Equipment)
             .FirstOrDefaultAsync(o => o.Id == id, ct);
         if (order is null)
         {
@@ -217,10 +218,28 @@ public class MaintenanceOrdersController(
         {
             order.Tool.LifeResetAt = DateTimeOffset.UtcNow;
         }
+        // 保全が終わった設備を差立に戻す。保全中へは保全担当が設備マスタで切り替える運用のため、
+        // 戻すのは保全中の設備だけ（停止中・廃棄の判断を保全実績で上書きしない）
+        var restoreEquipment = order.Equipment is { Status: EquipmentStatus.UnderMaintenance };
+        if (restoreEquipment)
+        {
+            order.Equipment!.Status = EquipmentStatus.Available;
+        }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Maintenance", "RecordAdd", nameof(MaintenanceOrder), id.ToString(),
             detail: $"orderNo={order.OrderNo}, resetToolLife={request.ResetToolLife}, " +
                     $"parts={record.Parts.Count}", ct: ct);
+        if (restoreEquipment)
+        {
+            await auditLogger.LogAsync("Maintenance", "EquipmentStatusChange", nameof(Equipment),
+                order.Equipment!.Id.ToString(),
+                detail: new
+                {
+                    before = EquipmentStatus.UnderMaintenance,
+                    after = EquipmentStatus.Available,
+                    reason = $"保全指示 {order.OrderNo} の実績登録による復帰",
+                }, ct: ct);
+        }
         var saved = await BaseQuery().FirstAsync(o => o.Id == id, ct);
         return ToResponse(saved);
     }

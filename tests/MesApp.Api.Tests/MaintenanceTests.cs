@@ -580,6 +580,62 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 保全中の設備は差立で割り当てられず保全実績の登録で稼働可能へ戻る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var released = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrderId = released.WorkOrders[0].Id;
+
+        // 保全担当が設備を保全中にする
+        (await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}",
+            new EquipmentRequest("EQ-01", "プレス機", "第1工場", EquipmentStatus.UnderMaintenance,
+                MaintenanceType.Calendar, 90m, "金型・ベルト"))).EnsureSuccessStatusCode();
+
+        // 保全中の設備には割り当てられない
+        var rejected = await admin.PutAsJsonAsync($"/api/work-orders/{workOrderId}/dispatch",
+            new DispatchRequest(null, equipment.Id, 1));
+        Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
+        Assert.Contains("保全中", await rejected.Content.ReadAsStringAsync());
+
+        // 保全実績を登録すると指示が完了し、設備は稼働可能へ戻る
+        var order = await (await admin.PostAsJsonAsync("/api/maintenance-orders",
+                new MaintenanceOrderCreateRequest(equipment.Id, null, null, null,
+                    DateOnly.FromDateTime(DateTime.Today), MaintenanceRequestType.Planned, null)))
+            .Content.ReadFromJsonAsync<MaintenanceOrderResponse>();
+        (await admin.PostAsJsonAsync($"/api/maintenance-orders/{order!.Id}/record",
+            new MaintenanceRecordRequest(DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now,
+                null, "ベルト交換", null))).EnsureSuccessStatusCode();
+        var restored = await admin.GetFromJsonAsync<EquipmentResponse>($"/api/equipments/{equipment.Id}");
+        Assert.Equal(EquipmentStatus.Available, restored!.Status);
+
+        var dispatched = await admin.PutAsJsonAsync($"/api/work-orders/{workOrderId}/dispatch",
+            new DispatchRequest(null, equipment.Id, 1));
+        Assert.Equal(HttpStatusCode.OK, dispatched.StatusCode);
+
+        // 割当済みの設備が停止しても、同じ設備のまま着手順を変える差立は通る
+        (await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}",
+            new EquipmentRequest("EQ-01", "プレス機", "第1工場", EquipmentStatus.Stopped,
+                MaintenanceType.Calendar, 90m, "金型・ベルト"))).EnsureSuccessStatusCode();
+        var reordered = await admin.PutAsJsonAsync($"/api/work-orders/{workOrderId}/dispatch",
+            new DispatchRequest(null, equipment.Id, 2));
+        Assert.Equal(HttpStatusCode.OK, reordered.StatusCode);
+
+        // 停止中の設備は保全実績を登録しても稼働可能へ上書きしない
+        var second = await (await admin.PostAsJsonAsync("/api/maintenance-orders",
+                new MaintenanceOrderCreateRequest(equipment.Id, null, null, null,
+                    DateOnly.FromDateTime(DateTime.Today), MaintenanceRequestType.Planned, null)))
+            .Content.ReadFromJsonAsync<MaintenanceOrderResponse>();
+        (await admin.PostAsJsonAsync($"/api/maintenance-orders/{second!.Id}/record",
+            new MaintenanceRecordRequest(DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now,
+                null, "点検のみ", null))).EnsureSuccessStatusCode();
+        var stillStopped = await admin.GetFromJsonAsync<EquipmentResponse>($"/api/equipments/{equipment.Id}");
+        Assert.Equal(EquipmentStatus.Stopped, stillStopped!.Status);
+    }
+
+    [Fact]
     public async Task 指示発行済みの保全計画は指示を取り消すまで取消できない()
     {
         using var factory = new ApiFactory();
