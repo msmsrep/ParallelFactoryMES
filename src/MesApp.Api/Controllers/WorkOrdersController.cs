@@ -328,9 +328,11 @@ public class WorkOrdersController(
         }
         var outcome = await dispatcher.DispatchAsync(
             workOrder, request, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
-        if (outcome.Error is { } error)
+        if (outcome.Failed)
         {
-            return outcome.IsConflict ? this.ConflictProblem(error) : this.BadRequestProblem(error);
+            return outcome.Kind == OutcomeError.Conflict
+                ? this.ConflictProblem(outcome.Error)
+                : this.BadRequestProblem(outcome.Error);
         }
 
         var updated = await BaseQuery().FirstAsync(w => w.Id == id, ct);
