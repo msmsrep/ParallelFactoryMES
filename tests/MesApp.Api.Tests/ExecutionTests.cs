@@ -740,6 +740,28 @@ public class ExecutionTests
         Assert.Equal(TroubleStatus.Closed, closed!.Status);
         Assert.Contains("金型を交換して復旧", closed.ResponseHistory);
 
+        // 完了から「発生」へは戻せない
+        var backToOpen = await admin.PutAsJsonAsync($"/api/trouble-reports/{trouble.Id}",
+            new TroubleUpdateRequest("誤操作", TroubleStatus.Open));
+        Assert.Equal(HttpStatusCode.Conflict, backToOpen.StatusCode);
+
+        // 再オープンは理由（対応履歴）が必須
+        var reopenNoReason = await admin.PutAsJsonAsync($"/api/trouble-reports/{trouble.Id}",
+            new TroubleUpdateRequest(null, TroubleStatus.InProgress));
+        Assert.Equal(HttpStatusCode.BadRequest, reopenNoReason.StatusCode);
+
+        var reopened = await admin.PutAsJsonAsync($"/api/trouble-reports/{trouble.Id}",
+            new TroubleUpdateRequest("同じ不良が再発", TroubleStatus.InProgress));
+        Assert.Equal(HttpStatusCode.OK, reopened.StatusCode);
+        var inProgress = await reopened.Content.ReadFromJsonAsync<TroubleReportResponse>();
+        Assert.Equal(TroubleStatus.InProgress, inProgress!.Status);
+        Assert.Contains("同じ不良が再発", inProgress.ResponseHistory);
+
+        // 対応中から「発生」へも戻せない
+        var inProgressToOpen = await admin.PutAsJsonAsync($"/api/trouble-reports/{trouble.Id}",
+            new TroubleUpdateRequest(null, TroubleStatus.Open));
+        Assert.Equal(HttpStatusCode.Conflict, inProgressToOpen.StatusCode);
+
         // 作業時間：直接作業は作業指示必須（B-30-30-02）
         var directNoWo = await admin.PostAsJsonAsync("/api/work-time-records",
             new WorkTimeRequest(WorkTimeType.Direct, null, null, DateTimeOffset.Now.AddHours(-2), DateTimeOffset.Now, null));
