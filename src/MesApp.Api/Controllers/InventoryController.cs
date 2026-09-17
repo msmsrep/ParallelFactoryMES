@@ -21,7 +21,7 @@ namespace MesApp.Api.Controllers;
 public class InventoryController(
     MesAppDbContext db,
     InventoryService inventory,
-    NumberingService numbering,
+    LotOperationService lotOperations,
     LotStatusService lotStatus,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
@@ -267,60 +267,9 @@ public class InventoryController(
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<LotResponse>> Split(SplitRequest request, CancellationToken ct)
     {
-        var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
-        if (lot is null)
-        {
-            return this.BadRequestProblem("存在しないロットIDです。");
-        }
-
-        var newLotNumber = request.NewLotNumber;
-        if (string.IsNullOrWhiteSpace(newLotNumber))
-        {
-            newLotNumber = await numbering.NextLotNumberAsync(lot.Product!.Code, ct);
-        }
-        else if (await db.Lots.AnyAsync(l => l.LotNumber == newLotNumber, ct))
-        {
-            return this.ConflictProblem($"ロット番号 '{newLotNumber}' は既に存在します。");
-        }
-
-        var newLot = new Lot
-        {
-            LotNumber = newLotNumber,
-            ProductId = lot.ProductId,
-            InitialQuantity = request.Quantity,
-            OriginType = lot.OriginType,
-            ManufacturedOn = lot.ManufacturedOn,
-            ExpiresOn = lot.ExpiresOn,
-            StockStatus = lot.StockStatus,
-            Grade = lot.Grade,
-            ParentLotId = lot.Id,
-        };
-        db.Lots.Add(newLot);
-
-        // newLot.Idの確定に一度SaveChangesが要るため保存が2回に分かれる。
-        // 途中で失敗すると分割元から減った在庫が分割先に入らず消えるので、トランザクションでまとめる
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        try
-        {
-            await inventory.RemoveAsync(lot, request.LocationId, request.Quantity,
-                InventoryTransactionType.Split, CurrentUserId, note: $"分割 -> {newLotNumber}", ct: ct);
-            await db.SaveChangesAsync(ct); // newLot.Id確定＋在庫減算の確定
-            await inventory.AddAsync(newLot, request.LocationId, request.Quantity,
-                InventoryTransactionType.Split, CurrentUserId, note: $"分割元 {lot.LotNumber}", ct: ct);
-            AddGenealogy(lot.Id, newLot.Id, LotRelationType.Split, request.Quantity);
-        }
-        catch (InventoryException ex)
-        {
-            return this.BadRequestProblem(ex.Message);
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "Split", nameof(Lot), lot.Id.ToString(),
-            detail: new { from = lot.LotNumber, to = newLotNumber, quantity = request.Quantity }, ct: ct);
-        await transaction.CommitAsync(ct);
-
-        return new LotResponse(newLot.Id, newLot.LotNumber, lot.ProductId, lot.Product!.Code, lot.Product!.Name,
-            newLot.InitialQuantity, newLot.OriginType, newLot.StockStatus,
-            newLot.ManufacturedOn, newLot.ExpiresOn, newLot.Grade, newLot.ParentLotId);
+        var outcome = await lotOperations.SplitAsync(request.LotId, request.LocationId, request.Quantity,
+            request.NewLotNumber, CurrentUserId, ct);
+        return ToLotResult(outcome);
     }
 
     /// <summary>ロット統合（D-10-30-05。同一品目・同一ロケーションの在庫を統合先ロットへ移す）</summary>
@@ -328,46 +277,9 @@ public class InventoryController(
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<IActionResult> Merge(MergeRequest request, CancellationToken ct)
     {
-        var source = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.SourceLotId, ct);
-        var target = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.TargetLotId, ct);
-        if (source is null || target is null)
-        {
-            return this.BadRequestProblem("存在しないロットIDです。");
-        }
-        if (source.Id == target.Id)
-        {
-            return this.BadRequestProblem("統合元と統合先が同一ロットです。");
-        }
-        if (source.ProductId != target.ProductId)
-        {
-            return this.BadRequestProblem("品目が異なるロットは統合できません。");
-        }
-
-        var stock = await db.InventoryStocks.FirstOrDefaultAsync(
-            s => s.LotId == source.Id && s.LocationId == request.LocationId, ct);
-        if (stock is null || stock.Quantity <= 0)
-        {
-            return this.BadRequestProblem("統合元の在庫がありません。");
-        }
-        var quantity = stock.Quantity;
-
-        try
-        {
-            await inventory.RemoveAsync(source, request.LocationId, quantity,
-                InventoryTransactionType.Merge, CurrentUserId, note: $"統合 -> {target.LotNumber}", ct: ct);
-            await inventory.AddAsync(target, request.LocationId, quantity,
-                InventoryTransactionType.Merge, CurrentUserId, note: $"統合元 {source.LotNumber}", ct: ct);
-            // 統合先ロットは親を複数持ちうるため、系譜はLot.ParentLotIdではなくLotGenealogyへ残す
-            AddGenealogy(source.Id, target.Id, LotRelationType.Merge, quantity);
-        }
-        catch (InventoryException ex)
-        {
-            return this.BadRequestProblem(ex.Message);
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "Merge", nameof(Lot), target.Id.ToString(),
-            detail: new { from = source.LotNumber, to = target.LotNumber, quantity }, ct: ct);
-        return NoContent();
+        var outcome = await lotOperations.MergeAsync(request.SourceLotId, request.TargetLotId,
+            request.LocationId, CurrentUserId, ct);
+        return outcome.Error is { } error ? this.BadRequestProblem(error) : NoContent();
     }
 
     /// <summary>品目振替・ロット振替（D-10-30-06〜07。新しいロットを生成して数量を移す）</summary>
@@ -375,80 +287,21 @@ public class InventoryController(
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<LotResponse>> Transfer(LotTransferRequest request, CancellationToken ct)
     {
-        if (request.NewProductId is null && string.IsNullOrWhiteSpace(request.NewLotNumber))
-        {
-            return this.BadRequestProblem("新品目ID（品目振替）または新ロット番号（ロット振替）を指定してください。");
-        }
-        var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
-        if (lot is null)
-        {
-            return this.BadRequestProblem("存在しないロットIDです。");
-        }
+        var outcome = await lotOperations.TransferAsync(request.LotId, request.LocationId, request.Quantity,
+            request.NewProductId, request.NewLotNumber, CurrentUserId, ct);
+        return ToLotResult(outcome);
+    }
 
-        var newProduct = lot.Product!;
-        if (request.NewProductId is int newProductId && newProductId != lot.ProductId)
+    private ActionResult<LotResponse> ToLotResult(LotOperationOutcome outcome)
+    {
+        if (outcome.Error is { } error)
         {
-            var found = await db.Products.FirstOrDefaultAsync(p => p.Id == newProductId && p.IsActive, ct);
-            if (found is null)
-            {
-                return this.BadRequestProblem("存在しない（または無効な）振替先品目IDです。");
-            }
-            newProduct = found;
+            return outcome.IsConflict ? this.ConflictProblem(error) : this.BadRequestProblem(error);
         }
-
-        var newLotNumber = request.NewLotNumber;
-        if (string.IsNullOrWhiteSpace(newLotNumber))
-        {
-            newLotNumber = await numbering.NextLotNumberAsync(newProduct.Code, ct);
-        }
-        else if (await db.Lots.AnyAsync(l => l.LotNumber == newLotNumber, ct))
-        {
-            return this.ConflictProblem($"ロット番号 '{newLotNumber}' は既に存在します。");
-        }
-
-        var newLot = new Lot
-        {
-            LotNumber = newLotNumber,
-            ProductId = newProduct.Id,
-            InitialQuantity = request.Quantity,
-            OriginType = lot.OriginType,
-            ManufacturedOn = lot.ManufacturedOn,
-            ExpiresOn = lot.ExpiresOn,
-            StockStatus = lot.StockStatus,
-            Grade = lot.Grade,
-            ParentLotId = lot.Id,
-        };
-        db.Lots.Add(newLot);
-
-        // 分割と同じく、newLot.Idの確定で保存が2回に分かれる。振替元から減らした在庫が
-        // 振替先に入らないまま確定しないよう、トランザクションでまとめる
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        try
-        {
-            await inventory.RemoveAsync(lot, request.LocationId, request.Quantity,
-                InventoryTransactionType.Transfer, CurrentUserId, note: $"振替 -> {newLotNumber}", ct: ct);
-            await db.SaveChangesAsync(ct);
-            await inventory.AddAsync(newLot, request.LocationId, request.Quantity,
-                InventoryTransactionType.Transfer, CurrentUserId, note: $"振替元 {lot.LotNumber}", ct: ct);
-            AddGenealogy(lot.Id, newLot.Id, LotRelationType.Transfer, request.Quantity);
-        }
-        catch (InventoryException ex)
-        {
-            return this.BadRequestProblem(ex.Message);
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "LotTransfer", nameof(Lot), lot.Id.ToString(),
-            detail: new
-            {
-                from = new { lot = lot.LotNumber, product = lot.Product!.Code },
-                to = new { lot = newLotNumber, product = newProduct.Code },
-                quantity = request.Quantity,
-            }, ct: ct);
-        await transaction.CommitAsync(ct);
-
-        return new LotResponse(newLot.Id, newLot.LotNumber, newProduct.Id, newProduct.Code, newProduct.Name,
-            newLot.InitialQuantity, newLot.OriginType, newLot.StockStatus,
-            newLot.ManufacturedOn, newLot.ExpiresOn, newLot.Grade, newLot.ParentLotId);
+        var (lot, product) = (outcome.Lot!, outcome.Product!);
+        return new LotResponse(lot.Id, lot.LotNumber, product.Id, product.Code, product.Name,
+            lot.InitialQuantity, lot.OriginType, lot.StockStatus,
+            lot.ManufacturedOn, lot.ExpiresOn, lot.Grade, lot.ParentLotId);
     }
 
     /// <summary>在庫廃棄（D-50-30-01）</summary>
@@ -582,18 +435,4 @@ public class InventoryController(
                 kind, items.Count, items.Count - open.Count, open.Count, oldest);
         }
     }
-
-    /// <summary>
-    /// ロット系譜の記録（分割・統合・振替）。トレーサビリティ（H-30-10）は
-    /// Lot.ParentLotIdではなくこの関係を辿るため、由来が生じる操作では必ず残す
-    /// </summary>
-    private void AddGenealogy(int parentLotId, int childLotId, LotRelationType relationType, decimal quantity) =>
-        db.LotGenealogies.Add(new LotGenealogy
-        {
-            ParentLotId = parentLotId,
-            ChildLotId = childLotId,
-            RelationType = relationType,
-            Quantity = quantity,
-            PerformedByUserId = CurrentUserId,
-        });
 }
