@@ -194,10 +194,10 @@
                     string.IsNullOrEmpty(form.UserId) ? null : form.UserId,
                     form.EquipmentId == 0 ? null : form.EquipmentId,
                     form.Order == 0 ? null : form.Order));
-            if (!response.IsSuccessStatusCode)
+            // スキル・資格照合エラーもここに表示される（F-20-30-01）
+            if (await response.ReadErrorAsync("差立に失敗しました。") is { } error)
             {
-                // スキル・資格照合エラーもここに表示される（F-20-30-01）
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "差立に失敗しました。";
+                _error = error;
                 return;
             }
             _message = $"{workOrder.WorkOrderNo} を差立しました。";

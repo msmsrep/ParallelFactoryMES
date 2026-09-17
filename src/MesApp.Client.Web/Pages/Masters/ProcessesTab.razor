@@ -116,9 +116,9 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/processes", request)
                 : await Http.PutAsJsonAsync($"api/processes/{_editingId}", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保存しました。";
@@ -138,9 +138,9 @@
         try
         {
             var response = await Http.DeleteAsync($"api/processes/{id}");
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "無効化しました。";

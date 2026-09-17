@@ -152,9 +152,9 @@
                     new DateTimeOffset(_startedAt),
                     _endedAt is null ? null : new DateTimeOffset(_endedAt.Value),
                     string.IsNullOrWhiteSpace(_note) ? null : _note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "作業時間を記録しました。";

@@ -73,6 +73,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 
 - `@inject HttpClient Http`。認証ヘッダは `Auth/AuthMessageHandler` が付与する
 - 冒頭に根拠コメント：`@* ロケーションマスタ（Spec.md 5.1 Location。D-50-20-01） *@`
+- API の失敗応答は `Shared/ApiErrors.ReadErrorAsync` で読む（`IsSuccessStatusCode` と ProblemDetails の読み取りを各画面に書かない）：`if (await response.ReadErrorAsync("登録に失敗しました。") is { } error) { _error = error; return; }`
 - メッセージ表示は `<Notice Error="@_error" Message="@_message" />`、権限制御は `<AuthorizeView Roles="@MesRoleGroups.Xxx">`（APIと同じ定数を使う。書き込みの操作要素だけを隠し、画面自体は開けたままにする）
 - CSV 入出力は `<CsvIoPanel Kind="..." Label="..." KeyLabel="..." OnImported="LoadAsync" />`
 - マスタ画面は `Pages/Masters/<名前>Tab.razor` を追加し `MastersPage.razor` に登録。独立画面は `Pages/` に置き `Layout/NavMenu.razor` に導線を追加

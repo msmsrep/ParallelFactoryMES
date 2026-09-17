@@ -173,9 +173,9 @@
                     lotId == 0 ? null : lotId,
                     _workOrderId == 0 ? null : _workOrderId,
                     null, _note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("発行に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "発行に失敗しました。";
+                _error = error;
                 return;
             }
             var created = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();

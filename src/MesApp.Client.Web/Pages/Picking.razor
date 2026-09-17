@@ -217,10 +217,10 @@
                     _workOrderId == 0 ? null : _workOrderId,
                     _shippingOrderId == 0 ? null : _shippingOrderId,
                     [.. _lines]));
-            if (!response.IsSuccessStatusCode)
+            // 在庫不足もここで通知される
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
             {
-                // 在庫不足もここで通知される
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "ピッキング指示を作成しました（先入れ先出しで引当）。";
@@ -247,9 +247,9 @@
         try
         {
             var response = await Http.PostAsync(url, null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _message = successMessage;

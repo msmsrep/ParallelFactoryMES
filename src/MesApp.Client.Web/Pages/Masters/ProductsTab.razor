@@ -489,9 +489,9 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/products", request)
                 : await Http.PutAsJsonAsync($"api/products/{_editingId}", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保存しました。";
@@ -511,9 +511,9 @@
         try
         {
             var response = await Http.DeleteAsync($"api/products/{id}");
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "無効化しました。";
@@ -584,9 +584,9 @@
         try
         {
             var response = await Http.PutAsJsonAsync($"api/products/{_selected.Id}/bom", _bomLines);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "MBOMを保存しました。";
@@ -666,9 +666,9 @@
         try
         {
             var response = await Http.PutAsJsonAsync($"api/products/{_selected.Id}/routing", _routingSteps);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "工順（BOP）を保存しました。";

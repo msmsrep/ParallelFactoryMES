@@ -150,9 +150,9 @@
                     _form.ProductId, _form.Quantity,
                     _form.DueDate is null ? null : DateOnly.FromDateTime(_form.DueDate.Value),
                     _form.OrderType, null, _form.Note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _form.ProductId = 0;

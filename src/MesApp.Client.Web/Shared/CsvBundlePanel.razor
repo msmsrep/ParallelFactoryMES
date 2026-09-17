@@ -141,9 +141,9 @@
         try
         {
             var response = await Http.GetAsync($"{BaseUrl}/bundle?includeInactive=true");
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("ZIPの出力に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "ZIPの出力に失敗しました。";
+                _error = error;
                 return;
             }
             var bytes = await response.Content.ReadAsByteArrayAsync();
@@ -192,9 +192,9 @@
                 _error = "ZIPに、取り込む権限の無い種別のCSVが含まれています（何も取り込んでいません）。";
                 return;
             }
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("一括取込に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "一括取込に失敗しました。";
+                _error = error;
                 return;
             }
 

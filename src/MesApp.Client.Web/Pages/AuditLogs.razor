@@ -240,10 +240,10 @@
             var request = new AuditLogPurgeRequest(DateOnly.FromDateTime(to), _purgeReason.Trim());
             var response = await Http.PostAsJsonAsync(
                 $"api/audit-logs/purge{(dryRun ? "?dryRun=true" : string.Empty)}", request);
-            if (!response.IsSuccessStatusCode)
+            // 保持期間の内側を指定した場合もここに出る
+            if (await response.ReadErrorAsync("一括削除に失敗しました。") is { } error)
             {
-                // 保持期間の内側を指定した場合もここに出る
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "一括削除に失敗しました。";
+                _error = error;
                 _preview = null;
                 return;
             }

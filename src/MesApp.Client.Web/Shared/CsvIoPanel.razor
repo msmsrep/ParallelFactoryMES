@@ -189,9 +189,9 @@
         try
         {
             var response = await Http.GetAsync(url);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("CSVの出力に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "CSVの出力に失敗しました。";
+                _error = error;
                 return;
             }
             var bytes = await response.Content.ReadAsByteArrayAsync();
@@ -235,9 +235,9 @@
             content.Add(fileContent, "file", _file.Name);
 
             var response = await Http.PostAsync($"{BaseUrl}/{Kind}?dryRun={(_dryRun ? "true" : "false")}", content);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("取込に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取込に失敗しました。";
+                _error = error;
                 return;
             }
 

@@ -235,9 +235,9 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/inspection-devices", request)
                 : await Http.PutAsJsonAsync($"api/inspection-devices/{_editingId}", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保存しました。";
@@ -278,9 +278,9 @@
                 _calibrationResult);
             var response = await Http.PostAsJsonAsync(
                 $"api/inspection-devices/{_calibrationTarget.Id}/calibrations", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "校正を記録しました。";
@@ -305,9 +305,9 @@
         try
         {
             var response = await Http.DeleteAsync($"api/inspection-devices/{id}");
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "無効化しました。";

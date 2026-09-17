@@ -311,9 +311,9 @@ else
         try
         {
             var response = await Http.PostAsJsonAsync($"api/inspection-orders/{Id}/results", requests);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
@@ -335,9 +335,9 @@ else
         {
             var response = await Http.PostAsJsonAsync($"api/inspection-orders/{Id}/judge",
                 new InspectionJudgeRequest(string.IsNullOrWhiteSpace(_grade) ? null : _grade));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("判定に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "判定に失敗しました。";
+                _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
@@ -364,9 +364,9 @@ else
         try
         {
             var response = await Http.PostAsync($"api/inspection-orders/{Id}/cancel", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取消に失敗しました。";
+                _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
@@ -385,9 +385,9 @@ else
         try
         {
             var response = await Http.PostAsync($"api/inspection-orders/{Id}/approve", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
@@ -423,9 +423,9 @@ else
                 $"api/inspection-orders/{Id}/results/{_correcting.Id}",
                 new InspectionResultCorrectionRequest(_correctMeasured, _correcting.TextValue,
                     _correctJudgment, _correctReason));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("訂正に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "訂正に失敗しました。";
+                _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();

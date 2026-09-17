@@ -298,9 +298,9 @@
                     _form.WorkOrderId == 0 ? null : _form.WorkOrderId,
                     _form.EquipmentId == 0 ? null : _form.EquipmentId,
                     _form.Content));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("報告に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "報告に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "トラブルを報告しました。";
@@ -323,9 +323,9 @@
             var note = GetResponse(trouble.Id).Note;
             var response = await Http.PutAsJsonAsync($"api/trouble-reports/{trouble.Id}",
                 new TroubleUpdateRequest(note, status));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("更新に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "更新に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "対応履歴を更新しました。";

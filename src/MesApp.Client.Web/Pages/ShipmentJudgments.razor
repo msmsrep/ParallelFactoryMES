@@ -129,9 +129,9 @@
                     _lotId == 0 ? null : _lotId,
                     _shippingOrderId == 0 ? null : _shippingOrderId,
                     _result, _note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "出荷判定を登録しました。承認すると出荷実行が可能になります。";
@@ -152,9 +152,9 @@
         try
         {
             var response = await Http.PostAsync($"api/shipment-judgments/{id}/approve", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "判定を承認しました。";

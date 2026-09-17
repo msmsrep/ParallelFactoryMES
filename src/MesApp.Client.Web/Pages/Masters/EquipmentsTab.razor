@@ -248,9 +248,9 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/equipments", request)
                 : await Http.PutAsJsonAsync($"api/equipments/{_editingId}", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保存しました。";
@@ -270,9 +270,9 @@
         try
         {
             var response = await Http.DeleteAsync($"api/equipments/{id}");
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "無効化しました。";
@@ -335,9 +335,9 @@
         {
             var response = await Http.PutAsJsonAsync(
                 $"api/equipments/{_selected.Id}/parts", _partLines);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保全部品の保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保全部品の保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保全部品を保存しました。";

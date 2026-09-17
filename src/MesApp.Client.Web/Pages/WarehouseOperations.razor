@@ -284,9 +284,9 @@
                 _retainUntil is null ? null : DateOnly.FromDateTime(_retainUntil.Value),
                 null, _note);
             var response = await Http.PostAsJsonAsync("api/sample-storages", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("採取の登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "採取の登録に失敗しました。";
+                _error = error;
                 return;
             }
             var sample = await response.Content.ReadFromJsonAsync<SampleStorageResponse>();
@@ -310,9 +310,9 @@
         {
             var response = await Http.PostAsJsonAsync(
                 $"api/sample-storages/{sample.Id}/close", new SampleCloseRequest(status, null));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保管の終了に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保管の終了に失敗しました。";
+                _error = error;
                 return;
             }
             _message = $"サンプル {sample.SampleNo} を{StatusLabel(status)}にしました。";

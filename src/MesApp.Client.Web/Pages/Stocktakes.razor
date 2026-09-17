@@ -176,9 +176,9 @@
         {
             var response = await Http.PostAsJsonAsync("api/stocktakes",
                 new StocktakeCreateRequest(_targetLocationId == 0 ? null : _targetLocationId));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "棚卸指示を作成しました。";
@@ -205,9 +205,9 @@
             var counts = _counts.Select(c => new StocktakeCountLine(c.Key, c.Value)).ToList();
             var response = await Http.PutAsJsonAsync($"api/stocktakes/{_selected.Id}/counts",
                 new StocktakeCountRequest(counts));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _selected = await response.Content.ReadFromJsonAsync<StocktakeResponse>();
@@ -234,9 +234,9 @@
         try
         {
             var response = await Http.PostAsync(url, null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _selected = await response.Content.ReadFromJsonAsync<StocktakeResponse>();

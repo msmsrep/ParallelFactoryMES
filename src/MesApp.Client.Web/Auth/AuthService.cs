@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using MesApp.Client.Web.Shared;
 using MesApp.Core.Contracts.Auth;
 
 namespace MesApp.Client.Web.Auth;
@@ -23,10 +24,9 @@ public class AuthService(HttpClient bareClient, TokenStore tokenStore, ApiAuthen
     public async Task<string?> LoginAsync(string userName, string password)
     {
         var response = await bareClient.PostAsJsonAsync("api/auth/login", new LoginRequest(userName, password));
-        if (!response.IsSuccessStatusCode)
+        if (await response.ReadErrorAsync("ログインに失敗しました。") is { } error)
         {
-            var problem = await ReadProblemTitleAsync(response);
-            return problem ?? "ログインに失敗しました。";
+            return error;
         }
         var token = await response.Content.ReadFromJsonAsync<TokenResponse>();
         tokenStore.Set(token!.AccessToken, token.User);
@@ -92,27 +92,12 @@ public class AuthService(HttpClient bareClient, TokenStore tokenStore, ApiAuthen
         request.Headers.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenStore.AccessToken);
         var response = await bareClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
+        if (await response.ReadErrorAsync("パスワード変更に失敗しました。") is { } error)
         {
-            return await ReadProblemTitleAsync(response) ?? "パスワード変更に失敗しました。";
+            return error;
         }
         tokenStore.Clear();
         stateProvider.NotifyChanged();
         return null;
-    }
-
-    private sealed record ProblemDto(string? Title);
-
-    internal static async Task<string?> ReadProblemTitleAsync(HttpResponseMessage response)
-    {
-        try
-        {
-            var problem = await response.Content.ReadFromJsonAsync<ProblemDto>();
-            return problem?.Title;
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

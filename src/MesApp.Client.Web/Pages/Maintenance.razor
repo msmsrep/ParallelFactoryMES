@@ -758,9 +758,9 @@ else
                 new EquipmentLogRequest(_log.EquipmentId, _log.Status, new DateTimeOffset(_log.StartedAt),
                     _log.EndedAt is null ? null : new DateTimeOffset(_log.EndedAt.Value),
                     _log.StopCause, null, _log.WorkOrderId == 0 ? null : _log.WorkOrderId));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "稼働実績を記録しました。";
@@ -789,9 +789,9 @@ else
                 new MaintenancePlanRequest(_plan.EquipmentId, _plan.Category, _plan.PlanYear,
                     _plan.ScheduledDate is null ? null : DateOnly.FromDateTime(_plan.ScheduledDate.Value),
                     _plan.CycleDays, _plan.Note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保全計画を作成しました。";
@@ -813,9 +813,9 @@ else
             var response = await Http.PostAsJsonAsync("api/maintenance-orders",
                 new MaintenanceOrderCreateRequest(plan.EquipmentId, null, plan.Id, null,
                     plan.ScheduledDate, MaintenanceRequestType.Planned, plan.Note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("発行に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "発行に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保全指示を発行しました。";
@@ -842,9 +842,9 @@ else
                     _order.ProcedureId == 0 ? null : _order.ProcedureId,
                     _order.ScheduledDate is null ? null : DateOnly.FromDateTime(_order.ScheduledDate.Value),
                     _order.RequestType, _order.Note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保全指示を作成しました。";
@@ -889,9 +889,9 @@ else
                         .Select(line => new MaintenanceRecordPartRequest(
                             line.LotId, line.LocationId, line.Quantity, null))
                         .ToList()));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保全実績を登録しました（指示は完了になります）。";
@@ -911,9 +911,9 @@ else
         try
         {
             var response = await Http.PostAsync($"api/maintenance-orders/{id}/cancel", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取消に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保全指示を取消しました。";
@@ -942,9 +942,9 @@ else
                     _procedure.EquipmentId == 0 ? null : _procedure.EquipmentId,
                     _procedure.ToolId == 0 ? null : _procedure.ToolId,
                     _procedure.Steps));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保全手順書を登録しました。";

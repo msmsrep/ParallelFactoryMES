@@ -174,9 +174,9 @@
                     string.IsNullOrWhiteSpace(_form.LotNumber) ? null : _form.LotNumber,
                     _form.ExpiresOn is null ? null : DateOnly.FromDateTime(_form.ExpiresOn.Value),
                     _form.Note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("受入登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "受入登録に失敗しました。";
+                _error = error;
                 return;
             }
             var lot = await response.Content.ReadFromJsonAsync<LotResponse>();
@@ -199,9 +199,9 @@
         try
         {
             var response = await Http.PostAsync($"api/receiving/{lotId}/cancel", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取消に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "受入を取消しました。";

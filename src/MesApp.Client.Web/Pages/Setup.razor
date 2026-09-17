@@ -55,7 +55,7 @@
                 Navigation.NavigateTo("login");
                 return;
             }
-            _error = await AuthService.ReadProblemTitleAsync(response) ?? "セットアップに失敗しました。パスワード要件（8文字以上・英小文字・数字）を確認してください。";
+            _error = await response.ReadErrorAsync("セットアップに失敗しました。パスワード要件（8文字以上・英小文字・数字）を確認してください。");
         }
         finally
         {

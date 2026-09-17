@@ -273,9 +273,9 @@ else
             var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/setup-records",
                 new SetupRecordRequest(_setupType, new DateTimeOffset(_startedAt),
                     _endedAt is null ? null : new DateTimeOffset(_endedAt.Value), _abnormality));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "段取り実績を記録しました。";
@@ -304,10 +304,10 @@ else
                 .ToList();
             var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/checklist-records",
                 new ChecklistRecordRequest(_selectedChecklist.Id, results));
-            if (!response.IsSuccessStatusCode)
+            // 必須項目が未チェックの場合はここでエラーになる
+            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
             {
-                // 必須項目が未チェックの場合はここでエラーになる
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "チェックリストを記録しました。";
@@ -371,9 +371,9 @@ else
         try
         {
             var response = await action();
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _message = success;

@@ -225,9 +225,9 @@ else
                     _editQuantity,
                     _editDueDate is null ? null : DateOnly.FromDateTime(_editDueDate.Value),
                     string.IsNullOrWhiteSpace(_editNote) ? null : _editNote));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("変更に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "変更に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "指図を変更しました（承認済みだったものは未承認に戻ります）。";
@@ -256,9 +256,9 @@ else
         try
         {
             var response = await Http.PostAsync(url, content);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _message = successMessage;

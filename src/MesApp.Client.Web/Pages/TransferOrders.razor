@@ -184,10 +184,10 @@
         {
             var response = await Http.PostAsJsonAsync("api/transfer-orders",
                 new TransferOrderRequest(_lotId, _quantity, _fromLocationId, _toLocationId));
-            if (!response.IsSuccessStatusCode)
+            // 在庫不足・同一ロケーション指定もここに出る
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
             {
-                // 在庫不足・同一ロケーション指定もここに出る
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "搬送指示を作成しました。運び終えたら「実行」で在庫を移動します。";
@@ -214,9 +214,9 @@
         try
         {
             var response = await Http.PostAsync(url, null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _message = successMessage;

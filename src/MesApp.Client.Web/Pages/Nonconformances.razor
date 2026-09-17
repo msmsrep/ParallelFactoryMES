@@ -207,9 +207,9 @@
                     _form.LotId == 0 ? null : _form.LotId,
                     _form.WorkOrderId == 0 ? null : _form.WorkOrderId,
                     null, _form.Content, _form.CauseCategory, _form.CauseDetail));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("起票に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "起票に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "不適合を起票しました。";
@@ -256,9 +256,9 @@
         try
         {
             var response = await Http.PostAsync($"api/nonconformances/{report.Id}/approve", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "承認しました（クローズ）。";
@@ -278,9 +278,9 @@
         try
         {
             var response = await Http.PostAsJsonAsync(url, body);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _message = successMessage;

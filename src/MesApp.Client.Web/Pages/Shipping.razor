@@ -224,9 +224,9 @@
                 new ShippingOrderCreateRequest(_destination,
                     _plannedDate is null ? null : DateOnly.FromDateTime(_plannedDate.Value),
                     [.. _lines]));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "出荷指示を作成しました。出荷前に出荷判定（可／特採）の承認が必要です。";
@@ -255,10 +255,10 @@
         {
             var response = await Http.PostAsJsonAsync($"api/shipping-orders/{order.Id}/ship",
                 new ShipExecuteRequest([new ShipLineRequest(form.LotId, form.LocationId, form.Quantity)]));
-            if (!response.IsSuccessStatusCode)
+            // 出荷判定未承認の場合もここで通知される（H-10-10ゲート）
+            if (await response.ReadErrorAsync("出荷に失敗しました。") is { } error)
             {
-                // 出荷判定未承認の場合もここで通知される（H-10-10ゲート）
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "出荷に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "出荷を実行しました。";
@@ -278,9 +278,9 @@
         try
         {
             var response = await Http.PostAsync($"api/shipping-orders/{id}/cancel", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取消に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "出荷指示を取消しました。";

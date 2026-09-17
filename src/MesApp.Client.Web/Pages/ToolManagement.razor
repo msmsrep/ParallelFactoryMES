@@ -284,9 +284,9 @@
             var response = await Http.PostAsJsonAsync("api/tool-usages",
                 new ToolUsageRequest(_toolId, _workOrderId == 0 ? null : _workOrderId,
                     _usageCount, _usageHours));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "利用実績を記録しました。";

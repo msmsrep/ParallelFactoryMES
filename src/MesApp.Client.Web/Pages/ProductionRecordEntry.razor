@@ -598,10 +598,10 @@ else
             var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/consumptions",
                 new ConsumptionRequest(_consumeLotId, _consumeLocationId, _consumeQuantity,
                     string.IsNullOrWhiteSpace(_substituteReason) ? null : _substituteReason));
-            if (!response.IsSuccessStatusCode)
+            // 予定材料との照合エラー（代替理由の未入力を含む）もここに出る
+            if (await response.ReadErrorAsync("部材投入に失敗しました。") is { } error)
             {
-                // 予定材料との照合エラー（代替理由の未入力を含む）もここに出る
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "部材投入に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "部材投入を記録しました。";
@@ -668,9 +668,9 @@ else
                         _dataControlItemId == 0 ? null : _dataControlItemId,
                         _dataControlItemId == 0 ? null : _dataNumericValue),
                 });
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("製造条件の記録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "製造条件の記録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "製造条件を記録しました。";
@@ -722,9 +722,9 @@ else
             var response = await Http.PutAsJsonAsync($"api/production-records/{_correcting.Id}",
                 new ProductionRecordCorrectionRequest(
                     _correctGood, _correctDefect, _correctReason, _correctScrap, _correctRework));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("訂正に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "訂正に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "実績を訂正しました（訂正前の値は訂正履歴に残ります）。";
@@ -744,9 +744,9 @@ else
         try
         {
             var response = await Http.PostAsync($"api/work-orders/{Id}/start", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("着手に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "着手に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "着手しました。";
@@ -794,9 +794,9 @@ else
                     _defectByReason.Where(x => x.Value > 0)
                         .Select(x => new ProductionDefectRequest(x.Key, x.Value))
                         .ToList()));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("実績登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "実績登録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "実績を登録しました。";
@@ -820,9 +820,9 @@ else
         try
         {
             var response = await Http.PostAsync($"api/work-orders/{Id}/approve", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "承認しました。";
