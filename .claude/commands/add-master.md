@@ -18,7 +18,7 @@ allowed-tools: Read, Grep, Glob, Edit, Write, PowerShell, Bash
 ## 実装順序（各ステップ完了後に次へ）
 
 1. **エンティティ**: `Core/Entities/Masters.cs` にクラス追加。`Id` / 一意コード / `IsActive` を持たせる。ステータス系は `Core/Entities/Enums.cs` に追加。
-2. **DbContext**: `Infra/MesAppDbContext.cs` に `DbSet` と `OnModelCreating` の設定（一意インデックス・必須・最大長）を追加。既存マスタの記述に揃える。
+2. **DbContext**: `Infra/MesAppDbContext.cs` に `DbSet` を、`Infra/Configurations/MasterConfigurations.cs` に `IEntityTypeConfiguration<T>` のクラス（一意インデックス・必須・最大長）を追加（`ApplyConfigurationsFromAssembly` で自動で読み込まれる）。既存マスタの記述に揃える。
 3. **マイグレーション**: `dotnet ef migrations add Add<Name>Master --project src/MesApp.Infrastructure --startup-project src/MesApp.Api`
    生成物は**開かない・編集しない**。
 4. **DTO**: `Core/Contracts/Masters/` に `<Name>Request` / `<Name>Response` を `record` で追加。

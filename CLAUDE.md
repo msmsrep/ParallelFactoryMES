@@ -34,7 +34,7 @@ dotnet ef migrations add <Name> --project src/MesApp.Infrastructure --startup-pr
 | プロジェクト | 責務 |
 |:--|:--|
 | `src/MesApp.Core` | エンティティ（`Entities/`）、DTO（`Contracts/<領域>/`、record）、`Constants/MesRoles.cs`・`Constants/MesRoleGroups.cs`、抽象（`Abstractions/`）。外部依存なし |
-| `src/MesApp.Infrastructure` | `MesAppDbContext`、EF Core (SQLite)、`Migrations/`、`Services/AuditLogger.cs`、DI 拡張 |
+| `src/MesApp.Infrastructure` | `MesAppDbContext`、エンティティ設定（`Configurations/<領域>Configurations.cs`）、EF Core (SQLite)、`Migrations/`、`Services/AuditLogger.cs`、DI 拡張 |
 | `src/MesApp.Api` | Controllers、業務サービス（`Services/`）、JWT 認証、Blazor WASM の静的配信 |
 | `src/MesApp.Client.Web` | Blazor WASM。`Pages/`、`Pages/Masters/*Tab.razor`、`Shared/` 共通コンポーネント、`Auth/` |
 | `tests/MesApp.Api.Tests` | xUnit + `WebApplicationFactory`。テストごとに一時 SQLite |
@@ -51,7 +51,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 
 ## 読み込み禁止・注意
 
-- `src/MesApp.Infrastructure/Migrations/**`（`*.Designer.cs`、`MesAppDbContextModelSnapshot.cs` 含む、約13,700行）— **開かない**。スキーマは `MesAppDbContext.cs` とエンティティで確認する。
+- `src/MesApp.Infrastructure/Migrations/**`（`*.Designer.cs`、`MesAppDbContextModelSnapshot.cs` 含む、約13,700行）— **開かない**。スキーマは `Configurations/` とエンティティで確認する。
 - `Spec.md`（496行）/ `MES.md`（518行）— **全文を読まない。必ず grep で該当節・該当業務Noだけ**を読む。
 - `MES.md` は ENAA 著作物のためリポジトリに含めない（`.gitignore` 済み・ローカルのみ）。内容を他ファイルに転記しない。
 - 500行超のファイル（`Maintenance.razor`、`MasterCsvService.Import.cs` 等）は該当行 ±40行のみ読む。
@@ -87,7 +87,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 
 ## 新機能を追加する順序
 
-Entity（`Core/Entities`）→ `MesAppDbContext` 設定 → マイグレーション → DTO（`Core/Contracts`）→ Controller → 必要なら `MesRoleGroups` → Razor 画面 → `MastersPage`/`NavMenu` 登録 → CSV 対応（`MasterCsvKinds`）→ テスト → `Spec.md` 更新
+Entity（`Core/Entities`）→ `MesAppDbContext` の `DbSet` と `Configurations/` の設定 → マイグレーション → DTO（`Core/Contracts`）→ Controller → 必要なら `MesRoleGroups` → Razor 画面 → `MastersPage`/`NavMenu` 登録 → CSV 対応（`MasterCsvKinds`）→ テスト → `Spec.md` 更新
 
 ## 完了の定義（DoD・全項目必須）
 
