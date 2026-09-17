@@ -168,7 +168,6 @@ public class UsersController(
         return await ToSummaryAsync(user);
     }
 
-    /// <summary>パスワードリセット（管理者操作。次回ログイン時に変更を強制）</summary>
     /// <summary>
     /// 作業場所（作業区）と所属する直の指定が使える値かを確認する。使えない場合は日本語の理由を返す。
     /// 登録と更新で同じ判定を通す（片方にだけ書くと、登録した内容が編集で弾かれる食い違いが出る）。
@@ -194,6 +193,7 @@ public class UsersController(
         return null;
     }
 
+    /// <summary>パスワードリセット（管理者操作。次回ログイン時に変更を強制）</summary>
     [HttpPost("{id}/reset-password")]
     [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<IActionResult> ResetPassword(string id, ResetPasswordRequest request, CancellationToken ct)
