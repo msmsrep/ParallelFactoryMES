@@ -1,36 +1,187 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace MesApp.Api.Services;
 
-/// <summary>ロット操作の結果（Errorがあれば未反映。IsConflictはロット番号の重複）</summary>
-public sealed record LotOperationOutcome(Lot? Lot, Product? Product, string? Error, bool IsConflict = false)
-{
-    public static LotOperationOutcome Ok(Lot lot, Product? product) => new(lot, product, null);
-    public static LotOperationOutcome Invalid(string error) => new(null, null, error);
-    public static LotOperationOutcome Conflict(string error) => new(null, null, error, IsConflict: true);
-}
-
 /// <summary>
-/// ロットの分割・統合・振替（D-10-30-05〜07）。数量の移し替えとロット系譜（H-30-10）の記録をまとめる。
+/// ロットに対する在庫操作（D-10-30）：移動・調整・ステータス変更・分割・統合・振替・廃棄・返品・払出戻し。
+/// 数量の移し替えとロット系譜（H-30-10）の記録をまとめる。
 /// 保存・監査ログまで行い、ロットの生成を伴う分割・振替はここでトランザクションを張る。
 /// </summary>
 public sealed class LotOperationService(
     MesAppDbContext db,
     InventoryService inventory,
+    LotStatusService lotStatus,
     NumberingService numbering,
     IAuditLogger auditLogger)
 {
+    /// <summary>在庫移動（D-10-30-02）</summary>
+    public async Task<Outcome<Lot>> MoveAsync(
+        int lotId, int fromLocationId, int toLocationId, decimal quantity, string? userId, CancellationToken ct)
+    {
+        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
+        if (lot is null)
+        {
+            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+        }
+        if (!await db.Locations.AnyAsync(l => l.Id == toLocationId && l.IsActive, ct))
+        {
+            return Outcome<Lot>.Invalid("存在しない（または無効な）移動先ロケーションです。");
+        }
+        try
+        {
+            await inventory.MoveAsync(lot, fromLocationId, toLocationId, quantity,
+                InventoryTransactionType.Move, userId, ct: ct);
+        }
+        catch (InventoryException ex)
+        {
+            return Outcome<Lot>.Invalid(ex.Message);
+        }
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "Move", nameof(Lot), lot.Id.ToString(),
+            detail: $"lot={lot.LotNumber}, qty={quantity}", ct: ct);
+        return Outcome<Lot>.Ok(lot);
+    }
+
+    /// <summary>数量調整（実在庫との差異訂正 D-10-30-04。理由必須・変更前後を監査ログに残す）</summary>
+    public async Task<Outcome<Lot>> AdjustAsync(
+        int lotId, int locationId, decimal newQuantity, string? reason, string? userId, CancellationToken ct)
+    {
+        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
+        if (lot is null)
+        {
+            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+        }
+        var stock = await db.InventoryStocks.FirstOrDefaultAsync(
+            s => s.LotId == lotId && s.LocationId == locationId, ct);
+        var current = stock?.Quantity ?? 0;
+        var delta = newQuantity - current;
+        if (delta == 0)
+        {
+            return Outcome<Lot>.Invalid("現在数量と同じため調整は不要です。");
+        }
+
+        try
+        {
+            if (delta > 0)
+            {
+                await inventory.AddAsync(lot, locationId, delta,
+                    InventoryTransactionType.Adjust, userId, note: reason, ct: ct);
+            }
+            else
+            {
+                await inventory.RemoveAsync(lot, locationId, -delta,
+                    InventoryTransactionType.Adjust, userId, note: reason, ct: ct);
+            }
+        }
+        catch (InventoryException ex)
+        {
+            return Outcome<Lot>.Invalid(ex.Message);
+        }
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "Adjust", nameof(Lot), lot.Id.ToString(),
+            detail: new
+            {
+                lot = lot.LotNumber,
+                locationId,
+                before = current,
+                after = newQuantity,
+                reason,
+            }, ct: ct);
+        return Outcome<Lot>.Ok(lot);
+    }
+
+    /// <summary>在庫ステータス変更（保留・検査待ち・不良・廃棄予定等。D-10-30-08。ロット単位）</summary>
+    public async Task<Outcome<Lot>> ChangeStatusAsync(
+        int lotId, LotStockStatus status, string? reason, string? userId, CancellationToken ct)
+    {
+        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
+        if (lot is null)
+        {
+            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+        }
+        var before = lot.StockStatus;
+        lotStatus.ChangeStatus(lot, status, LotStatusChangeSource.Manual, reason, userId);
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "StatusChange", nameof(Lot), lot.Id.ToString(),
+            detail: new
+            {
+                lot = lot.LotNumber,
+                before = before.ToString(),
+                after = status.ToString(),
+                reason,
+            }, ct: ct);
+        return Outcome<Lot>.Ok(lot);
+    }
+
+    /// <summary>在庫廃棄（D-50-30-01）</summary>
+    public Task<Outcome<Lot>> DiscardAsync(
+        int lotId, int locationId, decimal quantity, string? reason, string? userId, CancellationToken ct) =>
+        RemoveSimpleAsync(lotId, locationId, quantity,
+            InventoryTransactionType.Discard, "Discard", reason, userId, ct);
+
+    /// <summary>返品（D-10-10-05。サプライヤーへの返品による在庫引落し）</summary>
+    public Task<Outcome<Lot>> ReturnAsync(
+        int lotId, int locationId, decimal quantity, string? reason, string? userId, CancellationToken ct) =>
+        RemoveSimpleAsync(lotId, locationId, quantity,
+            InventoryTransactionType.Return, "Return", reason, userId, ct);
+
+    /// <summary>払出戻し（D-20-20-03。工程に払い出した部材の在庫戻し）</summary>
+    public async Task<Outcome<Lot>> IssueReturnAsync(
+        int lotId, int locationId, decimal quantity, int? workOrderId, string? userId, CancellationToken ct)
+    {
+        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
+        if (lot is null)
+        {
+            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+        }
+        if (!await db.Locations.AnyAsync(l => l.Id == locationId && l.IsActive, ct))
+        {
+            return Outcome<Lot>.Invalid("存在しない（または無効な）ロケーションIDです。");
+        }
+        await inventory.AddAsync(lot, locationId, quantity,
+            InventoryTransactionType.IssueReturn, userId, workOrderId: workOrderId, ct: ct);
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "IssueReturn", nameof(Lot), lot.Id.ToString(),
+            detail: $"lot={lot.LotNumber}, qty={quantity}", ct: ct);
+        return Outcome<Lot>.Ok(lot);
+    }
+
+    /// <summary>ロケーションから数量を引き落とすだけの操作（廃棄・返品で共通）</summary>
+    private async Task<Outcome<Lot>> RemoveSimpleAsync(
+        int lotId, int locationId, decimal quantity,
+        InventoryTransactionType type, string auditAction, string? reason,
+        string? userId, CancellationToken ct)
+    {
+        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
+        if (lot is null)
+        {
+            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+        }
+        try
+        {
+            await inventory.RemoveAsync(lot, locationId, quantity, type, userId, note: reason, ct: ct);
+        }
+        catch (InventoryException ex)
+        {
+            return Outcome<Lot>.Invalid(ex.Message);
+        }
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", auditAction, nameof(Lot), lot.Id.ToString(),
+            detail: $"lot={lot.LotNumber}, qty={quantity}, reason={reason}", ct: ct);
+        return Outcome<Lot>.Ok(lot);
+    }
+
     /// <summary>ロット分割（新ロットは親ロットの系譜・期限を引き継ぐ）</summary>
-    public async Task<LotOperationOutcome> SplitAsync(
+    public async Task<Outcome<Lot>> SplitAsync(
         int lotId, int locationId, decimal quantity, string? newLotNumber, string? userId, CancellationToken ct)
     {
         var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return LotOperationOutcome.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid("存在しないロットIDです。");
         }
 
         return await DeriveAsync(lot, lot.Product!, locationId, quantity, newLotNumber,
@@ -41,29 +192,29 @@ public sealed class LotOperationService(
     }
 
     /// <summary>ロット統合（同一品目・同一ロケーションの在庫を統合先ロットへ移す）</summary>
-    public async Task<LotOperationOutcome> MergeAsync(
+    public async Task<Outcome<Lot>> MergeAsync(
         int sourceLotId, int targetLotId, int locationId, string? userId, CancellationToken ct)
     {
         var source = await db.Lots.FirstOrDefaultAsync(l => l.Id == sourceLotId, ct);
         var target = await db.Lots.FirstOrDefaultAsync(l => l.Id == targetLotId, ct);
         if (source is null || target is null)
         {
-            return LotOperationOutcome.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid("存在しないロットIDです。");
         }
         if (source.Id == target.Id)
         {
-            return LotOperationOutcome.Invalid("統合元と統合先が同一ロットです。");
+            return Outcome<Lot>.Invalid("統合元と統合先が同一ロットです。");
         }
         if (source.ProductId != target.ProductId)
         {
-            return LotOperationOutcome.Invalid("品目が異なるロットは統合できません。");
+            return Outcome<Lot>.Invalid("品目が異なるロットは統合できません。");
         }
 
         var stock = await db.InventoryStocks.FirstOrDefaultAsync(
             s => s.LotId == source.Id && s.LocationId == locationId, ct);
         if (stock is null || stock.Quantity <= 0)
         {
-            return LotOperationOutcome.Invalid("統合元の在庫がありません。");
+            return Outcome<Lot>.Invalid("統合元の在庫がありません。");
         }
         var quantity = stock.Quantity;
 
@@ -78,27 +229,27 @@ public sealed class LotOperationService(
         }
         catch (InventoryException ex)
         {
-            return LotOperationOutcome.Invalid(ex.Message);
+            return Outcome<Lot>.Invalid(ex.Message);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "Merge", nameof(Lot), target.Id.ToString(),
             detail: new { from = source.LotNumber, to = target.LotNumber, quantity }, ct: ct);
-        return LotOperationOutcome.Ok(target, null);
+        return Outcome<Lot>.Ok(target);
     }
 
     /// <summary>品目振替・ロット振替（新しいロットを生成して数量を移す）</summary>
-    public async Task<LotOperationOutcome> TransferAsync(
+    public async Task<Outcome<Lot>> TransferAsync(
         int lotId, int locationId, decimal quantity, int? newProductId, string? newLotNumber,
         string? userId, CancellationToken ct)
     {
         if (newProductId is null && string.IsNullOrWhiteSpace(newLotNumber))
         {
-            return LotOperationOutcome.Invalid("新品目ID（品目振替）または新ロット番号（ロット振替）を指定してください。");
+            return Outcome<Lot>.Invalid("新品目ID（品目振替）または新ロット番号（ロット振替）を指定してください。");
         }
         var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return LotOperationOutcome.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid("存在しないロットIDです。");
         }
 
         var newProduct = lot.Product!;
@@ -107,7 +258,7 @@ public sealed class LotOperationService(
             var found = await db.Products.FirstOrDefaultAsync(p => p.Id == productId && p.IsActive, ct);
             if (found is null)
             {
-                return LotOperationOutcome.Invalid("存在しない（または無効な）振替先品目IDです。");
+                return Outcome<Lot>.Invalid("存在しない（または無効な）振替先品目IDです。");
             }
             newProduct = found;
         }
@@ -128,7 +279,7 @@ public sealed class LotOperationService(
     /// 親ロットから新ロットを生成して数量を移す（分割・振替で共通）。
     /// 新ロットは親ロットの由来・製造日・期限・ステータス・グレードを引き継ぐ
     /// </summary>
-    private async Task<LotOperationOutcome> DeriveAsync(
+    private async Task<Outcome<Lot>> DeriveAsync(
         Lot lot, Product newProduct, int locationId, decimal quantity, string? newLotNumber,
         InventoryTransactionType transactionType, LotRelationType relationType, string label,
         string? userId, Func<Lot, Task> audit, CancellationToken ct)
@@ -139,7 +290,7 @@ public sealed class LotOperationService(
         }
         else if (await db.Lots.AnyAsync(l => l.LotNumber == newLotNumber, ct))
         {
-            return LotOperationOutcome.Conflict($"ロット番号 '{newLotNumber}' は既に存在します。");
+            return Outcome<Lot>.Conflict($"ロット番号 '{newLotNumber}' は既に存在します。");
         }
 
         var newLot = new Lot
@@ -153,6 +304,7 @@ public sealed class LotOperationService(
             StockStatus = lot.StockStatus,
             Grade = lot.Grade,
             ParentLotId = lot.Id,
+            Product = newProduct,
         };
         db.Lots.Add(newLot);
 
@@ -170,12 +322,12 @@ public sealed class LotOperationService(
         }
         catch (InventoryException ex)
         {
-            return LotOperationOutcome.Invalid(ex.Message);
+            return Outcome<Lot>.Invalid(ex.Message);
         }
         await db.SaveChangesAsync(ct);
         await audit(newLot);
         await transaction.CommitAsync(ct);
-        return LotOperationOutcome.Ok(newLot, newProduct);
+        return Outcome<Lot>.Ok(newLot);
     }
 
     /// <summary>

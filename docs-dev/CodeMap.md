@@ -57,7 +57,7 @@
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
 | 受入・受入ロット採番 | D-10-10 | `ReceivingController.cs` `api/receiving` | `Core/Entities/Inventory.cs`: InventoryStock / InventoryTransaction<br>Production.cs: Lot | `/receiving` `Receiving.razor` | `Tests/InventoryTests.cs` |
-| 在庫オペレーション（照会・移動・調整・分割/統合・廃棄・期限） | D-10-30 / D-30-10 / D-40-40 | `InventoryController.cs` `api/inventory`<br>`Api/Services/InventoryService.cs`<br>分割・統合・振替は `Api/Services/LotOperationService.cs` | Inventory.cs: InventoryStock / InventoryTransaction | `/inventory` `Inventory.razor` | `Tests/InventoryTests.cs` |
+| 在庫オペレーション（照会・移動・調整・分割/統合・廃棄・期限） | D-10-30 / D-30-10 / D-40-40 | `InventoryController.cs` `api/inventory`<br>更新系（移動・調整・ステータス変更・分割・統合・振替・廃棄・返品・払出戻し）は `Api/Services/LotOperationService.cs`<br>在庫数量の増減そのものは `Api/Services/InventoryService.cs` | Inventory.cs: InventoryStock / InventoryTransaction | `/inventory` `Inventory.razor` | `Tests/InventoryTests.cs` |
 | 出庫・ピッキング・工程払出（FEFO自動引当） | D-20-10 / D-20-20 | `PickingOrdersController.cs` `api/picking-orders` | Inventory.cs: PickingOrder / PickingLine | `/picking` `Picking.razor` | `Tests/InventoryTests.cs` |
 | 出荷（出荷判定ゲート付き） | D-40 / H-10-10 | `ShippingOrdersController.cs` `api/shipping-orders` | Inventory.cs: ShippingOrder / ShippingLine | `/shipping` `Shipping.razor`<br>`/print/shipping/{id}` `Print/ShippingSlip.razor` | `Tests/InventoryTests.cs` |
 | 棚卸（スナップショット→実棚→差異→確定） | D-50-10 | `StocktakesController.cs` `api/stocktakes` | Inventory.cs: Stocktake / StocktakeLine | `/stocktakes` `Stocktakes.razor`<br>`/print/stocktake/{id}` `Print/StocktakeSheet.razor` | `Tests/InventoryTests.cs` |
@@ -123,7 +123,7 @@
 | システム管理者を失わない | `Api/Policies/LastAdminPolicy.cs` | Spec.md 3.6。有効なシステム管理者が0人になる無効化・降格を拒否する。呼び先は `UsersController.Update`（1件ずつ判定）／`MasterCsvService.Import.ImportUsersAsync`（**全行の適用後**に判定。行順で引き継ぎを弾かないため）。`Tests/MasterTests.cs` / `MasterCsvTests.cs` |
 | 参照中マスタの無効化拒否 | `Api/Policies/MasterDeactivationPolicy.cs` | Spec.md 3.8。工順から参照中の作業手順書／在籍中の従業員が所属する直の無効化を拒否する。呼び先は `WorkProceduresController.Deactivate`・`ShiftsController.Deactivate` と `MasterCsvService.Import` の `ImportWorkProceduresAsync`・`ImportShiftsAsync`（**単票APIにだけ書くとCSVから迂回できる**）。`Tests/MasterTests.cs` / `MasterCsvTests.cs` |
 | 出荷判定ゲート | `Api/Policies/ShipmentGatePolicy.cs` | Spec.md 3.9。承認済みの「可／特採」判定の条件はここだけに置く |
-| ロット在庫ステータス変更（＋状態履歴） | `Api/Services/LotStatusService.cs`<br>`Core/Entities/Production.cs`: LotStatusHistory | Spec.md 5.3。`Lot.StockStatus` を**直接代入しない**。呼び先は `InventoryController`／`InspectionOrdersController`／`NonconformanceController`／`ReceivingController` |
+| ロット在庫ステータス変更（＋状態履歴） | `Api/Services/LotStatusService.cs`<br>`Core/Entities/Production.cs`: LotStatusHistory | Spec.md 5.3。`Lot.StockStatus` を**直接代入しない**。呼び先は `LotOperationService`／`InspectionOrdersController`／`NonconformanceController`／`ReceivingController` |
 | ロット系譜（分割・統合・振替） | `Core/Entities/Production.cs`: LotGenealogy<br>`LotOperationService.AddGenealogy` | Spec.md 5.3・5.7。追跡の正は `Lot.ParentLotId` ではなくこちら。`TraceabilityController` はこの関係を辿る |
 | 製造日（業務日付）境界 | `Core/Abstractions/IBusinessDateService.cs`<br>`Api/Services/BusinessDateService.cs`<br>`Api/Controllers/BusinessDateController.cs` `api/business-date`（現在の製造日と境界時刻） | Spec.md 3.9。**画面は境界時刻を知らないので「当日」を暦日で代用しない**（境界をまたぐ時間帯に夜勤の実績が前日・当日へずれる）。`Tests/BusinessDateTests.cs` |
 | ダッシュボード（当日KPI） | `Web/Pages/Home.razor`（`/`） | Spec.md 3.8。集計は既存APIを製造日で絞って呼ぶだけで、**画面では数えない**（`api/quality/summary`・`api/equipment-logs/summary`・`api/manufacturing-orders/progress`）。KPIが取れなくても進捗一覧は出す |

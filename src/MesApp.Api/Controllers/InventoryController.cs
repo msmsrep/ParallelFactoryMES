@@ -20,11 +20,8 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class InventoryController(
     MesAppDbContext db,
-    InventoryService inventory,
     LotOperationService lotOperations,
-    LotStatusService lotStatus,
-    IBusinessDateService businessDate,
-    IAuditLogger auditLogger) : ControllerBase
+    IBusinessDateService businessDate) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -158,215 +155,92 @@ public class InventoryController(
     }
 
     // ---- 更新系（在庫管理ロール）----
+    // 業務処理は LotOperationService に集約し、ここでは結果を ProblemDetails に変換するだけにする
 
     /// <summary>在庫移動（D-10-30-02）</summary>
     [HttpPost("move")]
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
-    public async Task<IActionResult> Move(MoveRequest request, CancellationToken ct)
-    {
-        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
-        if (lot is null)
-        {
-            return this.BadRequestProblem("存在しないロットIDです。");
-        }
-        if (!await db.Locations.AnyAsync(l => l.Id == request.ToLocationId && l.IsActive, ct))
-        {
-            return this.BadRequestProblem("存在しない（または無効な）移動先ロケーションです。");
-        }
-        try
-        {
-            await inventory.MoveAsync(lot, request.FromLocationId, request.ToLocationId, request.Quantity,
-                InventoryTransactionType.Move, CurrentUserId, ct: ct);
-        }
-        catch (InventoryException ex)
-        {
-            return this.BadRequestProblem(ex.Message);
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "Move", nameof(Lot), lot.Id.ToString(),
-            detail: $"lot={lot.LotNumber}, qty={request.Quantity}", ct: ct);
-        return NoContent();
-    }
+    public async Task<IActionResult> Move(MoveRequest request, CancellationToken ct) =>
+        ToResult(await lotOperations.MoveAsync(request.LotId, request.FromLocationId,
+            request.ToLocationId, request.Quantity, CurrentUserId, ct));
 
     /// <summary>数量調整（実在庫との差異訂正 D-10-30-04。理由必須・監査ログ記録）</summary>
     [HttpPost("adjust")]
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
-    public async Task<IActionResult> Adjust(AdjustRequest request, CancellationToken ct)
-    {
-        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
-        if (lot is null)
-        {
-            return this.BadRequestProblem("存在しないロットIDです。");
-        }
-        var stock = await db.InventoryStocks.FirstOrDefaultAsync(
-            s => s.LotId == request.LotId && s.LocationId == request.LocationId, ct);
-        var current = stock?.Quantity ?? 0;
-        var delta = request.NewQuantity - current;
-        if (delta == 0)
-        {
-            return this.BadRequestProblem("現在数量と同じため調整は不要です。");
-        }
-
-        try
-        {
-            if (delta > 0)
-            {
-                await inventory.AddAsync(lot, request.LocationId, delta,
-                    InventoryTransactionType.Adjust, CurrentUserId, note: request.Reason, ct: ct);
-            }
-            else
-            {
-                await inventory.RemoveAsync(lot, request.LocationId, -delta,
-                    InventoryTransactionType.Adjust, CurrentUserId, note: request.Reason, ct: ct);
-            }
-        }
-        catch (InventoryException ex)
-        {
-            return this.BadRequestProblem(ex.Message);
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "Adjust", nameof(Lot), lot.Id.ToString(),
-            detail: new
-            {
-                lot = lot.LotNumber,
-                locationId = request.LocationId,
-                before = current,
-                after = request.NewQuantity,
-                reason = request.Reason,
-            }, ct: ct);
-        return NoContent();
-    }
+    public async Task<IActionResult> Adjust(AdjustRequest request, CancellationToken ct) =>
+        ToResult(await lotOperations.AdjustAsync(request.LotId, request.LocationId,
+            request.NewQuantity, request.Reason, CurrentUserId, ct));
 
     /// <summary>在庫ステータス変更（保留・検査待ち・不良・廃棄予定等。D-10-30-08。ロット単位）</summary>
     [HttpPost("status")]
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
-    public async Task<IActionResult> ChangeStatus(LotStatusRequest request, CancellationToken ct)
-    {
-        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
-        if (lot is null)
-        {
-            return this.BadRequestProblem("存在しないロットIDです。");
-        }
-        var before = lot.StockStatus;
-        lotStatus.ChangeStatus(lot, request.Status, LotStatusChangeSource.Manual,
-            request.Reason, CurrentUserId);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "StatusChange", nameof(Lot), lot.Id.ToString(),
-            detail: new
-            {
-                lot = lot.LotNumber,
-                before = before.ToString(),
-                after = request.Status.ToString(),
-                reason = request.Reason,
-            }, ct: ct);
-        return NoContent();
-    }
+    public async Task<IActionResult> ChangeStatus(LotStatusRequest request, CancellationToken ct) =>
+        ToResult(await lotOperations.ChangeStatusAsync(request.LotId, request.Status,
+            request.Reason, CurrentUserId, ct));
 
     /// <summary>ロット分割（D-10-30-05。新ロットは親ロットの系譜・期限を引き継ぐ）</summary>
     [HttpPost("split")]
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
-    public async Task<ActionResult<LotResponse>> Split(SplitRequest request, CancellationToken ct)
-    {
-        var outcome = await lotOperations.SplitAsync(request.LotId, request.LocationId, request.Quantity,
-            request.NewLotNumber, CurrentUserId, ct);
-        return ToLotResult(outcome);
-    }
+    public async Task<ActionResult<LotResponse>> Split(SplitRequest request, CancellationToken ct) =>
+        ToLotResult(await lotOperations.SplitAsync(request.LotId, request.LocationId, request.Quantity,
+            request.NewLotNumber, CurrentUserId, ct));
 
     /// <summary>ロット統合（D-10-30-05。同一品目・同一ロケーションの在庫を統合先ロットへ移す）</summary>
     [HttpPost("merge")]
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
-    public async Task<IActionResult> Merge(MergeRequest request, CancellationToken ct)
-    {
-        var outcome = await lotOperations.MergeAsync(request.SourceLotId, request.TargetLotId,
-            request.LocationId, CurrentUserId, ct);
-        return outcome.Error is { } error ? this.BadRequestProblem(error) : NoContent();
-    }
+    public async Task<IActionResult> Merge(MergeRequest request, CancellationToken ct) =>
+        ToResult(await lotOperations.MergeAsync(request.SourceLotId, request.TargetLotId,
+            request.LocationId, CurrentUserId, ct));
 
     /// <summary>品目振替・ロット振替（D-10-30-06〜07。新しいロットを生成して数量を移す）</summary>
     [HttpPost("transfer")]
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
-    public async Task<ActionResult<LotResponse>> Transfer(LotTransferRequest request, CancellationToken ct)
-    {
-        var outcome = await lotOperations.TransferAsync(request.LotId, request.LocationId, request.Quantity,
-            request.NewProductId, request.NewLotNumber, CurrentUserId, ct);
-        return ToLotResult(outcome);
-    }
+    public async Task<ActionResult<LotResponse>> Transfer(LotTransferRequest request, CancellationToken ct) =>
+        ToLotResult(await lotOperations.TransferAsync(request.LotId, request.LocationId, request.Quantity,
+            request.NewProductId, request.NewLotNumber, CurrentUserId, ct));
 
-    private ActionResult<LotResponse> ToLotResult(LotOperationOutcome outcome)
+    /// <summary>在庫廃棄（D-50-30-01）</summary>
+    [HttpPost("discard")]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
+    public async Task<IActionResult> Discard(DiscardRequest request, CancellationToken ct) =>
+        ToResult(await lotOperations.DiscardAsync(request.LotId, request.LocationId,
+            request.Quantity, request.Reason, CurrentUserId, ct));
+
+    /// <summary>返品（D-10-10-05。サプライヤーへの返品による在庫引落し）</summary>
+    [HttpPost("return")]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
+    public async Task<IActionResult> Return(ReturnRequest request, CancellationToken ct) =>
+        ToResult(await lotOperations.ReturnAsync(request.LotId, request.LocationId,
+            request.Quantity, request.Reason, CurrentUserId, ct));
+
+    /// <summary>払出戻し（D-20-20-03。工程に払い出した部材の在庫戻し）</summary>
+    [HttpPost("issue-return")]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
+    public async Task<IActionResult> IssueReturn(IssueReturnRequest request, CancellationToken ct) =>
+        ToResult(await lotOperations.IssueReturnAsync(request.LotId, request.LocationId,
+            request.Quantity, request.WorkOrderId, CurrentUserId, ct));
+
+    private IActionResult ToResult(Outcome<Lot> outcome) =>
+        outcome.Failed ? ToProblem(outcome) : NoContent();
+
+    private ActionResult<LotResponse> ToLotResult(Outcome<Lot> outcome)
     {
-        if (outcome.Error is { } error)
+        if (outcome.Failed)
         {
-            return outcome.IsConflict ? this.ConflictProblem(error) : this.BadRequestProblem(error);
+            return ToProblem(outcome);
         }
-        var (lot, product) = (outcome.Lot!, outcome.Product!);
+        var (lot, product) = (outcome.Value!, outcome.Value!.Product!);
         return new LotResponse(lot.Id, lot.LotNumber, product.Id, product.Code, product.Name,
             lot.InitialQuantity, lot.OriginType, lot.StockStatus,
             lot.ManufacturedOn, lot.ExpiresOn, lot.Grade, lot.ParentLotId);
     }
 
-    /// <summary>在庫廃棄（D-50-30-01）</summary>
-    [HttpPost("discard")]
-    [Authorize(Roles = MesRoleGroups.InventoryManage)]
-    public async Task<IActionResult> Discard(DiscardRequest request, CancellationToken ct)
+    private ActionResult ToProblem(Outcome<Lot> outcome) => outcome.Kind switch
     {
-        return await RemoveSimpleAsync(request.LotId, request.LocationId, request.Quantity,
-            InventoryTransactionType.Discard, "Discard", request.Reason, ct);
-    }
-
-    /// <summary>返品（D-10-10-05。サプライヤーへの返品による在庫引落し）</summary>
-    [HttpPost("return")]
-    [Authorize(Roles = MesRoleGroups.InventoryManage)]
-    public async Task<IActionResult> Return(ReturnRequest request, CancellationToken ct)
-    {
-        return await RemoveSimpleAsync(request.LotId, request.LocationId, request.Quantity,
-            InventoryTransactionType.Return, "Return", request.Reason, ct);
-    }
-
-    /// <summary>払出戻し（D-20-20-03。工程に払い出した部材の在庫戻し）</summary>
-    [HttpPost("issue-return")]
-    [Authorize(Roles = MesRoleGroups.InventoryManage)]
-    public async Task<IActionResult> IssueReturn(IssueReturnRequest request, CancellationToken ct)
-    {
-        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
-        if (lot is null)
-        {
-            return this.BadRequestProblem("存在しないロットIDです。");
-        }
-        if (!await db.Locations.AnyAsync(l => l.Id == request.LocationId && l.IsActive, ct))
-        {
-            return this.BadRequestProblem("存在しない（または無効な）ロケーションIDです。");
-        }
-        await inventory.AddAsync(lot, request.LocationId, request.Quantity,
-            InventoryTransactionType.IssueReturn, CurrentUserId,
-            workOrderId: request.WorkOrderId, ct: ct);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "IssueReturn", nameof(Lot), lot.Id.ToString(),
-            detail: $"lot={lot.LotNumber}, qty={request.Quantity}", ct: ct);
-        return NoContent();
-    }
-
-    private async Task<IActionResult> RemoveSimpleAsync(
-        int lotId, int locationId, decimal quantity,
-        InventoryTransactionType type, string auditAction, string? reason, CancellationToken ct)
-    {
-        var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
-        if (lot is null)
-        {
-            return this.BadRequestProblem("存在しないロットIDです。");
-        }
-        try
-        {
-            await inventory.RemoveAsync(lot, locationId, quantity, type, CurrentUserId, note: reason, ct: ct);
-        }
-        catch (InventoryException ex)
-        {
-            return this.BadRequestProblem(ex.Message);
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", auditAction, nameof(Lot), lot.Id.ToString(),
-            detail: $"lot={lot.LotNumber}, qty={quantity}, reason={reason}", ct: ct);
-        return NoContent();
-    }
+        OutcomeError.NotFound => NotFound(),
+        OutcomeError.Conflict => this.ConflictProblem(outcome.Error),
+        _ => this.BadRequestProblem(outcome.Error),
+    };
 
 
     // ---- 倉庫業務進捗（D-50-30-07）----
