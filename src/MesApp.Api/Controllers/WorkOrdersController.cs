@@ -20,9 +20,8 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class WorkOrdersController(
     MesAppDbContext db,
-    WorkOrderStatusService workOrderStatus,
-    IBusinessDateService businessDate,
-    IAuditLogger auditLogger) : ControllerBase
+    WorkOrderDispatchService dispatcher,
+    IBusinessDateService businessDate) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<WorkOrderResponse>>> List(
@@ -234,10 +233,7 @@ public class WorkOrdersController(
         {
             return NotFound();
         }
-        return await db.RoutingEquipments.AsNoTracking()
-            .Where(c => c.Routing!.ProductId == workOrder.ProductId
-                        && c.Routing!.ProcessId == workOrder.ProcessId
-                        && c.Routing!.Sequence == workOrder.RoutingSequence)
+        return await dispatcher.CandidatesOf(workOrder.ProductId, workOrder.ProcessId, workOrder.RoutingSequence)
             .OrderBy(c => c.Equipment!.AssetNo)
             .Select(c => new WorkOrderEquipmentCandidate(
                 c.EquipmentId, c.Equipment!.AssetNo, c.Equipment!.Name, c.Equipment!.IsActive))
@@ -245,7 +241,6 @@ public class WorkOrdersController(
     }
 
     /// <summary>
-    /// 工程管理項目の指示（B-30-30-04）。    /// <summary>
     /// 工程管理項目の指示（B-30-30-04）。展開時点のマスタを写したもので、
     /// 実績の逸脱判定と画面表示はこれを使う（マスタの現在値を参照しない。Spec.md 5.7）
     /// </summary>
@@ -331,83 +326,12 @@ public class WorkOrdersController(
         {
             return NotFound();
         }
-        if (workOrder.Status is not (WorkOrderStatus.Created or WorkOrderStatus.Dispatched))
+        var outcome = await dispatcher.DispatchAsync(
+            workOrder, request, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        if (outcome.Error is { } error)
         {
-            return this.ConflictProblem($"状態 '{workOrder.Status}' の作業指示は差立できません。");
+            return outcome.IsConflict ? this.ConflictProblem(error) : this.BadRequestProblem(error);
         }
-
-        // 作業員割当：スキル・資格照合（F-20-30-01）
-        if (request.AssignedUserId is not null)
-        {
-            var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.AssignedUserId, ct);
-            if (user is null || !user.IsActive)
-            {
-                return this.BadRequestProblem("割当作業者が存在しないか無効です。");
-            }
-
-            // 必要スキルは工順マスタの現在値ではなく、展開時点のスナップショットを使う（Spec.md 5.7）
-            if (workOrder.RequiredSkillId is int skillId)
-            {
-                var today = businessDate.Today;
-                var userSkill = await db.UserSkills.Include(s => s.Skill)
-                    .FirstOrDefaultAsync(s => s.UserId == user.Id && s.SkillId == skillId, ct);
-                var skillName = userSkill?.Skill?.Name
-                    ?? await db.Skills.Where(s => s.Id == skillId).Select(s => s.Name).FirstAsync(ct);
-                if (userSkill is null)
-                {
-                    return this.BadRequestProblem(
-                        $"作業者 '{user.DisplayName}' は必要スキル '{skillName}' を保有していません。");
-                }
-                if (userSkill.Skill!.RequiresExpiry && (userSkill.ExpiresOn is null || userSkill.ExpiresOn < today))
-                {
-                    return this.BadRequestProblem(
-                        $"作業者 '{user.DisplayName}' のスキル '{skillName}' は有効期限切れです。");
-                }
-            }
-        }
-
-        // 設備割当（B-10-20-02）
-        if (request.AssignedEquipmentId is int equipmentId)
-        {
-            var equipment = await db.Equipments.FindAsync([equipmentId], ct);
-            if (equipment is null || !equipment.IsActive)
-            {
-                return this.BadRequestProblem("割当設備が存在しないか無効です。");
-            }
-            // 停止中・保全中・廃棄の設備には新しく割り当てさせない。既に割り当て済みの設備のまま
-            // 着手順だけを変える差立は通す（保全に入った設備の作業指示を画面から触れなくしないため）
-            if (equipmentId != workOrder.AssignedEquipmentId && equipment.Status != EquipmentStatus.Available)
-            {
-                return this.ConflictProblem(
-                    $"設備 '{equipment.AssetNo}' は{EquipmentStatusLabel(equipment.Status)}のため割り当てられません。");
-            }
-
-            // 工順に候補設備が登録されていれば、その中からしか選べない。
-            // 候補は工順マスタの現在値を見る（設備は差立で決めるためスナップショットに含めない：Spec.md 5.7）。
-            // 候補が未登録の工順は従来どおり設備を限定しない
-            var candidates = await db.RoutingEquipments.AsNoTracking()
-                .Where(c => c.Routing!.ProductId == workOrder.ProductId
-                            && c.Routing!.ProcessId == workOrder.ProcessId
-                            && c.Routing!.Sequence == workOrder.RoutingSequence)
-                .Select(c => new { c.EquipmentId, c.Equipment!.AssetNo })
-                .ToListAsync(ct);
-            if (candidates.Count > 0 && candidates.All(c => c.EquipmentId != equipmentId))
-            {
-                return this.BadRequestProblem(
-                    $"設備 '{equipment.AssetNo}' はこの工程の候補設備ではありません" +
-                    $"（候補：{string.Join("、", candidates.Select(c => c.AssetNo))}）。");
-            }
-        }
-
-        workOrder.AssignedUserId = request.AssignedUserId;
-        workOrder.AssignedEquipmentId = request.AssignedEquipmentId;
-        workOrder.DispatchOrder = request.DispatchOrder;
-        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Dispatched,
-            WorkOrderStatusChangeSource.Dispatch, User.FindFirstValue(ClaimTypes.NameIdentifier));
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Production", "Dispatch", nameof(WorkOrder), id.ToString(),
-            detail: $"workOrderNo={workOrder.WorkOrderNo}, user={request.AssignedUserId}, " +
-                    $"equipment={request.AssignedEquipmentId}, order={request.DispatchOrder}", ct: ct);
 
         var updated = await BaseQuery().FirstAsync(w => w.Id == id, ct);
         return ToResponse(updated, updated.ManufacturingOrder!);
@@ -424,15 +348,6 @@ public class WorkOrdersController(
             .AsQueryable();
         return track ? query : query.AsNoTracking();
     }
-
-    private static string EquipmentStatusLabel(EquipmentStatus status) => status switch
-    {
-        EquipmentStatus.Available => "稼働可能",
-        EquipmentStatus.Stopped => "停止中",
-        EquipmentStatus.UnderMaintenance => "保全中",
-        EquipmentStatus.Retired => "廃棄・除却",
-        _ => status.ToString(),
-    };
 
     internal static WorkOrderResponse ToResponse(WorkOrder w, ManufacturingOrder order) =>
         new(w.Id, w.WorkOrderNo, w.ManufacturingOrderId, order.OrderNo,
