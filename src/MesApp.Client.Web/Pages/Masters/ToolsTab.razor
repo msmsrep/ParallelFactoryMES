@@ -31,7 +31,8 @@
                 <label>状態</label>
                 <select @bind="_status">
                     <option value="@ToolStatus.Available">使用可能</option>
-                    <option value="@ToolStatus.InUse">使用中</option>
+                    @* 使用中は作業指示への引当で決まるため、手では選ばせない（既に使用中のものは表示のため残す） *@
+                    <option value="@ToolStatus.InUse" disabled="@(_originalStatus != ToolStatus.InUse)">使用中（引当で設定）</option>
                     <option value="@ToolStatus.UnderMaintenance">メンテナンス中</option>
                     <option value="@ToolStatus.Retired">廃棄</option>
                 </select>
@@ -96,6 +97,7 @@
     private int? _lifeCount;
     private decimal? _lifeHours;
     private ToolStatus _status = ToolStatus.Available;
+    private ToolStatus? _originalStatus;
     private string? _error;
     private string? _message;
     private bool _busy;
@@ -114,6 +116,7 @@
         _lifeCount = item.LifeThresholdCount;
         _lifeHours = item.LifeThresholdHours;
         _status = item.Status;
+        _originalStatus = item.Status;
     }
 
     private void ResetForm()
@@ -125,6 +128,7 @@
         _lifeCount = null;
         _lifeHours = null;
         _status = ToolStatus.Available;
+        _originalStatus = null;
     }
 
     private async Task SaveAsync()

@@ -170,6 +170,48 @@ public class MasterTests
     }
 
     [Fact]
+    public async Task 治工具の使用中はマスタ編集で付け外しできず引当から決まる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(client);
+
+        // 新規登録で使用中にはできない
+        var createdInUse = await client.PostAsJsonAsync("/api/tools",
+            new ToolRequest("T-09", "金型Z", "型", null, null, ToolStatus.InUse));
+        Assert.Equal(HttpStatusCode.Conflict, createdInUse.StatusCode);
+
+        var tool = (await (await client.PostAsJsonAsync("/api/tools",
+                new ToolRequest("T-01", "金型A", "型", null, null, ToolStatus.Available)))
+            .Content.ReadFromJsonAsync<ToolResponse>())!;
+
+        // 引当の無い治工具を手で使用中にはできない
+        var manualInUse = await client.PutAsJsonAsync($"/api/tools/{tool.Id}",
+            new ToolRequest("T-01", "金型A", "型", null, null, ToolStatus.InUse));
+        Assert.Equal(HttpStatusCode.Conflict, manualInUse.StatusCode);
+        Assert.Contains("引当で設定", await manualInUse.Content.ReadAsStringAsync());
+
+        // 引当で使用中になる
+        var order = await Phase3TestData.CreateReleasedOrderAsync(client, ctx.ProductId, 10m);
+        var allocated = await client.PostAsJsonAsync("/api/tool-issues",
+            new MesApp.Core.Contracts.Maintenance.ToolAllocateRequest(tool.Id, order.WorkOrders[0].Id, null));
+        Assert.Equal(HttpStatusCode.Created, allocated.StatusCode);
+        var allocatedTool = await client.GetFromJsonAsync<ToolResponse>($"/api/tools/{tool.Id}");
+        Assert.Equal(ToolStatus.InUse, allocatedTool!.Status);
+
+        // 引当中は使用可能に戻せない。状態を変えない編集とメンテナンス中への変更はできる
+        var manualAvailable = await client.PutAsJsonAsync($"/api/tools/{tool.Id}",
+            new ToolRequest("T-01", "金型A", "型", null, null, ToolStatus.Available));
+        Assert.Equal(HttpStatusCode.Conflict, manualAvailable.StatusCode);
+        var renamed = await client.PutAsJsonAsync($"/api/tools/{tool.Id}",
+            new ToolRequest("T-01", "金型A（改）", "型", null, null, ToolStatus.InUse));
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+        var maintenance = await client.PutAsJsonAsync($"/api/tools/{tool.Id}",
+            new ToolRequest("T-01", "金型A（改）", "型", null, null, ToolStatus.UnderMaintenance));
+        Assert.Equal(HttpStatusCode.OK, maintenance.StatusCode);
+    }
+
+    [Fact]
     public async Task 設備と治工具とロケーションと検査項目とチェックリストを登録できる()
     {
         using var factory = new ApiFactory();

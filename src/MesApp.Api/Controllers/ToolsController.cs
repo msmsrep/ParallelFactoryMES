@@ -1,3 +1,4 @@
+using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -41,6 +42,10 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
         {
             return this.ConflictProblem($"治工具コード '{request.Code}' は既に存在します。");
         }
+        if (ToolIssuePolicy.CheckManualStatus(request.Code, null, request.Status, hasOpenIssue: false) is { } reason)
+        {
+            return this.ConflictProblem(reason);
+        }
         var t = new Tool
         {
             Code = request.Code,
@@ -69,6 +74,12 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
         if (await db.Tools.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
             return this.ConflictProblem($"治工具コード '{request.Code}' は既に存在します。");
+        }
+        var hasOpenIssue = await db.ToolIssues.AnyAsync(i => i.ToolId == id
+            && (i.Status == ToolIssueStatus.Allocated || i.Status == ToolIssueStatus.Issued), ct);
+        if (ToolIssuePolicy.CheckManualStatus(request.Code, t.Status, request.Status, hasOpenIssue) is { } reason)
+        {
+            return this.ConflictProblem(reason);
         }
         t.Code = request.Code;
         t.Name = request.Name;

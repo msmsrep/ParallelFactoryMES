@@ -991,6 +991,47 @@ public class MasterCsvTests
         Assert.Contains("第1製造課", exported, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task 治工具CSVでも使用中を手で付け外しできない()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(client);
+
+        var created = await ImportAsync(client, "tools", """
+            Code,Name,ToolType,Status
+            T-01,金型A,型,使用可能
+            T-02,金型B,型,使用可能
+            """);
+        Assert.True(created.Succeeded, string.Join(" / ", created.Errors.Select(e => e.Message)));
+        var tools = await client.GetFromJsonAsync<List<ToolResponse>>("/api/tools");
+        var t01 = tools!.Single(t => t.Code == "T-01");
+
+        var order = await Phase3TestData.CreateReleasedOrderAsync(client, ctx.ProductId, 10m);
+        (await client.PostAsJsonAsync("/api/tool-issues",
+            new MesApp.Core.Contracts.Maintenance.ToolAllocateRequest(t01.Id, order.WorkOrders[0].Id, null)))
+            .EnsureSuccessStatusCode();
+
+        // 引当中の T-01 を使用可能に戻す行、引当の無い T-02 と新規 T-03 を使用中にする行はエラー
+        var rejected = await ImportAsync(client, "tools", """
+            Code,Name,ToolType,Status
+            T-01,金型A,型,使用可能
+            T-02,金型B,型,使用中
+            T-03,金型C,型,使用中
+            """);
+        Assert.False(rejected.Succeeded);
+        Assert.Contains(rejected.Errors, e => e.Line == 2 && e.Message.Contains("引当中"));
+        Assert.Contains(rejected.Errors, e => e.Line == 3 && e.Message.Contains("引当で設定"));
+        Assert.Contains(rejected.Errors, e => e.Line == 4 && e.Message.Contains("引当で設定"));
+
+        // Status 列を省いた取込は現在の状態（使用中）を保つので通る
+        var kept = await ImportAsync(client, "tools", """
+            Code,Name,ToolType
+            T-01,金型A（改）,型
+            """);
+        Assert.True(kept.Succeeded, string.Join(" / ", kept.Errors.Select(e => e.Message)));
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {

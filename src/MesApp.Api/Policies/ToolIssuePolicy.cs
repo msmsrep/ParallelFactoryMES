@@ -44,6 +44,33 @@ public static class ToolIssuePolicy
     }
 
     /// <summary>
+    /// マスタ編集（画面・CSV取込）で状態を変えてよいか。変えられない理由を日本語で返し、問題なければ null を返す。
+    /// <para>
+    /// 使用中は引当（<see cref="ToolIssue"/>）から決まる状態なので手で付け外しさせない。
+    /// 手で使用中にすると引当の無い治工具が使用中に見え、引当中のものを使用可能に戻すと
+    /// 現物が現場にあるのに空いているように見える。引当の無い治工具を使用中から戻すのは、
+    /// ずれた表示を直す操作として認める。メンテナンス中・廃棄への変更は引当中でも認める
+    /// （払出時にもう一度判定するため、現物は現場へ出ない）。
+    /// </para>
+    /// </summary>
+    /// <param name="code">治工具コード（メッセージ用）</param>
+    /// <param name="current">現在の状態（新規登録時は null）</param>
+    /// <param name="requested">変更後の状態</param>
+    /// <param name="hasOpenIssue">引当中（未返却）の引当があるか</param>
+    public static string? CheckManualStatus(string code, ToolStatus? current, ToolStatus requested, bool hasOpenIssue)
+    {
+        if (requested == ToolStatus.InUse && current != ToolStatus.InUse)
+        {
+            return $"治工具 '{code}' を手で使用中にはできません。使用中は作業指示への引当で設定されます。";
+        }
+        if (requested == ToolStatus.Available && hasOpenIssue)
+        {
+            return $"治工具 '{code}' は作業指示に引当中のため使用可能にできません。返却または引当の取消をしてください。";
+        }
+        return null;
+    }
+
+    /// <summary>
     /// 寿命に達しているか（E-60-20-02 と同じ条件）。
     /// 閾値を設定していない治工具は判定しない（基準が無いため寿命到達にはしない）
     /// </summary>

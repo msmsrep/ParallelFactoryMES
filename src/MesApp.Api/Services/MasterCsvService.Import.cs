@@ -355,6 +355,12 @@ public sealed partial class MasterCsvService
     {
         var byCode = await db.Tools.ToDictionaryAsync(t => t.Code, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        // 状態の手変更を画面と同じ条件で判定するため、引当中の治工具を先に集めておく
+        var openIssueToolIds = (await db.ToolIssues
+                .Where(i => i.Status == ToolIssueStatus.Allocated || i.Status == ToolIssueStatus.Issued)
+                .Select(i => i.ToolId)
+                .ToListAsync(ct))
+            .ToHashSet();
 
         foreach (var row in table.Rows)
         {
@@ -374,6 +380,11 @@ public sealed partial class MasterCsvService
             var lifeHours = reader.NumberOrNull("LifeThresholdHours", tool.LifeThresholdHours, 0);
             var status = reader.Enum("Status", tool.Status, CsvEnumLabels.ToolStatuses);
             var isActive = reader.Bool("IsActive", tool.IsActive);
+            if (!reader.Failed && ToolIssuePolicy.CheckManualStatus(code, isNew ? null : tool.Status, status,
+                    !isNew && openIssueToolIds.Contains(tool.Id)) is { } statusError)
+            {
+                reader.Fail(statusError);
+            }
             if (reader.Failed)
             {
                 continue;
