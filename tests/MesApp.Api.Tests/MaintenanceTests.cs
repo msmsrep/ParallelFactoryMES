@@ -580,6 +580,39 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 指示発行済みの保全計画は指示を取り消すまで取消できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+
+        var plan = await (await admin.PostAsJsonAsync("/api/maintenance-plans",
+                new MaintenancePlanRequest(equipment.Id, MaintenanceCategory.Periodic, 2026,
+                    DateOnly.FromDateTime(DateTime.Today).AddDays(7), 90, "定期点検")))
+            .Content.ReadFromJsonAsync<MaintenancePlanResponse>();
+        var order = await (await admin.PostAsJsonAsync("/api/maintenance-orders",
+                new MaintenanceOrderCreateRequest(equipment.Id, null, plan!.Id, null,
+                    plan.ScheduledDate, MaintenanceRequestType.Planned, null)))
+            .Content.ReadFromJsonAsync<MaintenanceOrderResponse>();
+
+        // 指示発行済みの計画は取り消せず、指示も計画もそのまま残る
+        var rejected = await admin.PostAsync($"/api/maintenance-plans/{plan.Id}/cancel", null);
+        Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
+        Assert.Contains("先に保全指示を取り消してください", await rejected.Content.ReadAsStringAsync());
+        var planAfterReject = await admin.GetFromJsonAsync<MaintenancePlanResponse>(
+            $"/api/maintenance-plans/{plan.Id}");
+        Assert.Equal(MaintenancePlanStatus.Ordered, planAfterReject!.Status);
+
+        // 指示を取り消すと計画は計画中へ戻り、計画を取り消せる
+        var orderCanceled = await admin.PostAsync($"/api/maintenance-orders/{order!.Id}/cancel", null);
+        Assert.Equal(HttpStatusCode.OK, orderCanceled.StatusCode);
+        var planCanceled = await admin.PostAsync($"/api/maintenance-plans/{plan.Id}/cancel", null);
+        Assert.Equal(HttpStatusCode.OK, planCanceled.StatusCode);
+        var planAfterCancel = await planCanceled.Content.ReadFromJsonAsync<MaintenancePlanResponse>();
+        Assert.Equal(MaintenancePlanStatus.Canceled, planAfterCancel!.Status);
+    }
+
+    [Fact]
     public async Task 突発の保全依頼は作業者も起票できるが計画保全は保全ロールのみ()
     {
         using var factory = new ApiFactory();

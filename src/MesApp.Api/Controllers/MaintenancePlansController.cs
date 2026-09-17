@@ -119,6 +119,12 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
         {
             return NotFound();
         }
+        // 指示発行済みの計画を取り消すと保全指示だけが「指示済み」で残るため、先に指示を取り消させる
+        // （指示の取消で計画は計画中へ戻る）。現場が着手しようとしている指示を計画側の操作で消さない
+        if (plan.Status == MaintenancePlanStatus.Ordered)
+        {
+            return this.ConflictProblem("保全指示を発行済みの計画は取消できません。先に保全指示を取り消してください。");
+        }
         if (plan.Status is MaintenancePlanStatus.Completed or MaintenancePlanStatus.Canceled)
         {
             return this.ConflictProblem($"状態 '{plan.Status}' の保全計画は取消できません。");
