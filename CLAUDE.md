@@ -1,4 +1,4 @@
-# CLAUDE.md — Parallel Factory MES
+﻿# CLAUDE.md — Parallel Factory MES
 
 .NET 10 / ASP.NET Core API + Blazor WebAssembly の製造実行システム（MES）。
 **応答・コード内コメント・UI文言・コミットメッセージはすべて日本語。**
@@ -54,7 +54,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 - `src/MesApp.Infrastructure/Migrations/**`（`*.Designer.cs`、`MesAppDbContextModelSnapshot.cs` 含む、約13,700行）— **開かない**。スキーマは `Configurations/` とエンティティで確認する。
 - `Spec.md`（496行）/ `MES.md`（518行）— **全文を読まない。必ず grep で該当節・該当業務Noだけ**を読む。
 - `MES.md` は ENAA 著作物のためリポジトリに含めない（`.gitignore` 済み・ローカルのみ）。内容を他ファイルに転記しない。
-- 500行超のファイル（`Maintenance.razor`、`MasterCsvService.Import.cs` 等）は該当行 ±40行のみ読む。
+- 500行超のファイル（`MasterCsvService.Import.cs`、`ActualCsvService.cs` 等）は該当行 ±40行のみ読む。
 
 ## API 側の規約
 
@@ -77,6 +77,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 - メッセージ表示は `<Notice Error="@_error" Message="@_message" />`、権限制御は `<AuthorizeView Roles="@MesRoleGroups.Xxx">`（APIと同じ定数を使う。書き込みの操作要素だけを隠し、画面自体は開けたままにする）
 - CSV 入出力は `<CsvIoPanel Kind="..." Label="..." KeyLabel="..." OnImported="LoadAsync" />`
 - マスタ画面は `Pages/Masters/<名前>Tab.razor` を追加し `MastersPage.razor` に登録。独立画面は `Pages/` に置き `Layout/NavMenu.razor` に導線を追加
+- **タブを持つ画面は1ファイルに詰めない**。`Pages/<領域>Page.razor`（タブバーと `@switch` だけ）＋ `Pages/<領域>/<名前>Tab.razor` に分ける。タブ側が自分で `@inject HttpClient Http`・`_error`/`_message`・`<Notice>` を持つ（`MastersPage` / `MaintenancePage` が見本。フォルダ名とファイル名が衝突するのでページ側に `Page` を付ける）
 - フィールドは `_camelCase`、共通スタイルは既存の `card` / `form-grid` / `form-field` / `btn` / `btn-secondary` / `actions` / `text-muted` を使う（新規 CSS クラスを増やさない）
 
 ## テストの規約

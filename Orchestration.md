@@ -1,4 +1,4 @@
-# Claude Code オーケストレーション運用仕様書
+﻿# Claude Code オーケストレーション運用仕様書
 プロダクト名：Parallel Factory MES
 
 版: 1.0（2026-08-22 制定）
@@ -142,7 +142,7 @@ N ターン目の入力は「それまでの全履歴」である。したがっ
 **全文読込を禁止する対象**
 - `src/MesApp.Infrastructure/Migrations/**`（`*.Designer.cs`、`MesAppDbContextModelSnapshot.cs` を含む）
 - `Spec.md`、`MES.md`（必ず grep で該当節・該当業務Noのみ）
-- 500行を超える任意のファイル（`Maintenance.razor`、`MasterCsvService.Import.cs` 等）
+- 500行を超える任意のファイル（`MasterCsvService.Import.cs`、`ActualCsvService.cs` 等）
 
 **探索予算（1タスクあたり）**
 - 読込 1,500行以下 / Grep 8回以下

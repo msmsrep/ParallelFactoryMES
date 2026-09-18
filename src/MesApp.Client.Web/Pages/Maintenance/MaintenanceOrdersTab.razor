@@ -1,0 +1,372 @@
+﻿@inject HttpClient Http
+
+@* 保全指示・実績（Spec.md 3.1。E-30-20〜E-40-30）。突発依頼の起票と、実績・消費部材の登録 *@
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <h2 style="margin-top:0;">保全指示の作成（計画保全は保全担当、突発依頼は全ユーザー可。E-30-30-01）</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>対象設備</label>
+            <select @bind="_order.EquipmentId">
+                <option value="0">なし</option>
+                @foreach (var equipment in _equipments)
+                {
+                    <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>対象治工具（E-60-30）</label>
+            <select @bind="_order.ToolId">
+                <option value="0">なし</option>
+                @foreach (var tool in _tools)
+                {
+                    <option value="@tool.Id">@tool.Code @tool.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>依頼区分</label>
+            <select @bind="_order.RequestType">
+                <option value="@MaintenanceRequestType.Spot">突発依頼</option>
+                <option value="@MaintenanceRequestType.Planned">計画</option>
+            </select>
+        </div>
+        <div class="form-field">
+            <label>手順書</label>
+            <select @bind="_order.ProcedureId">
+                <option value="0">なし</option>
+                @foreach (var procedure in _procedures)
+                {
+                    <option value="@procedure.Id">@procedure.ProcedureNo @procedure.Title</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>予定日</label>
+            <input type="date" @bind="_order.ScheduledDate" />
+        </div>
+        <div class="form-field">
+            <label>依頼内容</label>
+            <input @bind="_order.Note" />
+        </div>
+    </div>
+    <button class="btn" disabled="@_busy" @onclick="CreateOrderAsync">保全指示を作成</button>
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">保全指示・実績一覧（E-20-30-01〜02）</h2>
+    @if (_orders is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_orders.Total == 0)
+    {
+        <p class="text-muted">保全指示はありません。</p>
+    }
+    else
+    {
+        @foreach (var order in _orders.Items)
+        {
+            <div class="card">
+                <div>
+                    <strong>@order.OrderNo</strong>
+                    <span class="badge">@(order.RequestType == MaintenanceRequestType.Planned ? "計画" : "突発依頼")</span>
+                    <span class="badge @OrderStatusClass(order.Status)">@OrderStatusLabel(order.Status)</span>
+                    <span class="text-muted">対象：@(order.EquipmentName ?? order.ToolName ?? "-")</span>
+                    @if (order.ProcedureNo is not null)
+                    {
+                        <span class="text-muted">／手順書 @order.ProcedureNo</span>
+                    }
+                    <span class="text-muted">／予定日 @(order.ScheduledDate?.ToString("yyyy-MM-dd") ?? "-")</span>
+                </div>
+                @if (order.Note is not null)
+                {
+                    <div class="text-muted">@order.Note</div>
+                }
+
+                @if (order.Records.Count > 0)
+                {
+                    <table class="table mt-2">
+                        <thead><tr><th>実施者</th><th>開始</th><th>終了</th><th>消費部材</th><th>結果</th></tr></thead>
+                        <tbody>
+                            @foreach (var record in order.Records)
+                            {
+                                <tr>
+                                    <td>@record.PerformedByName</td>
+                                    <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                                    <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
+                                    <td>
+                                        @foreach (var part in record.Parts)
+                                        {
+                                            <div>@part.ProductCode @part.ProductName @part.Quantity@part.Unit
+                                                <span class="text-muted">（@part.LotNumber / @part.LocationCode）</span>
+                                            </div>
+                                        }
+                                        @if (record.PartsUsed is not null)
+                                        {
+                                            <div class="text-muted">@record.PartsUsed</div>
+                                        }
+                                        @if (record.Parts.Count == 0 && record.PartsUsed is null)
+                                        {
+                                            @("-")
+                                        }
+                                    </td>
+                                    <td>@(record.Result ?? "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <Pager TItem="MaintenanceOrderResponse" Result="_orders" OnPageChanged="LoadMaintenanceOrdersAsync" />
+                }
+
+                @if (order.Status == MaintenanceOrderStatus.Instructed)
+                {
+                    <div class="form-grid mt-2">
+                        <div class="form-field">
+                            <label>開始時刻</label>
+                            <input type="datetime-local" value="@GetRecord(order.Id).StartedAt.ToString("yyyy-MM-ddTHH:mm")"
+                                   @onchange="e => GetRecord(order.Id).StartedAt = ToDateTime(e.Value)" />
+                        </div>
+                        <div class="form-field">
+                            <label>終了時刻</label>
+                            <input type="datetime-local" @onchange="e => GetRecord(order.Id).EndedAt = ToDateTime(e.Value)" />
+                        </div>
+                        <div class="form-field">
+                            <label>消費部材・交換部品</label>
+                            <input value="@GetRecord(order.Id).PartsUsed"
+                                   @onchange="e => GetRecord(order.Id).PartsUsed = e.Value?.ToString()" />
+                        </div>
+                        <div class="form-field">
+                            <label>結果</label>
+                            <input value="@GetRecord(order.Id).Result"
+                                   @onchange="e => GetRecord(order.Id).Result = e.Value?.ToString()" />
+                        </div>
+                        @if (order.ToolId is not null)
+                        {
+                            <div class="form-field">
+                                <label>
+                                    <input type="checkbox" style="width:auto;" checked="@GetRecord(order.Id).ResetLife"
+                                           @onchange="e => GetRecord(order.Id).ResetLife = (bool)(e.Value ?? false)" />
+                                    寿命カウンタをリセット（E-60-30）
+                                </label>
+                            </div>
+                        }
+                    </div>
+                    @* 在庫を引き落とす消費部材（E-40-30-01）。自由記述の欄は補足として残している *@
+                    <h3>消費部材（在庫から引き落とす）</h3>
+                    @foreach (var line in GetRecord(order.Id).Parts)
+                    {
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label>消費ロット（スキャン可）</label>
+                                <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                                              @bind-Value="line.LotId"
+                                              SelectedItemChanged="stock => OnPartStockSelected(line, stock)"
+                                              ValueOf="stock => stock.LotId"
+                                              LabelOf='@(stock => $"{stock.LotNumber}（{stock.ProductCode} / {stock.LocationCode} 残{stock.Quantity}）")' />
+                            </div>
+                            <div class="form-field">
+                                <label>数量</label>
+                                <input type="number" step="any" min="0" value="@line.Quantity"
+                                       @onchange="e => line.Quantity = ToDecimal(e.Value)" />
+                            </div>
+                            <div class="form-field">
+                                <label>&nbsp;</label>
+                                <button class="btn btn-secondary" @onclick="() => RemovePartLine(order.Id, line)">この行を削除</button>
+                            </div>
+                        </div>
+                    }
+                    <div class="actions">
+                        <button class="btn btn-secondary" @onclick="() => AddPartLine(order.Id)">消費部材の行を追加</button>
+                    </div>
+
+                    <div class="actions">
+                        <button class="btn" disabled="@_busy" @onclick="() => AddRecordAsync(order)">保全実績を登録</button>
+                        <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage" Context="mtCancel">
+                            <button class="btn btn-danger" disabled="@_busy" @onclick="() => CancelOrderAsync(order.Id)">取消</button>
+                        </AuthorizeView>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private sealed class OrderForm
+    {
+        public int EquipmentId { get; set; }
+        public int ToolId { get; set; }
+        public int ProcedureId { get; set; }
+        public MaintenanceRequestType RequestType { get; set; } = MaintenanceRequestType.Spot;
+        public DateTime? ScheduledDate { get; set; }
+        public string? Note { get; set; }
+    }
+
+    private sealed class RecordForm
+    {
+        public DateTime StartedAt { get; set; } = DateTime.Now.AddHours(-1);
+        public DateTime? EndedAt { get; set; }
+        public string? PartsUsed { get; set; }
+        public string? Result { get; set; }
+        public bool ResetLife { get; set; }
+        public List<PartLine> Parts { get; } = [];
+    }
+
+    /// <summary>消費部材の入力1行（ロケーションは選んだ在庫から決まる）</summary>
+    private sealed class PartLine
+    {
+        public int LotId { get; set; }
+        public int LocationId { get; set; }
+        public decimal Quantity { get; set; }
+    }
+
+    private List<EquipmentResponse> _equipments = [];
+    private List<ToolResponse> _tools = [];
+    private List<MaintenanceProcedureResponse> _procedures = [];
+    private PagedResult<MaintenanceOrderResponse>? _orders;
+
+    private readonly OrderForm _order = new();
+
+    /// <summary>実績の入力内容は指示ごとに別（一覧の行を開いたまま複数を書けるようにする）</summary>
+    private readonly Dictionary<int, RecordForm> _records = [];
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
+        _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
+        _procedures = await Http.GetFromJsonAsync<List<MaintenanceProcedureResponse>>(
+            "api/maintenance-procedures") ?? [];
+        await LoadMaintenanceOrdersAsync(1);
+    }
+
+    private async Task LoadMaintenanceOrdersAsync(int page) =>
+        _orders = await Http.GetFromJsonAsync<PagedResult<MaintenanceOrderResponse>>(
+            $"api/maintenance-orders?page={page}");
+
+    private static DateTime ToDateTime(object? value) =>
+        DateTime.TryParse(value?.ToString(), out var result) ? result : DateTime.Now;
+
+    private static decimal ToDecimal(object? value) =>
+        decimal.TryParse(value?.ToString(), out var result) ? result : 0m;
+
+    private void AddPartLine(int orderId) => GetRecord(orderId).Parts.Add(new PartLine());
+
+    private void RemovePartLine(int orderId, PartLine line) => GetRecord(orderId).Parts.Remove(line);
+
+    private static void OnPartStockSelected(PartLine line, StockResponse? stock) =>
+        line.LocationId = stock?.LocationId ?? 0;
+
+    private RecordForm GetRecord(int orderId)
+    {
+        if (!_records.TryGetValue(orderId, out var form))
+        {
+            form = new RecordForm();
+            _records[orderId] = form;
+        }
+        return form;
+    }
+
+    private async Task CreateOrderAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/maintenance-orders",
+                new MaintenanceOrderCreateRequest(
+                    _order.EquipmentId == 0 ? null : _order.EquipmentId,
+                    _order.ToolId == 0 ? null : _order.ToolId,
+                    null,
+                    _order.ProcedureId == 0 ? null : _order.ProcedureId,
+                    _order.ScheduledDate is null ? null : DateOnly.FromDateTime(_order.ScheduledDate.Value),
+                    _order.RequestType, _order.Note));
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = "保全指示を作成しました。";
+            _order.Note = null;
+            await LoadMaintenanceOrdersAsync(1);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task AddRecordAsync(MaintenanceOrderResponse order)
+    {
+        var form = GetRecord(order.Id);
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/maintenance-orders/{order.Id}/record",
+                new MaintenanceRecordRequest(new DateTimeOffset(form.StartedAt),
+                    form.EndedAt is null ? null : new DateTimeOffset(form.EndedAt.Value),
+                    form.PartsUsed, form.Result, null, form.ResetLife,
+                    form.Parts.Where(line => line.LotId != 0 && line.Quantity > 0)
+                        .Select(line => new MaintenanceRecordPartRequest(
+                            line.LotId, line.LocationId, line.Quantity, null))
+                        .ToList()));
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = "保全実績を登録しました（指示は完了になります）。";
+            _records.Remove(order.Id);
+            await LoadMaintenanceOrdersAsync(1);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CancelOrderAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsync($"api/maintenance-orders/{id}/cancel", null);
+            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = "保全指示を取消しました。";
+            await LoadMaintenanceOrdersAsync(1);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string OrderStatusLabel(MaintenanceOrderStatus status) => status switch
+    {
+        MaintenanceOrderStatus.Instructed => "指示",
+        MaintenanceOrderStatus.Completed => "完了",
+        MaintenanceOrderStatus.Canceled => "取消",
+        _ => status.ToString(),
+    };
+
+    private static string OrderStatusClass(MaintenanceOrderStatus status) => status switch
+    {
+        MaintenanceOrderStatus.Completed => "badge-success",
+        MaintenanceOrderStatus.Canceled => "badge-danger",
+        _ => "badge-info",
+    };
+}
