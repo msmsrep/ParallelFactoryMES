@@ -9,6 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
+<AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
     <h2 style="margin-top:0;">ピッキング指示の作成</h2>
     <div class="form-grid">
@@ -23,37 +24,30 @@
         {
             <div class="form-field">
                 <label>払出先 作業指示</label>
-                <select @bind="_workOrderId">
-                    <option value="0">選択してください</option>
-                    @foreach (var workOrder in _workOrders)
-                    {
-                        <option value="@workOrder.Id">@workOrder.WorkOrderNo（@workOrder.ProductCode / @workOrder.ProcessCode）</option>
-                    }
-                </select>
+                <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
+                              @bind-Value="_workOrderId"
+                              ValueOf="w => w.Id"
+                              LabelOf='@(w => $"{w.WorkOrderNo}（{w.ProductCode} / {w.ProcessCode}）")' />
             </div>
         }
         else
         {
             <div class="form-field">
                 <label>払出先 出荷指示</label>
-                <select @bind="_shippingOrderId">
-                    <option value="0">選択してください</option>
-                    @foreach (var shipping in _shippingOrders)
-                    {
-                        <option value="@shipping.Id">@shipping.ShippingNo（@shipping.Destination）</option>
-                    }
-                </select>
+                <OptionSelect TItem="ShippingOrderResponse"
+                              Endpoint="api/shipping-orders/options?status=Instructed"
+                              @bind-Value="_shippingOrderId"
+                              ValueOf="s => s.Id"
+                              LabelOf='@(s => $"{s.ShippingNo}（{s.Destination}）")' />
             </div>
         }
         <div class="form-field">
             <label>品目</label>
-            <select @bind="_lineProductId">
-                <option value="0">選択してください</option>
-                @foreach (var product in _products)
-                {
-                    <option value="@product.Id">@product.Code @product.Name</option>
-                }
-            </select>
+            <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                          @bind-Value="_lineProductId"
+                          SelectedItemChanged="RememberProduct"
+                          ValueOf="p => p.Id"
+                          LabelOf='@(p => $"{p.Code} {p.Name}")' />
         </div>
         <div class="form-field">
             <label>数量</label>
@@ -73,7 +67,7 @@
                 @foreach (var line in _lines)
                 {
                     <tr>
-                        <td>@(_products.FirstOrDefault(p => p.Id == line.ProductId)?.Code)</td>
+                        <td>@_productCodes.GetValueOrDefault(line.ProductId, "-")</td>
                         <td>@line.Quantity</td>
                         <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">削除</button></td>
                     </tr>
@@ -82,6 +76,7 @@
         </table>
     }
 </div>
+</AuthorizeView>
 
 <div class="card">
     <h2 style="margin-top:0;">ピッキング指示一覧</h2>
@@ -89,13 +84,13 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_orders.Count == 0)
+    else if (_orders.Total == 0)
     {
         <p class="text-muted">ピッキング指示はありません。</p>
     }
     else
     {
-        @foreach (var order in _orders)
+        @foreach (var order in _orders.Items)
         {
             <div class="card">
                 <div class="actions" style="justify-content:space-between;">
@@ -107,10 +102,12 @@
                     </div>
                     @if (order.Status == PickingOrderStatus.Instructed)
                     {
-                        <div class="actions">
-                            <button class="btn btn-sm" disabled="@_busy" @onclick="() => ExecuteAsync(order.Id)">ピッキング実行</button>
-                            <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
-                        </div>
+                        <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="inventoryWrite">
+                            <div class="actions">
+                                <button class="btn btn-sm" disabled="@_busy" @onclick="() => ExecuteAsync(order.Id)">ピッキング実行</button>
+                                <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
+                            </div>
+                        </AuthorizeView>
                     }
                 </div>
                 <table class="table mt-2">
@@ -149,17 +146,18 @@
                         }
                     </tbody>
                 </table>
+                <Pager TItem="PickingOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
             </div>
         }
     }
 </div>
 
 @code {
-    private List<PickingOrderResponse>? _orders;
-    private List<ProductResponse> _products = [];
-    private List<WorkOrderResponse> _workOrders = [];
-    private List<ShippingOrderResponse> _shippingOrders = [];
+    private PagedResult<PickingOrderResponse>? _orders;
     private readonly List<PickingRequestLine> _lines = [];
+
+    /// <summary>入力中の明細に出す品目コード（選択肢APIにしたため一覧を手元に持たない）</summary>
+    private readonly Dictionary<int, string> _productCodes = [];
     private readonly Dictionary<int, string?> _scans = [];
 
     private PickingOrderType _type = PickingOrderType.ProcessIssue;
@@ -171,21 +169,24 @@
     private string? _message;
     private bool _busy;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private void RememberProduct(ProductResponse? product)
     {
-        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders") ?? [];
-        _shippingOrders = await Http.GetFromJsonAsync<List<ShippingOrderResponse>>(
-            "api/shipping-orders?status=Instructed") ?? [];
-        await LoadAsync();
+        if (product is not null)
+        {
+            _productCodes[product.Id] = product.Code;
+        }
     }
 
     private string? GetScan(int lineId) => _scans.GetValueOrDefault(lineId);
 
     private void SetScan(int lineId, string? value) => _scans[lineId] = value;
 
-    private async Task LoadAsync() =>
-        _orders = await Http.GetFromJsonAsync<List<PickingOrderResponse>>("api/picking-orders");
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page) =>
+        _orders = await Http.GetFromJsonAsync<PagedResult<PickingOrderResponse>>($"api/picking-orders?page={page}");
 
     private void AddLine()
     {
@@ -216,10 +217,10 @@
                     _workOrderId == 0 ? null : _workOrderId,
                     _shippingOrderId == 0 ? null : _shippingOrderId,
                     [.. _lines]));
-            if (!response.IsSuccessStatusCode)
+            // 在庫不足もここで通知される
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
             {
-                // 在庫不足もここで通知される
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "ピッキング指示を作成しました（先入れ先出しで引当）。";
@@ -246,9 +247,9 @@
         try
         {
             var response = await Http.PostAsync(url, null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _message = successMessage;

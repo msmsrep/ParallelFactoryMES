@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    全プロジェクト共通のビルド設定。
+    DoD 1「新規の警告を増やしていない」を人手の確認に頼らず、ビルドで落とすためにここへ集約する。
+    TargetFramework は MesApp.Desktop だけ net10.0-windows のため各プロジェクトに残す。
+  -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+</Project>

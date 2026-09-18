@@ -1,0 +1,170 @@
+@page "/work-time"
+@attribute [Authorize]
+@inject HttpClient Http
+
+@* 作業時間記録（MES.md B-30-30-02 直接／F-30-20-02 間接）。本人が自分の時間を記録する *@
+
+<PageTitle>作業時間 - Parallel Factory MES</PageTitle>
+
+<h1>作業時間の記録</h1>
+<p class="text-muted">
+    作業指示に紐づく<strong>直接作業</strong>と、段取り・部材準備・設備対応などの<strong>間接作業</strong>を記録します
+    （B-30-30-02／F-30-20-02）。一覧には自分の記録が表示されます（生産管理・システム管理者は全員分）。
+</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord">
+    <div class="card">
+        <h2 style="margin-top:0;">作業時間を記録する</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>区分</label>
+                <select @bind="_type">
+                    <option value="@WorkTimeType.Direct">直接作業（作業指示に紐づく）</option>
+                    <option value="@WorkTimeType.Indirect">間接作業</option>
+                </select>
+            </div>
+            @if (_type == WorkTimeType.Direct)
+            {
+                <div class="form-field">
+                    <label>作業指示</label>
+                    <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
+                                  @bind-Value="_workOrderId"
+                                  ValueOf="workOrder => workOrder.Id"
+                                  LabelOf='@(workOrder => $"{workOrder.WorkOrderNo}（{workOrder.ProductCode} / {workOrder.ProcessCode}）")' />
+                </div>
+            }
+            else
+            {
+                <div class="form-field">
+                    <label>間接作業の区分（例：段取り、部材準備、清掃）</label>
+                    <input @bind="_indirectCategory" />
+                </div>
+            }
+            <div class="form-field">
+                <label>開始時刻</label>
+                <input type="datetime-local" @bind="_startedAt" />
+            </div>
+            <div class="form-field">
+                <label>終了時刻（作業中なら空欄）</label>
+                <input type="datetime-local" @bind="_endedAt" />
+            </div>
+            <div class="form-field">
+                <label>備考</label>
+                <input @bind="_note" />
+            </div>
+        </div>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">作業時間を記録</button>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    <h2 style="margin-top:0;">記録一覧</h2>
+    @if (_records is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_records.Count == 0)
+    {
+        <p class="text-muted">記録はまだありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>作業者</th><th>区分</th><th>作業指示 / 間接区分</th>
+                    <th>開始</th><th>終了</th><th>時間</th><th>備考</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in _records)
+                {
+                    <tr>
+                        <td>@(record.UserName ?? "-")</td>
+                        <td>@(record.Type == WorkTimeType.Direct ? "直接" : "間接")</td>
+                        <td>@(record.WorkOrderNo ?? record.IndirectCategory ?? "-")</td>
+                        <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                        <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "作業中")</td>
+                        <td>@Duration(record)</td>
+                        <td>@(record.Note ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<WorkTimeResponse>? _records;
+
+    private WorkTimeType _type = WorkTimeType.Direct;
+    private int _workOrderId;
+    private string? _indirectCategory;
+    private DateTime _startedAt = DateTime.Now;
+    private DateTime? _endedAt;
+    private string? _note;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    private static string Duration(WorkTimeResponse record) =>
+        record.EndedAt is null ? "-" : $"{(record.EndedAt.Value - record.StartedAt).TotalMinutes:0}分";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() =>
+        _records = await Http.GetFromJsonAsync<List<WorkTimeResponse>>("api/work-time-records") ?? [];
+
+    private async Task CreateAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        if (_type == WorkTimeType.Direct && _workOrderId == 0)
+        {
+            _error = "直接作業には作業指示の選択が必要です。";
+            return;
+        }
+        if (_type == WorkTimeType.Indirect && string.IsNullOrWhiteSpace(_indirectCategory))
+        {
+            _error = "間接作業には区分の入力が必要です。";
+            return;
+        }
+        if (_endedAt is not null && _endedAt <= _startedAt)
+        {
+            _error = "終了時刻は開始時刻より後にしてください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/work-time-records",
+                new WorkTimeRequest(
+                    _type,
+                    _type == WorkTimeType.Indirect ? _indirectCategory : null,
+                    _type == WorkTimeType.Direct ? _workOrderId : null,
+                    new DateTimeOffset(_startedAt),
+                    _endedAt is null ? null : new DateTimeOffset(_endedAt.Value),
+                    string.IsNullOrWhiteSpace(_note) ? null : _note));
+            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = "作業時間を記録しました。";
+            _endedAt = null;
+            _note = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

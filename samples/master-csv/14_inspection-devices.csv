@@ -1,0 +1,4 @@
+﻿Code,Name,SerialNo,Location,CalibratedOn,CalibrationDueOn,CalibrationCycleDays,Note,IsActive
+DV-01,デジタルノギス 150mm,NG-2024-015,加工エリア,2026-04-01,2027-03-31,365,,true
+DV-02,流量計,FM-0081,検査室,2026-07-01,2027-06-30,365,,true
+DV-03,圧力計 1MPa,PG-0112,検査室,2025-06-01,2026-05-31,365,校正期限切れ（使用不可の確認用）,true

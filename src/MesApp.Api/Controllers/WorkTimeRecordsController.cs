@@ -1,3 +1,5 @@
+using MesApp.Api.Services;
+using MesApp.Core.Abstractions;
 using System.Security.Claims;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Entities;
@@ -15,7 +17,7 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/work-time-records")]
 [Authorize]
-public class WorkTimeRecordsController(MesAppDbContext db) : ControllerBase
+public class WorkTimeRecordsController(MesAppDbContext db, ShopFloorReportService reports) : ControllerBase
 {
     private string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
@@ -48,30 +50,14 @@ public class WorkTimeRecordsController(MesAppDbContext db) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = MesRoleGroups.ShopFloorRecord)]
     public async Task<ActionResult<WorkTimeResponse>> Create(WorkTimeRequest request, CancellationToken ct)
     {
-        if (request.Type == WorkTimeType.Direct && request.WorkOrderId is null)
+        var outcome = await reports.AddWorkTimeAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!, ct);
+        if (outcome.Value is not { } record)
         {
-            return BadRequest(new ProblemDetails { Title = "直接作業には作業指示ID（workOrderId）が必要です。" });
+            return this.BadRequestProblem(outcome.Error);
         }
-        if (request.WorkOrderId is int workOrderId
-            && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
-        {
-            return BadRequest(new ProblemDetails { Title = "存在しない作業指示IDです。" });
-        }
-
-        var record = new WorkTimeRecord
-        {
-            UserId = CurrentUserId,
-            Type = request.Type,
-            IndirectCategory = request.IndirectCategory,
-            WorkOrderId = request.WorkOrderId,
-            StartedAt = request.StartedAt,
-            EndedAt = request.EndedAt,
-            Note = request.Note,
-        };
-        db.WorkTimeRecords.Add(record);
-        await db.SaveChangesAsync(ct);
 
         var saved = await db.WorkTimeRecords.AsNoTracking()
             .Where(r => r.Id == record.Id)

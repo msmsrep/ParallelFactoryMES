@@ -1,9 +1,13 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Inventory;
+using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MesApp.Api.Tests;
 
@@ -22,11 +26,74 @@ public class InventoryTests
 
         Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
 
-        // 在庫トランザクションに受入が記録される
-        var transactions = await admin.GetFromJsonAsync<List<TransactionResponse>>(
+        // 在庫トランザクションに受入が記録される（一覧はページング応答）
+        var transactions = await admin.GetFromJsonAsync<PagedResult<TransactionResponse>>(
             $"/api/inventory/transactions?lotId={lot.Id}");
-        Assert.Single(transactions!);
-        Assert.Equal(InventoryTransactionType.Receipt, transactions![0].Type);
+        Assert.Equal(1, transactions!.Total);
+        Assert.Equal(InventoryTransactionType.Receipt, Assert.Single(transactions.Items).Type);
+    }
+
+    [Fact]
+    public async Task 受入をCSVで一括取込でき_1行でも不正なら全件取り消される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        await Phase3TestData.SetupAsync(admin);
+        const string header = "ProductCode,Quantity,LocationCode,LotNumber,ExpiresOn,Note\n";
+
+        // 検証のみではDBが変わらない
+        var dry = await Phase3TestData.ImportActualCsvAsync(admin, "receiving",
+            header + "RM-01,100,LOC-M,CSV-LOT-1,2027-01-31,初回\nRM-01,30,LOC-M,,,\n", dryRun: true);
+        Assert.True(dry.Succeeded);
+        Assert.Equal(0m, await StockOfProductAsync(admin, "RM-01"));
+
+        var result = await Phase3TestData.ImportActualCsvAsync(admin, "receiving",
+            header + "RM-01,100,LOC-M,CSV-LOT-1,2027-01-31,初回\nRM-01,30,LOC-M,,,\n");
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.Created);
+        Assert.Equal(130m, await StockOfProductAsync(admin, "RM-01"));
+        var stocks = await admin.GetFromJsonAsync<PagedResult<StockResponse>>("/api/inventory/stocks");
+        Assert.Equal(new DateOnly(2027, 1, 31), stocks!.Items.Single(s => s.LotNumber == "CSV-LOT-1").ExpiresOn);
+        Assert.Contains(stocks.Items, s => s.LotNumber.StartsWith("RM-01-") && s.Quantity == 30m); // 空欄は自動採番
+
+        // 同じファイル内のロット番号重複・既存ロットとの重複・未登録コード・数量0は行番号付きで返り、
+        // 正しい行（2行目）も含めて1件も登録されない
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "receiving",
+            header
+            + "RM-01,10,LOC-M,CSV-LOT-2,,\n"
+            + "RM-01,10,LOC-M,CSV-LOT-2,,\n"
+            + "RM-01,10,LOC-M,CSV-LOT-1,,\n"
+            + "RM-99,10,LOC-M,,,\n"
+            + "RM-01,0,LOC-X,,,\n");
+        Assert.False(invalid.Succeeded);
+        Assert.Equal(0, invalid.Created);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("CSV-LOT-2"));
+        Assert.Contains(invalid.Errors, e => e.Line == 4 && e.Message.Contains("CSV-LOT-1"));
+        Assert.Contains(invalid.Errors, e => e.Line == 5 && e.Message.Contains("RM-99"));
+        Assert.Contains(invalid.Errors, e => e.Line == 6 && e.Message.Contains("Quantity"));
+        Assert.Contains(invalid.Errors, e => e.Line == 6 && e.Message.Contains("LOC-X"));
+        Assert.Equal(130m, await StockOfProductAsync(admin, "RM-01"));
+
+        // 必須列が無いファイルは行を読む前に拒否する
+        var missing = await Phase3TestData.ImportActualCsvAsync(admin, "receiving", "ProductCode,Quantity\nRM-01,1\n");
+        Assert.False(missing.Succeeded);
+        Assert.Contains("LocationCode", Assert.Single(missing.Errors).Message);
+
+        // 取込の権限は単票の受入APIと同じ（作業者は受入できない）。画面が取込欄を隠すのに使うロールも同じ定数を返す
+        var kinds = await admin.GetFromJsonAsync<List<CsvKindInfo>>("/api/actuals/csv/kinds");
+        Assert.Equal(MesRoleGroups.InventoryManage, kinds!.Single(k => k.Kind == "receiving").WriteRoles);
+        using var operator_ = await TestAuth.CreateUserClientAsync(
+            factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
+        var forbidden = await Phase3TestData.PostActualCsvAsync(operator_, "receiving", header + "RM-01,1,LOC-M,,,\n");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Phase3TestData.PostActualCsvAsync(admin, "unknown", header)).StatusCode);
+    }
+
+    private static async Task<decimal> StockOfProductAsync(HttpClient client, string productCode)
+    {
+        var stocks = await client.GetFromJsonAsync<PagedResult<StockResponse>>("/api/inventory/stocks");
+        return stocks!.Items.Where(s => s.ProductCode == productCode).Sum(s => s.Quantity);
     }
 
     [Fact]
@@ -215,6 +282,65 @@ public class InventoryTests
     }
 
     [Fact]
+    public async Task 出荷判定の承認後に保留になったロットは出荷できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+
+        var created = await admin.PostAsJsonAsync("/api/shipping-orders",
+            new ShippingOrderCreateRequest("出荷先A", null, [new(ctx.ProductId, 60m)]));
+        var shipping = (await created.Content.ReadFromJsonAsync<ShippingOrderResponse>())!;
+        var judged = await admin.PostAsJsonAsync("/api/shipment-judgments",
+            new Core.Contracts.Quality.ShipmentJudgmentCreateRequest(
+                null, shipping.Id, ShipmentJudgmentResult.Approved, null));
+        var judgment = (await judged.Content.ReadFromJsonAsync<Core.Contracts.Quality.ShipmentJudgmentResponse>())!;
+        (await admin.PostAsync($"/api/shipment-judgments/{judgment.Id}/approve", null)).EnsureSuccessStatusCode();
+
+        // 判定は承認済みでも、ロットが保留になっていれば出荷できない
+        await admin.PostAsJsonAsync("/api/inventory/status",
+            new LotStatusRequest(lot.Id, LotStockStatus.OnHold, "調査中"));
+        var held = await admin.PostAsJsonAsync($"/api/shipping-orders/{shipping.Id}/ship",
+            new ShipExecuteRequest([new(lot.Id, ctx.ProductLocationId, 20m)]));
+        Assert.Equal(HttpStatusCode.Conflict, held.StatusCode);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 保留を解除すれば出荷できる
+        await admin.PostAsJsonAsync("/api/inventory/status",
+            new LotStatusRequest(lot.Id, LotStockStatus.Normal, "調査完了"));
+        var shipped = await admin.PostAsJsonAsync($"/api/shipping-orders/{shipping.Id}/ship",
+            new ShipExecuteRequest([new(lot.Id, ctx.ProductLocationId, 20m)]));
+        Assert.Equal(HttpStatusCode.OK, shipped.StatusCode);
+        Assert.Equal(80m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+    }
+
+    [Fact]
+    public async Task 有効期限切れのロットは出荷できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId,
+            // 業務日付の境界（既定6時）で前日扱いになる時間帯でも確実に期限切れになるよう2日前にする
+            expiresOn: DateOnly.FromDateTime(DateTime.Today).AddDays(-2));
+
+        var created = await admin.PostAsJsonAsync("/api/shipping-orders",
+            new ShippingOrderCreateRequest("出荷先A", null, [new(ctx.ProductId, 60m)]));
+        var shipping = (await created.Content.ReadFromJsonAsync<ShippingOrderResponse>())!;
+        var judged = await admin.PostAsJsonAsync("/api/shipment-judgments",
+            new Core.Contracts.Quality.ShipmentJudgmentCreateRequest(
+                null, shipping.Id, ShipmentJudgmentResult.Approved, null));
+        var judgment = (await judged.Content.ReadFromJsonAsync<Core.Contracts.Quality.ShipmentJudgmentResponse>())!;
+        (await admin.PostAsync($"/api/shipment-judgments/{judgment.Id}/approve", null)).EnsureSuccessStatusCode();
+
+        var expired = await admin.PostAsJsonAsync($"/api/shipping-orders/{shipping.Id}/ship",
+            new ShipExecuteRequest([new(lot.Id, ctx.ProductLocationId, 20m)]));
+        Assert.Equal(HttpStatusCode.Conflict, expired.StatusCode);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+    }
+
+    [Fact]
     public async Task 棚卸で差異が調整される()
     {
         using var factory = new ApiFactory();
@@ -287,8 +413,260 @@ public class InventoryTests
             new MoveRequest(lot.Id, ctx.MaterialLocationId, ctx.ProductLocationId, 1m));
         Assert.Equal(HttpStatusCode.Forbidden, move.StatusCode);
 
+        // 搬送指示も実在庫を動かすので在庫権限が要る
+        var transfer = await operator_.PostAsJsonAsync("/api/transfer-orders",
+            new TransferOrderRequest(lot.Id, 1m, ctx.MaterialLocationId, ctx.ProductLocationId));
+        Assert.Equal(HttpStatusCode.Forbidden, transfer.StatusCode);
+
         // 参照は可能
         var stocks = await operator_.GetAsync("/api/inventory/stocks");
         Assert.Equal(HttpStatusCode.OK, stocks.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await operator_.GetAsync("/api/transfer-orders")).StatusCode);
     }
+
+    [Fact]
+    public async Task 同時受入でもロット番号が重複せず全件成立する()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 採番はNumberSequenceの1行を更新してから読むため、同時に採番しても同じ番号にならない
+        const int concurrency = 8;
+        var responses = await Task.WhenAll(Enumerable.Range(0, concurrency).Select(_ =>
+            admin.PostAsJsonAsync("/api/receiving",
+                new ReceivingRequest(ctx.MaterialId, 1m, ctx.MaterialLocationId, null, null, null))));
+
+        foreach (var response in responses)
+        {
+            Assert.True(response.IsSuccessStatusCode,
+                $"採番が衝突しました：{(int)response.StatusCode}");
+        }
+
+        var lotNumbers = new List<string>();
+        foreach (var response in responses)
+        {
+            lotNumbers.Add((await response.Content.ReadFromJsonAsync<LotResponse>())!.LotNumber);
+        }
+        Assert.Equal(concurrency, lotNumbers.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task 採番は既存番号の続きから始まる()
+    {
+        // 業務日付の境界（既定6時）で日付がずれると番号のプレフィックスが変わるため、境界を0時にして固定する
+        using var factory = new ApiFactory(new Dictionary<string, string> { ["BusinessDay:BoundaryHour"] = "0" });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 採番テーブルが無い状態（既存DBからの移行）でも、手入力の番号と衝突しない
+        var manual = await Phase3TestData.ReceiveAsync(
+            admin, ctx.MaterialId, 1m, ctx.MaterialLocationId,
+            lotNumber: $"RM-01-{DateTime.Today:yyyyMMdd}-005");
+        Assert.EndsWith("-005", manual.LotNumber, StringComparison.Ordinal);
+
+        var next = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 1m, ctx.MaterialLocationId);
+        Assert.EndsWith("-006", next.LotNumber, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 在庫トランザクションはページングされ総件数が返る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        // 受入1件＋移動（移動元・移動先で1件）を繰り返し、5件のトランザクションを作る
+        for (var i = 0; i < 4; i++)
+        {
+            var from = i % 2 == 0 ? ctx.MaterialLocationId : ctx.ProductLocationId;
+            var to = i % 2 == 0 ? ctx.ProductLocationId : ctx.MaterialLocationId;
+            (await admin.PostAsJsonAsync("/api/inventory/move", new MoveRequest(lot.Id, from, to, 1m)))
+                .EnsureSuccessStatusCode();
+        }
+
+        var first = await admin.GetFromJsonAsync<PagedResult<TransactionResponse>>(
+            $"/api/inventory/transactions?lotId={lot.Id}&page=1&pageSize=2");
+        Assert.Equal(5, first!.Total);
+        Assert.Equal(2, first.Items.Count);
+        Assert.True(first.HasNext);
+        Assert.False(first.HasPrevious);
+        Assert.Equal(3, first.PageCount);
+
+        var last = await admin.GetFromJsonAsync<PagedResult<TransactionResponse>>(
+            $"/api/inventory/transactions?lotId={lot.Id}&page=3&pageSize=2");
+        Assert.Single(last!.Items);
+        Assert.False(last.HasNext);
+        Assert.True(last.HasPrevious);
+
+        // ページ間で内容が重複しない（並べ替えが確定している）
+        Assert.Empty(first.Items.Select(t => t.Id).Intersect(last.Items.Select(t => t.Id)));
+
+        // pageSizeの指定は上限で頭打ちにする
+        var capped = await admin.GetFromJsonAsync<PagedResult<TransactionResponse>>(
+            $"/api/inventory/transactions?lotId={lot.Id}&pageSize=9999");
+        Assert.Equal(PageQuery.MaxPageSize, capped!.PageSize);
+    }
+
+    [Fact]
+    public async Task ロット選択肢は検索で絞り込め上限超過を知らせる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        var target = await Phase3TestData.ReceiveAsync(
+            admin, ctx.MaterialId, 10m, ctx.MaterialLocationId, lotNumber: "FIND-ME-001");
+        for (var i = 0; i < 3; i++)
+        {
+            await Phase3TestData.ReceiveAsync(
+                admin, ctx.MaterialId, 10m, ctx.MaterialLocationId, lotNumber: $"OTHER-{i:000}");
+        }
+
+        // 絞り込みなしなら全件（上限内なので truncated は false）
+        var all = await admin.GetFromJsonAsync<OptionsResult<StockResponse>>("/api/inventory/stocks/options");
+        Assert.Equal(4, all!.Items.Count);
+        Assert.False(all.Truncated);
+
+        // ロット番号の部分一致（スキャンした値をそのまま渡せる）
+        var found = await admin.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            "/api/inventory/stocks/options?q=FIND-ME");
+        Assert.Equal(target.Id, Assert.Single(found!.Items).LotId);
+
+        // 品目コードでも引ける
+        var byProduct = await admin.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            "/api/inventory/stocks/options?q=RM-01");
+        Assert.Equal(4, byProduct!.Items.Count);
+
+        // 上限を超えたら黙って切らずに知らせる
+        var limited = await admin.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            "/api/inventory/stocks/options?limit=2");
+        Assert.Equal(2, limited!.Items.Count);
+        Assert.True(limited.Truncated);
+    }
+
+    [Fact]
+    public async Task 品質保証ロールは出荷_出庫_棚卸を参照できるが更新はできない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        using var qa = await TestAuth.CreateUserClientAsync(
+            factory, admin, "qa1", "Passw0rd123", MesRoles.QualityAssurance);
+
+        // 参照：出荷判定（H-10-10）は対象の出荷指示を選ぶところから始まるため、
+        // 参照できないと品質保証ロール単独では判定を作成できない
+        Assert.Equal(HttpStatusCode.OK, (await qa.GetAsync("/api/shipping-orders")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await qa.GetAsync("/api/shipping-orders/options")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await qa.GetAsync("/api/picking-orders")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await qa.GetAsync("/api/stocktakes")).StatusCode);
+
+        // 更新：実在庫を動かす操作は在庫権限のまま
+        var shipping = await qa.PostAsJsonAsync("/api/shipping-orders",
+            new ShippingOrderCreateRequest("出荷先A", null, [new(ctx.ProductId, 1m)]));
+        Assert.Equal(HttpStatusCode.Forbidden, shipping.StatusCode);
+
+        var stocktake = await qa.PostAsJsonAsync("/api/stocktakes",
+            new StocktakeCreateRequest(ctx.MaterialLocationId));
+        Assert.Equal(HttpStatusCode.Forbidden, stocktake.StatusCode);
+
+        var picking = await qa.PostAsJsonAsync("/api/picking-orders",
+            new PickingOrderCreateRequest(PickingOrderType.ProcessIssue, null, null, []));
+        Assert.Equal(HttpStatusCode.Forbidden, picking.StatusCode);
+    }
+    [Fact]
+    public async Task サンプル採取で在庫から抜け保管期限と廃棄が記録される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        var today = (await admin.GetFromJsonAsync<BusinessDateResponse>("/api/business-date"))!.Today;
+
+        // 採取した分は在庫から抜ける（保管棚へ移り、出荷・投入には使えないため）
+        var created = await admin.PostAsJsonAsync("/api/sample-storages",
+            new SampleCollectRequest(lot.Id, ctx.ProductLocationId, 3m, today.AddDays(30), null, "受入検査分"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var sample = (await created.Content.ReadFromJsonAsync<SampleStorageResponse>())!;
+        Assert.StartsWith("SP", sample.SampleNo);
+        Assert.Equal(SampleStorageStatus.Stored, sample.Status);
+        Assert.Equal(30, sample.DaysUntilRetentionEnd);
+        Assert.False(sample.IsRetentionOver);
+        Assert.Equal(97m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 保管期限を過ぎたものだけの一覧には出ない
+        var over = await admin.GetFromJsonAsync<List<SampleStorageResponse>>(
+            "/api/sample-storages?retentionOverOnly=true");
+        Assert.Empty(over!);
+
+        // 在庫を超える採取はできない
+        var tooMuch = await admin.PostAsJsonAsync("/api/sample-storages",
+            new SampleCollectRequest(lot.Id, ctx.ProductLocationId, 1000m, null, null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, tooMuch.StatusCode);
+
+        // 廃棄しても在庫は動かない（採取時に既に抜いてある）
+        var closed = await admin.PostAsJsonAsync($"/api/sample-storages/{sample.Id}/close",
+            new SampleCloseRequest(SampleStorageStatus.Disposed, "期限前だが試験で使い切り"));
+        Assert.Equal(HttpStatusCode.OK, closed.StatusCode);
+        var disposed = (await closed.Content.ReadFromJsonAsync<SampleStorageResponse>())!;
+        Assert.Equal(SampleStorageStatus.Disposed, disposed.Status);
+        Assert.Equal(today, disposed.ClosedOn);
+        Assert.Equal(97m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 保管を終えたものは二度閉じられない
+        var again = await admin.PostAsJsonAsync($"/api/sample-storages/{sample.Id}/close",
+            new SampleCloseRequest(SampleStorageStatus.Consumed, null));
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task 倉庫業務進捗は指示と完了を業務種別ごとに数える()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+
+        // 搬送指示を2件作り、片方だけ実行する
+        var first = await admin.PostAsJsonAsync("/api/transfer-orders",
+            new TransferOrderRequest(lot.Id, 10m, ctx.MaterialLocationId, ctx.ProductLocationId));
+        var firstOrder = (await first.Content.ReadFromJsonAsync<TransferOrderResponse>())!;
+        (await admin.PostAsync($"/api/transfer-orders/{firstOrder.Id}/execute", null))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/transfer-orders",
+            new TransferOrderRequest(lot.Id, 10m, ctx.MaterialLocationId, ctx.ProductLocationId)))
+            .EnsureSuccessStatusCode();
+
+        var progress = await admin.GetFromJsonAsync<WarehouseProgressResponse>(
+            "/api/inventory/warehouse-progress");
+        var transfer = progress!.Rows.Single(r => r.Kind == "在庫移動");
+        Assert.Equal(2, transfer.TotalCount);
+        Assert.Equal(1, transfer.CompletedCount);
+        Assert.Equal(1, transfer.OpenCount);
+        Assert.Equal(0, transfer.OldestOpenAgeDays);
+
+        // 指示の無い業務は0件で並ぶ（行そのものは消さない）
+        Assert.Equal(0, progress.Rows.Single(r => r.Kind == "棚卸").TotalCount);
+
+        // 受入は「指示」を持たないため進捗の対象にしない
+        Assert.DoesNotContain(progress.Rows, r => r.Kind == "受入");
+
+        // 経過日数は製造日で数える。2製造日前の始まり直後（日本では境界6時の直後＝UTCでは前日）に作った
+        // 指示は2日になる。作成日時をUTCの暦日で数えると3日になる（実行時刻によらず差が出る時刻を選ぶ）
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesApp.Infrastructure.MesAppDbContext>();
+            var businessDate = scope.ServiceProvider.GetRequiredService<MesApp.Core.Abstractions.IBusinessDateService>();
+            var twoDaysAgo = businessDate.Today.AddDays(-2);
+            var open = await db.TransferOrders.SingleAsync(t => t.Status == TransferOrderStatus.Instructed);
+            open.CreatedAt = businessDate.GetRange(twoDaysAgo).Start.AddMinutes(30);
+            await db.SaveChangesAsync();
+            progress = await admin.GetFromJsonAsync<WarehouseProgressResponse>(
+                $"/api/inventory/warehouse-progress?from={twoDaysAgo:yyyy-MM-dd}");
+        }
+        Assert.Equal(2, progress!.Rows.Single(r => r.Kind == "在庫移動").OldestOpenAgeDays);
+    }
+
 }

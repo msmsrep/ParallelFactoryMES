@@ -1,6 +1,8 @@
-﻿Code,AreaType,ShelfNo,IsActive
-WH-M01,MaterialWarehouse,A-01-01,true
-WH-M02,MaterialWarehouse,A-01-02,true
-WIP-01,InProcess,,true
-WH-P01,ProductWarehouse,B-01-01,true
-SHIP-01,ShippingArea,,true
+﻿Code,WorkCenterCode,AreaType,ShelfNo,IsActive
+WH-M01,PL-1,MaterialWarehouse,A-01-01,true
+WH-M02,PL-1,MaterialWarehouse,A-01-02,true
+WH-S01,PL-1,MaterialWarehouse,M-01-01,true
+WIP-01,WC-MC1,InProcess,,true
+WIP-02,WC-AS1,InProcess,,true
+WH-P01,PL-1,ProductWarehouse,B-01-01,true
+SHIP-01,AR-SH,ShippingArea,,true

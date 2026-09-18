@@ -1,4 +1,7 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
@@ -83,7 +86,32 @@ internal static class Phase3TestData
         {
             url += $"&locationId={locationId}";
         }
-        var stocks = await client.GetFromJsonAsync<List<StockResponse>>(url);
-        return stocks!.Sum(s => s.Quantity);
+        // 1ロット分の在庫行はページに収まる前提（テストデータの規模）
+        var stocks = await client.GetFromJsonAsync<PagedResult<StockResponse>>(url);
+        return stocks!.Items.Sum(s => s.Quantity);
+    }
+
+    /// <summary>CSVを取り込み、結果を返す（path は api/ 以下。例 actuals/csv/receiving。HTTPエラーは例外）</summary>
+    public static async Task<CsvImportResult> ImportCsvAsync(HttpClient client, string path, string csv, bool dryRun = false)
+    {
+        var response = await PostCsvAsync(client, path, csv, dryRun);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<CsvImportResult>())!;
+    }
+
+    /// <summary>実績CSVを取り込み、結果を返す（HTTPエラーは例外）</summary>
+    public static Task<CsvImportResult> ImportActualCsvAsync(
+        HttpClient client, string kind, string csv, bool dryRun = false) =>
+        ImportCsvAsync(client, $"actuals/csv/{kind}", csv, dryRun);
+
+    public static Task<HttpResponseMessage> PostActualCsvAsync(
+        HttpClient client, string kind, string csv, bool dryRun = false) =>
+        PostCsvAsync(client, $"actuals/csv/{kind}", csv, dryRun);
+
+    private static Task<HttpResponseMessage> PostCsvAsync(HttpClient client, string path, string csv, bool dryRun)
+    {
+        var content = new StringContent(csv, Encoding.UTF8);
+        content.Headers.ContentType = new MediaTypeHeaderValue("text/csv") { CharSet = "utf-8" };
+        return client.PostAsync($"/api/{path}?dryRun={(dryRun ? "true" : "false")}", content);
     }
 }

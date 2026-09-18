@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Auth;
 using MesApp.Core.Contracts.Setup;
+using MesApp.Core.Contracts.Users;
 
 namespace MesApp.Api.Tests;
 
@@ -148,5 +149,79 @@ public class AuthTests
         var relogin = await client.PostAsJsonAsync(
             "/api/auth/login", new LoginRequest(AdminUser, "NewPassw0rd456"));
         Assert.Equal(HttpStatusCode.OK, relogin.StatusCode);
+    }
+
+    [Fact]
+    public async Task 初期パスワードのままでは業務APIを呼べずパスワード変更だけができる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        // 管理者が作成したユーザーは MustChangePassword が立つ
+        var created = await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("worker1", "Passw0rd123", "作業者1", [MesRoles.Operator]));
+        created.EnsureSuccessStatusCode();
+
+        using var client = factory.CreateClient();
+        var login = await client.PostAsJsonAsync(
+            "/api/auth/login", new LoginRequest("worker1", "Passw0rd123"));
+        var token = (await login.Content.ReadFromJsonAsync<TokenResponse>())!;
+        Assert.True(token.User.MustChangePassword);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token.AccessToken);
+
+        // 業務APIは403（参照も含めて止める）
+        var blocked = await client.GetAsync("/api/locations");
+        Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+
+        // 自分の情報とパスワード変更だけは通る
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/me")).StatusCode);
+        var change = await client.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest("Passw0rd123", "NewPassw0rd456"));
+        Assert.Equal(HttpStatusCode.NoContent, change.StatusCode);
+
+        // 変更後に再ログインすれば業務APIを呼べる
+        await TestAuth.LoginAsync(client, "worker1", "NewPassw0rd456");
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/locations")).StatusCode);
+    }
+
+    [Fact]
+    public async Task 失効済みリフレッシュトークンの再提示でセッション全体を失効させる()
+    {
+        using var factory = new ApiFactory();
+        // Cookieを手で持ち回るため自動Cookie管理は使わない
+        using var client = factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = false });
+        await SetupAdminAsync(client);
+
+        var login = await client.PostAsJsonAsync(
+            "/api/auth/login", new LoginRequest(AdminUser, AdminPassword));
+        login.EnsureSuccessStatusCode();
+        var oldCookie = ExtractRefreshCookie(login);
+
+        // 正常なローテーション。ここで旧トークンは失効する
+        var rotated = await RefreshWithCookieAsync(client, oldCookie);
+        Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
+        var newCookie = ExtractRefreshCookie(rotated);
+
+        // 失効済みの旧トークンを再提示（盗用の想定）
+        var reuse = await RefreshWithCookieAsync(client, oldCookie);
+        Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
+
+        // 正規の利用者が持っている新トークンも巻き添えで失効している（再ログインが必要）
+        var afterReuse = await RefreshWithCookieAsync(client, newCookie);
+        Assert.Equal(HttpStatusCode.Unauthorized, afterReuse.StatusCode);
+    }
+
+    private static string ExtractRefreshCookie(HttpResponseMessage response) =>
+        response.Headers.GetValues("Set-Cookie")
+            .First(v => v.StartsWith("mesapp_rt=", StringComparison.Ordinal))
+            .Split(';')[0];
+
+    private static Task<HttpResponseMessage> RefreshWithCookieAsync(HttpClient client, string cookie)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        request.Headers.Add("Cookie", cookie);
+        return client.SendAsync(request);
     }
 }

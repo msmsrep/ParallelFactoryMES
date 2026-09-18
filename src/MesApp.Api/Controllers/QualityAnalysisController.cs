@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -33,8 +33,12 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
                     r.CreatedAt,
                     r.GoodQuantity,
                     r.DefectQuantity,
+                    r.ScrapQuantity,
+                    r.ReworkQuantity,
                     ProductCode = r.WorkOrder!.Product!.Code,
                     ProcessCode = r.WorkOrder!.Process!.Code,
+                    // 直は記録時に固定した値。集計のたびに時刻から引き直さない（Spec.md 5.7）
+                    ShiftLabel = r.Shift == null ? null : r.Shift.Code + " " + r.Shift.Name,
                 })
                 .ToListAsync(ct))
             .Where(r => (fromStart is null || r.CreatedAt >= fromStart)
@@ -44,12 +48,59 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
         var byProduct = records
             .GroupBy(r => r.ProductCode)
             .OrderBy(g => g.Key)
-            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity)))
+            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity),
+                g.Sum(r => r.ScrapQuantity), g.Sum(r => r.ReworkQuantity)))
             .ToList();
         var byProcess = records
             .GroupBy(r => r.ProcessCode)
             .OrderBy(g => g.Key)
-            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity)))
+            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity),
+                g.Sum(r => r.ScrapQuantity), g.Sum(r => r.ReworkQuantity)))
+            .ToList();
+        // 直別（C-40-10-03）。3.9節の製造日が夜勤を前提にしているので、
+        // 昼勤と夜勤で不良率が違わないかを見られるようにする
+        var byShift = records
+            .GroupBy(r => r.ShiftLabel ?? ShiftLabels.NoShift)
+            .OrderBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => ToRow(g.Key, g.Sum(r => r.GoodQuantity), g.Sum(r => r.DefectQuantity),
+                g.Sum(r => r.ScrapQuantity), g.Sum(r => r.ReworkQuantity)))
+            .ToList();
+
+        // 不良理由別の集計（C-40-10-01）。改善活動の対象を選ぶための構成比も返す
+        var defects = (await db.ProductionDefects.AsNoTracking()
+                .Select(d => new
+                {
+                    d.ProductionRecord!.CreatedAt,
+                    d.Quantity,
+                    Code = d.DefectReason!.Code,
+                    Name = d.DefectReason!.Name,
+                    d.DefectReason!.Category,
+                })
+                .ToListAsync(ct))
+            .Where(d => (fromStart is null || d.CreatedAt >= fromStart)
+                        && (toEnd is null || d.CreatedAt < toEnd))
+            .ToList();
+        var defectTotal = defects.Sum(d => d.Quantity);
+        var byDefectReason = defects
+            .GroupBy(d => (d.Code, d.Name, d.Category))
+            .Select(g => new DefectReasonSummaryRow(
+                g.Key.Code, g.Key.Name, g.Key.Category,
+                g.Sum(d => d.Quantity),
+                defectTotal == 0 ? 0 : Math.Round(g.Sum(d => d.Quantity) / defectTotal * 100, 2)))
+            .OrderByDescending(r => r.Quantity).ThenBy(r => r.Code)
+            .ToList();
+        // 累積構成比（パレート図。C-40-10-01）。構成比を丸めてから積むと合計が100%からずれるため、
+        // 数量の累計から毎回求め直す
+        decimal cumulative = 0;
+        byDefectReason = byDefectReason
+            .Select(r =>
+            {
+                cumulative += r.Quantity;
+                return r with
+                {
+                    CumulativeShare = defectTotal == 0 ? 0 : Math.Round(cumulative / defectTotal * 100, 2),
+                };
+            })
             .ToList();
 
         var nonconformances = (await db.NonconformanceReports.AsNoTracking()
@@ -74,12 +125,16 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
         return new QualitySummaryResponse(
             byProduct,
             byProcess,
+            byShift,
+            byDefectReason,
             byCause,
             inspections.Count(i => i.OverallJudgment == InspectionJudgment.Pass),
             inspections.Count(i => i.OverallJudgment == InspectionJudgment.Fail),
             nonconformances.Count(n => n.Status != NonconformanceStatus.Closed));
     }
 
-    private static DefectSummaryRow ToRow(string key, decimal good, decimal defect) =>
-        new(key, good, defect, good + defect == 0 ? 0 : Math.Round(defect / (good + defect) * 100, 2));
+    private static DefectSummaryRow ToRow(
+        string key, decimal good, decimal defect, decimal scrap, decimal rework) =>
+        new(key, good, defect, scrap, rework,
+            good + defect == 0 ? 0 : Math.Round(defect / (good + defect) * 100, 2));
 }

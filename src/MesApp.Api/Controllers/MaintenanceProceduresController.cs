@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -48,18 +48,18 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenanceProcedureResponse>> Create(
         MaintenanceProcedureRequest request, CancellationToken ct)
     {
         if (await db.MaintenanceProcedures.AnyAsync(p => p.ProcedureNo == request.ProcedureNo, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"手順書番号 '{request.ProcedureNo}' は既に存在します。" });
+            return this.ConflictProblem($"手順書番号 '{request.ProcedureNo}' は既に存在します。");
         }
         var error = await ValidateTargetsAsync(request, ct);
         if (error is not null)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         var procedure = new MaintenanceProcedure
@@ -78,7 +78,7 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenanceProcedureResponse>> Update(
         int id, MaintenanceProcedureRequest request, CancellationToken ct)
     {
@@ -89,12 +89,12 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
         }
         if (await db.MaintenanceProcedures.AnyAsync(p => p.ProcedureNo == request.ProcedureNo && p.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"手順書番号 '{request.ProcedureNo}' は既に存在します。" });
+            return this.ConflictProblem($"手順書番号 '{request.ProcedureNo}' は既に存在します。");
         }
         var error = await ValidateTargetsAsync(request, ct);
         if (error is not null)
         {
-            return BadRequest(new ProblemDetails { Title = error });
+            return this.BadRequestProblem(error);
         }
 
         procedure.ProcedureNo = request.ProcedureNo;
@@ -110,20 +110,11 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var procedure = await db.MaintenanceProcedures.FindAsync([id], ct);
-        if (procedure is null)
-        {
-            return NotFound();
-        }
-        procedure.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Maintenance", "ProcedureDeactivate", nameof(MaintenanceProcedure),
-            id.ToString(), detail: $"procedureNo={procedure.ProcedureNo}", ct: ct);
-        return NoContent();
-    }
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<MaintenanceProcedure>(db, auditLogger, id,
+            p => $"procedureNo={p.ProcedureNo}", ct,
+            category: "Maintenance", action: "ProcedureDeactivate");
 
     private async Task<string?> ValidateTargetsAsync(MaintenanceProcedureRequest request, CancellationToken ct)
     {

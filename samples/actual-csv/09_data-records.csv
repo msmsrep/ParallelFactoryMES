@@ -1,0 +1,6 @@
+﻿OrderNo,Sequence,ControlItemCode,NumericValue,Item,Value
+SMP-SF-001,10,CI-01,8050,,
+SMP-SF-001,10,CI-02,1350,,
+SMP-FG-001,10,CI-03,10.2,,
+SMP-FG-001,20,CI-04,0.5,,
+SMP-FG-001,20,,,吐出音,異音なし

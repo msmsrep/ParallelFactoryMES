@@ -1,0 +1,218 @@
+@inject HttpClient Http
+
+@* 工程管理項目の指示（展開時点のスナップショット。Spec.md 5.7）と、その実績（B-30-30-04） *@
+<Notice Error="@_error" Message="@_message" />
+@if (_controlItems.Count > 0)
+{
+    <h2>製造条件の指示（この指示が展開された時点の条件）</h2>
+    <table class="table">
+        <thead><tr><th>項目</th><th>指示値</th><th>許容範囲</th><th>版数</th></tr></thead>
+        <tbody>
+            @foreach (var item in _controlItems)
+            {
+                <tr>
+                    <td>@item.ItemCode @item.ItemName</td>
+                    <td>@(item.TargetValue?.ToString() ?? "-") @item.Unit</td>
+                    <td>@(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")</td>
+                    <td>v@(item.ItemVersion)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@* 製造条件データ（B-30-30-04。温度・回転数などを手入力で残す） *@
+<h2>製造条件データ</h2>
+@if (_dataRecords.Count == 0)
+{
+    <p class="text-muted">記録はまだありません。</p>
+}
+else
+{
+    <table class="table">
+        <thead><tr><th>項目</th><th>値</th><th>許容範囲</th><th>判定</th><th>記録日時</th></tr></thead>
+        <tbody>
+            @foreach (var data in _dataRecords)
+            {
+                <tr>
+                    <td>@data.Item</td>
+                    <td>@data.Value</td>
+                    <td>
+                        @if (data.WorkOrderControlItemId is null)
+                        {
+                            <span class="text-muted">-</span>
+                        }
+                        else
+                        {
+                            @($"{data.LowerLimit?.ToString() ?? "-"} 〜 {data.UpperLimit?.ToString() ?? "-"}")
+                        }
+                    </td>
+                    <td>
+                        @if (data.IsDeviation == true)
+                        {
+                            <span class="badge badge-danger">逸脱</span>
+                        }
+                        else if (data.IsDeviation == false)
+                        {
+                            <span class="badge badge-success">範囲内</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">-</span>
+                        }
+                    </td>
+                    <td>@data.RecordedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="dataWrite">
+    @if (Editable)
+    {
+        <div class="card">
+            <h2 style="margin-top:0;">製造条件を記録する（B-30-30-04）</h2>
+            <div class="form-grid">
+                @if (_controlItems.Count > 0)
+                {
+                    <div class="form-field">
+                        <label>指示項目（選ぶと許容範囲と照合する）</label>
+                        <select @bind="_controlItemId" @bind:after="OnControlItemSelected">
+                            <option value="0">指示に紐づけない（自由記述）</option>
+                            @foreach (var item in _controlItems)
+                            {
+                                <option value="@item.Id">@item.ItemCode @item.ItemName</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <div class="form-field">
+                    <label>項目（例：加熱温度）</label>
+                    <input @bind="_item" />
+                </div>
+                @if (_controlItemId == 0)
+                {
+                    <div class="form-field">
+                        <label>値（例：180℃）</label>
+                        <input @bind="_value" />
+                    </div>
+                }
+                else
+                {
+                    <div class="form-field">
+                        <label>実績値（数値。@(SelectedControlItem?.Unit)）</label>
+                        <input type="number" step="any" @bind="_numericValue" />
+                    </div>
+                }
+            </div>
+            <button class="btn" disabled="@_busy" @onclick="AddAsync">条件を記録</button>
+        </div>
+    }
+</AuthorizeView>
+
+@code {
+    /// <summary>対象の作業指示</summary>
+    [Parameter, EditorRequired] public int WorkOrderId { get; set; }
+
+    /// <summary>記録フォームを出してよいか（承認済・取消の作業指示には記録できない）</summary>
+    [Parameter] public bool Editable { get; set; }
+
+    /// <summary>展開時点の指示（マスタの現在値ではない。Spec.md 5.7）</summary>
+    private List<WorkOrderControlItemResponse> _controlItems = [];
+    private List<DataRecordResponse> _dataRecords = [];
+    private int _loadedWorkOrderId;
+
+    private int _controlItemId;
+    private decimal? _numericValue;
+    private string _item = string.Empty;
+    private string _value = string.Empty;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedWorkOrderId != WorkOrderId)
+        {
+            _loadedWorkOrderId = WorkOrderId;
+            _controlItems = await Http.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
+                $"api/work-orders/{WorkOrderId}/control-items") ?? [];
+            await LoadRecordsAsync();
+        }
+    }
+
+    private async Task LoadRecordsAsync() =>
+        _dataRecords = await Http.GetFromJsonAsync<List<DataRecordResponse>>(
+            $"api/work-orders/{WorkOrderId}/data-records") ?? [];
+
+    /// <summary>選択中の指示（単位や許容範囲の表示に使う）</summary>
+    private WorkOrderControlItemResponse? SelectedControlItem =>
+        _controlItems.FirstOrDefault(i => i.Id == _controlItemId);
+
+    /// <summary>指示を選んだら項目名を埋める（同じ内容を二度入力させない）</summary>
+    private void OnControlItemSelected()
+    {
+        if (SelectedControlItem is { } item)
+        {
+            _item = $"{item.ItemCode} {item.ItemName}";
+            _numericValue ??= item.TargetValue;
+        }
+    }
+
+    private async Task AddAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_item))
+        {
+            _error = "項目を入力してください。";
+            return;
+        }
+        if (_controlItemId == 0 && string.IsNullOrWhiteSpace(_value))
+        {
+            _error = "値を入力してください。";
+            return;
+        }
+        if (_controlItemId != 0 && _numericValue is null)
+        {
+            _error = "実績値を入力してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            // 指示に紐づけるときは、表示用の値を数値＋単位から組み立てる（入力を二重にさせない）
+            var value = _controlItemId == 0
+                ? _value
+                : $"{_numericValue}{SelectedControlItem?.Unit}";
+            var response = await Http.PostAsJsonAsync($"api/work-orders/{WorkOrderId}/data-records",
+                new List<DataRecordRequest>
+                {
+                    new(_item, value,
+                        _controlItemId == 0 ? null : _controlItemId,
+                        _controlItemId == 0 ? null : _numericValue),
+                });
+            if (await response.ReadErrorAsync("製造条件の記録に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = "製造条件を記録しました。";
+            _item = string.Empty;
+            _value = string.Empty;
+            _numericValue = null;
+            _controlItemId = 0;
+            await LoadRecordsAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -201,3 +201,54 @@ public class StocktakeLine
     /// <summary>差異調整済みか（確定時に設定）</summary>
     public bool IsAdjusted { get; set; }
 }
+
+/// <summary>
+/// サンプル品の保管（Spec.md 5.3 SampleStorage。D-40-50-01）。
+/// <para>
+/// 検査で採取したサンプルは現物として残り、保管期限まで捨てられない。
+/// 採取した時点で**在庫からは抜く**（保管棚へ移り、出荷・投入には使えないため。
+/// 在庫に残すと引当・先入れ先出しの対象になってしまう）。
+/// </para>
+/// </summary>
+public class SampleStorage
+{
+    public int Id { get; set; }
+
+    /// <summary>サンプル番号（一意。自動採番：SPyyyyMMdd-連番）</summary>
+    public string SampleNo { get; set; } = string.Empty;
+
+    public int ProductId { get; set; }
+    public Product? Product { get; set; }
+
+    /// <summary>採取元ロット（どのロットのサンプルかを追えるようにする）</summary>
+    public int LotId { get; set; }
+    public Lot? Lot { get; set; }
+
+    /// <summary>採取のきっかけとなった検査指示（無い運用もあるため任意）</summary>
+    public int? InspectionOrderId { get; set; }
+    public InspectionOrder? InspectionOrder { get; set; }
+
+    public decimal Quantity { get; set; }
+
+    /// <summary>保管場所</summary>
+    public int StorageLocationId { get; set; }
+    public Location? StorageLocation { get; set; }
+
+    /// <summary>採取日（業務日付）</summary>
+    public DateOnly CollectedOn { get; set; }
+
+    /// <summary>保管期限（この日までは捨てられない。未設定なら期限の判定を行わない）</summary>
+    public DateOnly? RetainUntil { get; set; }
+
+    public SampleStorageStatus Status { get; set; } = SampleStorageStatus.Stored;
+
+    public string? CollectedByUserId { get; set; }
+
+    /// <summary>保管終了（廃棄・払出）の日と実施者</summary>
+    public DateOnly? ClosedOn { get; set; }
+    public string? ClosedByUserId { get; set; }
+
+    public string? Note { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}

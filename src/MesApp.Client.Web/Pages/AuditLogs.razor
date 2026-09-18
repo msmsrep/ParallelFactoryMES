@@ -1,0 +1,269 @@
+@page "/audit-logs"
+@attribute [Authorize(Roles = MesRoles.SystemAdmin)]
+@inject HttpClient Http
+
+@* 監査ログ（Spec.md 7.6）。記録するだけでは追跡できないため、アプリから引けるようにする *@
+
+<PageTitle>監査ログ - Parallel Factory MES</PageTitle>
+
+<h1>監査ログ</h1>
+<p class="text-muted">
+    誰が・いつ・何を変更したかの記録（Spec.md 7.6）。個々の記録は書き換えも削除もできません。
+    整理できるのは保持期間を過ぎた分だけで、それも削除したこと自体が記録に残ります。
+</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <div class="form-grid">
+        <div class="form-field">
+            <label>期間（開始）</label>
+            <input type="date" @bind="_from" />
+        </div>
+        <div class="form-field">
+            <label>期間（終了）</label>
+            <input type="date" @bind="_to" />
+        </div>
+        <div class="form-field">
+            <label>分類・操作</label>
+            <select @bind="_categoryAction">
+                <option value="">すべて</option>
+                @foreach (var option in _options)
+                {
+                    <option value="@($"{option.Category}/{option.Action}")">
+                        @option.Category / @option.Action（@option.Count 件）
+                    </option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>対象の種別</label>
+            <input @bind="_targetType" placeholder="WorkOrder / Lot など" />
+        </div>
+        <div class="form-field">
+            <label>対象のID</label>
+            <input @bind="_targetId" placeholder="対象種別と組で指定" />
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn" disabled="@_busy" @onclick="SearchAsync">検索</button>
+        <button class="btn btn-secondary" disabled="@_busy" @onclick="ResetAsync">条件をクリア</button>
+    </div>
+</div>
+
+<div class="card">
+    @if (_logs is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_logs.Total == 0)
+    {
+        <p class="text-muted">該当する記録はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>日時</th><th>ユーザー</th><th>分類</th><th>操作</th><th>対象</th><th>詳細</th><th>IP</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var log in _logs.Items)
+                {
+                    <tr>
+                        <td>@log.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@(log.UserName ?? "-")</td>
+                        <td>@log.Category</td>
+                        <td>@log.Action</td>
+                        <td>@(log.TargetType is null ? "-" : $"{log.TargetType} #{log.TargetId}")</td>
+                        @* 詳細は操作ごとに中身が違う（要約文字列 or before/after のJSON）ためそのまま出す *@
+                        <td style="white-space:pre-wrap;word-break:break-all;">@(log.Detail ?? "-")</td>
+                        <td class="text-muted">@(log.IpAddress ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager TItem="AuditLogResponse" Result="_logs" OnPageChanged="LoadPageAsync" />
+    }
+</div>
+
+@* 保持期間を過ぎた記録の整理（Spec.md 7.6）。消す前に必ず件数を確認させる二段階にする *@
+<div class="card">
+    <h2 style="margin-top:0;">古い記録の一括削除</h2>
+    <p class="text-muted">
+        保持期間を過ぎた記録だけを整理できます。保持期間の内側は削除できません。
+        削除したこと自体（期間・件数・理由・実行者）が監査ログに残ります。
+        <strong>先にバックアップを取得してください。</strong>
+    </p>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>この日まで削除（指定日を含む）</label>
+            <input type="date" value="@_purgeTo?.ToString("yyyy-MM-dd")"
+                   @onchange="e => SetPurgeTo(e.Value?.ToString())" />
+        </div>
+        <div class="form-field">
+            <label>理由（必須）</label>
+            <input value="@_purgeReason" @onchange="e => SetPurgeReason(e.Value?.ToString())"
+                   placeholder="例：容量削減のため" />
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn btn-secondary" disabled="@_purgeBusy" @onclick="PreviewPurgeAsync">削除件数を確認</button>
+        @if (_preview is not null)
+        {
+            <button class="btn btn-danger" disabled="@_purgeBusy" @onclick="ExecutePurgeAsync">
+                @_preview.DeletedCount 件を削除する
+            </button>
+        }
+    </div>
+    @if (_preview is not null)
+    {
+        <p class="text-muted">
+            @_preview.To.ToString("yyyy-MM-dd") 以前の <strong>@_preview.DeletedCount 件</strong>が対象です
+            （削除できるのは @_preview.RetentionCutoff.ToString("yyyy-MM-dd") 以前）。
+            内容を変えると、もう一度件数の確認が必要になります。
+        </p>
+    }
+</div>
+
+@code {
+    private PagedResult<AuditLogResponse>? _logs;
+    private List<AuditCategoryOption> _options = [];
+
+    private DateTime? _from;
+    private DateTime? _to;
+    private string _categoryAction = string.Empty;
+    private string? _targetType;
+    private string? _targetId;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    private DateTime? _purgeTo;
+    private string? _purgeReason;
+    private bool _purgeBusy;
+
+    /// <summary>
+    /// 確認済みの削除内容。入力を変えたら破棄して確認からやり直させる
+    /// （件数を見た内容と実際に消す内容がずれないようにする）
+    /// </summary>
+    private AuditLogPurgeResult? _preview;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _options = await Http.GetFromJsonAsync<List<AuditCategoryOption>>("api/audit-logs/categories") ?? [];
+        await LoadPageAsync(1);
+    }
+
+    private Task SearchAsync() => LoadPageAsync(1);
+
+    private Task ResetAsync()
+    {
+        _from = null;
+        _to = null;
+        _categoryAction = string.Empty;
+        _targetType = null;
+        _targetId = null;
+        return LoadPageAsync(1);
+    }
+
+    private async Task LoadPageAsync(int page)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _logs = await Http.GetFromJsonAsync<PagedResult<AuditLogResponse>>(BuildUrl(page));
+            _message = _logs is null ? null : $"{_logs.Total} 件";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string BuildUrl(int page)
+    {
+        var query = new List<string> { $"page={page}" };
+        if (_from is DateTime from)
+        {
+            query.Add($"from={DateOnly.FromDateTime(from):yyyy-MM-dd}");
+        }
+        if (_to is DateTime to)
+        {
+            query.Add($"to={DateOnly.FromDateTime(to):yyyy-MM-dd}");
+        }
+        if (_categoryAction.Split('/') is [var category, var action] && category.Length > 0)
+        {
+            query.Add($"category={Uri.EscapeDataString(category)}");
+            query.Add($"action={Uri.EscapeDataString(action)}");
+        }
+        if (!string.IsNullOrWhiteSpace(_targetType))
+        {
+            query.Add($"targetType={Uri.EscapeDataString(_targetType.Trim())}");
+        }
+        if (!string.IsNullOrWhiteSpace(_targetId))
+        {
+            query.Add($"targetId={Uri.EscapeDataString(_targetId.Trim())}");
+        }
+        return $"api/audit-logs?{string.Join('&', query)}";
+    }
+
+    private void SetPurgeTo(string? value)
+    {
+        _purgeTo = DateTime.TryParse(value, out var parsed) ? parsed : null;
+        _preview = null;
+    }
+
+    private void SetPurgeReason(string? value)
+    {
+        _purgeReason = value;
+        _preview = null;
+    }
+
+    /// <summary>削除件数の確認（dryRun）。ここではDBに触らない</summary>
+    private Task PreviewPurgeAsync() => PurgeAsync(dryRun: true);
+
+    private Task ExecutePurgeAsync() => PurgeAsync(dryRun: false);
+
+    private async Task PurgeAsync(bool dryRun)
+    {
+        if (_purgeTo is not DateTime to || string.IsNullOrWhiteSpace(_purgeReason))
+        {
+            _error = "削除する期間と理由を指定してください。";
+            return;
+        }
+        _purgeBusy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new AuditLogPurgeRequest(DateOnly.FromDateTime(to), _purgeReason.Trim());
+            var response = await Http.PostAsJsonAsync(
+                $"api/audit-logs/purge{(dryRun ? "?dryRun=true" : string.Empty)}", request);
+            // 保持期間の内側を指定した場合もここに出る
+            if (await response.ReadErrorAsync("一括削除に失敗しました。") is { } error)
+            {
+                _error = error;
+                _preview = null;
+                return;
+            }
+            var result = await response.Content.ReadFromJsonAsync<AuditLogPurgeResult>();
+            if (dryRun)
+            {
+                _preview = result;
+                return;
+            }
+            _preview = null;
+            _purgeTo = null;
+            _purgeReason = null;
+            _options = await Http.GetFromJsonAsync<List<AuditCategoryOption>>("api/audit-logs/categories") ?? [];
+            await LoadPageAsync(1);
+            // 再読込は件数を表示するので、削除の結果はそのあとに出す
+            _message = $"{result!.DeletedCount} 件を削除しました。";
+        }
+        finally
+        {
+            _purgeBusy = false;
+        }
+    }
+}

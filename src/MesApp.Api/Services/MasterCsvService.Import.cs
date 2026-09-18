@@ -1,3 +1,4 @@
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -11,12 +12,6 @@ namespace MesApp.Api.Services;
 /// </summary>
 public sealed partial class MasterCsvService
 {
-    /// <summary>取込可能な最大データ行数</summary>
-    public const int MaxRows = 20000;
-
-    /// <summary>応答に含めるエラーの最大件数</summary>
-    private const int MaxReportedErrors = 200;
-
     private sealed class ImportCounter
     {
         public int Created { get; set; }
@@ -26,114 +21,93 @@ public sealed partial class MasterCsvService
     public async Task<CsvImportResult> ImportAsync(
         CsvKindInfo kind, string csvText, bool dryRun, CancellationToken ct)
     {
-        var errors = new List<CsvImportError>();
-        var table = CsvTable.Create(CsvFile.Parse(csvText));
-        if (table is null)
-        {
-            errors.Add(new CsvImportError(1, "CSVが空です。1行目にヘッダー行が必要です。"));
-            return Result(kind, 0, new ImportCounter(), dryRun, errors);
-        }
-
-        var missing = kind.Columns.Where(c => c.Required && !table.HasColumn(c.Name)).Select(c => c.Name).ToList();
-        if (missing.Count > 0)
-        {
-            errors.Add(new CsvImportError(table.Header.Line,
-                $"必須の列がありません：{string.Join(", ", missing)}。テンプレートCSVの1行目をそのまま使ってください。"));
-            return Result(kind, 0, new ImportCounter(), dryRun, errors);
-        }
-        if (table.Rows.Count == 0)
-        {
-            errors.Add(new CsvImportError(table.Header.Line, "データ行がありません。"));
-            return Result(kind, 0, new ImportCounter(), dryRun, errors);
-        }
-        if (table.Rows.Count > MaxRows)
-        {
-            errors.Add(new CsvImportError(table.Header.Line,
-                $"1回に取り込めるのは{MaxRows}行までです（{table.Rows.Count}行）。ファイルを分割してください。"));
-            return Result(kind, 0, new ImportCounter(), dryRun, errors);
-        }
-
-        var counter = new ImportCounter();
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        try
-        {
-            switch (kind.Kind)
-            {
-                case MasterCsvKinds.Products:
-                    await ImportProductsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Processes:
-                    await ImportProcessesAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Equipments:
-                    await ImportEquipmentsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Tools:
-                    await ImportToolsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Locations:
-                    await ImportLocationsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.InspectionItems:
-                    await ImportInspectionItemsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Checklists:
-                    await ImportChecklistsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Skills:
-                    await ImportSkillsAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Bom:
-                    await ImportBomAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Routing:
-                    await ImportRoutingAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.Users:
-                    await ImportUsersAsync(table, errors, counter, ct);
-                    break;
-                case MasterCsvKinds.UserSkills:
-                    await ImportUserSkillsAsync(table, errors, counter, ct);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(kind));
-            }
-
-            if (errors.Count == 0 && !dryRun)
-            {
-                await db.SaveChangesAsync(ct);
-                await auditLogger.LogAsync("Master", "CsvImport", kind.Kind, null,
-                    detail: $"rows={table.Rows.Count}, created={counter.Created}, updated={counter.Updated}", ct: ct);
-                await transaction.CommitAsync(ct);
-            }
-            else
-            {
-                await transaction.RollbackAsync(ct);
-            }
-        }
-        catch (DbUpdateException ex)
-        {
-            await transaction.RollbackAsync(ct);
-            errors.Add(new CsvImportError(0, $"DBへの反映に失敗しました：{ex.InnerException?.Message ?? ex.Message}"));
-        }
-
-        return Result(kind, table.Rows.Count, counter, dryRun, errors);
+        var bundle = await ImportBundleAsync([new CsvBundleFile<CsvKindInfo>(kind.Kind, kind, csvText)], dryRun, ct);
+        return bundle.Files[0].Result;
     }
 
-    private static CsvImportResult Result(
-        CsvKindInfo kind, int dataRows, ImportCounter counter, bool dryRun, List<CsvImportError> errors)
+    /// <summary>
+    /// 複数ファイルの一括取込。全ファイルを1つのトランザクションで順に取り込み、
+    /// どれか1つでもエラーがあれば全ファイルを取り消す（<see cref="CsvBundle"/>）
+    /// </summary>
+    public Task<CsvBundleImportResult> ImportBundleAsync(
+        IReadOnlyList<CsvBundleFile<CsvKindInfo>> files, bool dryRun, CancellationToken ct) =>
+        CsvBundle.ImportAsync(db, files, kind => kind, dryRun, ImportOneAsync, ct);
+
+    /// <summary>1ファイル分を取り込み、エラーが無ければ保存して監査ログを残す（トランザクションは呼び出し側）</summary>
+    private async Task<CsvFileImportCount> ImportOneAsync(
+        CsvKindInfo kind, CsvTable table, List<CsvImportError> errors, CancellationToken ct)
     {
-        var succeeded = errors.Count == 0;
-        if (errors.Count > MaxReportedErrors)
+        var counter = new ImportCounter();
+        switch (kind.Kind)
         {
-            var omitted = errors.Count - MaxReportedErrors;
-            errors = [.. errors.Take(MaxReportedErrors), new CsvImportError(0, $"他 {omitted} 件のエラーは省略しました。")];
+            case MasterCsvKinds.Products:
+                await ImportProductsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Processes:
+                await ImportProcessesAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Equipments:
+                await ImportEquipmentsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.EquipmentParts:
+                await ImportEquipmentPartsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Tools:
+                await ImportToolsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.WorkCenters:
+                await ImportWorkCentersAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Locations:
+                await ImportLocationsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.InspectionItems:
+                await ImportInspectionItemsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.ControlItems:
+                await ImportControlItemsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Checklists:
+                await ImportChecklistsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.DefectReasons:
+                await ImportDefectReasonsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Skills:
+                await ImportSkillsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Bom:
+                await ImportBomAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Routing:
+                await ImportRoutingAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.WorkProcedures:
+                await ImportWorkProceduresAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.InspectionDevices:
+                await ImportInspectionDevicesAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Shifts:
+                await ImportShiftsAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.Users:
+                await ImportUsersAsync(table, errors, counter, ct);
+                break;
+            case MasterCsvKinds.UserSkills:
+                await ImportUserSkillsAsync(table, errors, counter, ct);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind));
         }
-        return new CsvImportResult(
-            kind.Kind, dataRows,
-            succeeded ? counter.Created : 0,
-            succeeded ? counter.Updated : 0,
-            dryRun, succeeded, errors);
+
+        if (errors.Count == 0)
+        {
+            await db.SaveChangesAsync(ct);
+            await auditLogger.LogAsync("Master", "CsvImport", kind.Kind, null,
+                detail: $"rows={table.Rows.Count}, created={counter.Created}, updated={counter.Updated}", ct: ct);
+        }
+        return new CsvFileImportCount(counter.Created, counter.Updated);
     }
 
     // ---- 単票マスタ ----
@@ -142,6 +116,9 @@ public sealed partial class MasterCsvService
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var byCode = await db.Products.ToDictionaryAsync(p => p.Code, StringComparer.Ordinal, ct);
+        // 既定ロケーションの条件は単票APIと共通
+        var locationIds = await ProductStructurePolicy.AssignableDefaultLocations(db.Locations.AsNoTracking())
+            .ToDictionaryAsync(l => l.Code, l => l.Id, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var row in table.Rows)
@@ -161,6 +138,8 @@ public sealed partial class MasterCsvService
             var specification = reader.Text("Specification", product.Specification);
             var type = reader.Enum("Type", product.Type, CsvEnumLabels.ProductTypes);
             var defectRate = reader.Number("StandardDefectRate", product.StandardDefectRate, 0, 100);
+            var defaultLocationId = reader.Reference(
+                "DefaultLocationCode", product.DefaultLocationId, locationIds, "ロケーション");
             var isActive = reader.Bool("IsActive", product.IsActive);
             if (reader.Failed)
             {
@@ -172,6 +151,7 @@ public sealed partial class MasterCsvService
             product.Specification = specification;
             product.Type = type;
             product.StandardDefectRate = defectRate;
+            product.DefaultLocationId = defaultLocationId;
             product.IsActive = isActive;
             product.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -235,6 +215,8 @@ public sealed partial class MasterCsvService
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var byAssetNo = await db.Equipments.ToDictionaryAsync(e => e.AssetNo, StringComparer.Ordinal, ct);
+        var workCenters = await db.WorkCenters.AsNoTracking()
+            .ToDictionaryAsync(w => w.Code, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var row in table.Rows)
@@ -251,6 +233,8 @@ public sealed partial class MasterCsvService
 
             var name = reader.RequiredText("Name", 200);
             var site = reader.Text("Site", equipment.Site, 200);
+            var workCenter = ResolveWorkCenter(
+                reader, table, "WorkCenterCode", equipment.WorkCenterId, workCenters, out var workCenterKept);
             var status = reader.Enum("Status", equipment.Status, CsvEnumLabels.EquipmentStatuses);
             var maintenanceType = reader.Enum("MaintenanceType", equipment.MaintenanceType, CsvEnumLabels.MaintenanceTypes);
             var threshold = reader.NumberOrNull("MaintenanceThreshold", equipment.MaintenanceThreshold, 0);
@@ -261,8 +245,19 @@ public sealed partial class MasterCsvService
                 continue;
             }
 
+            // 設備は作業区（最下段）にだけ紐付ける。判定は単票APIと同じ（Spec.md 5.1 Equipment）
+            if (!workCenterKept && WorkCenterHierarchyPolicy.CheckEquipmentPlacement(workCenter) is { } placement)
+            {
+                reader.Fail(placement);
+                continue;
+            }
+
             equipment.Name = name;
             equipment.Site = site;
+            if (!workCenterKept)
+            {
+                equipment.WorkCenterId = workCenter?.Id;
+            }
             equipment.Status = status;
             equipment.MaintenanceType = maintenanceType;
             equipment.MaintenanceThreshold = threshold;
@@ -282,11 +277,91 @@ public sealed partial class MasterCsvService
         }
     }
 
+    /// <summary>
+    /// 設備の保全部品。単票APIと同じく設備ごとの一括置換にする
+    /// （行単位の追加だと、CSVから削除したつもりの部品が残る）
+    /// </summary>
+    private async Task ImportEquipmentPartsAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var equipmentIds = await db.Equipments.AsNoTracking()
+            .ToDictionaryAsync(e => e.AssetNo, e => e.Id, StringComparer.Ordinal, ct);
+        var productIds = await db.Products.AsNoTracking()
+            .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
+
+        foreach (var group in GroupRows(table, "EquipmentAssetNo", errors))
+        {
+            var groupReader = new CsvRowReader(table, group.First(), errors);
+            var assetNo = groupReader.RequiredText("EquipmentAssetNo");
+            if (!equipmentIds.TryGetValue(assetNo, out var equipmentId))
+            {
+                groupReader.Fail($"設備 '{assetNo}' は登録されていません。先に設備マスタを取り込んでください。");
+                continue;
+            }
+
+            var parts = new List<EquipmentPart>();
+            var seenProducts = new HashSet<int>();
+            var failed = false;
+            foreach (var row in group)
+            {
+                var reader = new CsvRowReader(table, row, errors);
+                var productId = reader.Reference("ProductCode", null, productIds, "部品の品目");
+                var category = reader.Enum("Category", MaintenancePartCategory.Consumable,
+                    CsvEnumLabels.MaintenancePartCategories);
+                var quantity = reader.Number("QuantityPer", 0m, 0);
+                var note = reader.Text("Note", null, 500);
+                if (productId is null && !reader.Failed)
+                {
+                    reader.Fail("ProductCode（部品の品目コード）は必須です。");
+                }
+                if (productId is { } id && !seenProducts.Add(id))
+                {
+                    reader.Fail($"設備 '{assetNo}' に同じ品目が複数行あります。");
+                }
+                if (reader.Failed)
+                {
+                    failed = true;
+                    continue;
+                }
+                parts.Add(new EquipmentPart
+                {
+                    EquipmentId = equipmentId,
+                    ProductId = productId!.Value,
+                    Category = category,
+                    QuantityPer = quantity,
+                    Note = note,
+                });
+            }
+            if (failed)
+            {
+                continue;
+            }
+
+            var existing = await db.EquipmentParts.Where(p => p.EquipmentId == equipmentId).ToListAsync(ct);
+            db.EquipmentParts.RemoveRange(existing);
+            db.EquipmentParts.AddRange(parts);
+            if (existing.Count == 0)
+            {
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
     private async Task ImportToolsAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var byCode = await db.Tools.ToDictionaryAsync(t => t.Code, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        // 状態の手変更を画面と同じ条件で判定するため、引当中の治工具を先に集めておく
+        var openIssueToolIds = (await db.ToolIssues
+                .Where(i => i.Status == ToolIssueStatus.Allocated || i.Status == ToolIssueStatus.Issued)
+                .Select(i => i.ToolId)
+                .ToListAsync(ct))
+            .ToHashSet();
 
         foreach (var row in table.Rows)
         {
@@ -306,6 +381,11 @@ public sealed partial class MasterCsvService
             var lifeHours = reader.NumberOrNull("LifeThresholdHours", tool.LifeThresholdHours, 0);
             var status = reader.Enum("Status", tool.Status, CsvEnumLabels.ToolStatuses);
             var isActive = reader.Bool("IsActive", tool.IsActive);
+            if (!reader.Failed && ToolIssuePolicy.CheckManualStatus(code, isNew ? null : tool.Status, status,
+                    !isNew && openIssueToolIds.Contains(tool.Id)) is { } statusError)
+            {
+                reader.Fail(statusError);
+            }
             if (reader.Failed)
             {
                 continue;
@@ -331,10 +411,175 @@ public sealed partial class MasterCsvService
         }
     }
 
+    private async Task ImportDefectReasonsAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.DefectReasons.ToDictionaryAsync(r => r.Code, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 50);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "不良理由コード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var reason);
+            reason ??= new DefectReason { Code = code };
+
+            var name = reader.RequiredText("Name", 200);
+            var category = reader.Enum("Category", reason.Category, CsvEnumLabels.DefectReasonCategories);
+            var isActive = reader.Bool("IsActive", reason.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            reason.Name = name;
+            reason.Category = category;
+            reason.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.DefectReasons.Add(reason);
+                byCode[code] = reason;
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 作業区の取込。上位をコードで参照するため2周する。
+    /// 1周目で全行の実体を用意し（同じファイル内で上位が後に書かれていても引けるようにする）、
+    /// 2周目で上位を結び付けて階層の妥当性を <see cref="WorkCenterHierarchyPolicy"/> で検証する。
+    /// 判定を単票APIと共有するので、フォームからは作れない階層がCSVからだけ通ることがない。
+    /// </summary>
+    /// <summary>
+    /// CSVの作業区コード列を解決する。列が無いときは現在値を保つ（<paramref name="kept"/> が true）。
+    /// 列があって空欄なら「紐付けを外す」意味になるため null を返す。
+    /// </summary>
+    private static WorkCenter? ResolveWorkCenter(
+        CsvRowReader reader, CsvTable table, string column, int? currentId,
+        IReadOnlyDictionary<string, WorkCenter> byCode, out bool kept)
+    {
+        if (!table.HasColumn(column))
+        {
+            kept = true;
+            return currentId is null ? null : byCode.Values.FirstOrDefault(w => w.Id == currentId);
+        }
+        kept = false;
+        var code = reader.Text(column, null, 50);
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return null;
+        }
+        if (byCode.TryGetValue(code, out var found))
+        {
+            return found;
+        }
+        reader.Fail($"作業区 '{code}' は登録されていません（{column}）。");
+        return null;
+    }
+
+    private async Task ImportWorkCentersAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.WorkCenters.ToDictionaryAsync(w => w.Code, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var staged = new List<(CsvRowReader Reader, WorkCenter Entity, string? ParentCode, bool IsNew)>();
+
+        // 1周目：実体を用意し、上位以外の項目を埋める
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 50);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "作業区コード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var workCenter);
+            workCenter ??= new WorkCenter { Code = code };
+
+            var name = reader.Text("Name", workCenter.Name, 200) ?? workCenter.Name;
+            var level = reader.Enum("Level", workCenter.Level, CsvEnumLabels.WorkCenterLevels);
+            var parentCode = reader.Text("ParentCode", null, 50);
+            var isActive = reader.Bool("IsActive", workCenter.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                reader.Fail("Name は必須です。");
+                continue;
+            }
+
+            workCenter.Name = name;
+            workCenter.Level = level;
+            workCenter.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.WorkCenters.Add(workCenter);
+                byCode[code] = workCenter;
+            }
+            staged.Add((reader, workCenter, parentCode, isNew));
+        }
+
+        // 2周目：上位を結び付けて階層を検証する
+        var all = byCode.Values.ToList();
+        foreach (var (reader, workCenter, parentCode, isNew) in staged)
+        {
+            WorkCenter? parent = null;
+            if (!string.IsNullOrWhiteSpace(parentCode))
+            {
+                if (!byCode.TryGetValue(parentCode, out parent))
+                {
+                    reader.Fail($"上位の作業区 '{parentCode}' は登録されていません（ParentCode）。");
+                    continue;
+                }
+            }
+            // 列が無いときは現在の上位を保つ（列単位の部分更新を既存マスタと揃える）
+            else if (!table.HasColumn("ParentCode") && workCenter.ParentId is { } currentParentId)
+            {
+                parent = all.FirstOrDefault(x => x.Id == currentParentId);
+            }
+
+            var selfId = isNew ? (int?)null : workCenter.Id;
+            if (WorkCenterHierarchyPolicy.Check(workCenter.Code, workCenter.Level, parent, selfId, all) is { } reason)
+            {
+                reader.Fail(reason);
+                continue;
+            }
+
+            // 新規の上位はまだIdを持たないため、ナビゲーションで結ぶ（保存時にEFがIdを埋める）
+            workCenter.Parent = parent;
+            workCenter.ParentId = parent?.Id;
+
+            if (isNew)
+            {
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
     private async Task ImportLocationsAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var byCode = await db.Locations.ToDictionaryAsync(l => l.Code, StringComparer.Ordinal, ct);
+        var workCenters = await db.WorkCenters.AsNoTracking()
+            .ToDictionaryAsync(w => w.Code, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var row in table.Rows)
@@ -350,6 +595,8 @@ public sealed partial class MasterCsvService
             location ??= new Location { Code = code };
 
             var areaType = reader.Enum("AreaType", location.AreaType, CsvEnumLabels.LocationAreaTypes);
+            var workCenter = ResolveWorkCenter(
+                reader, table, "WorkCenterCode", location.WorkCenterId, workCenters, out var workCenterKept);
             var shelfNo = reader.Text("ShelfNo", location.ShelfNo, 50);
             var isActive = reader.Bool("IsActive", location.IsActive);
             if (reader.Failed)
@@ -357,8 +604,19 @@ public sealed partial class MasterCsvService
                 continue;
             }
 
+            // 倉庫は工場直下に置かれることがあるため段は問わない（Spec.md 5.1 Location）
+            if (!workCenterKept && WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } placement)
+            {
+                reader.Fail(placement);
+                continue;
+            }
+
             location.AreaType = areaType;
             location.ShelfNo = shelfNo;
+            if (!workCenterKept)
+            {
+                location.WorkCenterId = workCenter?.Id;
+            }
             location.IsActive = isActive;
 
             if (isNew)
@@ -494,6 +752,75 @@ public sealed partial class MasterCsvService
 
     // ---- 明細を持つマスタ（同一キーの行をまとめて一括置換）----
 
+    private async Task ImportControlItemsAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.ControlItems.ToDictionaryAsync(i => i.Code, StringComparer.Ordinal, ct);
+        var productIds = await db.Products.AsNoTracking()
+            .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
+        var processIds = await db.Processes.AsNoTracking()
+            .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 50);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "工程管理項目コード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var item);
+            item ??= new ControlItem { Code = code };
+
+            var name = reader.RequiredText("Name", 200);
+            var unit = reader.Text("Unit", item.Unit, 30);
+            var productId = reader.Reference("TargetProductCode", item.TargetProductId, productIds, "対象品目");
+            var processId = reader.Reference("TargetProcessCode", item.TargetProcessId, processIds, "対象工程");
+            var target = reader.NumberOrNull("TargetValue", item.TargetValue);
+            var lower = reader.NumberOrNull("LowerLimit", item.LowerLimit);
+            var upper = reader.NumberOrNull("UpperLimit", item.UpperLimit);
+            var isActive = reader.Bool("IsActive", item.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+            // 判定条件は単票APIと同じにする（片方だけ通る状態を作らない。Spec.md 7.4）
+            if (lower is { } l && upper is { } u && l > u)
+            {
+                reader.Fail("許容下限は許容上限以下で指定してください。");
+                continue;
+            }
+            if (target is { } tv && ((lower is { } lo && tv < lo) || (upper is { } up && tv > up)))
+            {
+                reader.Fail("指示値が許容範囲の外にあります。");
+                continue;
+            }
+
+            item.Name = name;
+            item.Unit = unit;
+            item.TargetProductId = productId;
+            item.TargetProcessId = processId;
+            item.TargetValue = target;
+            item.LowerLimit = lower;
+            item.UpperLimit = upper;
+            item.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.ControlItems.Add(item);
+                byCode[code] = item;
+                counter.Created++;
+            }
+            else
+            {
+                item.Version++; // 条件の改訂
+                counter.Updated++;
+            }
+        }
+    }
+
     private async Task ImportChecklistsAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
@@ -593,6 +920,7 @@ public sealed partial class MasterCsvService
                 var quantity = reader.NumberOrNull("QuantityPer", null, 0.000001m);
                 var makeOrBuy = reader.Enum("MakeOrBuy", MakeOrBuy.InHouse, CsvEnumLabels.MakeOrBuys);
                 var alternativeGroup = reader.Text("AlternativeGroup", null, 50);
+                var isAlternative = reader.Bool("IsAlternative", false);
                 if (quantity is null && !reader.Failed)
                 {
                     reader.Fail("QuantityPer（必要数量）は必須です。");
@@ -617,6 +945,7 @@ public sealed partial class MasterCsvService
                     QuantityPer = quantity!.Value,
                     MakeOrBuy = makeOrBuy,
                     AlternativeGroup = alternativeGroup,
+                    IsAlternative = isAlternative,
                 });
             }
             if (failed)
@@ -638,6 +967,73 @@ public sealed partial class MasterCsvService
         }
     }
 
+    private async Task ImportWorkProceduresAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byNo = await db.WorkProcedures.ToDictionaryAsync(p => p.ProcedureNo, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        // 参照中の手順書を無効化できないのは単票APIと同じ。行ごとに引けるよう先にまとめて読む
+        // （工順は別種別のCSVなので、この取込の途中で参照関係が変わることはない）
+        var referencingProducts = (await db.Routings.AsNoTracking()
+                .Where(r => r.WorkProcedureId != null)
+                .Select(r => new { ProcedureId = r.WorkProcedureId!.Value, ProductCode = r.Product!.Code })
+                .Distinct()
+                .ToListAsync(ct))
+            .GroupBy(x => x.ProcedureId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyCollection<string>)g.Select(x => x.ProductCode).ToList());
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var procedureNo = reader.RequiredText("ProcedureNo", 50);
+            if (reader.Failed || !CheckUnique(reader, seen, procedureNo, "手順書番号"))
+            {
+                continue;
+            }
+
+            var isNew = !byNo.TryGetValue(procedureNo, out var procedure);
+            procedure ??= new WorkProcedure { ProcedureNo = procedureNo };
+
+            var title = reader.RequiredText("Title", 200);
+            var steps = reader.Text("Steps", procedure.Steps, 4000) ?? string.Empty;
+            var reference = reader.Text("Reference", procedure.Reference, 500);
+            var isActive = reader.Bool("IsActive", procedure.IsActive);
+            if (!reader.Failed && string.IsNullOrWhiteSpace(steps) && string.IsNullOrWhiteSpace(reference))
+            {
+                reader.Fail("Steps（手順ステップ）かReference（手順書の所在）のどちらかを指定してください。");
+            }
+            if (!isNew && procedure.IsActive && !isActive
+                && MasterDeactivationPolicy.CheckWorkProcedure(
+                    procedureNo, referencingProducts.GetValueOrDefault(procedure.Id, [])) is { } inUse)
+            {
+                reader.Fail(inUse);
+            }
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            procedure.Title = title;
+            procedure.Steps = steps;
+            procedure.Reference = reference;
+            procedure.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.WorkProcedures.Add(procedure);
+                byNo[procedureNo] = procedure;
+                counter.Created++;
+            }
+            else
+            {
+                procedure.Version++; // 取込による改訂も版数を上げる（I-30-40-02）
+                counter.Updated++;
+            }
+        }
+    }
+
     private async Task ImportRoutingAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
@@ -652,6 +1048,13 @@ public sealed partial class MasterCsvService
             .ToDictionaryAsync(t => t.Code, t => t.Id, StringComparer.Ordinal, ct);
         var checklistIds = await db.Checklists.AsNoTracking()
             .ToDictionaryAsync(c => c.Code, c => c.Id, StringComparer.Ordinal, ct);
+        // 無効な手順書は候補に入れない（単票APIと共通の条件）
+        var workProcedureIds = await ProductStructurePolicy.AssignableWorkProcedures(db.WorkProcedures.AsNoTracking())
+            .ToDictionaryAsync(p => p.ProcedureNo, p => p.Id, StringComparer.Ordinal, ct);
+        // 工順の作業区は最下段のみ（単票APIと共通の条件。Spec.md 5.7）。
+        // 候補をここで絞ることで、上位の段を書いた行は「登録されていません」として弾かれる
+        var workCenterIds = await ProductStructurePolicy.AssignableWorkCenters(db.WorkCenters.AsNoTracking())
+            .ToDictionaryAsync(w => w.Code, w => w.Id, StringComparer.Ordinal, ct);
         var existing = await db.Routings.ToListAsync(ct);
 
         foreach (var group in GroupRows(table, "ProductCode", errors))
@@ -676,9 +1079,12 @@ public sealed partial class MasterCsvService
                 var setup = reader.Number("StandardSetupMinutes", 0m, 0);
                 var skillId = reader.Reference("RequiredSkillCode", null, skillIds, "スキル・資格");
                 var equipmentId = reader.Reference("EquipmentAssetNo", null, equipmentIds, "設備");
+                var candidateIds = ParseCandidates(reader, table, row, equipmentIds);
                 var toolId = reader.Reference("ToolCode", null, toolIds, "治工具");
                 var checklistId = reader.Reference("ChecklistCode", null, checklistIds, "チェックリスト");
+                var workCenterId = reader.Reference("WorkCenterCode", null, workCenterIds, "作業区");
                 var controlItems = reader.Text("ControlItems", null, 500);
+                var workProcedureId = reader.Reference("WorkProcedureNo", null, workProcedureIds, "作業手順書");
                 if (sequence is null && !reader.Failed)
                 {
                     reader.Fail("Sequence（工程順序）は1以上の整数で指定してください。");
@@ -705,9 +1111,16 @@ public sealed partial class MasterCsvService
                     StandardSetupMinutes = setup,
                     RequiredSkillId = skillId,
                     EquipmentId = equipmentId,
+                    EquipmentCandidates =
+                    [
+                        .. ProductStructurePolicy.CandidateEquipmentIds(candidateIds, equipmentId)
+                            .Select(x => new RoutingEquipment { EquipmentId = x }),
+                    ],
                     ToolId = toolId,
+                    WorkCenterId = workCenterId,
                     ChecklistId = checklistId,
                     ControlItems = controlItems,
+                    WorkProcedureId = workProcedureId,
                 });
             }
             if (failed)
@@ -731,10 +1144,183 @@ public sealed partial class MasterCsvService
 
     // ---- ユーザー（システム管理者のみ）----
 
+    /// <summary>工順CSVの候補設備列（セミコロン区切りの資産番号）を解決する</summary>
+    private static List<int> ParseCandidates(
+        CsvRowReader reader, CsvTable table, CsvRecord row, IReadOnlyDictionary<string, int> equipmentIds)
+    {
+        if (!table.HasColumn("EquipmentAssetNos"))
+        {
+            return [];
+        }
+        var raw = table.Value(row, "EquipmentAssetNos");
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return [];
+        }
+        var result = new List<int>();
+        foreach (var code in raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (equipmentIds.TryGetValue(code, out var id))
+            {
+                result.Add(id);
+            }
+            else
+            {
+                reader.Fail($"候補設備 '{code}' は登録されていません（EquipmentAssetNos）。");
+            }
+        }
+        return result;
+    }
+
+    private async Task ImportInspectionDevicesAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.InspectionDevices.ToDictionaryAsync(d => d.Code, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 30);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "検査機コード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var device);
+            device ??= new InspectionDevice { Code = code };
+
+            var name = reader.RequiredText("Name", 200);
+            var serialNo = reader.Text("SerialNo", device.SerialNo, 100);
+            var location = reader.Text("Location", device.Location, 200);
+            var calibratedOn = reader.DateOrNull("CalibratedOn", device.CalibratedOn);
+            var dueOn = reader.DateOrNull("CalibrationDueOn", device.CalibrationDueOn);
+            var cycle = reader.IntOrNull("CalibrationCycleDays", device.CalibrationCycleDays, 1);
+            var note = reader.Text("Note", device.Note, 500);
+            var isActive = reader.Bool("IsActive", device.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            device.Name = name;
+            device.SerialNo = serialNo;
+            device.Location = location;
+            device.CalibratedOn = calibratedOn;
+            device.CalibrationDueOn = dueOn;
+            device.CalibrationCycleDays = cycle;
+            device.Note = note;
+            device.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.InspectionDevices.Add(device);
+                byCode[code] = device;
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
+    private async Task ImportShiftsAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byCode = await db.Shifts.ToDictionaryAsync(s => s.Code, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        // 所属者がいる直を無効化できないのは単票APIと同じ。行ごとに引けるよう先にまとめて数える
+        // （ユーザーは別種別のCSVなので、この取込の途中で所属が変わることはない）
+        var assignedUsers = await db.Users.AsNoTracking()
+            .Where(u => u.IsActive && u.ShiftId != null)
+            .GroupBy(u => u.ShiftId!.Value)
+            .Select(g => new { ShiftId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ShiftId, x => x.Count, ct);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var code = reader.RequiredText("Code", 20);
+            if (reader.Failed || !CheckUnique(reader, seen, code, "シフトコード"))
+            {
+                continue;
+            }
+
+            var isNew = !byCode.TryGetValue(code, out var shift);
+            shift ??= new Shift { Code = code };
+
+            var name = reader.RequiredText("Name", 100);
+            var start = ParseTime(reader, "StartTime", isNew ? null : shift.StartTime);
+            var end = ParseTime(reader, "EndTime", isNew ? null : shift.EndTime);
+            var isActive = reader.Bool("IsActive", shift.IsActive);
+            if (reader.Failed || start is not { } startTime || end is not { } endTime)
+            {
+                if (!reader.Failed)
+                {
+                    reader.Fail("StartTime（開始時刻）とEndTime（終了時刻）は HH:mm で指定してください。");
+                }
+                continue;
+            }
+            // 時間帯の重なりは単票APIと同じ条件で弾く（重なると実績の直が一意に決まらない）
+            var others = byCode.Values.Where(s => s.IsActive && !ReferenceEquals(s, shift)).ToList();
+            if (isActive && ShiftSchedulePolicy.Check(code, startTime, endTime, others) is { } scheduleError)
+            {
+                reader.Fail(scheduleError);
+                continue;
+            }
+            if (!isNew && shift.IsActive && !isActive
+                && MasterDeactivationPolicy.CheckShift(
+                    code, assignedUsers.GetValueOrDefault(shift.Id)) is { } inUse)
+            {
+                reader.Fail(inUse);
+                continue;
+            }
+
+            shift.Name = name;
+            shift.StartTime = startTime;
+            shift.EndTime = endTime;
+            shift.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.Shifts.Add(shift);
+                byCode[code] = shift;
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
+    /// <summary>HH:mm の時刻列を読む（空欄なら既定値。TimeOnlyを読む列はここだけ）</summary>
+    private static TimeOnly? ParseTime(CsvRowReader reader, string column, TimeOnly? fallback)
+    {
+        var text = reader.Text(column, null, 10);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return fallback;
+        }
+        if (TimeOnly.TryParse(text, out var parsed))
+        {
+            return parsed;
+        }
+        reader.Fail($"{column} は HH:mm 形式で指定してください（'{text}'）。");
+        return null;
+    }
+
     private async Task ImportUsersAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // 作業場所は段を問わない（Spec.md 5.7）
+        var workCenters = await db.WorkCenters.AsNoTracking()
+            .ToDictionaryAsync(w => w.Code, StringComparer.Ordinal, ct);
+        // 無効な直は所属先にしない（単票APIと同じ条件）
+        var shiftIds = await db.Shifts.AsNoTracking().Where(s => s.IsActive)
+            .ToDictionaryAsync(s => s.Code, s => s.Id, StringComparer.Ordinal, ct);
 
         foreach (var row in table.Rows)
         {
@@ -750,10 +1336,24 @@ public sealed partial class MasterCsvService
             var displayName = reader.RequiredText("DisplayName", 100);
             var isActive = reader.Bool("IsActive", user?.IsActive ?? true);
             var password = reader.Text("InitialPassword", null);
+            var workCenter = ResolveWorkCenter(
+                reader, table, "WorkCenterCode", user?.WorkCenterId, workCenters, out var workCenterKept);
+            // 列が無ければ現状維持、空欄なら解除（作業場所と同じ扱い）
+            var departmentKept = !table.HasColumn("Department");
+            var department = departmentKept ? user?.Department : reader.Text("Department", null, 100);
+            var shiftKept = !table.HasColumn("ShiftCode");
+            var shiftId = shiftKept
+                ? user?.ShiftId
+                : reader.Reference("ShiftCode", null, shiftIds, "直");
             // Roles列が無ければ現状維持、空欄なら全ロール解除
             var roles = table.HasColumn("Roles") ? ParseRoles(reader, table.Value(row, "Roles")) : null;
             if (reader.Failed)
             {
+                continue;
+            }
+            if (!workCenterKept && WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } wcReason)
+            {
+                reader.Fail(wcReason);
                 continue;
             }
 
@@ -769,6 +1369,9 @@ public sealed partial class MasterCsvService
                     UserName = userName,
                     DisplayName = displayName,
                     IsActive = isActive,
+                    WorkCenterId = workCenterKept ? null : workCenter?.Id,
+                    Department = department,
+                    ShiftId = shiftId,
                     // 管理者が発行した初期パスワードは初回ログイン時に変更を強制する
                     MustChangePassword = true,
                 };
@@ -788,6 +1391,18 @@ public sealed partial class MasterCsvService
             var deactivated = user!.IsActive && !isActive;
             user.DisplayName = displayName;
             user.IsActive = isActive;
+            if (!workCenterKept)
+            {
+                user.WorkCenterId = workCenter?.Id;
+            }
+            if (!departmentKept)
+            {
+                user.Department = department;
+            }
+            if (!shiftKept)
+            {
+                user.ShiftId = shiftId;
+            }
             await userManager.UpdateAsync(user);
 
             if (roles is not null)
@@ -814,6 +1429,13 @@ public sealed partial class MasterCsvService
                 await refreshTokenService.RevokeAllForUserAsync(user.Id, ct);
             }
             counter.Updated++;
+        }
+
+        // 「Aを降格してからBを昇格する」順序を誤って弾かないよう、全行を適用したあとに確認する。
+        // エラーを立てれば取込全体がロールバックされる
+        if (errors.Count == 0 && !await LastAdminPolicy.HasActiveAdminAsync(userManager))
+        {
+            errors.Add(new CsvImportError(0, LastAdminPolicy.NoAdminRemains));
         }
     }
 

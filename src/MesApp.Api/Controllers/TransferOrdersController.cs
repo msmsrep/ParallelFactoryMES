@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -11,7 +12,12 @@ using Microsoft.EntityFrameworkCore;
 namespace MesApp.Api.Controllers;
 
 /// <summary>
-/// 搬送・移動指示（B-50-10-01〜02 半製品の搬送指示と移動実行、D-30-10-04 工程間在庫搬送）
+/// 搬送・移動指示（B-50-10-01〜02 半製品の搬送指示と移動実行、D-30-10-04 工程間在庫搬送）。
+/// <para>
+/// 実行は <c>InventoryService.MoveAsync</c> で実在庫を動かすため、更新系は
+/// <c>InventoryController</c> の在庫操作と同じ在庫権限（<see cref="MesRoleGroups.InventoryManage"/>）で揃える。
+/// 参照は認証済みユーザー全員に開放する。
+/// </para>
 /// </summary>
 [ApiController]
 [Route("api/transfer-orders")]
@@ -22,7 +28,8 @@ public class TransferOrdersController(
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<TransferOrderResponse>>> List(
+    public async Task<ActionResult<PagedResult<TransferOrderResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] TransferOrderStatus? status = null, CancellationToken ct = default)
     {
         var query = db.TransferOrders.AsNoTracking().AsQueryable();
@@ -32,7 +39,7 @@ public class TransferOrdersController(
         }
         return await query.OrderByDescending(t => t.Id)
             .Select(Projection)
-            .ToListAsync(ct);
+            .ToPagedResultAsync(paging, ct);
     }
 
     [HttpGet("{id:int}")]
@@ -45,20 +52,21 @@ public class TransferOrdersController(
 
     /// <summary>搬送指示の作成（B-50-10-01）</summary>
     [HttpPost]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<TransferOrderResponse>> Create(TransferOrderRequest request, CancellationToken ct)
     {
         if (!await db.Lots.AnyAsync(l => l.Id == request.LotId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         if (request.FromLocationId == request.ToLocationId)
         {
-            return BadRequest(new ProblemDetails { Title = "移動元と移動先が同一です。" });
+            return this.BadRequestProblem("移動元と移動先が同一です。");
         }
         var locationIds = new[] { request.FromLocationId, request.ToLocationId };
         if (await db.Locations.CountAsync(l => locationIds.Contains(l.Id) && l.IsActive, ct) != 2)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）ロケーションが含まれています。" });
+            return this.BadRequestProblem("存在しない（または無効な）ロケーションが含まれています。");
         }
 
         var order = new TransferOrder
@@ -71,11 +79,15 @@ public class TransferOrdersController(
         };
         db.TransferOrders.Add(order);
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "TransferCreate", nameof(TransferOrder), order.Id.ToString(),
+            detail: new { lotId = order.LotId, quantity = order.Quantity,
+                from = order.FromLocationId, to = order.ToLocationId }, ct: ct);
         return CreatedAtAction(nameof(Get), new { id = order.Id }, await GetResponseAsync(order.Id, ct));
     }
 
     /// <summary>移動実行（B-50-10-02。在庫を移動して完了にする）</summary>
     [HttpPost("{id:int}/execute")]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<TransferOrderResponse>> Execute(int id, CancellationToken ct)
     {
         var order = await db.TransferOrders.Include(t => t.Lot).FirstOrDefaultAsync(t => t.Id == id, ct);
@@ -85,7 +97,7 @@ public class TransferOrdersController(
         }
         if (order.Status != TransferOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の搬送指示は実行できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の搬送指示は実行できません。");
         }
 
         try
@@ -96,7 +108,7 @@ public class TransferOrdersController(
         }
         catch (InventoryException ex)
         {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
+            return this.BadRequestProblem(ex.Message);
         }
 
         order.Status = TransferOrderStatus.Completed;
@@ -108,6 +120,7 @@ public class TransferOrdersController(
     }
 
     [HttpPost("{id:int}/cancel")]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<TransferOrderResponse>> Cancel(int id, CancellationToken ct)
     {
         var order = await db.TransferOrders.FindAsync([id], ct);
@@ -117,10 +130,13 @@ public class TransferOrdersController(
         }
         if (order.Status != TransferOrderStatus.Instructed)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の搬送指示は取消できません。" });
+            return this.ConflictProblem($"状態 '{order.Status}' の搬送指示は取消できません。");
         }
+        var before = order.Status;
         order.Status = TransferOrderStatus.Canceled;
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Inventory", "TransferCancel", nameof(TransferOrder), id.ToString(),
+            detail: new { before, after = order.Status }, ct: ct);
         return await GetResponseAsync(id, ct);
     }
 

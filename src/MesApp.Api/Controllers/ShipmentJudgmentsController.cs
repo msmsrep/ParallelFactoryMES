@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -24,7 +25,8 @@ public class ShipmentJudgmentsController(
 {
     /// <summary>出荷判定一覧（H-10-10-01）</summary>
     [HttpGet]
-    public async Task<ActionResult<List<ShipmentJudgmentResponse>>> List(
+    public async Task<ActionResult<PagedResult<ShipmentJudgmentResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] int? shippingOrderId = null, CancellationToken ct = default)
     {
         var query = BaseQuery();
@@ -32,8 +34,8 @@ public class ShipmentJudgmentsController(
         {
             query = query.Where(j => j.ShippingOrderId == shippingOrderId);
         }
-        var judgments = await query.OrderByDescending(j => j.Id).ToListAsync(ct);
-        return judgments.Select(ToResponse).ToList();
+        var judgments = await query.OrderByDescending(j => j.Id).ToPagedResultAsync(paging, ct);
+        return judgments.Map(ToResponse);
     }
 
     /// <summary>出荷判定書データ（H-10-10-04。帳票出力はPhase 7）</summary>
@@ -46,22 +48,22 @@ public class ShipmentJudgmentsController(
 
     /// <summary>出荷判定（H-10-10-02。対象はロットまたは出荷指示）</summary>
     [HttpPost]
-    [Authorize(Roles = RoleGroups.QaManage)]
+    [Authorize(Roles = MesRoleGroups.QaManage)]
     public async Task<ActionResult<ShipmentJudgmentResponse>> Create(
         ShipmentJudgmentCreateRequest request, CancellationToken ct)
     {
         if (request.LotId is null && request.ShippingOrderId is null)
         {
-            return BadRequest(new ProblemDetails { Title = "対象ロットIDまたは出荷指示IDを指定してください。" });
+            return this.BadRequestProblem("対象ロットIDまたは出荷指示IDを指定してください。");
         }
         if (request.LotId is int lotId && !await db.Lots.AnyAsync(l => l.Id == lotId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロットIDです。" });
+            return this.BadRequestProblem("存在しないロットIDです。");
         }
         if (request.ShippingOrderId is int shippingOrderId
             && !await db.ShippingOrders.AnyAsync(s => s.Id == shippingOrderId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない出荷指示IDです。" });
+            return this.BadRequestProblem("存在しない出荷指示IDです。");
         }
 
         var judgment = new ShipmentJudgment
@@ -83,7 +85,7 @@ public class ShipmentJudgmentsController(
 
     /// <summary>判定承認（H-10-10-03）</summary>
     [HttpPost("{id:int}/approve")]
-    [Authorize(Roles = RoleGroups.QaManage)]
+    [Authorize(Roles = MesRoleGroups.QaManage)]
     public async Task<ActionResult<ShipmentJudgmentResponse>> Approve(int id, CancellationToken ct)
     {
         var judgment = await db.ShipmentJudgments.FirstOrDefaultAsync(j => j.Id == id, ct);
@@ -93,7 +95,7 @@ public class ShipmentJudgmentsController(
         }
         if (judgment.ApprovedAt is not null)
         {
-            return Conflict(new ProblemDetails { Title = "既に承認済みです。" });
+            return this.ConflictProblem("既に承認済みです。");
         }
         judgment.ApprovedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         judgment.ApprovedAt = DateTimeOffset.UtcNow;

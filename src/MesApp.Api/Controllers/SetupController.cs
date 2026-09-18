@@ -29,7 +29,7 @@ public class SetupController(
     {
         if (await userManager.Users.AnyAsync(ct))
         {
-            return Conflict(new ProblemDetails { Title = "初期セットアップは完了済みです。" });
+            return this.ConflictProblem("初期セットアップは完了済みです。");
         }
 
         var user = new AppUser

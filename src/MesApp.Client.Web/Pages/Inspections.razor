@@ -9,7 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")">
+<AuthorizeView Roles="@MesRoleGroups.QualityManage">
     <div class="card">
         <h2 style="margin-top:0;">検査指示の発行（C-20-10-02）</h2>
         <div class="form-grid">
@@ -27,13 +27,10 @@
             {
                 <div class="form-field">
                     <label>対象作業指示</label>
-                    <select @bind="_workOrderId">
-                        <option value="0">選択してください</option>
-                        @foreach (var workOrder in _workOrders)
-                        {
-                            <option value="@workOrder.Id">@workOrder.WorkOrderNo（@workOrder.ProductCode）</option>
-                        }
-                    </select>
+                    <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
+                                  @bind-Value="_workOrderId"
+                                  ValueOf="w => w.Id"
+                                  LabelOf='@(w => $"{w.WorkOrderNo}（{w.ProductCode}）")' />
                 </div>
             }
             <div class="form-field">
@@ -42,13 +39,10 @@
             </div>
             <div class="form-field">
                 <label>ロット選択</label>
-                <select @bind="_lotId">
-                    <option value="0">（スキャン入力または選択）</option>
-                    @foreach (var stock in _stocks)
-                    {
-                        <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode）</option>
-                    }
-                </select>
+                <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                              @bind-Value="_lotId" EmptyLabel="（スキャン入力または選択）"
+                              ValueOf="s => s.LotId"
+                              LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode}）")' />
             </div>
             <div class="form-field">
                 <label>備考</label>
@@ -75,7 +69,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_orders.Count == 0)
+    else if (_orders.Total == 0)
     {
         <p class="text-muted">検査指示はありません。</p>
     }
@@ -86,7 +80,7 @@
                 <tr><th>検査指示番号</th><th>種別</th><th>対象</th><th>状態</th><th>判定</th><th>発行日</th><th></th></tr>
             </thead>
             <tbody>
-                @foreach (var order in _orders)
+                @foreach (var order in _orders.Items)
                 {
                     <tr>
                         <td>@order.OrderNo</td>
@@ -111,13 +105,12 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="InspectionOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
 @code {
-    private List<InspectionOrderResponse>? _orders;
-    private List<StockResponse> _stocks = [];
-    private List<WorkOrderResponse> _workOrders = [];
+    private PagedResult<InspectionOrderResponse>? _orders;
 
     private InspectionOrderType _type = InspectionOrderType.FinalProduct;
     private int _lotId;
@@ -131,19 +124,28 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders") ?? [];
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        var url = "api/inspection-orders";
+        var url = $"api/inspection-orders?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _orders = await Http.GetFromJsonAsync<List<InspectionOrderResponse>>(url);
+        _orders = await Http.GetFromJsonAsync<PagedResult<InspectionOrderResponse>>(url);
+    }
+
+    /// <summary>スキャンしたロット番号から在庫のロットIDを引く（完全一致のみ。見つからなければ0）</summary>
+    private async Task<int> ResolveLotIdAsync(string lotNumber)
+    {
+        var result = await Http.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            $"api/inventory/stocks/options?q={Uri.EscapeDataString(lotNumber)}");
+        return result?.Items.FirstOrDefault(s =>
+            string.Equals(s.LotNumber, lotNumber, StringComparison.OrdinalIgnoreCase))?.LotId ?? 0;
     }
 
     private async Task CreateAsync()
@@ -153,12 +155,12 @@
         _message = null;
         try
         {
-            // スキャン入力があればロット番号から対象ロットを解決する
+            // スキャン入力があればロット番号から対象ロットを解決する。
+            // 在庫は全件を手元に持たないため、選択肢APIへ問い合わせて完全一致を探す
             var lotId = _lotId;
             if (lotId == 0 && !string.IsNullOrWhiteSpace(_lotNumber))
             {
-                lotId = _stocks.FirstOrDefault(s =>
-                    string.Equals(s.LotNumber, _lotNumber.Trim(), StringComparison.OrdinalIgnoreCase))?.LotId ?? 0;
+                lotId = await ResolveLotIdAsync(_lotNumber.Trim());
                 if (lotId == 0)
                 {
                     _error = $"ロット '{_lotNumber}' が見つかりません。";
@@ -171,9 +173,9 @@
                     lotId == 0 ? null : lotId,
                     _workOrderId == 0 ? null : _workOrderId,
                     null, _note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("発行に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "発行に失敗しました。";
+                _error = error;
                 return;
             }
             var created = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();

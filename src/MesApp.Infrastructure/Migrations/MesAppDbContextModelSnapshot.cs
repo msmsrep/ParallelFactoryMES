@@ -32,6 +32,10 @@ namespace MesApp.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Department")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -75,12 +79,18 @@ namespace MesApp.Infrastructure.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("ShiftId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("WorkCenterId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -90,6 +100,10 @@ namespace MesApp.Infrastructure.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
+
+                    b.HasIndex("ShiftId");
+
+                    b.HasIndex("WorkCenterId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -116,6 +130,9 @@ namespace MesApp.Infrastructure.Migrations
                     b.Property<string>("IpAddress")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateOnly>("RecordedOn")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("TargetId")
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
@@ -135,9 +152,15 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("RecordedOn");
+
                     b.HasIndex("Timestamp");
 
+                    b.HasIndex("UserId");
+
                     b.HasIndex("Category", "Action");
+
+                    b.HasIndex("TargetType", "TargetId");
 
                     b.ToTable("AuditLogs");
                 });
@@ -153,6 +176,9 @@ namespace MesApp.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("ChildProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsAlternative")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("MakeOrBuy")
@@ -298,6 +324,91 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("ChecklistResultItem");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.ControlItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("LowerLimit")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("TargetProcessId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("TargetProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("TargetValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("UpperLimit")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("TargetProcessId");
+
+                    b.HasIndex("TargetProductId");
+
+                    b.ToTable("ControlItems");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.DefectReason", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("DefectReasons");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.Equipment", b =>
                 {
                     b.Property<int>("Id")
@@ -338,10 +449,15 @@ namespace MesApp.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("WorkCenterId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AssetNo")
                         .IsUnique();
+
+                    b.HasIndex("WorkCenterId");
 
                     b.ToTable("Equipments");
                 });
@@ -380,11 +496,133 @@ namespace MesApp.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("WorkOrderId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EquipmentId");
 
+                    b.HasIndex("WorkOrderId");
+
                     b.ToTable("EquipmentLogs");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentPart", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EquipmentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("QuantityPer")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("EquipmentId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("EquipmentParts");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.InspectionDevice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly?>("CalibratedOn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("CalibrationCycleDays")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly?>("CalibrationDueOn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SerialNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("InspectionDevices");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.InspectionDeviceCalibration", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("CalibratedOn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("InspectionDeviceId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly?>("NextDueOn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PerformedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PerformedByUserId");
+
+                    b.HasIndex("InspectionDeviceId", "CalibratedOn");
+
+                    b.ToTable("InspectionDeviceCalibrations");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.InspectionItem", b =>
@@ -529,6 +767,35 @@ namespace MesApp.Infrastructure.Migrations
                     b.Property<int>("InspectionOrderId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ItemCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ItemName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ItemVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("LowerLimit")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Method")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("SamplingCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("StandardValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("UpperLimit")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("InspectionItemId");
@@ -556,6 +823,9 @@ namespace MesApp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("InspectionDeviceId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("InspectionItemId")
                         .HasColumnType("INTEGER");
 
@@ -581,11 +851,72 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.HasIndex("InspectedByUserId");
 
+                    b.HasIndex("InspectionDeviceId");
+
                     b.HasIndex("InspectionItemId");
 
                     b.HasIndex("InspectionOrderId");
 
                     b.ToTable("InspectionResults");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.InspectionResultCorrection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AfterJudgment")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("AfterMeasuredValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AfterTextValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BeforeJudgment")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("BeforeMeasuredValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BeforeTextValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CorrectedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CorrectedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("InspectionOrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("InspectionResultId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrectedByUserId");
+
+                    b.HasIndex("InspectionResultId");
+
+                    b.HasIndex("InspectionOrderId", "Id");
+
+                    b.ToTable("InspectionResultCorrections");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.InventoryStock", b =>
@@ -709,10 +1040,15 @@ namespace MesApp.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("WorkCenterId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("WorkCenterId");
 
                     b.ToTable("Locations");
                 });
@@ -775,6 +1111,90 @@ namespace MesApp.Infrastructure.Migrations
                     b.HasIndex("SourceWorkOrderId");
 
                     b.ToTable("Lots");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.LotGenealogy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ChildLotId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ParentLotId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PerformedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RelationType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildLotId");
+
+                    b.HasIndex("ParentLotId");
+
+                    b.ToTable("LotGenealogies");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.LotStatusHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChangedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FromStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("InspectionOrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LotId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("NonconformanceReportId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LotId", "Id");
+
+                    b.ToTable("LotStatusHistories");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.MaintenanceOrder", b =>
@@ -976,6 +1396,45 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("MaintenanceRecords");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.MaintenanceRecordPart", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LocationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LotId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MaintenanceRecordId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocationId");
+
+                    b.HasIndex("LotId");
+
+                    b.HasIndex("MaintenanceRecordId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("MaintenanceRecordParts");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.ManufacturingOrder", b =>
                 {
                     b.Property<int>("Id")
@@ -1047,6 +1506,41 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("ManufacturingOrders");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.ManufacturingOrderMaterial", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AlternativeGroup")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ChildProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsAlternative")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ManufacturingOrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("PlannedQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("QuantityPer")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildProductId");
+
+                    b.HasIndex("ManufacturingOrderId", "ChildProductId")
+                        .IsUnique();
+
+                    b.ToTable("ManufacturingOrderMaterials");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.MaterialConsumption", b =>
                 {
                     b.Property<int>("Id")
@@ -1055,6 +1549,9 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset>("ConsumedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsSubstitute")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("LocationId")
                         .HasColumnType("INTEGER");
@@ -1074,6 +1571,10 @@ namespace MesApp.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("RecordedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SubstituteReason")
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("WorkOrderId")
@@ -1192,6 +1693,28 @@ namespace MesApp.Infrastructure.Migrations
                     b.HasIndex("WorkOrderId");
 
                     b.ToTable("NonconformanceReports");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.NumberSequence", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LastValue")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Prefix")
+                        .IsUnique();
+
+                    b.ToTable("NumberSequences");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.PickingLine", b =>
@@ -1325,6 +1848,9 @@ namespace MesApp.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("DefaultLocationId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
@@ -1358,6 +1884,8 @@ namespace MesApp.Infrastructure.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
+                    b.HasIndex("DefaultLocationId");
+
                     b.ToTable("Products");
                 });
 
@@ -1367,9 +1895,15 @@ namespace MesApp.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool?>("IsDeviation")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Item")
                         .IsRequired()
                         .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("NumericValue")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset>("RecordedAt")
@@ -1383,14 +1917,47 @@ namespace MesApp.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("WorkOrderControlItemId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("WorkOrderId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("WorkOrderControlItemId");
+
                     b.HasIndex("WorkOrderId");
 
                     b.ToTable("ProductionDataRecords");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.ProductionDefect", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DefectReasonId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProductionRecordId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefectReasonId");
+
+                    b.HasIndex("ProductionRecordId");
+
+                    b.ToTable("ProductionDefects");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.ProductionRecord", b =>
@@ -1427,6 +1994,15 @@ namespace MesApp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("ReworkQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ScrapQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ShiftId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("TEXT");
 
@@ -1439,9 +2015,70 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.HasIndex("PerformedByUserId");
 
+                    b.HasIndex("ShiftId");
+
                     b.HasIndex("WorkOrderId");
 
                     b.ToTable("ProductionRecords");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.ProductionRecordCorrection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("AfterDefectQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AfterGoodQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AfterReworkQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AfterScrapQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("BeforeDefectQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("BeforeGoodQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("BeforeReworkQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("BeforeScrapQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CorrectedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CorrectedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProductionRecordId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrectedByUserId");
+
+                    b.HasIndex("ProductionRecordId");
+
+                    b.HasIndex("WorkOrderId", "Id");
+
+                    b.ToTable("ProductionRecordCorrections");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.RefreshToken", b =>
@@ -1515,6 +2152,12 @@ namespace MesApp.Infrastructure.Migrations
                     b.Property<int?>("ToolId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("WorkCenterId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("WorkProcedureId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ChecklistId");
@@ -1527,10 +2170,106 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.HasIndex("ToolId");
 
+                    b.HasIndex("WorkCenterId");
+
+                    b.HasIndex("WorkProcedureId");
+
                     b.HasIndex("ProductId", "Sequence")
                         .IsUnique();
 
                     b.ToTable("Routings");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.RoutingEquipment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EquipmentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RoutingId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentId");
+
+                    b.HasIndex("RoutingId", "EquipmentId")
+                        .IsUnique();
+
+                    b.ToTable("RoutingEquipments");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.SampleStorage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClosedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("ClosedOn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CollectedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("CollectedOn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("InspectionOrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LotId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("RetainUntil")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SampleNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StorageLocationId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InspectionOrderId");
+
+                    b.HasIndex("LotId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("SampleNo")
+                        .IsUnique();
+
+                    b.HasIndex("StorageLocationId");
+
+                    b.HasIndex("Status", "RetainUntil");
+
+                    b.ToTable("SampleStorages");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.SetupRecord", b =>
@@ -1571,6 +2310,39 @@ namespace MesApp.Infrastructure.Migrations
                     b.HasIndex("WorkOrderId");
 
                     b.ToTable("SetupRecords");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.Shift", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Shifts");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.ShipmentJudgment", b =>
@@ -1858,6 +2630,54 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("Tools");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.ToolIssue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("AllocatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AllocatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("IssuedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IssuedToUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ReturnedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReturnedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ToolId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IssuedToUserId");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.HasIndex("ToolId", "Status");
+
+                    b.ToTable("ToolIssues");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.ToolUsage", b =>
                 {
                     b.Property<int>("Id")
@@ -2022,6 +2842,43 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("UserSkills");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.WorkCenter", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("ParentId");
+
+                    b.ToTable("WorkCenters");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.WorkOrder", b =>
                 {
                     b.Property<int>("Id")
@@ -2032,6 +2889,10 @@ namespace MesApp.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("AssignedUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ControlItems")
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -2052,18 +2913,39 @@ namespace MesApp.Infrastructure.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("RequiredSkillId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("RoutingChecklistId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("RoutingSequence")
                         .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("StandardSetupMinutes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("StandardWorkMinutes")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("WorkCenterId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("WorkOrderNo")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("WorkProcedureId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("WorkProcedureVersion")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -2077,12 +2959,150 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("RequiredSkillId");
+
+                    b.HasIndex("RoutingChecklistId");
+
                     b.HasIndex("Status");
+
+                    b.HasIndex("WorkCenterId");
 
                     b.HasIndex("WorkOrderNo")
                         .IsUnique();
 
+                    b.HasIndex("WorkProcedureId");
+
                     b.ToTable("WorkOrders");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WorkOrderControlItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ControlItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ItemCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ItemName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ItemVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("LowerLimit")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("TargetValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("UpperLimit")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ControlItemId");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("WorkOrderControlItems");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WorkOrderStatusHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChangedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FromStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedByUserId");
+
+                    b.HasIndex("WorkOrderId", "Id");
+
+                    b.ToTable("WorkOrderStatusHistories");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WorkProcedure", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProcedureNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Steps")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcedureNo")
+                        .IsUnique();
+
+                    b.ToTable("WorkProcedures");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.WorkTimeRecord", b =>
@@ -2254,6 +3274,23 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.AppUser", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Shift", "Shift")
+                        .WithMany()
+                        .HasForeignKey("ShiftId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
+                        .WithMany()
+                        .HasForeignKey("WorkCenterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Shift");
+
+                    b.Navigation("WorkCenter");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.BomItem", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.Product", "ChildProduct")
@@ -2332,6 +3369,31 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("ChecklistItem");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.ControlItem", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.ProcessMaster", "TargetProcess")
+                        .WithMany()
+                        .HasForeignKey("TargetProcessId");
+
+                    b.HasOne("MesApp.Core.Entities.Product", "TargetProduct")
+                        .WithMany()
+                        .HasForeignKey("TargetProductId");
+
+                    b.Navigation("TargetProcess");
+
+                    b.Navigation("TargetProduct");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.Equipment", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
+                        .WithMany()
+                        .HasForeignKey("WorkCenterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("WorkCenter");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentLog", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
@@ -2340,7 +3402,51 @@ namespace MesApp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("MesApp.Core.Entities.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Equipment");
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentPart", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
+                        .WithMany("Parts")
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Equipment");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.InspectionDeviceCalibration", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.InspectionDevice", "InspectionDevice")
+                        .WithMany()
+                        .HasForeignKey("InspectionDeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.AppUser", "PerformedBy")
+                        .WithMany()
+                        .HasForeignKey("PerformedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("InspectionDevice");
+
+                    b.Navigation("PerformedBy");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.InspectionItem", b =>
@@ -2407,6 +3513,11 @@ namespace MesApp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("MesApp.Core.Entities.InspectionDevice", "InspectionDevice")
+                        .WithMany()
+                        .HasForeignKey("InspectionDeviceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MesApp.Core.Entities.InspectionItem", "InspectionItem")
                         .WithMany()
                         .HasForeignKey("InspectionItemId")
@@ -2421,7 +3532,27 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.Navigation("InspectedBy");
 
+                    b.Navigation("InspectionDevice");
+
                     b.Navigation("InspectionItem");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.InspectionResultCorrection", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.AppUser", "CorrectedBy")
+                        .WithMany()
+                        .HasForeignKey("CorrectedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MesApp.Core.Entities.InspectionResult", "InspectionResult")
+                        .WithMany()
+                        .HasForeignKey("InspectionResultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CorrectedBy");
+
+                    b.Navigation("InspectionResult");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.InventoryStock", b =>
@@ -2491,6 +3622,16 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.Location", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
+                        .WithMany()
+                        .HasForeignKey("WorkCenterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("WorkCenter");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.Lot", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.Lot", "ParentLot")
@@ -2514,6 +3655,36 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("SourceWorkOrder");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.LotGenealogy", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Lot", "ChildLot")
+                        .WithMany()
+                        .HasForeignKey("ChildLotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Lot", "ParentLot")
+                        .WithMany()
+                        .HasForeignKey("ParentLotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ChildLot");
+
+                    b.Navigation("ParentLot");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.LotStatusHistory", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Lot", "Lot")
+                        .WithMany()
+                        .HasForeignKey("LotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lot");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.MaintenanceOrder", b =>
@@ -2599,6 +3770,39 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("PerformedBy");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.MaintenanceRecordPart", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Location", "Location")
+                        .WithMany()
+                        .HasForeignKey("LocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Lot", "Lot")
+                        .WithMany()
+                        .HasForeignKey("LotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.MaintenanceRecord", null)
+                        .WithMany("Parts")
+                        .HasForeignKey("MaintenanceRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Location");
+
+                    b.Navigation("Lot");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.ManufacturingOrder", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.Lot", "OutputLot")
@@ -2622,6 +3826,25 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("SourceOrder");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.ManufacturingOrderMaterial", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Product", "ChildProduct")
+                        .WithMany()
+                        .HasForeignKey("ChildProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.ManufacturingOrder", "ManufacturingOrder")
+                        .WithMany("Materials")
+                        .HasForeignKey("ManufacturingOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChildProduct");
+
+                    b.Navigation("ManufacturingOrder");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.MaterialConsumption", b =>
@@ -2746,8 +3969,23 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.Product", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Location", "DefaultLocation")
+                        .WithMany()
+                        .HasForeignKey("DefaultLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("DefaultLocation");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.ProductionDataRecord", b =>
                 {
+                    b.HasOne("MesApp.Core.Entities.WorkOrderControlItem", "WorkOrderControlItem")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderControlItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MesApp.Core.Entities.WorkOrder", "WorkOrder")
                         .WithMany()
                         .HasForeignKey("WorkOrderId")
@@ -2755,6 +3993,27 @@ namespace MesApp.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("WorkOrder");
+
+                    b.Navigation("WorkOrderControlItem");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.ProductionDefect", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.DefectReason", "DefectReason")
+                        .WithMany()
+                        .HasForeignKey("DefectReasonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.ProductionRecord", "ProductionRecord")
+                        .WithMany("Defects")
+                        .HasForeignKey("ProductionRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DefectReason");
+
+                    b.Navigation("ProductionRecord");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.ProductionRecord", b =>
@@ -2770,6 +4029,11 @@ namespace MesApp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("MesApp.Core.Entities.Shift", "Shift")
+                        .WithMany()
+                        .HasForeignKey("ShiftId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MesApp.Core.Entities.WorkOrder", "WorkOrder")
                         .WithMany()
                         .HasForeignKey("WorkOrderId")
@@ -2779,6 +4043,34 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("OutputLot");
 
                     b.Navigation("PerformedBy");
+
+                    b.Navigation("Shift");
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.ProductionRecordCorrection", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.AppUser", "CorrectedBy")
+                        .WithMany()
+                        .HasForeignKey("CorrectedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MesApp.Core.Entities.ProductionRecord", "ProductionRecord")
+                        .WithMany()
+                        .HasForeignKey("ProductionRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CorrectedBy");
+
+                    b.Navigation("ProductionRecord");
 
                     b.Navigation("WorkOrder");
                 });
@@ -2824,6 +4116,16 @@ namespace MesApp.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ToolId");
 
+                    b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
+                        .WithMany()
+                        .HasForeignKey("WorkCenterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MesApp.Core.Entities.WorkProcedure", "WorkProcedure")
+                        .WithMany()
+                        .HasForeignKey("WorkProcedureId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Checklist");
 
                     b.Navigation("Equipment");
@@ -2835,6 +4137,63 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("RequiredSkill");
 
                     b.Navigation("Tool");
+
+                    b.Navigation("WorkCenter");
+
+                    b.Navigation("WorkProcedure");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.RoutingEquipment", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Routing", "Routing")
+                        .WithMany("EquipmentCandidates")
+                        .HasForeignKey("RoutingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Equipment");
+
+                    b.Navigation("Routing");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.SampleStorage", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.InspectionOrder", "InspectionOrder")
+                        .WithMany()
+                        .HasForeignKey("InspectionOrderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MesApp.Core.Entities.Lot", "Lot")
+                        .WithMany()
+                        .HasForeignKey("LotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Location", "StorageLocation")
+                        .WithMany()
+                        .HasForeignKey("StorageLocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InspectionOrder");
+
+                    b.Navigation("Lot");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("StorageLocation");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.SetupRecord", b =>
@@ -2941,6 +4300,32 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.ToolIssue", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.AppUser", "IssuedTo")
+                        .WithMany()
+                        .HasForeignKey("IssuedToUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MesApp.Core.Entities.Tool", "Tool")
+                        .WithMany()
+                        .HasForeignKey("ToolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("IssuedTo");
+
+                    b.Navigation("Tool");
+
+                    b.Navigation("WorkOrder");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.ToolUsage", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.Tool", "Tool")
@@ -3030,6 +4415,16 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.WorkCenter", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.WorkCenter", "Parent")
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.WorkOrder", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.Equipment", "AssignedEquipment")
@@ -3060,6 +4455,26 @@ namespace MesApp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
+                        .WithMany()
+                        .HasForeignKey("RequiredSkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MesApp.Core.Entities.Checklist", "RoutingChecklist")
+                        .WithMany()
+                        .HasForeignKey("RoutingChecklistId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
+                        .WithMany()
+                        .HasForeignKey("WorkCenterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MesApp.Core.Entities.WorkProcedure", "WorkProcedure")
+                        .WithMany()
+                        .HasForeignKey("WorkProcedureId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("AssignedEquipment");
 
                     b.Navigation("AssignedUser");
@@ -3069,6 +4484,50 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("Process");
 
                     b.Navigation("Product");
+
+                    b.Navigation("RequiredSkill");
+
+                    b.Navigation("RoutingChecklist");
+
+                    b.Navigation("WorkCenter");
+
+                    b.Navigation("WorkProcedure");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WorkOrderControlItem", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.ControlItem", "ControlItem")
+                        .WithMany()
+                        .HasForeignKey("ControlItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MesApp.Core.Entities.WorkOrder", "WorkOrder")
+                        .WithMany("ControlItemSnapshots")
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ControlItem");
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WorkOrderStatusHistory", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.AppUser", "ChangedBy")
+                        .WithMany()
+                        .HasForeignKey("ChangedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MesApp.Core.Entities.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChangedBy");
+
+                    b.Navigation("WorkOrder");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.WorkTimeRecord", b =>
@@ -3150,6 +4609,11 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("Results");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.Equipment", b =>
+                {
+                    b.Navigation("Parts");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.InspectionOrder", b =>
                 {
                     b.Navigation("Items");
@@ -3162,14 +4626,31 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("Records");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.MaintenanceRecord", b =>
+                {
+                    b.Navigation("Parts");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.ManufacturingOrder", b =>
                 {
+                    b.Navigation("Materials");
+
                     b.Navigation("WorkOrders");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.PickingOrder", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.ProductionRecord", b =>
+                {
+                    b.Navigation("Defects");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.Routing", b =>
+                {
+                    b.Navigation("EquipmentCandidates");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.ShippingOrder", b =>
@@ -3180,6 +4661,11 @@ namespace MesApp.Infrastructure.Migrations
             modelBuilder.Entity("MesApp.Core.Entities.Stocktake", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WorkOrder", b =>
+                {
+                    b.Navigation("ControlItemSnapshots");
                 });
 #pragma warning restore 612, 618
         }

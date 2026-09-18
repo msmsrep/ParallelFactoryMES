@@ -9,6 +9,17 @@ public class AuditLog
 
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
 
+    /// <summary>
+    /// 記録日。<see cref="Timestamp"/> と重複するが、**期間で絞り込むために必要**。
+    /// SQLiteは DateTimeOffset の比較・並べ替えをSQLへ変換できず、
+    /// 「この期間の監査ログ」を全件読み出さずに引くにはこの列が要る（Spec.md 7.6の参照API）。
+    /// <para>
+    /// UTCではなく<b>サーバーのローカル日付</b>で持つ。画面は記録時刻をローカル時刻で表示するため、
+    /// UTCの日付で絞ると「9月3日の朝の操作が9月2日で引っかかる」ことになり、見え方と食い違う。
+    /// </para>
+    /// </summary>
+    public DateOnly RecordedOn { get; set; }
+
     /// <summary>操作ユーザーID（未認証操作＝初期セットアップ等はnull）</summary>
     public string? UserId { get; set; }
 
@@ -27,7 +38,11 @@ public class AuditLog
     /// <summary>対象エンティティのID</summary>
     public string? TargetId { get; set; }
 
-    /// <summary>詳細（変更前後の値などをJSONで格納）</summary>
+    /// <summary>
+    /// 詳細。実績訂正・在庫操作など**変更前後を追跡したい操作はJSON**で格納する
+    /// （例：<c>{"before":{...},"after":{...},"reason":"..."}</c>）。
+    /// 作成・削除など要約で足りる操作は要約文字列を格納する
+    /// </summary>
     public string? Detail { get; set; }
 
     public string? IpAddress { get; set; }

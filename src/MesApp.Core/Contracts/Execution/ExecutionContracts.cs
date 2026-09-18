@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using MesApp.Core.Entities;
 
 namespace MesApp.Core.Contracts.Execution;
@@ -37,14 +37,27 @@ public record ChecklistRecordResponse(
 public record ConsumptionRequest(
     int LotId,
     int LocationId,
-    [Range(0.000001, double.MaxValue)] decimal Quantity);
+    [Range(0.000001, double.MaxValue)] decimal Quantity,
+    /// <summary>代替部品を投入する場合の理由（予定材料の代替行を投入するときは必須。A-40-10-04）</summary>
+    [MaxLength(500)] string? SubstituteReason = null);
 
 public record ConsumptionResponse(
     int Id, int WorkOrderId, int ProductId, string ProductCode, string ProductName,
     int LotId, string LotNumber, int? LocationId, decimal Quantity,
-    DateTimeOffset ConsumedAt, ConsumptionMethod Method);
+    DateTimeOffset ConsumedAt, ConsumptionMethod Method,
+    bool IsSubstitute = false, string? SubstituteReason = null);
 
 // ---- 生産実績（B-30-30、B-40-10）----
+
+/// <summary>不良理由別の内訳1件（C-40-10-01。合計は不良数を超えられない）</summary>
+public record ProductionDefectRequest(
+    int DefectReasonId,
+    [Range(0, double.MaxValue)] decimal Quantity,
+    [MaxLength(500)] string? Note = null);
+
+public record ProductionDefectResponse(
+    int DefectReasonId, string DefectReasonCode, string DefectReasonName,
+    decimal Quantity, string? Note);
 
 public record ProductionRecordRequest(
     [Range(0, double.MaxValue)] decimal GoodQuantity,
@@ -54,30 +67,50 @@ public record ProductionRecordRequest(
     /// <summary>入庫先ロケーション（最終工程の実績で必須。在庫計上 B-40-10-02）</summary>
     int? OutputLocationId,
     /// <summary>バックフラッシュ実行（MBOM×(良品+不良)数量の部材を自動消費。B-40-10-09）</summary>
-    bool Backflush);
+    bool Backflush,
+    /// <summary>廃棄数（不良数の内訳。省略時0）</summary>
+    [Range(0, double.MaxValue)] decimal ScrapQuantity = 0,
+    /// <summary>再作業待ち数（不良数の内訳。省略時0）</summary>
+    [Range(0, double.MaxValue)] decimal ReworkQuantity = 0,
+    /// <summary>不良理由別の内訳（省略可。合計は不良数を超えられない）</summary>
+    List<ProductionDefectRequest>? Defects = null);
 
 public record ProductionRecordResponse(
     int Id, int WorkOrderId, string WorkOrderNo,
     string PerformedByUserId, string? PerformedByName,
     decimal GoodQuantity, decimal DefectQuantity,
+    decimal ScrapQuantity, decimal ReworkQuantity,
     DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
     int? OutputLotId, string? OutputLotNumber, int? OutputLocationId,
-    string? ApprovedByUserId, DateTimeOffset? ApprovedAt);
+    string? ApprovedByUserId, DateTimeOffset? ApprovedAt,
+    List<ProductionDefectResponse>? Defects = null,
+    /// <summary>記録時に固定した直（ShiftCode・ShiftName は画面表示用の付随情報）</summary>
+    int? ShiftId = null, string? ShiftCode = null, string? ShiftName = null);
 
 /// <summary>製造履歴訂正（B-70-30-01。権限制御＋監査ログ。訂正理由必須）</summary>
 public record ProductionRecordCorrectionRequest(
     [Range(0, double.MaxValue)] decimal GoodQuantity,
     [Range(0, double.MaxValue)] decimal DefectQuantity,
-    [Required] string Reason);
+    [Required] string Reason,
+    [Range(0, double.MaxValue)] decimal ScrapQuantity = 0,
+    [Range(0, double.MaxValue)] decimal ReworkQuantity = 0);
 
 // ---- 製造条件データ（B-30-30-04）----
 
 public record DataRecordRequest(
     [Required, MaxLength(100)] string Item,
-    [Required, MaxLength(500)] string Value);
+    [Required, MaxLength(500)] string Value,
+    /// <summary>対応する工程管理項目の指示（作業指示のスナップショットのId）。指定すると逸脱を判定する</summary>
+    int? WorkOrderControlItemId = null,
+    /// <summary>判定に使う数値（指示を指定したときは必須）</summary>
+    decimal? NumericValue = null);
 
 public record DataRecordResponse(
-    int Id, int WorkOrderId, string Item, string Value, DateTimeOffset RecordedAt);
+    int Id, int WorkOrderId, string Item, string Value, DateTimeOffset RecordedAt,
+    int? WorkOrderControlItemId = null, decimal? NumericValue = null,
+    /// <summary>true=逸脱、false=範囲内、null=判定していない</summary>
+    bool? IsDeviation = null,
+    decimal? TargetValue = null, decimal? LowerLimit = null, decimal? UpperLimit = null);
 
 // ---- 作業時間記録（B-30-30-02、F-30-20）----
 

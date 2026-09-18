@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -35,16 +35,16 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ChecklistResponse>> Create(ChecklistRequest request, CancellationToken ct)
     {
         if (await db.Checklists.AnyAsync(c => c.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"チェックリストコード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"チェックリストコード '{request.Code}' は既に存在します。");
         }
         if (request.Items.GroupBy(i => i.Sequence).Any(g => g.Count() > 1))
         {
-            return BadRequest(new ProblemDetails { Title = "項目の表示順が重複しています。" });
+            return this.BadRequestProblem("項目の表示順が重複しています。");
         }
 
         var c = new Checklist
@@ -65,7 +65,7 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
 
     /// <summary>チェックリストの更新（項目は一括置換）</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ChecklistResponse>> Update(int id, ChecklistRequest request, CancellationToken ct)
     {
         var c = await db.Checklists.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -75,11 +75,11 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (await db.Checklists.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"チェックリストコード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"チェックリストコード '{request.Code}' は既に存在します。");
         }
         if (request.Items.GroupBy(i => i.Sequence).Any(g => g.Count() > 1))
         {
-            return BadRequest(new ProblemDetails { Title = "項目の表示順が重複しています。" });
+            return this.BadRequestProblem("項目の表示順が重複しています。");
         }
 
         c.Code = request.Code;
@@ -95,20 +95,9 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var c = await db.Checklists.FindAsync([id], ct);
-        if (c is null)
-        {
-            return NotFound();
-        }
-        c.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(Checklist), id.ToString(),
-            detail: $"code={c.Code}", ct: ct);
-        return NoContent();
-    }
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<Checklist>(db, auditLogger, id, c => $"code={c.Code}", ct);
 
     private static ChecklistResponse ToResponse(Checklist c) =>
         new(c.Id, c.Code, c.Name, c.Category, c.IsActive,

@@ -44,7 +44,7 @@ else
             </tbody>
         </table>
 
-        <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+        <AuthorizeView Roles="@MesRoleGroups.ProductionManage">
             <div class="actions mt-2">
                 @if (order.Status == ManufacturingOrderStatus.Draft)
                 {
@@ -54,6 +54,12 @@ else
                 {
                     <button class="btn" disabled="@_busy" @onclick="ExpandAsync">工程展開（B-10-10-01）</button>
                 }
+                @* 変更できるのは未承認・承認済のみ（展開済み以降は取消のみ。A-20-20-02） *@
+                @if (order.Status is ManufacturingOrderStatus.Draft or ManufacturingOrderStatus.Approved)
+                {
+                    <button class="btn btn-secondary" disabled="@_busy"
+                            @onclick="() => StartEdit(order)">変更（A-20-20-02）</button>
+                }
                 @if (order.Status is not (ManufacturingOrderStatus.Completed or ManufacturingOrderStatus.Canceled))
                 {
                     <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">取消</button>
@@ -61,6 +67,59 @@ else
             </div>
         </AuthorizeView>
     </div>
+
+    <AuthorizeView Roles="@MesRoleGroups.ProductionManage" Context="edit">
+        @if (_editing)
+        {
+            <div class="card">
+                <h2 style="margin-top:0;">指図の変更（A-20-20-02）</h2>
+                <p class="text-muted">
+                    承認済みの指図を変更すると<strong>未承認に戻り、承認をやり直します</strong>。
+                    品目は変更できません（取消して登録し直してください）。
+                </p>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>数量</label>
+                        <input type="number" step="any" @bind="_editQuantity" min="0" />
+                    </div>
+                    <div class="form-field">
+                        <label>納期</label>
+                        <input type="date" @bind="_editDueDate" />
+                    </div>
+                    <div class="form-field">
+                        <label>備考</label>
+                        <input @bind="_editNote" />
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn" disabled="@_busy" @onclick="SaveEditAsync">変更を保存</button>
+                    <button class="btn btn-secondary" @onclick="() => _editing = false">キャンセル</button>
+                </div>
+            </div>
+        }
+    </AuthorizeView>
+
+    @* 予定材料は展開時にMBOMから固定される。以降のMBOM改訂はこの指図に影響しない（Spec.md 5.7） *@
+    @if (_detail.Materials is { Count: > 0 })
+    {
+        <h2>予定材料（展開時のMBOMで確定）</h2>
+        <table class="table">
+            <thead>
+                <tr><th>品目</th><th>原単位</th><th>予定数量</th><th>代替部品グループ</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var material in _detail.Materials)
+                {
+                    <tr>
+                        <td>@material.ProductCode @material.ProductName</td>
+                        <td>@material.QuantityPer</td>
+                        <td>@material.PlannedQuantity</td>
+                        <td>@(material.AlternativeGroup ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
 
     <h2>作業指示（工程展開結果）</h2>
     @if (_detail.WorkOrders.Count == 0)
@@ -75,6 +134,7 @@ else
                     <th>指示番号</th>
                     <th>工程</th>
                     <th>計画数</th>
+                    <th>標準時間（作業/段取り）</th>
                     <th>着手順</th>
                     <th>担当者</th>
                     <th>設備</th>
@@ -89,6 +149,8 @@ else
                         <td>@workOrder.WorkOrderNo</td>
                         <td>@workOrder.ProcessCode @workOrder.ProcessName</td>
                         <td>@workOrder.PlannedQuantity</td>
+                        @* 標準時間は展開時点の工順スナップショット（以降の改訂に影響されない） *@
+                        <td>@workOrder.StandardWorkMinutes / @workOrder.StandardSetupMinutes 分</td>
                         <td>@(workOrder.DispatchOrder?.ToString() ?? "-")</td>
                         <td>@(workOrder.AssignedUserName ?? "-")</td>
                         <td>@(workOrder.AssignedEquipmentName ?? "-")</td>
@@ -114,6 +176,12 @@ else
     private string? _message;
     private bool _busy;
 
+    // 指図の変更（A-20-20-02）
+    private bool _editing;
+    private decimal _editQuantity;
+    private DateTime? _editDueDate;
+    private string? _editNote;
+
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
     private async Task LoadAsync() =>
@@ -125,6 +193,52 @@ else
 
     private Task CancelAsync() =>
         PostActionAsync($"api/manufacturing-orders/{Id}/cancel", null, "取消しました。");
+
+    private void StartEdit(ManufacturingOrderResponse order)
+    {
+        _editing = true;
+        _editQuantity = order.Quantity;
+        _editDueDate = order.DueDate?.ToDateTime(TimeOnly.MinValue);
+        _editNote = order.Note;
+        _error = null;
+        _message = null;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        if (_editQuantity <= 0)
+        {
+            _error = "数量は0より大きい必要があります。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/manufacturing-orders/{Id}",
+                new UpdateManufacturingOrderRequest(
+                    _editQuantity,
+                    _editDueDate is null ? null : DateOnly.FromDateTime(_editDueDate.Value),
+                    string.IsNullOrWhiteSpace(_editNote) ? null : _editNote));
+            if (await response.ReadErrorAsync("変更に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = "指図を変更しました（承認済みだったものは未承認に戻ります）。";
+            _editing = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 
     private Task ExpandAsync() =>
         PostActionAsync($"api/manufacturing-orders/{Id}/expand",
@@ -142,9 +256,9 @@ else
         try
         {
             var response = await Http.PostAsync(url, content);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _message = successMessage;

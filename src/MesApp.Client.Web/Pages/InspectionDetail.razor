@@ -1,4 +1,4 @@
-@page "/inspections/{Id:int}"
+﻿@page "/inspections/{Id:int}"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -25,7 +25,7 @@ else
 
     <Notice Error="@_error" Message="@_message" />
 
-    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")">
+    <AuthorizeView Roles="@MesRoleGroups.QualityManage">
         @if (_order.Status is InspectionOrderStatus.Instructed or InspectionOrderStatus.InProgress)
         {
             <div class="card">
@@ -68,6 +68,26 @@ else
                         }
                     </tbody>
                 </table>
+                @* 使用した検査機（C-20-50-03）。校正期限切れの機器はAPIが拒否するので、選択肢から外しておく *@
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>使用した検査機（任意）</label>
+                        <select @bind="_deviceId">
+                            <option value="0">選択しない</option>
+                            @foreach (var device in _devices)
+                            {
+                                <option value="@device.Id">@device.Code @device.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                @if (_expiredDevices.Count > 0)
+                {
+                    <p class="text-muted">
+                        校正期限切れのため選べない検査機：@string.Join("、", _expiredDevices.Select(d => $"{d.Code} {d.Name}"))。
+                        マスタ管理の検査機・測定器で校正を記録してください。
+                    </p>
+                }
                 <button class="btn mt-2" disabled="@_busy" @onclick="SubmitResultsAsync">検査実績を登録</button>
             </div>
 
@@ -90,6 +110,16 @@ else
                 <button class="btn" disabled="@_busy" @onclick="ApproveAsync">検査承認（C-20-10-06）</button>
             </div>
         }
+
+        @* 誤発行の取消。検査待ちで拘束していたロットは解放される（承認済み・取消済みは不可） *@
+        @if (_order.Status is not (InspectionOrderStatus.Approved or InspectionOrderStatus.Canceled))
+        {
+            <div class="card">
+                <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">
+                    検査指示を取消（対象ロットの検査待ちを解除）
+                </button>
+            </div>
+        }
     </AuthorizeView>
 
     <div class="card">
@@ -102,7 +132,7 @@ else
         {
             <table class="table">
                 <thead>
-                    <tr><th>検査項目</th><th>サンプルNo</th><th>測定値</th><th>記録</th><th>判定</th><th>検査者</th><th>検査日時</th><th>訂正</th></tr>
+                    <tr><th>検査項目</th><th>サンプルNo</th><th>測定値</th><th>記録</th><th>判定</th><th>検査機</th><th>検査者</th><th>検査日時</th><th>訂正</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var result in _order.Results)
@@ -117,13 +147,17 @@ else
                                     @(result.Judgment == InspectionJudgment.Pass ? "合格" : "不合格")
                                 </span>
                             </td>
+                            <td>@(result.InspectionDeviceCode ?? "-")</td>
                             <td>@result.InspectedByName</td>
                             <td>@result.InspectedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                             <td>
-                                @if (_order.Status != InspectionOrderStatus.Approved)
-                                {
-                                    <button class="btn btn-secondary btn-sm" @onclick="() => StartCorrection(result)">訂正</button>
-                                }
+                                @* 訂正はAPIと同じ品質管理権限（api/inspection-orders/{id}/results/{resultId}） *@
+                                <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="correct">
+                                    @if (_order.Status != InspectionOrderStatus.Approved)
+                                    {
+                                        <button class="btn btn-secondary btn-sm" @onclick="() => StartCorrection(result)">訂正</button>
+                                    }
+                                </AuthorizeView>
                                 @if (result.CorrectionNote is { Length: > 0 })
                                 {
                                     <div class="text-muted" style="white-space:pre-wrap;">@result.CorrectionNote</div>
@@ -134,8 +168,34 @@ else
                 </tbody>
             </table>
         }
+
+        @* 訂正履歴（C-20-50-07）：元の記録を残したまま、誰がいつ何を根拠に直したかを示す *@
+        @if (_order.Corrections.Count > 0)
+        {
+            <h2>訂正履歴</h2>
+            <table class="table">
+                <thead>
+                    <tr><th>日時</th><th>検査項目</th><th>サンプルNo</th><th>訂正前</th><th>訂正後</th><th>理由</th><th>訂正者</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var correction in _order.Corrections)
+                    {
+                        <tr>
+                            <td>@correction.CorrectedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@correction.ItemCode @correction.ItemName</td>
+                            <td>@correction.SampleNo</td>
+                            <td>@FormatValue(correction.BeforeMeasuredValue, correction.BeforeTextValue, correction.BeforeJudgment)</td>
+                            <td>@FormatValue(correction.AfterMeasuredValue, correction.AfterTextValue, correction.AfterJudgment)</td>
+                            <td>@correction.Reason</td>
+                            <td>@(correction.CorrectedByName ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
     </div>
 
+    <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="correctForm">
     @if (_correcting is not null)
     {
         <div class="card">
@@ -163,9 +223,16 @@ else
             </div>
         </div>
     }
+    </AuthorizeView>
 }
 
 @code {
+    private static string FormatValue(decimal? measured, string? text, InspectionJudgment judgment)
+    {
+        var value = measured?.ToString() ?? text ?? "-";
+        return $"{value}（{(judgment == InspectionJudgment.Pass ? "合格" : "不合格")}）";
+    }
+
     private sealed class ResultEntry
     {
         public string? Measured { get; set; }
@@ -182,6 +249,9 @@ else
     private InspectionJudgment _correctJudgment = InspectionJudgment.Pass;
     private string? _correctReason;
     private string? _grade;
+    private int _deviceId;
+    private List<InspectionDeviceResponse> _devices = [];
+    private List<InspectionDeviceResponse> _expiredDevices = [];
     private string? _error;
     private string? _message;
     private bool _busy;
@@ -192,6 +262,12 @@ else
     {
         _order = await Http.GetFromJsonAsync<InspectionOrderResponse>($"api/inspection-orders/{Id}");
         _entries.Clear();
+
+        // 校正期限切れの機器はAPIが拒否するため選択肢から外し、外した事実は画面に出す
+        // （黙って消すと「登録した機器が無い」と見える）
+        var devices = await Http.GetFromJsonAsync<List<InspectionDeviceResponse>>("api/inspection-devices") ?? [];
+        _devices = devices.Where(d => !d.IsCalibrationExpired).ToList();
+        _expiredDevices = devices.Where(d => d.IsCalibrationExpired).ToList();
     }
 
     private ResultEntry GetEntry(int itemId)
@@ -220,7 +296,8 @@ else
                 itemId, null,
                 decimal.TryParse(entry.Measured, out var measured) ? measured : null,
                 string.IsNullOrWhiteSpace(entry.Text) ? null : entry.Text,
-                Enum.TryParse<InspectionJudgment>(entry.Judgment, out var judgment) ? judgment : null));
+                Enum.TryParse<InspectionJudgment>(entry.Judgment, out var judgment) ? judgment : null,
+                _deviceId == 0 ? null : _deviceId));
         }
         if (requests.Count == 0)
         {
@@ -234,9 +311,9 @@ else
         try
         {
             var response = await Http.PostAsJsonAsync($"api/inspection-orders/{Id}/results", requests);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
@@ -258,15 +335,42 @@ else
         {
             var response = await Http.PostAsJsonAsync($"api/inspection-orders/{Id}/judge",
                 new InspectionJudgeRequest(string.IsNullOrWhiteSpace(_grade) ? null : _grade));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("判定に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "判定に失敗しました。";
+                _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
             _message = _order?.OverallJudgment == InspectionJudgment.Fail
                 ? "不合格と判定しました。ロットは不良となり、不適合が自動起票されました。"
                 : "合格と判定しました。ロットは正常になりました。";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>検査指示の取消。検査待ちで拘束していたロットはAPI側で解放される</summary>
+    private async Task CancelAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsync($"api/inspection-orders/{Id}/cancel", null);
+            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+            _message = "検査指示を取消しました。";
         }
         finally
         {
@@ -281,9 +385,9 @@ else
         try
         {
             var response = await Http.PostAsync($"api/inspection-orders/{Id}/approve", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
@@ -319,9 +423,9 @@ else
                 $"api/inspection-orders/{Id}/results/{_correcting.Id}",
                 new InspectionResultCorrectionRequest(_correctMeasured, _correcting.TextValue,
                     _correctJudgment, _correctReason));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("訂正に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "訂正に失敗しました。";
+                _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();

@@ -1,0 +1,333 @@
+﻿@page "/warehouse-operations"
+@attribute [Authorize]
+@inject HttpClient Http
+
+@* 倉庫業務進捗（D-50-30-07）とサンプル品保管管理（D-40-50-01）（Spec.md 3.4 その他） *@
+<PageTitle>倉庫業務 - Parallel Factory MES</PageTitle>
+
+<h1>倉庫業務</h1>
+<p class="text-muted">倉庫業務進捗管理（D-50-30-07）、サンプル品保管管理（D-40-50-01）。</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <h2 style="margin-top:0;">倉庫業務の進捗（D-50-30-07）</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>開始日（製造日）</label>
+            <input type="date" @bind="_from" @bind:after="LoadProgressAsync" />
+        </div>
+        <div class="form-field">
+            <label>終了日（製造日）</label>
+            <input type="date" @bind="_to" @bind:after="LoadProgressAsync" />
+        </div>
+    </div>
+    <p class="text-muted">
+        指示から完了までを数える。受入は「指示」を持たず実施の記録だけなので、ここには出さない。
+    </p>
+    @if (_progress is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>業務</th><th>指示</th><th>完了</th><th>未完了</th><th>最古の滞留</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _progress.Rows)
+                {
+                    <tr>
+                        <td>@row.Kind</td>
+                        <td>@row.TotalCount</td>
+                        <td>@row.CompletedCount</td>
+                        <td>
+                            @row.OpenCount
+                            @if (row.OpenCount > 0)
+                            {
+                                <span>&nbsp;</span>
+                                <span class="badge badge-warning">残</span>
+                            }
+                        </td>
+                        <td>@(row.OldestOpenAgeDays is { } days ? $"{days}日" : "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<AuthorizeView Roles="@MesRoleGroups.QualityManage">
+    <div class="card">
+        <h2 style="margin-top:0;">サンプルの採取（D-40-50-01）</h2>
+        <p class="text-muted">
+            採取した分は在庫から抜く（保管棚へ移り、出荷・投入には使えないため）。
+            保管期限を空欄にすると期限の判定を行わない。
+        </p>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>採取元ロット番号（スキャン可）</label>
+                <ScanInput @bind-Value="_lotNumber" OnScan="FindLotAsync" SubmitLabel="検索" />
+            </div>
+            <div class="form-field">
+                <label>採取元ロット</label>
+                <span>@(_stock is null ? "未選択" : $"{_stock.LotNumber}（{_stock.ProductCode} {_stock.ProductName}・在庫 {_stock.Quantity:0.##}）")</span>
+            </div>
+            <div class="form-field">
+                <label>数量</label>
+                <input type="number" step="any" @bind="_quantity" />
+            </div>
+            <div class="form-field">
+                <label>保管場所</label>
+                <select @bind="_storageLocationId">
+                    <option value="0">選択してください</option>
+                    @foreach (var location in _locations)
+                    {
+                        <option value="@location.Id">@location.Code</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>保管期限</label>
+                <input type="date" @bind="_retainUntil" />
+            </div>
+            <div class="form-field">
+                <label>備考</label>
+                <input @bind="_note" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="CollectAsync">採取を登録</button>
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    <h2 style="margin-top:0;">保管中のサンプル</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>
+                <input type="checkbox" @bind="_retentionOverOnly" @bind:after="LoadSamplesAsync"
+                       style="width:auto;" />
+                保管期限を過ぎたものだけ
+            </label>
+        </div>
+        <div class="form-field">
+            <label>
+                <input type="checkbox" @bind="_includeClosed" @bind:after="LoadSamplesAsync"
+                       style="width:auto;" />
+                保管を終えたものも表示
+            </label>
+        </div>
+    </div>
+    @if (_samples is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_samples.Count == 0)
+    {
+        <p class="text-muted">該当するサンプルはありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>サンプル番号</th><th>品目</th><th>採取元ロット</th><th>数量</th>
+                    <th>保管場所</th><th>採取日</th><th>保管期限</th><th>状態</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var sample in _samples)
+                {
+                    <tr>
+                        <td>@sample.SampleNo</td>
+                        <td>@sample.ProductCode @sample.ProductName</td>
+                        <td>@sample.LotNumber</td>
+                        <td>@sample.Quantity.ToString("0.##") @sample.Unit</td>
+                        <td>@sample.StorageLocationCode</td>
+                        <td>@sample.CollectedOn.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            @(sample.RetainUntil?.ToString("yyyy-MM-dd") ?? "-")
+                            @if (sample.IsRetentionOver)
+                            {
+                                <span>&nbsp;</span>
+                                <span class="badge badge-danger">期限経過</span>
+                            }
+                            else if (sample.Status == SampleStorageStatus.Stored
+                                     && sample.DaysUntilRetentionEnd is { } days && days <= 30)
+                            {
+                                <span>&nbsp;</span>
+                                <span class="badge badge-warning">あと@(days)日</span>
+                            }
+                        </td>
+                        <td>@StatusLabel(sample.Status)</td>
+                        <td class="actions">
+                            @if (sample.Status == SampleStorageStatus.Stored)
+                            {
+                                <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="qc">
+                                    <button class="btn btn-secondary btn-sm" disabled="@_busy"
+                                            @onclick="() => CloseAsync(sample, SampleStorageStatus.Consumed)">
+                                        払出
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => CloseAsync(sample, SampleStorageStatus.Disposed)">
+                                        廃棄
+                                    </button>
+                                </AuthorizeView>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private WarehouseProgressResponse? _progress;
+    private DateTime? _from;
+    private DateTime? _to;
+
+    private List<SampleStorageResponse>? _samples;
+    private bool _retentionOverOnly;
+    private bool _includeClosed;
+
+    private List<LocationResponse> _locations = [];
+    private StockResponse? _stock;
+    private string? _lotNumber;
+    private decimal _quantity;
+    private int _storageLocationId;
+    private DateTime? _retainUntil;
+    private string? _note;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
+        await LoadProgressAsync();
+        await LoadSamplesAsync();
+    }
+
+    private async Task LoadProgressAsync()
+    {
+        var query = new List<string>();
+        if (_from is { } from)
+        {
+            query.Add($"from={DateOnly.FromDateTime(from):yyyy-MM-dd}");
+        }
+        if (_to is { } to)
+        {
+            query.Add($"to={DateOnly.FromDateTime(to):yyyy-MM-dd}");
+        }
+        _progress = await Http.GetFromJsonAsync<WarehouseProgressResponse>(
+            "api/inventory/warehouse-progress" + (query.Count == 0 ? "" : "?" + string.Join("&", query)));
+        // 既定は直近1週間。サーバーが決めた範囲を画面の初期値にも反映する
+        _from ??= _progress?.From.ToDateTime(TimeOnly.MinValue);
+        _to ??= _progress?.To.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private async Task LoadSamplesAsync()
+    {
+        var query = new List<string>();
+        if (_retentionOverOnly)
+        {
+            query.Add("retentionOverOnly=true");
+        }
+        else if (!_includeClosed)
+        {
+            query.Add($"status={SampleStorageStatus.Stored}");
+        }
+        _samples = await Http.GetFromJsonAsync<List<SampleStorageResponse>>(
+            "api/sample-storages" + (query.Count == 0 ? "" : "?" + string.Join("&", query)));
+    }
+
+    /// <summary>在庫のあるロットから探す（在庫の無いロットからはサンプルを抜けない。在庫画面と同じ経路）</summary>
+    private async Task FindLotAsync()
+    {
+        _error = null;
+        _message = null;
+        _stock = null;
+        var keyword = (_lotNumber ?? string.Empty).Trim();
+        if (keyword.Length == 0)
+        {
+            return;
+        }
+        var options = await Http.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            $"api/inventory/stocks/options?q={Uri.EscapeDataString(keyword)}");
+        _stock = options?.Items.FirstOrDefault(s =>
+            string.Equals(s.LotNumber, keyword, StringComparison.OrdinalIgnoreCase));
+        if (_stock is null)
+        {
+            _error = $"ロット {keyword} の在庫は見つかりませんでした。";
+        }
+    }
+
+    private async Task CollectAsync()
+    {
+        if (_stock is null || _storageLocationId == 0 || _quantity <= 0)
+        {
+            _error = "採取元ロット・保管場所・数量（0より大きい値）を指定してください。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new SampleCollectRequest(
+                _stock.LotId, _storageLocationId, _quantity,
+                _retainUntil is null ? null : DateOnly.FromDateTime(_retainUntil.Value),
+                null, _note);
+            var response = await Http.PostAsJsonAsync("api/sample-storages", request);
+            if (await response.ReadErrorAsync("採取の登録に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            var sample = await response.Content.ReadFromJsonAsync<SampleStorageResponse>();
+            _message = $"サンプル {sample?.SampleNo} を登録しました（在庫から {_quantity:0.##} 抜きました）。";
+            _quantity = 0;
+            _note = null;
+            await LoadSamplesAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CloseAsync(SampleStorageResponse sample, SampleStorageStatus status)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"api/sample-storages/{sample.Id}/close", new SampleCloseRequest(status, null));
+            if (await response.ReadErrorAsync("保管の終了に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = $"サンプル {sample.SampleNo} を{StatusLabel(status)}にしました。";
+            await LoadSamplesAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string StatusLabel(SampleStorageStatus status) => status switch
+    {
+        SampleStorageStatus.Stored => "保管中",
+        SampleStorageStatus.Consumed => "払出済",
+        _ => "廃棄済",
+    };
+}

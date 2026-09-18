@@ -1,4 +1,6 @@
+﻿using MesApp.Core.Abstractions;
 using System.Security.Claims;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -11,14 +13,20 @@ namespace MesApp.Api.Controllers;
 /// <summary>
 /// 治工具の利用実績記録と寿命管理（E-60-20：作業指示との紐付けによる利用実績（-01）、
 /// 閾値到達前の交換・廃棄通知（-02）、寿命分析（-03））
+/// <para>
+/// 治工具の使用実績の記録はロールで絞らない（Spec.md 7.4 の意図的な例外）。
+/// 気づいた人がその場で上げられることを優先する。指示・承認は別途ロールで絞る。
+/// </para>
 /// </summary>
 [ApiController]
 [Route("api/tool-usages")]
 [Authorize]
-public class ToolUsagesController(MesAppDbContext db) : ControllerBase
+public class ToolUsagesController(
+    MesAppDbContext db, IAuditLogger auditLogger, IBusinessDateService businessDate) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<ToolUsageResponse>>> List(
+    public async Task<ActionResult<PagedResult<ToolUsageResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] int? toolId = null,
         [FromQuery] int? workOrderId = null,
         CancellationToken ct = default)
@@ -32,11 +40,11 @@ public class ToolUsagesController(MesAppDbContext db) : ControllerBase
         {
             query = query.Where(u => u.WorkOrderId == workOrderId);
         }
-        return await query.OrderByDescending(u => u.Id).Take(500)
+        return await query.OrderByDescending(u => u.Id)
             .Select(u => new ToolUsageResponse(
                 u.Id, u.ToolId, u.Tool!.Code, u.WorkOrderId, u.WorkOrder!.WorkOrderNo,
                 u.UsageCount, u.UsageHours, u.RecordedAt))
-            .ToListAsync(ct);
+            .ToPagedResultAsync(paging, ct);
     }
 
     /// <summary>利用実績の記録（E-60-20-01。現場作業者も記録できる）</summary>
@@ -46,16 +54,16 @@ public class ToolUsagesController(MesAppDbContext db) : ControllerBase
         var tool = await db.Tools.FirstOrDefaultAsync(t => t.Id == request.ToolId, ct);
         if (tool is null || !tool.IsActive)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）治工具IDです。" });
+            return this.BadRequestProblem("存在しない（または無効な）治工具IDです。");
         }
         if (request.WorkOrderId is int workOrderId
             && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない作業指示IDです。" });
+            return this.BadRequestProblem("存在しない作業指示IDです。");
         }
         if (request.UsageCount <= 0 && (request.UsageHours is null or <= 0))
         {
-            return BadRequest(new ProblemDetails { Title = "使用回数または使用時間のどちらかを記録してください。" });
+            return this.BadRequestProblem("使用回数または使用時間のどちらかを記録してください。");
         }
 
         var usage = new ToolUsage
@@ -68,6 +76,8 @@ public class ToolUsagesController(MesAppDbContext db) : ControllerBase
         };
         db.ToolUsages.Add(usage);
         await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Equipment", "ToolUsage", nameof(ToolUsage), usage.Id.ToString(),
+            detail: new { toolId = usage.ToolId, count = usage.UsageCount, hours = usage.UsageHours }, ct: ct);
 
         return await db.ToolUsages.AsNoTracking()
             .Where(u => u.Id == usage.Id)
@@ -75,6 +85,75 @@ public class ToolUsagesController(MesAppDbContext db) : ControllerBase
                 u.Id, u.ToolId, u.Tool!.Code, u.WorkOrderId, u.WorkOrder!.WorkOrderNo,
                 u.UsageCount, u.UsageHours, u.RecordedAt))
             .FirstAsync(ct);
+    }
+
+    /// <summary>
+    /// 寿命分析（E-60-20-03）。期間内の使用ペースから寿命へ達する見込みを出し、交換の準備に使う。
+    /// <para>
+    /// 期間は製造日（業務日付）基準。見込みが立たないもの（寿命閾値が未設定・期間内に使用が無い・
+    /// すでに寿命到達）は予測日を null で返す。適当な日付を置くと交換計画が実態とずれるため。
+    /// </para>
+    /// </summary>
+    [HttpGet("life-analysis")]
+    public async Task<ActionResult<List<ToolLifeAnalysisRow>>> LifeAnalysis(
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null,
+        CancellationToken ct = default)
+    {
+        var fromStart = from is null ? (DateTimeOffset?)null : businessDate.GetRange(from.Value).Start;
+        var toEnd = to is null ? (DateTimeOffset?)null : businessDate.GetRange(to.Value).End;
+        var today = businessDate.Today;
+
+        var tools = await db.Tools.AsNoTracking().Where(t => t.IsActive).ToListAsync(ct);
+        // SQLiteはDateTimeOffsetの比較を翻訳できないため、期間とリセットの判定は取り出してから行う
+        var usages = await db.ToolUsages.AsNoTracking()
+            .Select(u => new { u.ToolId, u.WorkOrderId, u.UsageCount, u.UsageHours, u.RecordedAt })
+            .ToListAsync(ct);
+
+        return tools
+            .OrderBy(t => t.Code, StringComparer.Ordinal)
+            .Select(t =>
+            {
+                // 寿命の累計はリセット（メンテ完了）以降だけを数える（寿命ステータスと同じ条件）
+                var effective = usages
+                    .Where(u => u.ToolId == t.Id && (t.LifeResetAt is null || u.RecordedAt > t.LifeResetAt))
+                    .ToList();
+                var cumulative = effective.Sum(u => u.UsageCount);
+
+                var period = effective
+                    .Where(u => (fromStart is null || u.RecordedAt >= fromStart)
+                                && (toEnd is null || u.RecordedAt < toEnd))
+                    .ToList();
+                var periodCount = period.Sum(u => u.UsageCount);
+                // 使用のあった日で割る（稼働しない日を含めると、まだ余裕があるように見える）
+                var usageDays = period
+                    .Select(u => businessDate.GetBusinessDate(u.RecordedAt))
+                    .Distinct()
+                    .Count();
+                var workOrderCount = period
+                    .Where(u => u.WorkOrderId != null)
+                    .Select(u => u.WorkOrderId!.Value)
+                    .Distinct()
+                    .Count();
+
+                int? remaining = t.LifeThresholdCount is > 0
+                    ? Math.Max(0, t.LifeThresholdCount.Value - cumulative)
+                    : null;
+                decimal? perDay = usageDays == 0 ? null : Math.Round((decimal)periodCount / usageDays, 2);
+                decimal? perWorkOrder = workOrderCount == 0
+                    ? null
+                    : Math.Round((decimal)periodCount / workOrderCount, 2);
+
+                DateOnly? estimated = remaining is > 0 && perDay is > 0
+                    ? today.AddDays((int)Math.Ceiling(remaining.Value / perDay.Value))
+                    : null;
+
+                return new ToolLifeAnalysisRow(
+                    t.Id, t.Code, t.Name, t.Status,
+                    t.LifeThresholdCount, cumulative, remaining,
+                    periodCount, usageDays, perDay, workOrderCount, perWorkOrder, estimated);
+            })
+            .ToList();
     }
 
     /// <summary>

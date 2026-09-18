@@ -40,6 +40,41 @@ public class ManufacturingOrder
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<WorkOrder> WorkOrders { get; set; } = [];
+
+    /// <summary>予定材料（展開時にMBOMから確定。Spec.md 5.7）</summary>
+    public List<ManufacturingOrderMaterial> Materials { get; set; } = [];
+}
+
+/// <summary>
+/// 指図の予定材料（Spec.md 5.2 ManufacturingOrderMaterial。A-40-10、B-30-20）。
+/// <para>
+/// MBOMは改訂され上書きされるため、指図展開時点の構成をここへ写して固定する。
+/// 部材投入の照合（B-30-20-01）とバックフラッシュ（B-40-10-09）はこの予定材料を基準にし、
+/// 仕掛中の指図が途中のMBOM改訂に影響されないようにする。
+/// </para>
+/// </summary>
+public class ManufacturingOrderMaterial
+{
+    public int Id { get; set; }
+
+    public int ManufacturingOrderId { get; set; }
+    public ManufacturingOrder? ManufacturingOrder { get; set; }
+
+    /// <summary>部材の品目</summary>
+    public int ChildProductId { get; set; }
+    public Product? ChildProduct { get; set; }
+
+    /// <summary>親1単位あたりの必要数量（展開時点のMBOMの値）</summary>
+    public decimal QuantityPer { get; set; }
+
+    /// <summary>予定数量（＝原単位 × 指図数量）</summary>
+    public decimal PlannedQuantity { get; set; }
+
+    /// <summary>代替部品グループ（展開時点のMBOMの値。同一グループ内は代替可）</summary>
+    public string? AlternativeGroup { get; set; }
+
+    /// <summary>代替部品か（展開時点のMBOMの値。投入時に理由の記録を求める）</summary>
+    public bool IsAlternative { get; set; }
 }
 
 /// <summary>作業指示（Spec.md 5.2 WorkOrder。製造指図×工程。B-10）</summary>
@@ -64,6 +99,55 @@ public class WorkOrder
 
     public decimal PlannedQuantity { get; set; }
 
+    // ---- 工順（BOP）のスナップショット（指図展開時点で固定。Spec.md 5.7）----
+    // 工順マスタは改訂され上書きされるため、仕掛中・完了済みの指図が
+    // 「当時どの条件で作れと指示されたか」を後から説明できるようここへ写す
+
+    /// <summary>
+    /// この工程を行う作業区（展開時点の工順の値。差立前でも決まるため進捗の集計軸に使える）
+    /// </summary>
+    public int? WorkCenterId { get; set; }
+    public WorkCenter? WorkCenter { get; set; }
+
+    /// <summary>標準作業時間（分。展開時点の工順の値）</summary>
+    public decimal StandardWorkMinutes { get; set; }
+
+    /// <summary>標準段取り時間（分。展開時点の工順の値）</summary>
+    public decimal StandardSetupMinutes { get; set; }
+
+    /// <summary>必要スキル（展開時点の工順の値。差立のスキル照合 F-20-30-01 はこれを使う）</summary>
+    public int? RequiredSkillId { get; set; }
+    public SkillMaster? RequiredSkill { get; set; }
+
+    /// <summary>工程管理項目（温度・回転数など記録すべき製造条件の定義。展開時点の工順の値）</summary>
+    public string? ControlItems { get; set; }
+
+    /// <summary>工程・段取りで実施するチェックリスト（展開時点の工順の値）</summary>
+    public int? RoutingChecklistId { get; set; }
+    public Checklist? RoutingChecklist { get; set; }
+
+    /// <summary>作業手順書（SOP。展開時点の工順の値。B-10-30-03）</summary>
+    public int? WorkProcedureId { get; set; }
+    public WorkProcedure? WorkProcedure { get; set; }
+
+    /// <summary>
+    /// 展開時点の手順書の版数。
+    /// <para>
+    /// 手順の本文は写さず、版数だけを固定する。安全上の訂正のように
+    /// 改訂した手順は仕掛中の作業指示にも届くべきで、表示は常にマスタの現在値を使う。
+    /// 版数を残しておけば「計画時から改訂されたか」を作業者と監査に示せる。
+    /// 製造条件（<see cref="WorkOrderControlItem"/>）が本文ごと固定するのは、
+    /// 逸脱の判定基準が後から変わってはいけないためで、手順書とは前提が違う。
+    /// </para>
+    /// </summary>
+    public int? WorkProcedureVersion { get; set; }
+
+    /// <summary>
+    /// 工程管理項目の指示（展開時点のマスタのスナップショット。B-30-30-04）。
+    /// 実績の逸脱判定はこれを基準にする
+    /// </summary>
+    public List<WorkOrderControlItem> ControlItemSnapshots { get; set; } = [];
+
     /// <summary>着手順（差立で設定。B-10-20-03。初期リリースでは順序強制はしない：Spec.md 3.9）</summary>
     public int? DispatchOrder { get; set; }
 
@@ -78,6 +162,34 @@ public class WorkOrder
     public WorkOrderStatus Status { get; set; } = WorkOrderStatus.Created;
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// 作業指示の状態履歴（Spec.md 5.2 WorkOrderStatusHistory）。
+/// 作業指示の状態は現在値しか持たないため、配布・着手・完了・承認・取消の遷移を
+/// 業務履歴として残し、工程進捗と製造記録を後から説明できるようにする
+/// （ロット状態履歴（5.3 LotStatusHistory）と同じ方針）。
+/// </summary>
+public class WorkOrderStatusHistory
+{
+    public int Id { get; set; }
+
+    public int WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
+    public WorkOrderStatus FromStatus { get; set; }
+
+    public WorkOrderStatus ToStatus { get; set; }
+
+    public WorkOrderStatusChangeSource Source { get; set; }
+
+    /// <summary>備考（取消理由など）</summary>
+    public string? Note { get; set; }
+
+    public string? ChangedByUserId { get; set; }
+    public AppUser? ChangedBy { get; set; }
+
+    public DateTimeOffset ChangedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>ロット（Spec.md 5.3 Lot。Phase 2では産出ロット採番 B-10-10-05 のために先行導入）</summary>
@@ -111,9 +223,110 @@ public class Lot
     /// <summary>グレード（検査結果により出荷先・品目が変わる製品の管理。C-60-10-01）</summary>
     public string? Grade { get; set; }
 
-    /// <summary>親ロット（分割・統合・振替の由来。系譜の保持）</summary>
+    /// <summary>
+    /// 親ロット（分割・振替の直接の由来。表示用の簡易参照であり、
+    /// 追跡の正は <see cref="LotGenealogy"/>（統合のように親が複数になる関係も表現できる）
+    /// </summary>
     public int? ParentLotId { get; set; }
     public Lot? ParentLot { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
+
+/// <summary>
+/// ロット系譜（Spec.md 5.3 LotGenealogy。D-10-30-05〜07 分割・統合・振替）。
+/// トレーサビリティ（H-30-10）で前方・後方どちらにも辿れるよう、由来元（親）と由来先（子）の
+/// 関係を1レコード＝1関係で残す。統合のように親が複数になる関係も表現できる。
+/// </summary>
+public class LotGenealogy
+{
+    public int Id { get; set; }
+
+    /// <summary>由来元ロット（分割元・振替元・統合元）</summary>
+    public int ParentLotId { get; set; }
+    public Lot? ParentLot { get; set; }
+
+    /// <summary>由来先ロット（分割先・振替先・統合先）</summary>
+    public int ChildLotId { get; set; }
+    public Lot? ChildLot { get; set; }
+
+    public LotRelationType RelationType { get; set; }
+
+    /// <summary>関係が成立した数量</summary>
+    public decimal Quantity { get; set; }
+
+    public string? PerformedByUserId { get; set; }
+
+    public DateTimeOffset OccurredAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// ロット状態履歴（Spec.md 5.3 LotStatusHistory）。
+/// 在庫ステータスは現在状態しか持たないため、保留・解除などの判断を後から説明できるよう
+/// 遷移を業務履歴として残す（誰が・いつ・なぜ止め、どの判断で解除したか）。
+/// </summary>
+public class LotStatusHistory
+{
+    public int Id { get; set; }
+
+    public int LotId { get; set; }
+    public Lot? Lot { get; set; }
+
+    public LotStockStatus FromStatus { get; set; }
+
+    public LotStockStatus ToStatus { get; set; }
+
+    public LotStatusChangeSource Source { get; set; }
+
+    /// <summary>理由（保留理由・解除理由など）</summary>
+    public string? Reason { get; set; }
+
+    /// <summary>契機となった検査指示（検査由来の場合）</summary>
+    public int? InspectionOrderId { get; set; }
+
+    /// <summary>契機となった不適合（不適合由来の場合）</summary>
+    public int? NonconformanceReportId { get; set; }
+
+    public string? ChangedByUserId { get; set; }
+
+    public DateTimeOffset ChangedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+/// <summary>
+/// 作業指示の工程管理項目（Spec.md 5.2 WorkOrderControlItem。B-30-30-04）。
+/// 指図展開時点の工程管理項目マスタを写したもの。
+/// <para>
+/// 検査指示の基準スナップショット（<see cref="InspectionOrderItem"/>）と同じ考え方。
+/// マスタは改訂され上書きされるため、実績の逸脱判定は**当時どの条件で作れと指示されたか**を
+/// 基準にしないと、後から見たときに判定が変わってしまう。
+/// </para>
+/// </summary>
+public class WorkOrderControlItem
+{
+    public int Id { get; set; }
+
+    public int WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
+    /// <summary>元の工程管理項目（マスタが消えても実績は残るため参照は任意）</summary>
+    public int? ControlItemId { get; set; }
+    public ControlItem? ControlItem { get; set; }
+
+    // ---- 展開時点のスナップショット ----
+
+    public string ItemCode { get; set; } = string.Empty;
+
+    public string ItemName { get; set; } = string.Empty;
+
+    public string? Unit { get; set; }
+
+    /// <summary>展開時点のマスタ版数</summary>
+    public int ItemVersion { get; set; }
+
+    /// <summary>指示値（レシピ上の狙い値）</summary>
+    public decimal? TargetValue { get; set; }
+
+    public decimal? LowerLimit { get; set; }
+
+    public decimal? UpperLimit { get; set; }
+}
+

@@ -1,4 +1,4 @@
-<nav>
+﻿<nav>
     <NavLink href="" Match="NavLinkMatch.All">ダッシュボード</NavLink>
 
     <div class="nav-group">生産・製造実行</div>
@@ -6,13 +6,17 @@
     <NavLink href="dispatch">差立</NavLink>
     <NavLink href="work-orders">作業指示</NavLink>
     <NavLink href="process-progress">工程進捗・トラブル</NavLink>
+    <NavLink href="productivity">生産性モニタリング</NavLink>
+    <NavLink href="work-time">作業時間</NavLink>
 
     <div class="nav-group">物流・在庫</div>
     <NavLink href="receiving">受入</NavLink>
     <NavLink href="inventory">在庫照会・操作</NavLink>
     <NavLink href="picking">出庫・払出</NavLink>
     <NavLink href="shipping">出荷管理</NavLink>
+    <NavLink href="transfer-orders">搬送指示</NavLink>
     <NavLink href="stocktakes">棚卸</NavLink>
+    <NavLink href="warehouse-operations">倉庫業務</NavLink>
 
     <div class="nav-group">品質</div>
     <NavLink href="inspections">検査管理</NavLink>
@@ -27,4 +31,10 @@
 
     <div class="nav-group">管理</div>
     <NavLink href="masters">マスタ管理</NavLink>
+    <NavLink href="actual-csv">実績CSV取込</NavLink>
+    @* 監査ログはシステム管理者専用（Spec.md 7.4・7.6）。他ロールは開いても403になるので出さない *@
+    <AuthorizeView Roles="@MesRoleGroups.UserAdmin">
+        <NavLink href="audit-logs">監査ログ</NavLink>
+    </AuthorizeView>
+    <NavLink href="about">このアプリについて</NavLink>
 </nav>

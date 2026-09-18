@@ -22,7 +22,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_workOrders.Count == 0)
+    else if (_workOrders.Total == 0)
     {
         <p class="text-muted">作業指示はありません。</p>
     }
@@ -43,7 +43,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var workOrder in _workOrders)
+                @foreach (var workOrder in _workOrders.Items)
                 {
                     <tr>
                         <td>@workOrder.WorkOrderNo</td>
@@ -63,22 +63,25 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="WorkOrderResponse" Result="_workOrders" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
 @code {
-    private List<WorkOrderResponse>? _workOrders;
+    private PagedResult<WorkOrderResponse>? _workOrders;
     private string _statusFilter = string.Empty;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        var url = "api/work-orders";
+        var url = $"api/work-orders?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>(url);
+        _workOrders = await Http.GetFromJsonAsync<PagedResult<WorkOrderResponse>>(url);
     }
 }

@@ -6,7 +6,7 @@
 
 <h1>製造指図管理</h1>
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.ProductionManage">
     <div class="card">
         <h2 style="margin-top:0;">指図登録（A-20-10-01）</h2>
         @if (_error is not null)
@@ -16,13 +16,11 @@
         <div class="form-grid">
             <div class="form-field">
                 <label>品目</label>
-                <select @bind="_form.ProductId">
-                    <option value="0">選択してください</option>
-                    @foreach (var product in _products)
-                    {
-                        <option value="@product.Id">@product.Code @product.Name</option>
-                    }
-                </select>
+                <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                              @bind-Value="_form.ProductId"
+                              EmptyLabel="選択してください"
+                              ValueOf="p => p.Id"
+                              LabelOf='@(p => $"{p.Code} {p.Name}")' />
             </div>
             <div class="form-field">
                 <label>数量</label>
@@ -80,7 +78,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var order in _orders)
+                @foreach (var order in _orders.Items)
                 {
                     <tr>
                         <td><a href="manufacturing-orders/@order.Id">@order.OrderNo</a></td>
@@ -95,6 +93,7 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="ManufacturingOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
@@ -108,8 +107,7 @@
         public string? Note { get; set; }
     }
 
-    private List<ManufacturingOrderResponse>? _orders;
-    private List<ProductResponse> _products = [];
+    private PagedResult<ManufacturingOrderResponse>? _orders;
     private readonly OrderForm _form = new();
     private string _statusFilter = string.Empty;
     private string? _error;
@@ -117,18 +115,19 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        var url = "api/manufacturing-orders";
+        var url = $"api/manufacturing-orders?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _orders = await Http.GetFromJsonAsync<List<ManufacturingOrderResponse>>(url);
+        _orders = await Http.GetFromJsonAsync<PagedResult<ManufacturingOrderResponse>>(url);
     }
 
     private async Task CreateAsync()
@@ -151,9 +150,9 @@
                     _form.ProductId, _form.Quantity,
                     _form.DueDate is null ? null : DateOnly.FromDateTime(_form.DueDate.Value),
                     _form.OrderType, null, _form.Note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _form.ProductId = 0;

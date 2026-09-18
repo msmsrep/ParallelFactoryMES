@@ -1,0 +1,5 @@
+﻿Type,IndirectCategory,OrderNo,Sequence,StartedAt,EndedAt,Note
+Direct,,SMP-SF-001,10,2026-09-01 21:00,2026-09-02 03:00,夜勤
+Indirect,部材準備,,,2026-09-02 07:30,2026-09-02 08:00,
+Direct,,SMP-FG-001,10,2026-09-02 08:30,2026-09-02 11:30,
+Direct,,SMP-FG-001,30,2026-09-02 13:30,2026-09-02 14:00,

@@ -1,0 +1,212 @@
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+@* CSVのZIP一括取込・一括出力（Spec.md 3.8）。マスタ（api/masters/csv/bundle）と実績（api/actuals/csv/bundle。取込のみ）で共用 *@
+<div class="card">
+    <details>
+        <summary class="csv-summary">ZIPで一括取込@(CanExport ? "・一括出力" : "")（@Label）</summary>
+
+        <p class="text-muted mt-2">
+            複数のCSVをZIPにまとめて1回で取り込めます。<strong>ファイル名の順に取り込み</strong>、
+            種別はファイル名の「_」より後ろで決まります（例 <code>@Example</code>）。
+            <strong>1ファイルでもエラーがあると、ZIPの全ファイルが取り消されます。</strong>
+            CSV以外のファイルは無視します。@(CanExport ? "実績のCSVは入れられません（実績CSV取込で取り込みます）。" : "マスタのCSVは入れられません（マスタ管理で取り込みます）。")
+        </p>
+
+        @if (CanExport)
+        {
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="ExportAsync">全マスタをZIPで出力</button>
+            </div>
+            <p class="text-muted">
+                出力したZIPは取り込む順の番号付きで、そのまま一括取込に使えます。
+                ユーザーはパスワードを出力しないため、別の環境へ移すときはユーザーのCSVに初期パスワードを書き足してください。
+            </p>
+        }
+
+        <AuthorizeView Roles="@Roles">
+            <div class="csv-import mt-2">
+                <div class="form-field">
+                    <label>取込ファイル（.zip）</label>
+                    <InputFile OnChange="OnFileSelected" accept=".zip,application/zip" />
+                </div>
+                <div class="actions mt-2">
+                    <label class="text-muted">
+                        <input type="checkbox" style="width:auto;" @bind="_dryRun" />
+                        検証のみ（DBに反映しない）
+                    </label>
+                    <button type="button" class="btn" disabled="@(_busy || _file is null)" @onclick="ImportAsync">
+                        一括取込を実行
+                    </button>
+                </div>
+            </div>
+        </AuthorizeView>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger mt-2">@_error</div>
+        }
+        @if (_result is not null)
+        {
+            @if (_result.Succeeded)
+            {
+                <div class="alert alert-success mt-2">
+                    @(_result.DryRun ? "検証のみ：エラーはありません。" : "取り込みました。")
+                    @_result.Files.Count ファイル
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-danger mt-2">
+                    エラーがあるため、<strong>ZIPの全ファイルを取り消しました</strong>（DBは変更されていません）。
+                    修正して再度取り込んでください。
+                </div>
+            }
+            <table class="table">
+                <thead><tr><th>ファイル</th><th style="width:140px;">結果</th><th>内容</th></tr></thead>
+                <tbody>
+                    @foreach (var file in _result.Files)
+                    {
+                        <tr>
+                            <td><code>@file.FileName</code></td>
+                            <td>@(file.Result.Succeeded ? "OK" : $"エラー {file.Result.Errors.Count} 件")</td>
+                            <td>
+                                @if (file.Result.Succeeded)
+                                {
+                                    <span class="text-muted">データ行 @file.Result.DataRows 件</span>
+                                }
+                                else
+                                {
+                                    @foreach (var error in file.Result.Errors)
+                                    {
+                                        <div>@(error.Line > 0 ? $"{error.Line}行目：" : "")@error.Message</div>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var name in _result.NotProcessed)
+                    {
+                        <tr>
+                            <td><code>@name</code></td>
+                            <td class="text-muted">未処理</td>
+                            <td class="text-muted">前のファイルでエラーがあったため取り込んでいません。</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </details>
+</div>
+
+@code {
+    /// <summary>一括取込・出力APIの基点（マスタは api/masters/csv、実績は api/actuals/csv）</summary>
+    [Parameter, EditorRequired] public string BaseUrl { get; set; } = string.Empty;
+
+    /// <summary>画面表示用の名称（マスタ／実績）</summary>
+    [Parameter] public string Label { get; set; } = string.Empty;
+
+    /// <summary>全件のZIP出力を出すか（実績は取込のみ）</summary>
+    [Parameter] public bool CanExport { get; set; }
+
+    /// <summary>取込欄を出すロール（実際の可否はZIP内の全種別についてAPIが判定する）</summary>
+    [Parameter] public string Roles { get; set; } = MesRoleGroups.MasterWrite;
+
+    /// <summary>ファイル名の例</summary>
+    [Parameter] public string Example { get; set; } = "01_work-centers.csv";
+
+    /// <summary>取込成功後に一覧を再読み込みするためのコールバック</summary>
+    [Parameter] public EventCallback OnImported { get; set; }
+
+    private const long MaxUploadBytes = 20 * 1024 * 1024;
+
+    private IBrowserFile? _file;
+    private CsvBundleImportResult? _result;
+    private string? _error;
+    private bool _dryRun;
+    private bool _busy;
+
+    private void OnFileSelected(InputFileChangeEventArgs args)
+    {
+        _file = args.File;
+        _result = null;
+        _error = null;
+    }
+
+    private async Task ExportAsync()
+    {
+        _busy = true;
+        _error = null;
+        _result = null;
+        try
+        {
+            var response = await Http.GetAsync($"{BaseUrl}/bundle?includeInactive=true");
+            if (await response.ReadErrorAsync("ZIPの出力に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var fileName = response.Content.Headers.ContentDisposition?.FileName?.Trim('"');
+            await JS.InvokeVoidAsync("mesApp.downloadFile",
+                string.IsNullOrEmpty(fileName) ? "masters.zip" : fileName,
+                Convert.ToBase64String(bytes), "application/zip");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        if (_file is null)
+        {
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _result = null;
+        try
+        {
+            if (_file.Size > MaxUploadBytes)
+            {
+                _error = $"ファイルサイズが大きすぎます（上限 {MaxUploadBytes / 1024 / 1024} MB）。";
+                return;
+            }
+
+            using var buffer = new MemoryStream();
+            await using (var stream = _file.OpenReadStream(MaxUploadBytes))
+            {
+                await stream.CopyToAsync(buffer);
+            }
+
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(buffer.ToArray());
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+            content.Add(fileContent, "file", _file.Name);
+
+            var response = await Http.PostAsync($"{BaseUrl}/bundle?dryRun={(_dryRun ? "true" : "false")}", content);
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                _error = "ZIPに、取り込む権限の無い種別のCSVが含まれています（何も取り込んでいません）。";
+                return;
+            }
+            if (await response.ReadErrorAsync("一括取込に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+
+            _result = await response.Content.ReadFromJsonAsync<CsvBundleImportResult>();
+            if (_result is { Succeeded: true, DryRun: false })
+            {
+                await OnImported.InvokeAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,4 @@
+﻿OrderNo,Sequence,GoodQuantity,DefectQuantity,ScrapQuantity,ReworkQuantity,StartedAt,EndedAt,OutputLocationCode,Backflush,Defects
+SMP-FG-001,10,10,0,,,2026-09-02 08:30,2026-09-02 11:30,,false,
+SMP-FG-001,20,10,0,,,2026-09-02 12:30,2026-09-02 13:00,,false,
+SMP-FG-001,30,9,1,,1,2026-09-02 13:30,2026-09-02 14:00,WH-P01,false,DR-05=1

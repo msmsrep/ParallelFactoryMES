@@ -3,7 +3,7 @@
 @* 検査項目・基準マスタ（Spec.md 5.1 InspectionItem。C-10-10。更新で版数が上がる） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "検査項目・基準の登録" : $"編集（{_code}）")</h2>
         <div class="form-grid">
@@ -26,13 +26,11 @@
             </div>
             <div class="form-field">
                 <label>対象品目</label>
-                <select @bind="_productId">
-                    <option value="0">指定なし</option>
-                    @foreach (var product in _products)
-                    {
-                        <option value="@product.Id">@product.Code @product.Name</option>
-                    }
-                </select>
+                <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                              @bind-Value="_productId"
+                              EmptyLabel="指定なし"
+                              ValueOf="p => p.Id"
+                              LabelOf='@(p => $"{p.Code} {p.Name}")' />
             </div>
             <div class="form-field">
                 <label>対象工程</label>
@@ -96,15 +94,14 @@
                         <td>@item.Name</td>
                         <td>@TypeLabel(item.Type)</td>
                         <td>
-                            @(_products.FirstOrDefault(p => p.Id == item.TargetProductId)?.Code
-                              ?? _processes.FirstOrDefault(p => p.Id == item.TargetProcessId)?.Code ?? "-")
+                            @(item.TargetProductCode ?? item.TargetProcessCode ?? "-")
                         </td>
                         <td>@(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")</td>
                         <td>@(item.Method ?? "-")</td>
                         <td>@(item.SamplingCount?.ToString() ?? "-")</td>
-                        <td>v@item.Version</td>
+                        <td>v@(item.Version)</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
                                 @if (item.IsActive)
                                 {
@@ -122,7 +119,6 @@
 
 @code {
     private List<InspectionItemResponse>? _items;
-    private List<ProductResponse> _products = [];
     private List<ProcessResponse> _processes = [];
 
     private int? _editingId;
@@ -142,7 +138,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
         _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
         await LoadAsync();
     }
@@ -199,9 +194,9 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/inspection-items", request)
                 : await Http.PutAsJsonAsync($"api/inspection-items/{_editingId}", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保存しました。";
@@ -221,9 +216,9 @@
         try
         {
             var response = await Http.DeleteAsync($"api/inspection-items/{id}");
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "無効化しました。";

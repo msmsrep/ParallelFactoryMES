@@ -1,6 +1,6 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MesApp.Api.Services;
-using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -12,181 +12,83 @@ namespace MesApp.Api.Controllers;
 
 /// <summary>
 /// 棚卸（D-50-10）：指示作成（理論在庫のスナップショット）→実棚数登録→差異一覧→確定（差異調整）
+/// 参照系は認証済みユーザー全員に開放し、更新系のみ在庫権限に絞る（Spec.md 7.4）。
+/// <b>クラスへ <c>[Authorize(Roles = ...)]</c> を付けてはならない</b>：認可属性はクラスとアクションで
+/// 合成されるため、アクション側の <c>[Authorize]</c> では開放できず、参照系まで在庫ロール限定になる。
 /// </summary>
 [ApiController]
 [Route("api/stocktakes")]
-[Authorize(Roles = RoleGroups.InventoryManage)]
+[Authorize]
 public class StocktakesController(
     MesAppDbContext db,
-    InventoryService inventory,
-    NumberingService numbering,
-    IAuditLogger auditLogger) : ControllerBase
+    StocktakeService stocktakes) : ControllerBase
 {
+    private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
+
     [HttpGet]
-    [Authorize]
-    public async Task<ActionResult<List<StocktakeResponse>>> List(CancellationToken ct)
+    public async Task<ActionResult<PagedResult<StocktakeResponse>>> List(
+        [FromQuery] PageQuery paging, CancellationToken ct = default)
     {
-        var stocktakes = await BaseQuery().OrderByDescending(s => s.Id).ToListAsync(ct);
-        return stocktakes.Select(ToResponse).ToList();
+        var result = await BaseQuery().OrderByDescending(s => s.Id).ToPagedResultAsync(paging, ct);
+        return result.Map(ToResponse);
     }
 
     [HttpGet("{id:int}")]
-    [Authorize]
     public async Task<ActionResult<StocktakeResponse>> Get(int id, CancellationToken ct)
     {
         var stocktake = await BaseQuery().FirstOrDefaultAsync(s => s.Id == id, ct);
         return stocktake is null ? NotFound() : ToResponse(stocktake);
     }
 
-    /// <summary>棚卸指示の作成（D-50-10-01。現在庫（数量>0）のスナップショットを明細化）</summary>
+    /// <summary>棚卸指示の作成（D-50-10-01。現在庫（数量&gt;0）のスナップショットを明細化）</summary>
     [HttpPost]
-    public async Task<ActionResult<StocktakeResponse>> Create(StocktakeCreateRequest request, CancellationToken ct)
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
+    public async Task<ActionResult<StocktakeResponse>> Create(
+        StocktakeCreateRequest request, CancellationToken ct)
     {
-        if (request.TargetLocationId is int locationId
-            && !await db.Locations.AnyAsync(l => l.Id == locationId, ct))
+        var outcome = await stocktakes.CreateAsync(request, CurrentUserId, ct);
+        if (outcome.Failed)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないロケーションIDです。" });
+            return ToProblem(outcome);
         }
-
-        var stocksQuery = db.InventoryStocks.AsNoTracking().Where(s => s.Quantity > 0);
-        if (request.TargetLocationId is not null)
-        {
-            stocksQuery = stocksQuery.Where(s => s.LocationId == request.TargetLocationId);
-        }
-        var stocks = await stocksQuery.ToListAsync(ct);
-        if (stocks.Count == 0)
-        {
-            return BadRequest(new ProblemDetails { Title = "対象在庫がありません。" });
-        }
-
-        var stocktake = new Stocktake
-        {
-            StocktakeNo = await numbering.NextStocktakeNoAsync(ct),
-            TargetLocationId = request.TargetLocationId,
-            CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-            Lines = stocks.Select(s => new StocktakeLine
-            {
-                ProductId = s.ProductId,
-                LotId = s.LotId,
-                LocationId = s.LocationId,
-                TheoreticalQuantity = s.Quantity,
-            }).ToList(),
-        };
-        db.Stocktakes.Add(stocktake);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "StocktakeCreate", nameof(Stocktake), stocktake.Id.ToString(),
-            detail: $"stocktakeNo={stocktake.StocktakeNo}, lines={stocktake.Lines.Count}", ct: ct);
-        var saved = await BaseQuery().FirstAsync(s => s.Id == stocktake.Id, ct);
-        return CreatedAtAction(nameof(Get), new { id = stocktake.Id }, ToResponse(saved));
+        var id = outcome.Value!.Id;
+        return CreatedAtAction(nameof(Get), new { id }, await ToResponseAsync(id, ct));
     }
 
     /// <summary>実棚数の登録（D-50-10-02。部分登録可・上書き可）</summary>
     [HttpPut("{id:int}/counts")]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<StocktakeResponse>> RegisterCounts(
-        int id, StocktakeCountRequest request, CancellationToken ct)
-    {
-        var stocktake = await db.Stocktakes.Include(s => s.Lines)
-            .FirstOrDefaultAsync(s => s.Id == id, ct);
-        if (stocktake is null)
-        {
-            return NotFound();
-        }
-        if (stocktake.Status != StocktakeStatus.Instructed)
-        {
-            return Conflict(new ProblemDetails { Title = $"状態 '{stocktake.Status}' の棚卸には登録できません。" });
-        }
-
-        var lineById = stocktake.Lines.ToDictionary(l => l.Id);
-        foreach (var count in request.Counts)
-        {
-            if (!lineById.TryGetValue(count.LineId, out var line))
-            {
-                return BadRequest(new ProblemDetails { Title = $"存在しない明細ID {count.LineId} が含まれています。" });
-            }
-            line.CountedQuantity = count.CountedQuantity;
-        }
-        await db.SaveChangesAsync(ct);
-        var saved = await BaseQuery().FirstAsync(s => s.Id == id, ct);
-        return ToResponse(saved);
-    }
+        int id, StocktakeCountRequest request, CancellationToken ct) =>
+        await ToResponseAsync(await stocktakes.RegisterCountsAsync(id, request, ct), id, ct);
 
     /// <summary>
     /// 棚卸確定（D-50-10-05）。実棚入力済みの明細について現在庫との差異を棚卸調整で反映する（D-50-10-04）。
     /// </summary>
     [HttpPost("{id:int}/finalize")]
-    public async Task<ActionResult<StocktakeResponse>> Finalize(int id, CancellationToken ct)
-    {
-        var stocktake = await db.Stocktakes
-            .Include(s => s.Lines).ThenInclude(l => l.Lot)
-            .FirstOrDefaultAsync(s => s.Id == id, ct);
-        if (stocktake is null)
-        {
-            return NotFound();
-        }
-        if (stocktake.Status != StocktakeStatus.Instructed)
-        {
-            return Conflict(new ProblemDetails { Title = $"状態 '{stocktake.Status}' の棚卸は確定できません。" });
-        }
-        if (stocktake.Lines.All(l => l.CountedQuantity is null))
-        {
-            return BadRequest(new ProblemDetails { Title = "実棚数が1件も登録されていません。" });
-        }
-
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        foreach (var line in stocktake.Lines.Where(l => l.CountedQuantity is not null))
-        {
-            // 差異は確定時点の現在庫と実棚の差で調整する（棚卸中の在庫変動があっても実棚に合わせる）
-            var stock = await db.InventoryStocks.FirstOrDefaultAsync(
-                s => s.LotId == line.LotId && s.LocationId == line.LocationId, ct);
-            var current = stock?.Quantity ?? 0;
-            var delta = line.CountedQuantity!.Value - current;
-            if (delta == 0)
-            {
-                continue;
-            }
-            if (delta > 0)
-            {
-                await inventory.AddAsync(line.Lot!, line.LocationId, delta,
-                    InventoryTransactionType.StocktakeAdjust, userId,
-                    note: $"棚卸 {stocktake.StocktakeNo}", ct: ct);
-            }
-            else
-            {
-                await inventory.RemoveAsync(line.Lot!, line.LocationId, -delta,
-                    InventoryTransactionType.StocktakeAdjust, userId,
-                    note: $"棚卸 {stocktake.StocktakeNo}", ct: ct);
-            }
-            line.IsAdjusted = true;
-        }
-
-        stocktake.Status = StocktakeStatus.Finalized;
-        stocktake.FinalizedAt = DateTimeOffset.UtcNow;
-        stocktake.FinalizedByUserId = userId;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "StocktakeFinalize", nameof(Stocktake), id.ToString(),
-            detail: $"stocktakeNo={stocktake.StocktakeNo}, " +
-                    $"adjusted={stocktake.Lines.Count(l => l.IsAdjusted)}", ct: ct);
-        var saved = await BaseQuery().FirstAsync(s => s.Id == id, ct);
-        return ToResponse(saved);
-    }
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
+    public async Task<ActionResult<StocktakeResponse>> Finalize(int id, CancellationToken ct) =>
+        await ToResponseAsync(await stocktakes.FinalizeAsync(id, CurrentUserId, ct), id, ct);
 
     [HttpPost("{id:int}/cancel")]
-    public async Task<ActionResult<StocktakeResponse>> Cancel(int id, CancellationToken ct)
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
+    public async Task<ActionResult<StocktakeResponse>> Cancel(int id, CancellationToken ct) =>
+        await ToResponseAsync(await stocktakes.CancelAsync(id, ct), id, ct);
+
+    private async Task<ActionResult<StocktakeResponse>> ToResponseAsync(
+        Outcome<Stocktake> outcome, int id, CancellationToken ct) =>
+        outcome.Failed ? ToProblem(outcome) : await ToResponseAsync(id, ct);
+
+    /// <summary>応答は明細の品目・ロット・ロケーションを読み直して返す（サービスが返すのは追跡中の本体のみのため）</summary>
+    private async Task<StocktakeResponse> ToResponseAsync(int id, CancellationToken ct) =>
+        ToResponse(await BaseQuery().FirstAsync(s => s.Id == id, ct));
+
+    private ActionResult ToProblem(Outcome<Stocktake> outcome) => outcome.Kind switch
     {
-        var stocktake = await db.Stocktakes.FindAsync([id], ct);
-        if (stocktake is null)
-        {
-            return NotFound();
-        }
-        if (stocktake.Status != StocktakeStatus.Instructed)
-        {
-            return Conflict(new ProblemDetails { Title = $"状態 '{stocktake.Status}' の棚卸は取消できません。" });
-        }
-        stocktake.Status = StocktakeStatus.Canceled;
-        await db.SaveChangesAsync(ct);
-        var saved = await BaseQuery().FirstAsync(s => s.Id == id, ct);
-        return ToResponse(saved);
-    }
+        OutcomeError.NotFound => NotFound(),
+        OutcomeError.Conflict => this.ConflictProblem(outcome.Error),
+        _ => this.BadRequestProblem(outcome.Error),
+    };
 
     private IQueryable<Stocktake> BaseQuery() =>
         db.Stocktakes.AsNoTracking()

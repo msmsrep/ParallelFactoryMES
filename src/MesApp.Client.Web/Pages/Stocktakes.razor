@@ -9,6 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
+<AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
     <h2 style="margin-top:0;">棚卸指示の作成</h2>
     <div class="form-grid">
@@ -25,6 +26,7 @@
     </div>
     <button class="btn" disabled="@_busy" @onclick="CreateAsync">棚卸指示を作成（現在庫をスナップショット）</button>
 </div>
+</AuthorizeView>
 
 <div class="card">
     <h2 style="margin-top:0;">棚卸一覧</h2>
@@ -32,7 +34,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_stocktakes.Count == 0)
+    else if (_stocktakes.Total == 0)
     {
         <p class="text-muted">棚卸はありません。</p>
     }
@@ -43,7 +45,7 @@
                 <tr><th>棚卸番号</th><th>対象</th><th>状態</th><th>作成日</th><th>確定日</th><th>明細</th><th></th></tr>
             </thead>
             <tbody>
-                @foreach (var stocktake in _stocktakes)
+                @foreach (var stocktake in _stocktakes.Items)
                 {
                     <tr>
                         <td>@stocktake.StocktakeNo</td>
@@ -60,6 +62,7 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="StocktakeResponse" Result="_stocktakes" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
@@ -101,17 +104,19 @@
 
         @if (_selected.Status == StocktakeStatus.Instructed)
         {
-            <div class="actions mt-2">
-                <button class="btn" disabled="@_busy" @onclick="SaveCountsAsync">実棚数を登録</button>
-                <button class="btn" disabled="@_busy" @onclick="FinalizeAsync">確定（差異を棚卸調整）</button>
-                <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">取消</button>
-            </div>
+            <AuthorizeView Roles="@MesRoleGroups.InventoryManage">
+                <div class="actions mt-2">
+                    <button class="btn" disabled="@_busy" @onclick="SaveCountsAsync">実棚数を登録</button>
+                    <button class="btn" disabled="@_busy" @onclick="FinalizeAsync">確定（差異を棚卸調整）</button>
+                    <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">取消</button>
+                </div>
+            </AuthorizeView>
         }
     </div>
 }
 
 @code {
-    private List<StocktakeResponse>? _stocktakes;
+    private PagedResult<StocktakeResponse>? _stocktakes;
     private List<LocationResponse> _locations = [];
     private StocktakeResponse? _selected;
     private readonly Dictionary<int, decimal> _counts = [];
@@ -126,12 +131,14 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        _stocktakes = await Http.GetFromJsonAsync<List<StocktakeResponse>>("api/stocktakes");
+        _stocktakes = await Http.GetFromJsonAsync<PagedResult<StocktakeResponse>>($"api/stocktakes?page={page}");
         if (_selected is not null)
         {
-            _selected = _stocktakes?.FirstOrDefault(s => s.Id == _selected.Id);
+            _selected = _stocktakes?.Items.FirstOrDefault(s => s.Id == _selected.Id);
         }
     }
 
@@ -169,9 +176,9 @@
         {
             var response = await Http.PostAsJsonAsync("api/stocktakes",
                 new StocktakeCreateRequest(_targetLocationId == 0 ? null : _targetLocationId));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "棚卸指示を作成しました。";
@@ -198,9 +205,9 @@
             var counts = _counts.Select(c => new StocktakeCountLine(c.Key, c.Value)).ToList();
             var response = await Http.PutAsJsonAsync($"api/stocktakes/{_selected.Id}/counts",
                 new StocktakeCountRequest(counts));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _selected = await response.Content.ReadFromJsonAsync<StocktakeResponse>();
@@ -227,9 +234,9 @@
         try
         {
             var response = await Http.PostAsync(url, null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _selected = await response.Content.ReadFromJsonAsync<StocktakeResponse>();

@@ -9,6 +9,7 @@
 
 <Notice Error="@_error" Message="@_message" />
 
+<AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
     <h2 style="margin-top:0;">出荷指示の作成</h2>
     <div class="form-grid">
@@ -22,13 +23,11 @@
         </div>
         <div class="form-field">
             <label>品目</label>
-            <select @bind="_lineProductId">
-                <option value="0">選択してください</option>
-                @foreach (var product in _products)
-                {
-                    <option value="@product.Id">@product.Code @product.Name</option>
-                }
-            </select>
+            <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                          @bind-Value="_lineProductId"
+                          SelectedItemChanged="RememberProduct"
+                          ValueOf="p => p.Id"
+                          LabelOf='@(p => $"{p.Code} {p.Name}")' />
         </div>
         <div class="form-field">
             <label>数量</label>
@@ -47,7 +46,7 @@
                 @foreach (var line in _lines)
                 {
                     <tr>
-                        <td>@(_products.FirstOrDefault(p => p.Id == line.ProductId)?.Code)</td>
+                        <td>@_productCodes.GetValueOrDefault(line.ProductId, "-")</td>
                         <td>@line.Quantity</td>
                         <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">削除</button></td>
                     </tr>
@@ -56,6 +55,7 @@
         </table>
     }
 </div>
+</AuthorizeView>
 
 <div class="card">
     <h2 style="margin-top:0;">出荷指示一覧</h2>
@@ -63,13 +63,13 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_orders.Count == 0)
+    else if (_orders.Total == 0)
     {
         <p class="text-muted">出荷指示はありません。</p>
     }
     else
     {
-        @foreach (var order in _orders)
+        @foreach (var order in _orders.Items)
         {
             <div class="card">
                 <div class="actions" style="justify-content:space-between;">
@@ -83,7 +83,9 @@
                         <a class="btn btn-secondary btn-sm" href="print/shipping/@order.Id" target="_blank">出荷伝票</a>
                         @if (order.Status == ShippingOrderStatus.Instructed)
                         {
-                            <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
+                            <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="inventoryWrite">
+                                <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
+                            </AuthorizeView>
                         }
                     </div>
                 </div>
@@ -101,21 +103,22 @@
                         }
                     </tbody>
                 </table>
+                <Pager TItem="ShippingOrderResponse" Result="_orders" OnPageChanged="LoadPageAsync" />
 
+                <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="shipWrite">
                 @if (order.Status == ShippingOrderStatus.Instructed)
                 {
                     <h2>出荷実行（ロット指定）</h2>
                     <div class="form-grid">
                         <div class="form-field">
                             <label>出荷ロット</label>
-                            <select value="@GetShip(order.Id).LotId"
-                                    @onchange="e => SetShipLot(order.Id, e.Value)">
-                                <option value="0">選択してください</option>
-                                @foreach (var stock in _stocks.Where(s => order.Lines.Any(l => l.ProductId == s.ProductId)))
-                                {
-                                    <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode / @stock.LocationCode / 在庫@stock.Quantity）</option>
-                                }
-                            </select>
+                            @* 指図の品目に該当するロットだけを出す。件数が増えたら検索で絞る *@
+                            <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                                          Value="GetShip(order.Id).LotId"
+                                          SelectedItemChanged="stock => SetShipLot(order.Id, stock)"
+                                          Filter="@(s => order.Lines.Any(l => l.ProductId == s.ProductId))"
+                                          ValueOf="s => s.LotId"
+                                          LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode} / {s.LocationCode} / 在庫{s.Quantity}）")' />
                         </div>
                         <div class="form-field">
                             <label>数量</label>
@@ -125,6 +128,7 @@
                     </div>
                     <button class="btn" disabled="@_busy" @onclick="() => ShipAsync(order)">出荷実行・完了報告</button>
                 }
+                </AuthorizeView>
             </div>
         }
     }
@@ -138,10 +142,12 @@
         public decimal Quantity { get; set; }
     }
 
-    private List<ShippingOrderResponse>? _orders;
-    private List<ProductResponse> _products = [];
-    private List<StockResponse> _stocks = [];
+    private PagedResult<ShippingOrderResponse>? _orders;
     private readonly List<ShippingLineRequest> _lines = [];
+
+    /// <summary>入力中の明細に出す品目コード（選択肢APIにしたため一覧を手元に持たない）</summary>
+    private readonly Dictionary<int, string> _productCodes = [];
+
     private readonly Dictionary<int, ShipForm> _shipForms = [];
 
     private string _destination = string.Empty;
@@ -152,16 +158,21 @@
     private string? _message;
     private bool _busy;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private void RememberProduct(ProductResponse? product)
     {
-        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
-        await LoadAsync();
+        if (product is not null)
+        {
+            _productCodes[product.Id] = product.Code;
+        }
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        _orders = await Http.GetFromJsonAsync<List<ShippingOrderResponse>>("api/shipping-orders");
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
+        _orders = await Http.GetFromJsonAsync<PagedResult<ShippingOrderResponse>>($"api/shipping-orders?page={page}");
     }
 
     private ShipForm GetShip(int orderId)
@@ -174,12 +185,12 @@
         return form;
     }
 
-    private void SetShipLot(int orderId, object? value)
+    /// <summary>出荷ロットの選択。出庫元ロケーションは選んだ在庫から取る</summary>
+    private void SetShipLot(int orderId, StockResponse? stock)
     {
-        var lotId = int.TryParse(value?.ToString(), out var parsed) ? parsed : 0;
         var form = GetShip(orderId);
-        form.LotId = lotId;
-        form.LocationId = _stocks.FirstOrDefault(s => s.LotId == lotId)?.LocationId ?? 0;
+        form.LotId = stock?.LotId ?? 0;
+        form.LocationId = stock?.LocationId ?? 0;
     }
 
     private static decimal ToDecimal(object? value) =>
@@ -213,9 +224,9 @@
                 new ShippingOrderCreateRequest(_destination,
                     _plannedDate is null ? null : DateOnly.FromDateTime(_plannedDate.Value),
                     [.. _lines]));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "作成に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "出荷指示を作成しました。出荷前に出荷判定（可／特採）の承認が必要です。";
@@ -244,10 +255,10 @@
         {
             var response = await Http.PostAsJsonAsync($"api/shipping-orders/{order.Id}/ship",
                 new ShipExecuteRequest([new ShipLineRequest(form.LotId, form.LocationId, form.Quantity)]));
-            if (!response.IsSuccessStatusCode)
+            // 出荷判定未承認の場合もここで通知される（H-10-10ゲート）
+            if (await response.ReadErrorAsync("出荷に失敗しました。") is { } error)
             {
-                // 出荷判定未承認の場合もここで通知される（H-10-10ゲート）
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "出荷に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "出荷を実行しました。";
@@ -267,9 +278,9 @@
         try
         {
             var response = await Http.PostAsync($"api/shipping-orders/{id}/cancel", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取消に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "出荷指示を取消しました。";

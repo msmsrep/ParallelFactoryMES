@@ -1,4 +1,4 @@
-@page "/receiving"
+﻿@page "/receiving"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -9,18 +9,18 @@
 
 <Notice Error="@_error" Message="@_message" />
 
+<AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
     <h2 style="margin-top:0;">受入登録</h2>
     <div class="form-grid">
         <div class="form-field">
             <label>品目</label>
-            <select @bind="_form.ProductId">
-                <option value="0">選択してください</option>
-                @foreach (var product in _products)
-                {
-                    <option value="@product.Id">@product.Code @product.Name</option>
-                }
-            </select>
+            <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                          Value="_form.ProductId"
+                          ValueChanged="OnProductChangedAsync"
+                          EmptyLabel="選択してください"
+                          ValueOf="p => p.Id"
+                          LabelOf='@(p => $"{p.Code} {p.Name}")' />
         </div>
         <div class="form-field">
             <label>数量</label>
@@ -35,6 +35,21 @@
                     <option value="@location.Id">@location.Code</option>
                 }
             </select>
+            @* 推奨ロケーション指示（D-10-30-03）。選ぶのは人で、押し付けない *@
+            @if (_recommendations is { Count: > 0 })
+            {
+                <p class="text-muted">
+                    推奨：
+                    @foreach (var r in _recommendations)
+                    {
+                        <button class="btn btn-secondary btn-sm" @onclick="() => _form.LocationId = r.LocationId">
+                            @r.Code
+                        </button>
+                        <span>&nbsp;</span>
+                    }
+                </p>
+                <p class="text-muted">@_recommendations[0].Code：@_recommendations[0].Reason</p>
+            }
         </div>
         <div class="form-field">
             <label>ロット番号（空欄で自動採番）</label>
@@ -51,6 +66,7 @@
     </div>
     <button class="btn" disabled="@_busy" @onclick="ReceiveAsync">受入登録</button>
 </div>
+</AuthorizeView>
 
 <div class="card">
     <h2 style="margin-top:0;">受入済みロット</h2>
@@ -58,7 +74,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_stocks.Count == 0)
+    else if (_stocks.Total == 0)
     {
         <p class="text-muted">受入在庫はありません。</p>
     }
@@ -69,7 +85,7 @@
                 <tr><th>ロット番号</th><th>品目</th><th>ロケーション</th><th>数量</th><th>ステータス</th><th>有効期限</th><th></th></tr>
             </thead>
             <tbody>
-                @foreach (var stock in _stocks)
+                @foreach (var stock in _stocks.Items)
                 {
                     <tr>
                         <td>@stock.LotNumber</td>
@@ -80,13 +96,16 @@
                         <td>@(stock.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
                         <td class="actions">
                             <a class="btn btn-secondary btn-sm" href="print/lot/@stock.LotId" target="_blank">現品票</a>
-                            <button class="btn btn-danger btn-sm" disabled="@_busy"
-                                    @onclick="() => CancelAsync(stock.LotId)">受入取消</button>
+                            <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="inventoryWrite">
+                                <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                        @onclick="() => CancelAsync(stock.LotId)">受入取消</button>
+                            </AuthorizeView>
                         </td>
                     </tr>
                 }
             </tbody>
         </table>
+        <Pager TItem="StockResponse" Result="_stocks" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
@@ -102,22 +121,41 @@
     }
 
     private readonly ReceivingForm _form = new();
-    private List<ProductResponse> _products = [];
     private List<LocationResponse> _locations = [];
-    private List<StockResponse>? _stocks;
+    /// <summary>推奨ロケーション（D-10-30-03）。品目を選ぶたびに取り直す</summary>
+    private List<LocationRecommendationResponse>? _recommendations;
+    private PagedResult<StockResponse>? _stocks;
     private string? _error;
     private string? _message;
     private bool _busy;
 
     protected override async Task OnInitializedAsync()
     {
-        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
         _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
         await LoadAsync();
     }
 
-    private async Task LoadAsync() =>
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks");
+    /// <summary>品目が決まって初めて推奨が出せる。先頭候補は既定の入庫先として置いておく</summary>
+    private async Task OnProductChangedAsync(int productId)
+    {
+        _form.ProductId = productId;
+        _recommendations = null;
+        if (productId == 0)
+        {
+            return;
+        }
+        _recommendations = await Http.GetFromJsonAsync<List<LocationRecommendationResponse>>(
+            $"api/locations/recommendations?productId={productId}");
+        if (_form.LocationId == 0 && _recommendations is { Count: > 0 })
+        {
+            _form.LocationId = _recommendations[0].LocationId;
+        }
+    }
+
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page) =>
+        _stocks = await Http.GetFromJsonAsync<PagedResult<StockResponse>>($"api/inventory/stocks?page={page}");
 
     private async Task ReceiveAsync()
     {
@@ -136,9 +174,9 @@
                     string.IsNullOrWhiteSpace(_form.LotNumber) ? null : _form.LotNumber,
                     _form.ExpiresOn is null ? null : DateOnly.FromDateTime(_form.ExpiresOn.Value),
                     _form.Note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("受入登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "受入登録に失敗しました。";
+                _error = error;
                 return;
             }
             var lot = await response.Content.ReadFromJsonAsync<LotResponse>();
@@ -161,9 +199,9 @@
         try
         {
             var response = await Http.PostAsync($"api/receiving/{lotId}/cancel", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取消に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "受入を取消しました。";

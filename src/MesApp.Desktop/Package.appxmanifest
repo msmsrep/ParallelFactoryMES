@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIXパッケージマニフェストのテンプレート。
+  Identity の Name / Publisher / Version と PublisherDisplayName は
+  build/Pack-Msix.ps1 が build/msix-identity.json の値で置換する。
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="$IdentityName$"
+    Publisher="$Publisher$"
+    Version="$Version$"
+    ProcessorArchitecture="$Architecture$" />
+
+  <Properties>
+    <DisplayName>Parallel Factory MES</DisplayName>
+    <PublisherDisplayName>$PublisherDisplayName$</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!-- WebView2ランタイムを前提とするため、Windows 10 2004（19041）以降を対象にする -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="ja-JP" />
+  </Resources>
+
+  <Applications>
+    <Application Id="ParallelFactoryMES"
+                 Executable="ParallelFactoryMES.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Parallel Factory MES"
+        Description="製造指図・作業実績・在庫・品質・保全を一貫して扱う製造実行システム（MES）。データはこのPC内に保存されます。"
+        BackgroundColor="#1F2A44"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- デスクトップアプリ（Win32）として全機能を使うために必要 -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>

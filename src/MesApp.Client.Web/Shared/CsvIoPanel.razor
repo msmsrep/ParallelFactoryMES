@@ -1,19 +1,29 @@
 @inject HttpClient Http
 @inject IJSRuntime JS
 
-@* マスタのCSV一括入出力（エクスポート／テンプレート／取込）。取込はマスタ更新権限が必要 *@
+@* CSV一括入出力（エクスポート／テンプレート／取込）。マスタ（api/masters/csv）と実績（api/actuals/csv。取込のみ）で共用 *@
 <div class="card">
     <details>
         <summary class="csv-summary">CSV入出力（@Label）</summary>
 
         <p class="text-muted mt-2">
-            エクスポートしたCSVをExcelで編集して取り込めます。取込は
-            <strong>@KeyLabel が既存と一致すれば更新、無ければ新規登録</strong>です。
+            @if (CanExport)
+            {
+                <span>エクスポートしたCSVをExcelで編集して取り込めます。取込は
+                <strong>@KeyLabel が既存と一致すれば更新、無ければ新規登録</strong>です。</span>
+            }
+            else
+            {
+                <span>取込は<strong>常に新規登録</strong>です（既存の記録は更新しません。同じファイルを2回取り込むと2回分登録されます）。</span>
+            }
             文字コードはUTF-8とShift_JISのどちらでも取り込めます。
         </p>
 
         <div class="actions">
-            <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="ExportAsync">CSVエクスポート</button>
+            @if (CanExport)
+            {
+                <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="ExportAsync">CSVエクスポート</button>
+            }
             <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="TemplateAsync">テンプレート（空のCSV）</button>
         </div>
 
@@ -45,7 +55,14 @@
             {
                 <div class="alert alert-success mt-2">
                     @(_result.DryRun ? "検証のみ：エラーはありません。" : "取り込みました。")
-                    データ行 @_result.DataRows 件（新規 @_result.Created 件／更新 @_result.Updated 件）
+                    @if (CanExport)
+                    {
+                        <span>データ行 @_result.DataRows 件（新規 @_result.Created 件／更新 @_result.Updated 件）</span>
+                    }
+                    else
+                    {
+                        <span>データ行 @_result.DataRows 件（登録 @_result.Created 件）</span>
+                    }
                 </div>
             }
             else
@@ -88,7 +105,9 @@
                     </tbody>
                 </table>
                 <p class="text-muted">
-                    列の順序は自由です。不要な列は削除できます（削除した列は現在の値を保ちます）。
+                    @(CanExport
+                        ? "列の順序は自由です。不要な列は削除できます（削除した列は現在の値を保ちます）。"
+                        : "列の順序は自由です。任意の列は削除できます（削除した列は空欄と同じ扱いです）。")
                 </p>
             </details>
         }
@@ -96,8 +115,17 @@
 </div>
 
 @code {
-    /// <summary>マスタ種別（api/masters/csv/{Kind}）</summary>
+    /// <summary>種別（{BaseUrl}/{Kind}）</summary>
     [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
+
+    /// <summary>CSV入出力APIの基点（マスタは api/masters/csv、実績は api/actuals/csv）</summary>
+    [Parameter] public string BaseUrl { get; set; } = "api/masters/csv";
+
+    /// <summary>エクスポートを出すか（実績CSVは取込のみ）</summary>
+    [Parameter] public bool CanExport { get; set; } = true;
+
+    /// <summary>種別と列の説明を親が取得済みなら渡す（種別ごとに kinds を取り直さないため）</summary>
+    [Parameter] public CsvKindInfo? Info { get; set; }
 
     /// <summary>画面表示用の名称</summary>
     [Parameter] public string Label { get; set; } = string.Empty;
@@ -106,7 +134,7 @@
     [Parameter] public string KeyLabel { get; set; } = "コード";
 
     /// <summary>取込を実行できるロール</summary>
-    [Parameter] public string Roles { get; set; } = $"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}";
+    [Parameter] public string Roles { get; set; } = MesRoleGroups.MasterWrite;
 
     /// <summary>取込成功後に一覧を再読み込みするためのコールバック</summary>
     [Parameter] public EventCallback OnImported { get; set; }
@@ -124,8 +152,12 @@
     {
         try
         {
-            var kinds = await Http.GetFromJsonAsync<List<CsvKindInfo>>("api/masters/csv/kinds") ?? [];
-            var info = kinds.FirstOrDefault(k => k.Kind == Kind);
+            var info = Info;
+            if (info is null)
+            {
+                var kinds = await Http.GetFromJsonAsync<List<CsvKindInfo>>($"{BaseUrl}/kinds") ?? [];
+                info = kinds.FirstOrDefault(k => k.Kind == Kind);
+            }
             _columns = info?.Columns;
             if (string.IsNullOrEmpty(Label) && info is not null)
             {
@@ -145,9 +177,9 @@
         _error = null;
     }
 
-    private Task ExportAsync() => DownloadAsync($"api/masters/csv/{Kind}?includeInactive=true", $"{Kind}.csv");
+    private Task ExportAsync() => DownloadAsync($"{BaseUrl}/{Kind}?includeInactive=true", $"{Kind}.csv");
 
-    private Task TemplateAsync() => DownloadAsync($"api/masters/csv/{Kind}/template", $"{Kind}_template.csv");
+    private Task TemplateAsync() => DownloadAsync($"{BaseUrl}/{Kind}/template", $"{Kind}_template.csv");
 
     private async Task DownloadAsync(string url, string fallbackFileName)
     {
@@ -157,9 +189,9 @@
         try
         {
             var response = await Http.GetAsync(url);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("CSVの出力に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "CSVの出力に失敗しました。";
+                _error = error;
                 return;
             }
             var bytes = await response.Content.ReadAsByteArrayAsync();
@@ -202,10 +234,10 @@
             fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/csv");
             content.Add(fileContent, "file", _file.Name);
 
-            var response = await Http.PostAsync($"api/masters/csv/{Kind}?dryRun={(_dryRun ? "true" : "false")}", content);
-            if (!response.IsSuccessStatusCode)
+            var response = await Http.PostAsync($"{BaseUrl}/{Kind}?dryRun={(_dryRun ? "true" : "false")}", content);
+            if (await response.ReadErrorAsync("取込に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "取込に失敗しました。";
+                _error = error;
                 return;
             }
 

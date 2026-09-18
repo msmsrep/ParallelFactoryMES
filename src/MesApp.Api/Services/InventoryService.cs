@@ -1,3 +1,5 @@
+using MesApp.Api.Policies;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +14,7 @@ public class InventoryException(string message) : Exception(message);
 /// InventoryTransactionに履歴を残す。SaveChangesは呼び出し側が行う（1操作＝1トランザクション）。
 /// 同時実行はInventoryStock.ConcurrencyStampの楽観的制御（改訂7）で検出する。
 /// </summary>
-public class InventoryService(MesAppDbContext db)
+public class InventoryService(MesAppDbContext db, IBusinessDateService businessDate)
 {
     /// <summary>在庫加算（受入・入庫・払出戻し・振替先など）</summary>
     public async Task<InventoryStock> AddAsync(
@@ -97,15 +99,16 @@ public class InventoryService(MesAppDbContext db)
 
     /// <summary>
     /// 先入れ先出し（有効期限優先＝FEFO、次に古いロット順）での引当（D-20-10-02）。
-    /// 正常ステータスのロットのみ対象。不足分があればInventoryException。
+    /// 引当対象は LotUsabilityPolicy が「使える」と判定した在庫のみ（正常ステータスかつ期限内）。
+    /// 不足分があればInventoryException。
     /// </summary>
     public async Task<List<(Lot Lot, int LocationId, decimal Quantity)>> AllocateFefoAsync(
         int productId, decimal quantity, CancellationToken ct = default)
     {
         var stocks = await db.InventoryStocks
             .Include(s => s.Lot)
-            .Where(s => s.ProductId == productId && s.Quantity > 0
-                        && s.Lot!.StockStatus == LotStockStatus.Normal)
+            .Where(s => s.ProductId == productId && s.Quantity > 0)
+            .Where(LotUsabilityPolicy.UsableStock(businessDate.Today))
             // SQLiteはDateTimeOffsetの並べ替え不可のため、古いロット順はId昇順（採番順）で代用する
             .OrderBy(s => s.Lot!.ExpiresOn == null).ThenBy(s => s.Lot!.ExpiresOn)
             .ThenBy(s => s.LotId).ThenBy(s => s.Id)

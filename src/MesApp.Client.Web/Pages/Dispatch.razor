@@ -9,6 +9,11 @@
 
 <Notice Error="@_error" Message="@_message" />
 
+@if (_usersTruncated)
+{
+    <p class="text-muted">作業者の選択肢は@(UserLimit)件までです。表示されない作業者がいる場合はシステム管理者に連絡してください。</p>
+}
+
 <div class="card">
     <div class="actions" style="margin-bottom:8px;">
         <select @bind="_statusFilter" @bind:after="LoadAsync">
@@ -22,7 +27,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_workOrders.Count == 0)
+    else if (_workOrders.Total == 0)
     {
         <p class="text-muted">対象の作業指示はありません。</p>
     }
@@ -36,7 +41,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var workOrder in _workOrders)
+                @foreach (var workOrder in _workOrders.Items)
                 {
                     <tr>
                         <td>@workOrder.WorkOrderNo</td>
@@ -57,7 +62,8 @@
                             <select value="@GetForm(workOrder.Id).EquipmentId"
                                     @onchange="e => GetForm(workOrder.Id).EquipmentId = ToInt(e.Value)">
                                 <option value="0">未割当</option>
-                                @foreach (var equipment in _equipments)
+                                @* 工順に候補設備があればその中だけ。無ければ設備マスタ全件（B-10-20-02） *@
+                                @foreach (var equipment in EquipmentChoices(workOrder.Id))
                                 {
                                     <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
                                 }
@@ -69,13 +75,16 @@
                         </td>
                         <td><StatusBadge Status="@workOrder.Status.ToString()" /></td>
                         <td>
-                            <button class="btn btn-sm" disabled="@_busy"
-                                    @onclick="() => DispatchAsync(workOrder)">割当</button>
+                            <AuthorizeView Roles="@MesRoleGroups.ProductionManage">
+                                <button class="btn btn-sm" disabled="@_busy"
+                                        @onclick="() => DispatchAsync(workOrder)">割当</button>
+                            </AuthorizeView>
                         </td>
                     </tr>
                 }
             </tbody>
         </table>
+        <Pager TItem="WorkOrderResponse" Result="_workOrders" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
@@ -87,9 +96,15 @@
         public int Order { get; set; }
     }
 
-    private List<WorkOrderResponse>? _workOrders;
-    private List<UserSummaryResponse> _users = [];
+    /// <summary>作業者の選択肢の取得件数（工場の従業員数を想定した上限）</summary>
+    private const int UserLimit = OptionQuery.MaxLimit;
+
+    private PagedResult<WorkOrderResponse>? _workOrders;
+    private List<UserOptionResponse> _users = [];
+    private bool _usersTruncated;
     private List<EquipmentResponse> _equipments = [];
+    /// <summary>作業指示ごとの候補設備（工順に登録が無ければ空＝設備を限定しない）</summary>
+    private readonly Dictionary<int, List<WorkOrderEquipmentCandidate>> _candidates = [];
     private readonly Dictionary<int, DispatchForm> _forms = [];
     private string _statusFilter = "Created";
     private string? _error;
@@ -98,15 +113,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // ユーザー一覧はシステム管理者のみ取得可能。取得できない場合は設備・着手順のみ割当可能とする
-        try
-        {
-            _users = await Http.GetFromJsonAsync<List<UserSummaryResponse>>("api/users") ?? [];
-        }
-        catch (HttpRequestException)
-        {
-            _users = [];
-        }
+        // 作業者は選択肢API（有効なユーザーのみ）。ユーザー管理の一覧は管理者専用のため使わない
+        var users = await Http.GetFromJsonAsync<OptionsResult<UserOptionResponse>>(
+            $"api/users/options?limit={UserLimit}");
+        _users = users?.Items.ToList() ?? [];
+        _usersTruncated = users?.Truncated ?? false;
         _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
         await LoadAsync();
     }
@@ -115,7 +126,7 @@
     {
         if (!_forms.TryGetValue(workOrderId, out var form))
         {
-            var workOrder = _workOrders?.FirstOrDefault(w => w.Id == workOrderId);
+            var workOrder = _workOrders?.Items.FirstOrDefault(w => w.Id == workOrderId);
             form = new DispatchForm
             {
                 UserId = workOrder?.AssignedUserId,
@@ -127,18 +138,43 @@
         return form;
     }
 
+    /// <summary>この作業指示で選べる設備。候補が登録されていなければ設備マスタ全件</summary>
+    private IEnumerable<EquipmentResponse> EquipmentChoices(int workOrderId)
+    {
+        if (!_candidates.TryGetValue(workOrderId, out var candidates) || candidates.Count == 0)
+        {
+            return _equipments;
+        }
+        return candidates
+            .Where(c => c.IsActive)
+            .Select(c => new EquipmentResponse(
+                c.EquipmentId, c.AssetNo, c.Name, null, EquipmentStatus.Available,
+                MaintenanceType.None, null, null, true));
+    }
+
     private static int ToInt(object? value) =>
         int.TryParse(value?.ToString(), out var result) ? result : 0;
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
         _forms.Clear();
-        var url = "api/work-orders";
+        var url = $"api/work-orders?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>(url);
+        _workOrders = await Http.GetFromJsonAsync<PagedResult<WorkOrderResponse>>(url);
+
+        // 候補設備は工順ごとに違うため、表示中の作業指示の分だけまとめて引く
+        _candidates.Clear();
+        foreach (var workOrder in _workOrders?.Items ?? [])
+        {
+            _candidates[workOrder.Id] =
+                await Http.GetFromJsonAsync<List<WorkOrderEquipmentCandidate>>(
+                    $"api/work-orders/{workOrder.Id}/equipment-candidates") ?? [];
+        }
     }
 
     private async Task DispatchAsync(WorkOrderResponse workOrder)
@@ -158,10 +194,10 @@
                     string.IsNullOrEmpty(form.UserId) ? null : form.UserId,
                     form.EquipmentId == 0 ? null : form.EquipmentId,
                     form.Order == 0 ? null : form.Order));
-            if (!response.IsSuccessStatusCode)
+            // スキル・資格照合エラーもここに表示される（F-20-30-01）
+            if (await response.ReadErrorAsync("差立に失敗しました。") is { } error)
             {
-                // スキル・資格照合エラーもここに表示される（F-20-30-01）
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "差立に失敗しました。";
+                _error = error;
                 return;
             }
             _message = $"{workOrder.WorkOrderNo} を差立しました。";

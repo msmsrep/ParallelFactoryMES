@@ -1,4 +1,4 @@
-namespace MesApp.Core.Entities;
+﻿namespace MesApp.Core.Entities;
 
 /// <summary>品目区分（Spec.md 5.1 Product）</summary>
 public enum ProductType
@@ -57,6 +57,32 @@ public enum ToolStatus
     UnderMaintenance,
     /// <summary>廃棄</summary>
     Retired,
+}
+
+/// <summary>治工具の引当・払出の状態（Spec.md 5.5 ToolIssue。B-20-30）</summary>
+public enum ToolIssueStatus
+{
+    /// <summary>引当済（作業指示に確保した。まだ現物は渡っていない）</summary>
+    Allocated,
+    /// <summary>払出済（現場が受領した）</summary>
+    Issued,
+    /// <summary>返却済（使用を終えて戻した）</summary>
+    Returned,
+    /// <summary>取消</summary>
+    Canceled,
+}
+
+/// <summary>資源階層の段（Spec.md 5.1 WorkCenter。上から 工場 → ライン → エリア → 作業区）</summary>
+public enum WorkCenterLevel
+{
+    /// <summary>工場</summary>
+    Plant,
+    /// <summary>ライン</summary>
+    Line,
+    /// <summary>エリア</summary>
+    Area,
+    /// <summary>作業区（作業の管理単位。最下段）</summary>
+    WorkCenter,
 }
 
 /// <summary>倉庫/エリア区分（Spec.md 5.1 Location）</summary>
@@ -178,6 +204,60 @@ public enum LotStockStatus
     ToBeDiscarded,
 }
 
+/// <summary>不良理由の区分（Spec.md 5.1 DefectReason。C-40-10-01 不良項目別分析の集計軸）</summary>
+public enum DefectReasonCategory
+{
+    /// <summary>材質・部材</summary>
+    Material,
+    /// <summary>加工・作業</summary>
+    Process,
+    /// <summary>設備</summary>
+    Equipment,
+    /// <summary>人的要因</summary>
+    Human,
+    /// <summary>その他</summary>
+    Other,
+}
+
+/// <summary>作業指示の状態変更の契機（Spec.md 5.2 WorkOrderStatusHistory）</summary>
+public enum WorkOrderStatusChangeSource
+{
+    /// <summary>差立（配布）（B-10-20）</summary>
+    Dispatch,
+    /// <summary>着手（B-30-30-01）</summary>
+    Start,
+    /// <summary>実績入力による作業完了報告（B-30-30-06）</summary>
+    ProductionRecord,
+    /// <summary>製造完了承認（B-40-10-10）</summary>
+    Approval,
+    /// <summary>指図取消への連動（A-20）</summary>
+    OrderCancel,
+}
+
+/// <summary>ロット系譜の関係区分（Spec.md 5.3 LotGenealogy。D-10-30-05〜07）</summary>
+public enum LotRelationType
+{
+    /// <summary>分割（1ロット → 複数ロット）</summary>
+    Split,
+    /// <summary>統合（複数ロット → 1ロット）</summary>
+    Merge,
+    /// <summary>品目振替・ロット振替</summary>
+    Transfer,
+}
+
+/// <summary>ロット状態変更の契機（Spec.md 5.3 LotStatusHistory）</summary>
+public enum LotStatusChangeSource
+{
+    /// <summary>在庫ステータス変更操作（D-10-30-08）</summary>
+    Manual,
+    /// <summary>検査指示・判定（C-20）</summary>
+    Inspection,
+    /// <summary>不適合の対応指示・承認（C-30）</summary>
+    Nonconformance,
+    /// <summary>受入取消（D-10-10-04）</summary>
+    Receiving,
+}
+
 /// <summary>段取り区分（B-20-50 前段取り／B-40-40 後段取り）</summary>
 public enum SetupType
 {
@@ -271,6 +351,26 @@ public enum InventoryTransactionType
     StocktakeAdjust,
     /// <summary>出荷</summary>
     Ship,
+    /// <summary>保全消費（保全実績で交換・消費した部材の引落し。E-40-30-01）</summary>
+    /// <remarks>
+    /// JSONでは列挙子を数値でやり取りするため、既存の値を動かさないよう末尾に追加する。
+    /// DBは文字列で保存するので保存済みデータへの影響はない。
+    /// </remarks>
+    MaintenanceIssue,
+
+    /// <summary>サンプル採取（保管サンプルとして在庫から抜く。D-40-50-01）</summary>
+    SampleRetention,
+}
+
+/// <summary>サンプル品の保管状態（Spec.md 5.3 SampleStorage。D-40-50-01）</summary>
+public enum SampleStorageStatus
+{
+    /// <summary>保管中</summary>
+    Stored,
+    /// <summary>払出済（再試験などで使用した）</summary>
+    Consumed,
+    /// <summary>廃棄済（保管期限を終えて処分した）</summary>
+    Disposed,
 }
 
 /// <summary>ピッキング指示区分（Spec.md 5.3 PickingOrder）</summary>
@@ -413,6 +513,27 @@ public enum EquipmentLogStatus
     Setup,
     /// <summary>故障</summary>
     Failure,
+    /// <summary>
+    /// アイドル（設備は動かせるが加工していない待機。停止と分けるのはOEEの時間区分に要るため）
+    /// </summary>
+    /// <remarks>
+    /// JSONでは列挙子を数値でやり取りするため、既存の値を動かさないよう末尾に追加する。
+    /// DBは文字列で保存するので保存済みデータへの影響はない。
+    /// </remarks>
+    Idle,
+}
+
+/// <summary>
+/// 保全部品の管理区分（Spec.md 5.1 EquipmentPart。E-10-10-01）。
+/// 資産管理部品（金型など設備の一部として資産計上するもの）と、
+/// 消耗品（Oリングなど交換のたびに在庫から引き落とすもの）で管理形態が違う
+/// </summary>
+public enum MaintenancePartCategory
+{
+    /// <summary>資産管理部品（金型など。寿命・個体を追う）</summary>
+    Asset,
+    /// <summary>消耗品（Oリング・フィルタなど。在庫から引き落とす）</summary>
+    Consumable,
 }
 
 /// <summary>保全種別（定期/計画外。Spec.md 5.5 MaintenancePlan）</summary>

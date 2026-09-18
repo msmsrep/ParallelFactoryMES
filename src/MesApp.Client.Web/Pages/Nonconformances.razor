@@ -22,23 +22,16 @@
         </div>
         <div class="form-field">
             <label>対象ロット</label>
-            <select @bind="_form.LotId">
-                <option value="0">なし</option>
-                @foreach (var stock in _stocks)
-                {
-                    <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode）</option>
-                }
-            </select>
+            <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                          @bind-Value="_form.LotId" EmptyLabel="なし"
+                          ValueOf="s => s.LotId"
+                          LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode}）")' />
         </div>
         <div class="form-field">
             <label>対象作業指示</label>
-            <select @bind="_form.WorkOrderId">
-                <option value="0">なし</option>
-                @foreach (var workOrder in _workOrders)
-                {
-                    <option value="@workOrder.Id">@workOrder.WorkOrderNo</option>
-                }
-            </select>
+            <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
+                          @bind-Value="_form.WorkOrderId" EmptyLabel="なし"
+                          ValueOf="w => w.Id" LabelOf="w => w.WorkOrderNo" />
         </div>
         <div class="form-field">
             <label>原因区分（B-40-30-02）</label>
@@ -70,13 +63,13 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_reports.Count == 0)
+    else if (_reports.Total == 0)
     {
         <p class="text-muted">不適合はありません。</p>
     }
     else
     {
-        @foreach (var report in _reports)
+        @foreach (var report in _reports.Items)
         {
             <div class="card">
                 <div>
@@ -103,9 +96,10 @@
                         <tr><th>対応実績</th><td style="white-space:normal;">@(report.ActionRecord ?? "-")</td></tr>
                     </tbody>
                 </table>
+                <Pager TItem="NonconformanceResponse" Result="_reports" OnPageChanged="LoadPageAsync" />
 
                 <div class="actions mt-2">
-                    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")" Context="qc">
+                    <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="qc">
                         @if (report.Status != NonconformanceStatus.Closed)
                         {
                             <select value="@GetForm(report.Id).Action"
@@ -129,7 +123,7 @@
                                 @onclick="() => RecordActionAsync(report)">対応記録</button>
                     }
 
-                    <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityControl}")" Context="qcApprove">
+                    <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="qcApprove">
                         @if (report.Status is NonconformanceStatus.ActionInstructed or NonconformanceStatus.ActionCompleted)
                         {
                             <button class="btn btn-sm" disabled="@_busy" @onclick="() => ApproveAsync(report)">
@@ -161,9 +155,7 @@
         public string? Record { get; set; }
     }
 
-    private List<NonconformanceResponse>? _reports;
-    private List<StockResponse> _stocks = [];
-    private List<WorkOrderResponse> _workOrders = [];
+    private PagedResult<NonconformanceResponse>? _reports;
     private readonly CreateForm _form = new();
     private readonly Dictionary<int, ActionForm> _forms = [];
     private string _statusFilter = string.Empty;
@@ -173,8 +165,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
-        _workOrders = await Http.GetFromJsonAsync<List<WorkOrderResponse>>("api/work-orders") ?? [];
         await LoadAsync();
     }
 
@@ -188,14 +178,16 @@
         return form;
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page)
     {
-        var url = "api/nonconformances";
+        var url = $"api/nonconformances?page={page}";
         if (!string.IsNullOrEmpty(_statusFilter))
         {
-            url += $"?status={_statusFilter}";
+            url += $"&status={_statusFilter}";
         }
-        _reports = await Http.GetFromJsonAsync<List<NonconformanceResponse>>(url);
+        _reports = await Http.GetFromJsonAsync<PagedResult<NonconformanceResponse>>(url);
     }
 
     private async Task CreateAsync()
@@ -215,9 +207,9 @@
                     _form.LotId == 0 ? null : _form.LotId,
                     _form.WorkOrderId == 0 ? null : _form.WorkOrderId,
                     null, _form.Content, _form.CauseCategory, _form.CauseDetail));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("起票に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "起票に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "不適合を起票しました。";
@@ -264,9 +256,9 @@
         try
         {
             var response = await Http.PostAsync($"api/nonconformances/{report.Id}/approve", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "承認しました（クローズ）。";
@@ -286,9 +278,9 @@
         try
         {
             var response = await Http.PostAsJsonAsync(url, body);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _message = successMessage;

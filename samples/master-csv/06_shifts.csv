@@ -1,0 +1,3 @@
+﻿Code,Name,StartTime,EndTime,IsActive
+D,昼勤,08:00,17:00,true
+N,夜勤,20:00,05:00,true

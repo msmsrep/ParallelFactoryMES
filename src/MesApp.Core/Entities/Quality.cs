@@ -1,4 +1,4 @@
-namespace MesApp.Core.Entities;
+﻿namespace MesApp.Core.Entities;
 
 /// <summary>検査指示（Spec.md 5.4 InspectionOrder。C-20）</summary>
 public class InspectionOrder
@@ -37,21 +37,51 @@ public class InspectionOrder
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>検査項目セット（指示作成時のスナップショット）</summary>
+    /// <summary>検査項目セット（指示作成時点の基準のスナップショット）</summary>
     public List<InspectionOrderItem> Items { get; set; } = [];
 
     public List<InspectionResult> Results { get; set; } = [];
 }
 
-/// <summary>検査指示の対象検査項目</summary>
+/// <summary>
+/// 検査指示の対象検査項目（Spec.md 5.4）。
+/// <para>
+/// 検査基準（<see cref="InspectionItem"/>）は改訂され、規格値は上書きされる。最新マスタで
+/// 過去ロットを判定・印字すると当時の判定根拠を再現できないため、**指示発行時点の基準を
+/// ここへ写して保持**する。自動判定・画面表示・検査成績書はこのスナップショットを使い、
+/// マスタは新規指示の作成時にのみ参照する（Spec.md 5.7）。
+/// </para>
+/// </summary>
 public class InspectionOrderItem
 {
     public int Id { get; set; }
 
     public int InspectionOrderId { get; set; }
 
+    /// <summary>基準の参照元（マスタ側の改訂履歴を辿るための参照であり、判定には使わない）</summary>
     public int InspectionItemId { get; set; }
     public InspectionItem? InspectionItem { get; set; }
+
+    // ---- 指示発行時点のスナップショット（以降マスタが改訂されても変わらない）----
+
+    /// <summary>検査項目コード</summary>
+    public string ItemCode { get; set; } = string.Empty;
+
+    /// <summary>検査項目名</summary>
+    public string ItemName { get; set; } = string.Empty;
+
+    /// <summary>参照した基準の版数（C-10-10-03）</summary>
+    public int ItemVersion { get; set; }
+
+    public decimal? LowerLimit { get; set; }
+
+    public decimal? UpperLimit { get; set; }
+
+    public decimal? StandardValue { get; set; }
+
+    public string? Method { get; set; }
+
+    public int? SamplingCount { get; set; }
 }
 
 /// <summary>検査実績（Spec.md 5.4 InspectionResult。C-20）</summary>
@@ -79,10 +109,53 @@ public class InspectionResult
     public string InspectedByUserId { get; set; } = string.Empty;
     public AppUser? InspectedBy { get; set; }
 
+    /// <summary>
+    /// 測定に使った検査機（C-20-50-03。任意）。
+    /// 校正期限を過ぎた機器は登録時に弾くため、ここに残るのは当時有効だった機器に限られる
+    /// </summary>
+    public int? InspectionDeviceId { get; set; }
+    public InspectionDevice? InspectionDevice { get; set; }
+
     public DateTimeOffset InspectedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>訂正履歴メモ（C-20-50-07。訂正時に理由を追記）</summary>
     public string? CorrectionNote { get; set; }
+}
+
+/// <summary>
+/// 検査実績の訂正履歴（Spec.md 5.4 InspectionResultCorrection。C-20-50-07）。
+/// <para>
+/// 測定値・判定を上書きすると当時の記録が消えるため、訂正のたびに1レコードを追加し、
+/// 訂正前値・訂正後値・訂正者・訂正日時・訂正理由を業務履歴として残す。
+/// 検査成績書（C-20-10-05）に「元の記録＋訂正理由・訂正者」を出せるようにするための記録であり、
+/// 監査ログ（操作の記録）とは用途が異なる。
+/// </para>
+/// </summary>
+public class InspectionResultCorrection
+{
+    public int Id { get; set; }
+
+    public int InspectionResultId { get; set; }
+    public InspectionResult? InspectionResult { get; set; }
+
+    /// <summary>訂正対象の検査指示（成績書から履歴を引くための非正規化）</summary>
+    public int InspectionOrderId { get; set; }
+
+    public decimal? BeforeMeasuredValue { get; set; }
+    public string? BeforeTextValue { get; set; }
+    public InspectionJudgment BeforeJudgment { get; set; }
+
+    public decimal? AfterMeasuredValue { get; set; }
+    public string? AfterTextValue { get; set; }
+    public InspectionJudgment AfterJudgment { get; set; }
+
+    /// <summary>訂正理由（必須）</summary>
+    public string Reason { get; set; } = string.Empty;
+
+    public string? CorrectedByUserId { get; set; }
+    public AppUser? CorrectedBy { get; set; }
+
+    public DateTimeOffset CorrectedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>不適合・逸脱（Spec.md 5.4 NonconformanceReport。B-40-30、C-30）</summary>

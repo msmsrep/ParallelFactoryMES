@@ -3,7 +3,7 @@
 @* 治工具マスタ（Spec.md 5.1 Tool。E-60。寿命閾値の設定） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "治工具の登録" : $"治工具の編集（{_code}）")</h2>
         <div class="form-grid">
@@ -31,7 +31,8 @@
                 <label>状態</label>
                 <select @bind="_status">
                     <option value="@ToolStatus.Available">使用可能</option>
-                    <option value="@ToolStatus.InUse">使用中</option>
+                    @* 使用中は作業指示への引当で決まるため、手では選ばせない（既に使用中のものは表示のため残す） *@
+                    <option value="@ToolStatus.InUse" disabled="@(_originalStatus != ToolStatus.InUse)">使用中（引当で設定）</option>
                     <option value="@ToolStatus.UnderMaintenance">メンテナンス中</option>
                     <option value="@ToolStatus.Retired">廃棄</option>
                 </select>
@@ -71,7 +72,7 @@
                         <td>@(item.LifeThresholdHours?.ToString() ?? "-")</td>
                         <td>@StatusLabel(item.Status)</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
                                 @if (item.IsActive)
                                 {
@@ -96,6 +97,7 @@
     private int? _lifeCount;
     private decimal? _lifeHours;
     private ToolStatus _status = ToolStatus.Available;
+    private ToolStatus? _originalStatus;
     private string? _error;
     private string? _message;
     private bool _busy;
@@ -114,6 +116,7 @@
         _lifeCount = item.LifeThresholdCount;
         _lifeHours = item.LifeThresholdHours;
         _status = item.Status;
+        _originalStatus = item.Status;
     }
 
     private void ResetForm()
@@ -125,6 +128,7 @@
         _lifeCount = null;
         _lifeHours = null;
         _status = ToolStatus.Available;
+        _originalStatus = null;
     }
 
     private async Task SaveAsync()
@@ -143,9 +147,9 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/tools", request)
                 : await Http.PutAsJsonAsync($"api/tools/{_editingId}", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保存しました。";
@@ -165,9 +169,9 @@
         try
         {
             var response = await Http.DeleteAsync($"api/tools/{id}");
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "無効化しました。";

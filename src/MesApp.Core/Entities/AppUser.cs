@@ -11,6 +11,23 @@ public class AppUser : IdentityUser
     /// <summary>氏名（表示名）</summary>
     public string DisplayName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 作業場所（作業区。段は問わない。工場単位で働く担当者も表せるようにするため）
+    /// </summary>
+    public int? WorkCenterId { get; set; }
+    public WorkCenter? WorkCenter { get; set; }
+
+    /// <summary>
+    /// 所属（部署・課。F-10-10-01 の工場従業員データ）。
+    /// 組織のマスタは別に持たない。権限は作業場所（<see cref="WorkCenterId"/>）とロールで決まり、
+    /// 所属は表示と名簿の並べ替えにしか使わないため
+    /// </summary>
+    public string? Department { get; set; }
+
+    /// <summary>所属する直（既定のシフト。F-10-10-01）</summary>
+    public int? ShiftId { get; set; }
+    public Shift? Shift { get; set; }
+
     /// <summary>在籍状態（false=退職・無効化。無効ユーザーはログイン不可）</summary>
     public bool IsActive { get; set; } = true;
 

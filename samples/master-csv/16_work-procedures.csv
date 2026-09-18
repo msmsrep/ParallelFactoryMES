@@ -1,0 +1,5 @@
+﻿ProcedureNo,Title,Steps,Reference,IsActive
+SOP-MC-001,ハウジング内径加工,"1. ワークをバイスに固定する
+2. 加工プログラム O1001 を呼び出す
+3. 初品の内径を測定し記録する",,true
+SOP-AS-001,ギアポンプ組立,,文書管理システム DOC-AS-0001,true

@@ -1,0 +1,9 @@
+﻿ParentProductCode,ChildProductCode,QuantityPer,MakeOrBuy,AlternativeGroup,IsAlternative
+FG-1000,SF-2000,1,InHouse,,false
+FG-1000,RM-3002,1,InHouse,,false
+FG-1000,RM-3003,1,InHouse,,false
+FG-1000,RM-3004,2,InHouse,ORING-P20,false
+FG-1000,RM-3007,2,InHouse,ORING-P20,true
+FG-1000,RM-3005,4,InHouse,,false
+FG-1000,RM-3006,0.05,InHouse,,false
+SF-2000,RM-3001,1,Outsourced,,false

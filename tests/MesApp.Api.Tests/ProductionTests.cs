@@ -1,6 +1,8 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Common;
+using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Users;
@@ -26,6 +28,67 @@ public class ProductionTests
         return (product.Id, process.Id);
     }
 
+    [Fact]
+    public async Task 製造指図をCSVで登録し承認と工程展開まで進められる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        await Phase3TestData.SetupAsync(admin);
+        const string header = "OrderNo,ProductCode,Quantity,DueDate,OrderType,SourceOrderNo,Note,Approve,Expand,OutputLotNumber\n";
+
+        var result = await Phase3TestData.ImportActualCsvAsync(admin, "manufacturing-orders",
+            header
+            + "CSV-MO-1,FG-01,10,2026-10-31,通常,,初回,true,true,FG-LOT-1\n"
+            + "CSV-MO-2,FG-01,5,,Spot,,,true,false,\n"
+            + "CSV-MO-3,FG-01,2,,Rework,CSV-MO-1,同じファイルの前の行を元指図にする,false,false,\n"
+            + ",FG-01,1,,,,,,,\n");
+        Assert.True(result.Succeeded, string.Join(" / ", result.Errors.Select(e => $"{e.Line}行目 {e.Message}")));
+        Assert.Equal(4, result.Created);
+
+        var orders = (await admin.GetFromJsonAsync<PagedResult<ManufacturingOrderResponse>>(
+            "/api/manufacturing-orders"))!.Items;
+        Assert.Equal(4, orders.Count);
+        var expanded = orders.Single(o => o.OrderNo == "CSV-MO-1");
+        Assert.Equal(ManufacturingOrderStatus.Released, expanded.Status);
+        Assert.Equal("FG-LOT-1", expanded.OutputLotNumber);
+        Assert.Equal(new DateOnly(2026, 10, 31), expanded.DueDate);
+        var detail = await admin.GetFromJsonAsync<ManufacturingOrderDetailResponse>(
+            $"/api/manufacturing-orders/{expanded.Id}");
+        // 後続の実績CSVは「指図番号＋工程順序」で作業指示を指す
+        Assert.Equal(["CSV-MO-1-01", "CSV-MO-1-02"], detail!.WorkOrders.Select(w => w.WorkOrderNo));
+        Assert.Equal(ManufacturingOrderStatus.Approved, orders.Single(o => o.OrderNo == "CSV-MO-2").Status);
+        var rework = orders.Single(o => o.OrderNo == "CSV-MO-3");
+        Assert.Equal(ManufacturingOrderStatus.Draft, rework.Status);
+        Assert.Equal(expanded.Id, rework.SourceOrderId);
+        Assert.StartsWith("MO", Assert.Single(orders, o => !o.OrderNo.StartsWith("CSV-")).OrderNo);
+
+        // 不正な行は行番号付きで返り、正しい行も含めて1件も登録されない
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "manufacturing-orders",
+            header
+            + "CSV-MO-4,FG-01,1,,,,,true,true,\n"
+            + "CSV-MO-1,FG-01,1,,,,,,,\n"
+            + "MO-MANUAL,FG-01,1,,,,,,,\n"
+            + "CSV-MO-5,FG-01,1,,,,,false,true,\n"
+            + "CSV-MO-6,FG-01,1,,Rework,NO-SUCH,,,,\n"
+            + "CSV-MO-7,RM-01,1,,,,,true,true,\n"
+            + "CSV-MO-8,FG-01,1,,,,,true,true,FG-LOT-1\n");
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("既に存在"));
+        Assert.Contains(invalid.Errors, e => e.Line == 4 && e.Message.Contains("自動採番"));
+        Assert.Contains(invalid.Errors, e => e.Line == 5 && e.Message.Contains("Approve"));
+        Assert.Contains(invalid.Errors, e => e.Line == 6 && e.Message.Contains("NO-SUCH"));
+        Assert.Contains(invalid.Errors, e => e.Line == 7 && e.Message.Contains("工順"));
+        Assert.Contains(invalid.Errors, e => e.Line == 8 && e.Message.Contains("FG-LOT-1"));
+        Assert.Equal(4, (await admin.GetFromJsonAsync<PagedResult<ManufacturingOrderResponse>>(
+            "/api/manufacturing-orders"))!.Total);
+
+        // 取込の権限は単票の指図APIと同じ（作業者は指図を発行できない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(
+            factory, admin, "operator1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(
+            operator_, "manufacturing-orders", header + ",FG-01,1,,,,,,,\n")).StatusCode);
+    }
+
     private static async Task<ManufacturingOrderResponse> CreateOrderAsync(
         HttpClient admin, int productId, decimal quantity = 100m, DateOnly? dueDate = null)
     {
@@ -34,6 +97,205 @@ public class ProductionTests
                 ManufacturingOrderType.Normal, null, null));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<ManufacturingOrderResponse>())!;
+    }
+
+    [Fact]
+    public async Task 工程管理項目が展開時に固定され以降のマスタ改訂で指示が変わらない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "加熱");
+        (await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null) }))
+            .EnsureSuccessStatusCode();
+
+        // 品目単位の項目と工程単位の項目を用意する（両方が作業指示へ写る）
+        var byProduct = await admin.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-01", "投入重量", "kg", product.Id, null, 10m, 9.5m, 10.5m));
+        byProduct.EnsureSuccessStatusCode();
+        var byProcess = await admin.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-02", "加熱温度", "℃", null, process.Id, 180m, 175m, 185m));
+        byProcess.EnsureSuccessStatusCode();
+        // 別工程の項目は写らない
+        var other = await MasterTests.CreateProcessAsync(admin, "PR-02", "検査");
+        (await admin.PostAsJsonAsync("/api/control-items",
+            new ControlItemRequest("CI-03", "別工程の項目", null, null, other.Id, null, null, null)))
+            .EnsureSuccessStatusCode();
+
+        var order = await CreateOrderAsync(admin, product.Id);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        expanded.EnsureSuccessStatusCode();
+        var detail = await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>();
+        var workOrder = detail!.WorkOrders.Single();
+
+        var items = await admin.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
+            $"/api/work-orders/{workOrder.Id}/control-items");
+        Assert.Equal(["CI-01", "CI-02"], items!.Select(i => i.ItemCode));
+        var temperature = items!.Single(i => i.ItemCode == "CI-02");
+        Assert.Equal(180m, temperature.TargetValue);
+        Assert.Equal(175m, temperature.LowerLimit);
+        Assert.Equal(1, temperature.ItemVersion);
+        Assert.Equal("℃", temperature.Unit);
+
+        // マスタを改訂しても展開済みの指示は変わらない（Spec.md 5.7）
+        var itemId = (await byProcess.Content.ReadFromJsonAsync<ControlItemResponse>())!.Id;
+        (await admin.PutAsJsonAsync($"/api/control-items/{itemId}",
+            new ControlItemRequest("CI-02", "加熱温度", "℃", null, process.Id, 200m, 195m, 205m)))
+            .EnsureSuccessStatusCode();
+        var afterRevision = await admin.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
+            $"/api/work-orders/{workOrder.Id}/control-items");
+        var kept = afterRevision!.Single(i => i.ItemCode == "CI-02");
+        Assert.Equal(180m, kept.TargetValue);
+        Assert.Equal(1, kept.ItemVersion);
+
+        // 改訂後に展開した指図には新しい条件が写る
+        var next = await CreateOrderAsync(admin, product.Id);
+        await admin.PostAsync($"/api/manufacturing-orders/{next.Id}/approve", null);
+        var nextExpanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{next.Id}/expand", new ExpandRequest(null));
+        var nextDetail = await nextExpanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>();
+        var nextItems = await admin.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
+            $"/api/work-orders/{nextDetail!.WorkOrders.Single().Id}/control-items");
+        Assert.Equal(200m, nextItems!.Single(i => i.ItemCode == "CI-02").TargetValue);
+        Assert.Equal(2, nextItems!.Single(i => i.ItemCode == "CI-02").ItemVersion);
+    }
+
+    [Fact]
+    public async Task 作業手順書は改訂が仕掛中の作業指示にも届き計画時の版数と食い違えば改訂ありになる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "組立");
+
+        var created = await admin.PostAsJsonAsync("/api/work-procedures",
+            new WorkProcedureRequest("SOP-01", "組立作業手順", "1. 部材を並べる", null));
+        created.EnsureSuccessStatusCode();
+        var procedure = (await created.Content.ReadFromJsonAsync<WorkProcedureResponse>())!;
+
+        // 1工程目だけ手順書を紐付ける
+        var routing = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, null, null, procedure.Id),
+                new(2, process.Id, 15m, 5m, null, null, null, null, null),
+            });
+        routing.EnsureSuccessStatusCode();
+
+        var order = await CreateOrderAsync(admin, product.Id);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        expanded.EnsureSuccessStatusCode();
+        var detail = (await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+        var first = detail.WorkOrders.Single(w => w.RoutingSequence == 1);
+        var second = detail.WorkOrders.Single(w => w.RoutingSequence == 2);
+
+        var shown = await admin.GetFromJsonAsync<WorkOrderProcedureResponse>(
+            $"/api/work-orders/{first.Id}/procedure");
+        Assert.Equal("SOP-01", shown!.ProcedureNo);
+        Assert.Equal("1. 部材を並べる", shown.Steps);
+        Assert.Equal(1, shown.CurrentVersion);
+        Assert.Equal(1, shown.PlannedVersion);
+        Assert.False(shown.IsRevised);
+
+        // 手順書が紐付いていない工程は404（工順に登録が無い運用でも画面は開ける）
+        var none = await admin.GetAsync($"/api/work-orders/{second.Id}/procedure");
+        Assert.Equal(HttpStatusCode.NotFound, none.StatusCode);
+
+        // 改訂は仕掛中の作業指示にも届く（本文はマスタの現在値。製造条件の固定とは前提が違う）
+        var revised = await admin.PutAsJsonAsync($"/api/work-procedures/{procedure.Id}",
+            new WorkProcedureRequest("SOP-01", "組立作業手順", "1. 部材を並べる／2. 規定トルクで締結する", null));
+        revised.EnsureSuccessStatusCode();
+
+        var afterRevision = await admin.GetFromJsonAsync<WorkOrderProcedureResponse>(
+            $"/api/work-orders/{first.Id}/procedure");
+        Assert.Equal("1. 部材を並べる／2. 規定トルクで締結する", afterRevision!.Steps);
+        Assert.Equal(2, afterRevision.CurrentVersion);
+        // 計画時の版数は展開時のまま。食い違いを「改訂あり」として示す
+        Assert.Equal(1, afterRevision.PlannedVersion);
+        Assert.True(afterRevision.IsRevised);
+
+        // 工順から手順書を外しても、展開済みの作業指示の紐付けは変わらない（Spec.md 5.7）
+        var unlinked = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null) });
+        unlinked.EnsureSuccessStatusCode();
+        var stillLinked = await admin.GetFromJsonAsync<WorkOrderProcedureResponse>(
+            $"/api/work-orders/{first.Id}/procedure");
+        Assert.Equal("SOP-01", stillLinked!.ProcedureNo);
+
+        // 外した後なら手順書を無効化でき、作業指示側では無効と分かる
+        (await admin.DeleteAsync($"/api/work-procedures/{procedure.Id}")).EnsureSuccessStatusCode();
+        var deactivated = await admin.GetFromJsonAsync<WorkOrderProcedureResponse>(
+            $"/api/work-orders/{first.Id}/procedure");
+        Assert.False(deactivated!.IsActive);
+    }
+
+    [Fact]
+    public async Task 工順の作業区が展開時に固定され進捗を上位の段でまとめて集計できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var plant = await MasterTests.CreateWorkCenterAsync(admin, "P1", "第一工場", WorkCenterLevel.Plant, null);
+        var line = await MasterTests.CreateWorkCenterAsync(admin, "L1", "組立1ライン", WorkCenterLevel.Line, plant.Id);
+        var area = await MasterTests.CreateWorkCenterAsync(admin, "A1", "前工程エリア", WorkCenterLevel.Area, line.Id);
+        var wc = await MasterTests.CreateWorkCenterAsync(admin, "WC01", "溶接作業区", WorkCenterLevel.WorkCenter, area.Id);
+
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "組立");
+        // 1工程目だけ作業区を指定する
+        var routing = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, wc.Id),
+                new(2, process.Id, 15m, 5m, null, null, null, null, null),
+            });
+        routing.EnsureSuccessStatusCode();
+
+        // 工順の作業区は最下段のみ（設備と同じ条件）
+        var wrongLevel = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null, line.Id) });
+        Assert.Equal(HttpStatusCode.BadRequest, wrongLevel.StatusCode);
+
+        var order = await CreateOrderAsync(admin, product.Id);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        expanded.EnsureSuccessStatusCode();
+
+        // 作業区を指定した工程だけが集計に乗る
+        var byWorkCenter = await admin.GetFromJsonAsync<List<ProcessProgressRow>>(
+            $"/api/work-orders/process-summary?workCenterId={wc.Id}");
+        Assert.Equal(1, byWorkCenter!.Sum(r => r.Created));
+
+        // 上位の段を指定しても配下へ展開されるので同じ件数になる（展開しないと常に0件になる）
+        foreach (var ancestor in new[] { area.Id, line.Id, plant.Id })
+        {
+            var rows = await admin.GetFromJsonAsync<List<ProcessProgressRow>>(
+                $"/api/work-orders/process-summary?workCenterId={ancestor}");
+            Assert.Equal(1, rows!.Sum(r => r.Created));
+        }
+
+        // 絞り込みなしは全件（作業区未設定の工程も含む）
+        var all = await admin.GetFromJsonAsync<List<ProcessProgressRow>>("/api/work-orders/process-summary");
+        Assert.Equal(2, all!.Sum(r => r.Created));
+
+        // 存在しない作業区は400
+        var missing = await admin.GetAsync("/api/work-orders/process-summary?workCenterId=9999");
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+
+        // 工順を改訂しても展開済みの作業指示の作業区は変わらない（Spec.md 5.7）
+        var revised = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null) });
+        revised.EnsureSuccessStatusCode();
+        var afterRevision = await admin.GetFromJsonAsync<List<ProcessProgressRow>>(
+            $"/api/work-orders/process-summary?workCenterId={wc.Id}");
+        Assert.Equal(1, afterRevision!.Sum(r => r.Created));
     }
 
     [Fact]
@@ -62,6 +324,61 @@ public class ProductionTests
         Assert.Equal(100m, detail.WorkOrders[0].PlannedQuantity);
         Assert.StartsWith("FG-01-", detail.Order.OutputLotNumber);
         Assert.Equal($"{order.OrderNo}-01", detail.WorkOrders[0].WorkOrderNo);
+    }
+
+    [Fact]
+    public async Task 展開時に工順とMBOMが固定されマスタ改訂の影響を受けない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (productId, processId) = await SetupMastersAsync(admin); // 工順1: 標準30分/段取り10分
+        var material = await MasterTests.CreateProductAsync(admin, "RM-01", "部材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{productId}/bom",
+            new List<BomItemRequest> { new(material.Id, 2m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+
+        var order = await CreateOrderAsync(admin, productId, 10m);
+        (await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null)).EnsureSuccessStatusCode();
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        var detail = (await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+
+        // 工順スナップショット
+        Assert.Equal(30m, detail.WorkOrders[0].StandardWorkMinutes);
+        Assert.Equal(10m, detail.WorkOrders[0].StandardSetupMinutes);
+        // 予定材料（MBOM × 指図数量）
+        var planned = Assert.Single(detail.Materials!);
+        Assert.Equal("RM-01", planned.ProductCode);
+        Assert.Equal(2m, planned.QuantityPer);
+        Assert.Equal(20m, planned.PlannedQuantity);
+
+        // 展開後に工順とMBOMを改訂する
+        (await admin.PutAsJsonAsync($"/api/products/{productId}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, processId, 99m, 88m, null, null, null, null, null),
+                new(2, processId, 15m, 5m, null, null, null, null, null),
+            })).EnsureSuccessStatusCode();
+        var other = await MasterTests.CreateProductAsync(admin, "RM-02", "別部材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{productId}/bom",
+            new List<BomItemRequest> { new(other.Id, 3m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+
+        // 既に展開済みの指図は改訂前の条件のまま
+        var reloaded = await admin.GetFromJsonAsync<ManufacturingOrderDetailResponse>(
+            $"/api/manufacturing-orders/{order.Id}");
+        Assert.Equal(30m, reloaded!.WorkOrders[0].StandardWorkMinutes);
+        Assert.Equal(10m, reloaded.WorkOrders[0].StandardSetupMinutes);
+        var stillPlanned = Assert.Single(reloaded.Materials!);
+        Assert.Equal("RM-01", stillPlanned.ProductCode);
+        Assert.Equal(20m, stillPlanned.PlannedQuantity);
+
+        // 改訂後に展開した指図は新しい条件になる
+        var next = await CreateOrderAsync(admin, productId, 10m);
+        (await admin.PostAsync($"/api/manufacturing-orders/{next.Id}/approve", null)).EnsureSuccessStatusCode();
+        var nextExpanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{next.Id}/expand", new ExpandRequest(null));
+        var nextDetail = (await nextExpanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+        Assert.Equal(99m, nextDetail.WorkOrders[0].StandardWorkMinutes);
+        Assert.Equal("RM-02", Assert.Single(nextDetail.Materials!).ProductCode);
     }
 
     [Fact]
@@ -213,5 +530,168 @@ public class ProductionTests
         // 参照は可能（B-10-30-03 指示内容の閲覧）
         var read = await operator_.GetAsync("/api/work-orders");
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+    }
+
+    [Fact]
+    public async Task 作業指示の選択肢は検索で絞り込める()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        var all = await admin.GetFromJsonAsync<OptionsResult<WorkOrderResponse>>("/api/work-orders/options");
+        Assert.Equal(order.WorkOrders.Count, all!.Items.Count);
+        Assert.False(all.Truncated);
+
+        // 指示番号の部分一致
+        var byNo = await admin.GetFromJsonAsync<OptionsResult<WorkOrderResponse>>(
+            $"/api/work-orders/options?q={order.WorkOrders[0].WorkOrderNo}");
+        Assert.Equal(order.WorkOrders[0].Id, Assert.Single(byNo!.Items).Id);
+
+        // 工程コードでも引ける
+        var byProcess = await admin.GetFromJsonAsync<OptionsResult<WorkOrderResponse>>(
+            "/api/work-orders/options?q=PR-01");
+        Assert.Equal(order.WorkOrders.Count, byProcess!.Items.Count);
+
+        var limited = await admin.GetFromJsonAsync<OptionsResult<WorkOrderResponse>>(
+            "/api/work-orders/options?limit=1");
+        Assert.Single(limited!.Items);
+        Assert.True(limited.Truncated);
+    }
+
+    [Fact]
+    public async Task 工程別サマリは状態ごとの件数をDB側で数える()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        var summary = await admin.GetFromJsonAsync<List<ProcessProgressRow>>("/api/work-orders/process-summary");
+        var row = Assert.Single(summary!);
+        Assert.Equal("PR-01", row.ProcessCode);
+        Assert.Equal(order.WorkOrders.Count, row.Created + row.Dispatched + row.Started + row.Completed + row.Approved);
+
+        // 1件着手すると内訳が動く
+        (await admin.PostAsync($"/api/work-orders/{order.WorkOrders[0].Id}/start", null)).EnsureSuccessStatusCode();
+        var after = await admin.GetFromJsonAsync<List<ProcessProgressRow>>("/api/work-orders/process-summary");
+        Assert.Equal(1, Assert.Single(after!).Started);
+    }
+
+    [Fact]
+    public async Task 生産性モニタリングで歩留まり直行率と標準時間予実を集計できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 通常指図10個：良品8・不良2（工順1段目は 作業30分/個・段取り10分）
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrder = order.WorkOrders.First();
+        var started = DateTimeOffset.Now.AddHours(-2);
+        (await admin.PostAsJsonAsync($"/api/work-orders/{workOrder.Id}/production-records",
+                new ProductionRecordRequest(8m, 2m, started, started.AddHours(1), ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+
+        // 直接作業時間60分（予定は 段取り10 + 作業30×10 = 310分）
+        (await admin.PostAsJsonAsync("/api/work-time-records",
+                new WorkTimeRequest(WorkTimeType.Direct, null, workOrder.Id, started, started.AddMinutes(60), null)))
+            .EnsureSuccessStatusCode();
+
+        // リワーク指図で不良2個を救済する（別指図なので分母には入らない）
+        var reworkCreated = await admin.PostAsJsonAsync("/api/manufacturing-orders",
+            new CreateManufacturingOrderRequest(ctx.ProductId, 2m, null,
+                ManufacturingOrderType.Rework, order.Order.Id, null));
+        reworkCreated.EnsureSuccessStatusCode();
+        var rework = (await reworkCreated.Content.ReadFromJsonAsync<ManufacturingOrderResponse>())!;
+        (await admin.PostAsync($"/api/manufacturing-orders/{rework.Id}/approve", null)).EnsureSuccessStatusCode();
+        var reworkExpanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{rework.Id}/expand", new ExpandRequest(null));
+        reworkExpanded.EnsureSuccessStatusCode();
+        var reworkDetail = (await reworkExpanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+        (await admin.PostAsJsonAsync(
+                $"/api/work-orders/{reworkDetail.WorkOrders.First().Id}/production-records",
+                new ProductionRecordRequest(2m, 0m, started, started.AddHours(1), ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+
+        var summary = await admin.GetFromJsonAsync<ProductivitySummaryResponse>("/api/productivity");
+
+        // 直行率は手直しを経ずに通った割合＝8/10、歩留まりは救済を含めて(8+2)/10
+        Assert.Equal(8m, summary!.Total.GoodQuantity);
+        Assert.Equal(2m, summary.Total.DefectQuantity);
+        Assert.Equal(2m, summary.Total.ReworkGoodQuantity);
+        Assert.Equal(80m, summary.Total.FirstPassRate);
+        Assert.Equal(100m, summary.Total.YieldRate);
+
+        var product = Assert.Single(summary.ByProduct);
+        Assert.Equal("FG-01", product.Key);
+        Assert.Equal(80m, product.FirstPassRate);
+
+        // 標準時間の予実：予定310分に対し実績60分
+        var variance = Assert.Single(summary.TimeVariances, v => v.WorkOrderNo == workOrder.WorkOrderNo);
+        Assert.Equal(310m, variance.PlannedMinutes);
+        Assert.Equal(60m, variance.ActualMinutes);
+        Assert.Equal(-80.65m, variance.VarianceRate);
+
+        // 期間外を指定すれば空になる（期間は製造日基準）
+        var empty = await admin.GetFromJsonAsync<ProductivitySummaryResponse>(
+            "/api/productivity?from=2020-01-01&to=2020-01-01");
+        Assert.Equal(0m, empty!.Total.GoodQuantity);
+        Assert.Empty(empty.ByProduct);
+        Assert.Empty(empty.TimeVariances);
+    }
+
+    [Fact]
+    public async Task 納期超過と標準時間超過の作業指示を遅延として拾える()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 納期が過去の指図（工順1段目は 作業30分/個・段取り10分）
+        var overdue = await admin.PostAsJsonAsync("/api/manufacturing-orders",
+            new CreateManufacturingOrderRequest(ctx.ProductId, 10m,
+                DateOnly.FromDateTime(DateTime.Today).AddDays(-3),
+                ManufacturingOrderType.Normal, null, null));
+        overdue.EnsureSuccessStatusCode();
+        var overdueOrder = (await overdue.Content.ReadFromJsonAsync<ManufacturingOrderResponse>())!;
+        (await admin.PostAsync($"/api/manufacturing-orders/{overdueOrder.Id}/approve", null))
+            .EnsureSuccessStatusCode();
+        var overdueExpanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{overdueOrder.Id}/expand", new ExpandRequest(null));
+        overdueExpanded.EnsureSuccessStatusCode();
+        var overdueDetail = (await overdueExpanded.Content
+            .ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+
+        var delays = await admin.GetFromJsonAsync<List<WorkOrderDelayRow>>("/api/work-orders/delays");
+        var overdueRow = Assert.Single(delays!,
+            d => d.WorkOrderNo == overdueDetail.WorkOrders[0].WorkOrderNo);
+        Assert.Equal(WorkOrderDelayKind.OverdueDueDate, overdueRow.Kind);
+        Assert.Equal(3, overdueRow.OverdueDays);
+
+        // 納期内の指図を着手すると、経過時間が予定（310分）を超えるまでは遅延に出ない
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrder = order.WorkOrders[0];
+        (await admin.PostAsync($"/api/work-orders/{workOrder.Id}/start", null)).EnsureSuccessStatusCode();
+        var justStarted = await admin.GetFromJsonAsync<List<WorkOrderDelayRow>>("/api/work-orders/delays");
+        Assert.DoesNotContain(justStarted!, d => d.WorkOrderNo == workOrder.WorkOrderNo);
+
+        // しきい値を下げれば着手直後でも拾える（超過率は負なので-100%より上を対象にする）
+        var sensitive = await admin.GetFromJsonAsync<List<WorkOrderDelayRow>>(
+            "/api/work-orders/delays?overrunPercent=-100");
+        var overrunRow = Assert.Single(sensitive!, d => d.WorkOrderNo == workOrder.WorkOrderNo);
+        Assert.Equal(WorkOrderDelayKind.OverrunStandardTime, overrunRow.Kind);
+        Assert.Equal(310m, overrunRow.PlannedMinutes);
+        Assert.NotNull(overrunRow.StartedAt);
+
+        // 実績を報告して完了した作業指示は遅延に出ない
+        (await admin.PostAsJsonAsync($"/api/work-orders/{workOrder.Id}/production-records",
+                new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now,
+                    ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+        var afterComplete = await admin.GetFromJsonAsync<List<WorkOrderDelayRow>>(
+            "/api/work-orders/delays?overrunPercent=-100");
+        Assert.DoesNotContain(afterComplete!, d => d.WorkOrderNo == workOrder.WorkOrderNo);
     }
 }

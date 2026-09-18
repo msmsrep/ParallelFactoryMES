@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
@@ -23,7 +23,7 @@ public class ProductionRecordsController(
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.ProductionManage)]
+    [Authorize(Roles = MesRoleGroups.ProductionManage)]
     public async Task<ActionResult<ProductionRecordResponse>> Correct(
         int id, ProductionRecordCorrectionRequest request, CancellationToken ct)
     {
@@ -31,13 +31,27 @@ public class ProductionRecordsController(
             .Include(r => r.WorkOrder)
             .Include(r => r.OutputLot)
             .Include(r => r.PerformedBy)
+            .Include(r => r.Shift)
             .FirstOrDefaultAsync(r => r.Id == id, ct);
         if (record is null)
         {
             return NotFound();
         }
 
-        var before = $"good={record.GoodQuantity}, defect={record.DefectQuantity}";
+        if (request.ScrapQuantity + request.ReworkQuantity > request.DefectQuantity)
+        {
+            return this.BadRequestProblem(
+                $"廃棄数と再作業待ち数の合計（{request.ScrapQuantity + request.ReworkQuantity}）が" +
+                $"不良数（{request.DefectQuantity}）を超えています。");
+        }
+
+        var before = new
+        {
+            good = record.GoodQuantity,
+            defect = record.DefectQuantity,
+            scrap = record.ScrapQuantity,
+            rework = record.ReworkQuantity,
+        };
         var goodDelta = request.GoodQuantity - record.GoodQuantity;
 
         // 在庫計上済み（最終工程）の実績訂正は在庫・ロット数量へ差分を反映
@@ -60,22 +74,57 @@ public class ProductionRecordsController(
             }
             catch (InventoryException ex)
             {
-                return BadRequest(new ProblemDetails { Title = ex.Message });
+                return this.BadRequestProblem(ex.Message);
             }
             record.OutputLot.InitialQuantity += goodDelta;
         }
 
+        // 訂正前の値を業務履歴として残す（B-70-30-01）。実績自体は上書きされるため、
+        // これがないと製造記録・トレースから「何をどう直したか」を説明できない
+        db.ProductionRecordCorrections.Add(new ProductionRecordCorrection
+        {
+            ProductionRecordId = record.Id,
+            WorkOrderId = record.WorkOrderId,
+            BeforeGoodQuantity = record.GoodQuantity,
+            BeforeDefectQuantity = record.DefectQuantity,
+            BeforeScrapQuantity = record.ScrapQuantity,
+            BeforeReworkQuantity = record.ReworkQuantity,
+            AfterGoodQuantity = request.GoodQuantity,
+            AfterDefectQuantity = request.DefectQuantity,
+            AfterScrapQuantity = request.ScrapQuantity,
+            AfterReworkQuantity = request.ReworkQuantity,
+            Reason = request.Reason,
+            CorrectedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+        });
+
         record.GoodQuantity = request.GoodQuantity;
         record.DefectQuantity = request.DefectQuantity;
+        record.ScrapQuantity = request.ScrapQuantity;
+        record.ReworkQuantity = request.ReworkQuantity;
         await db.SaveChangesAsync(ct);
+        // 訂正の証跡は後から追跡・検索できるよう構造化して残す（Spec.md 7.6）
         await auditLogger.LogAsync("Execution", "Correct", nameof(ProductionRecord), id.ToString(),
-            detail: $"before({before}) -> after(good={request.GoodQuantity}, defect={request.DefectQuantity}), " +
-                    $"reason={request.Reason}", ct: ct);
+            detail: new
+            {
+                workOrderNo = record.WorkOrder!.WorkOrderNo,
+                before,
+                after = new
+                {
+                    good = request.GoodQuantity,
+                    defect = request.DefectQuantity,
+                    scrap = request.ScrapQuantity,
+                    rework = request.ReworkQuantity,
+                },
+                reason = request.Reason,
+            }, ct: ct);
 
         return new ProductionRecordResponse(record.Id, record.WorkOrderId, record.WorkOrder!.WorkOrderNo,
             record.PerformedByUserId, record.PerformedBy?.DisplayName,
-            record.GoodQuantity, record.DefectQuantity, record.StartedAt, record.EndedAt,
+            record.GoodQuantity, record.DefectQuantity, record.ScrapQuantity, record.ReworkQuantity,
+            record.StartedAt, record.EndedAt,
             record.OutputLotId, record.OutputLot?.LotNumber, record.OutputLocationId,
-            record.ApprovedByUserId, record.ApprovedAt);
+            record.ApprovedByUserId, record.ApprovedAt,
+            // 訂正しても直は動かない（記録時に固定した値。Spec.md 5.7）
+            ShiftId: record.ShiftId, ShiftCode: record.Shift?.Code, ShiftName: record.Shift?.Name);
     }
 }

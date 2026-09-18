@@ -1,7 +1,7 @@
-@inject HttpClient Http
+﻿@inject HttpClient Http
 
 @* ユーザー/工場従業員管理（F-10-10）とスキル・資格の割当（F-20-10-02〜05）。システム管理者専用 *@
-<AuthorizeView Roles="@MesRoles.SystemAdmin">
+<AuthorizeView Roles="@MesRoleGroups.UserAdmin">
     <NotAuthorized>
         <div class="card">
             <p class="text-muted">ユーザー管理はシステム管理者のみ利用できます。</p>
@@ -39,6 +39,34 @@
                 }
             </div>
 
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>作業場所（作業区）</label>
+                    <select @bind="_workCenterId">
+                        <option value="0">なし</option>
+                        @foreach (var wc in _workCenters)
+                        {
+                            <option value="@wc.Id">@wc.Code @wc.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>所属（部署・課）</label>
+                    <input @bind="_department" placeholder="例：第1製造課" />
+                </div>
+                <div class="form-field">
+                    @* 所属する直（F-10-10-01）。実績の直は記録時刻から引くので、ここは既定の所属 *@
+                    <label>所属する直</label>
+                    <select @bind="_shiftId">
+                        <option value="0">なし</option>
+                        @foreach (var shift in _shifts)
+                        {
+                            <option value="@shift.Id">@shift.Code @shift.Name（@shift.ScheduleLabel）</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
             <h2>ロール</h2>
             <div class="form-grid">
                 @foreach (var role in MesRoles.All)
@@ -63,9 +91,9 @@
         </div>
 
         <CsvIoPanel Kind="users" Label="ユーザー" KeyLabel="ユーザー名"
-                    Roles="@MesRoles.SystemAdmin" OnImported="LoadAsync" />
+                    Roles="@MesRoleGroups.UserAdmin" OnImported="LoadAsync" />
         <CsvIoPanel Kind="user-skills" Label="ユーザーのスキル・資格" KeyLabel="ユーザー名＋スキル・資格コード"
-                    Roles="@MesRoles.SystemAdmin" OnImported="ReloadSkillsAsync" />
+                    Roles="@MesRoleGroups.UserAdmin" OnImported="ReloadSkillsAsync" />
 
         <div class="card">
             @if (_users is null)
@@ -76,7 +104,7 @@
             {
                 <table class="table">
                     <thead>
-                        <tr><th>ユーザー名</th><th>氏名</th><th>ロール</th><th>在籍</th><th>パスワード</th><th></th></tr>
+                        <tr><th>ユーザー名</th><th>氏名</th><th>所属</th><th>作業場所</th><th>直</th><th>ロール</th><th>在籍</th><th>パスワード</th><th></th></tr>
                     </thead>
                     <tbody>
                         @foreach (var user in _users)
@@ -84,6 +112,9 @@
                             <tr>
                                 <td>@user.UserName</td>
                                 <td>@user.DisplayName</td>
+                                <td>@(user.Department ?? "-")</td>
+                                <td>@(user.WorkCenterCode is null ? "-" : $"{user.WorkCenterCode} {user.WorkCenterName}")</td>
+                                <td>@(user.ShiftCode is null ? "-" : $"{user.ShiftCode} {user.ShiftName}")</td>
                                 <td>@string.Join("、", user.Roles.Select(RoleLabel))</td>
                                 <td>@(user.IsActive ? "在籍" : "無効")</td>
                                 <td>@(user.MustChangePassword ? "要変更" : "-")</td>
@@ -171,6 +202,12 @@
     private string _displayName = string.Empty;
     private string _password = string.Empty;
     private bool _isActive = true;
+    private int _workCenterId;
+    /// <summary>作業場所は段を問わない（Spec.md 5.7 資源階層への紐付け）</summary>
+    private List<WorkCenterResponse> _workCenters = [];
+    private string? _department;
+    private int _shiftId;
+    private List<ShiftResponse> _shifts = [];
 
     private UserSummaryResponse? _skillTarget;
     private readonly List<UserSkillRequest> _userSkills = [];
@@ -195,8 +232,12 @@
         }
     }
 
-    private async Task LoadAsync() =>
+    private async Task LoadAsync()
+    {
         _users = await Http.GetFromJsonAsync<List<UserSummaryResponse>>("api/users?includeInactive=true");
+        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers") ?? [];
+        _shifts = await Http.GetFromJsonAsync<List<ShiftResponse>>("api/shifts") ?? [];
+    }
 
     private void ToggleRole(string role, bool selected)
     {
@@ -219,6 +260,9 @@
         _userName = user.UserName;
         _displayName = user.DisplayName;
         _isActive = user.IsActive;
+        _workCenterId = user.WorkCenterId ?? 0;
+        _department = user.Department;
+        _shiftId = user.ShiftId ?? 0;
         _roles.Clear();
         _roles.AddRange(user.Roles);
     }
@@ -230,6 +274,9 @@
         _displayName = string.Empty;
         _password = string.Empty;
         _isActive = true;
+        _workCenterId = 0;
+        _department = null;
+        _shiftId = 0;
         _roles.Clear();
     }
 
@@ -254,17 +301,23 @@
                     return;
                 }
                 response = await Http.PostAsJsonAsync("api/users",
-                    new CreateUserRequest(_userName, _password, _displayName, [.. _roles]));
+                    new CreateUserRequest(_userName, _password, _displayName, [.. _roles],
+                        _workCenterId == 0 ? null : _workCenterId,
+                        string.IsNullOrWhiteSpace(_department) ? null : _department,
+                        _shiftId == 0 ? null : _shiftId));
             }
             else
             {
                 response = await Http.PutAsJsonAsync($"api/users/{_editingId}",
-                    new UpdateUserRequest(_displayName, [.. _roles], _isActive));
+                    new UpdateUserRequest(_displayName, [.. _roles], _isActive,
+                        _workCenterId == 0 ? null : _workCenterId,
+                        string.IsNullOrWhiteSpace(_department) ? null : _department,
+                        _shiftId == 0 ? null : _shiftId));
             }
 
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保存しました。";
@@ -325,9 +378,9 @@
         try
         {
             var response = await Http.PutAsJsonAsync($"api/users/{_skillTarget.Id}/skills", _userSkills);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "スキル・資格を保存しました。";

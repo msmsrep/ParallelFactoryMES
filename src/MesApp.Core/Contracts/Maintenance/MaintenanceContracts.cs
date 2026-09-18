@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using MesApp.Core.Entities;
 
 namespace MesApp.Core.Contracts.Maintenance;
@@ -27,19 +27,54 @@ public record EquipmentLogRequest(
     DateTimeOffset? EndedAt,
     /// <summary>停止原因（停止・故障時。B-40-20-02）</summary>
     string? StopCause,
-    string? Note);
+    string? Note,
+    /// <summary>この稼働区間で処理していた作業指示（任意。PQC×EQCの紐付け）</summary>
+    int? WorkOrderId = null);
 
 public record EquipmentLogResponse(
     int Id, int EquipmentId, string EquipmentName, EquipmentLogStatus Status,
-    DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string? StopCause, string? Note);
+    DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string? StopCause, string? Note,
+    int? WorkOrderId = null, string? WorkOrderNo = null);
 
 /// <summary>設備別の稼働サマリ（E-20-10-03 稼働・停止実績、E-20-30-03 パフォーマンス確認）</summary>
 public record EquipmentUtilizationRow(
     int EquipmentId, string AssetNo, string EquipmentName,
     decimal RunningHours, decimal StoppedHours, decimal SetupHours, decimal FailureHours,
+    decimal IdleHours,
     int FailureCount,
     /// <summary>時間稼働率（%。稼働時間 ÷ 記録済み総時間）</summary>
     decimal UtilizationRate);
+
+/// <summary>
+/// 設備総合効率（OEE。E-20-30-03）＝ 時間稼働率 × 性能稼働率 × 良品率。
+/// <para>
+/// 性能稼働率と良品率は<b>作業指示に紐づいた稼働区間</b>（<c>EquipmentLog.WorkOrderId</c>）からしか
+/// 導けない。紐付けのない稼働は「何個作ったか」が分からないため対象外にし、
+/// どれだけを見られているかを <see cref="CoverageRate"/> で併記する。
+/// 産出0として扱うと記録漏れが設備の悪い評価に化けるため、算出できないものは null を返す（0にしない）。
+/// </para>
+/// </summary>
+public record EquipmentOeeRow(
+    int EquipmentId, string AssetNo, string EquipmentName,
+    /// <summary>負荷時間（h）＝記録済み総時間。計画休止の区分は持たないため除外しない（Spec.md 5.7）</summary>
+    decimal LoadHours,
+    /// <summary>稼働時間（h）</summary>
+    decimal RunningHours,
+    /// <summary>時間稼働率（%）＝稼働時間÷負荷時間。記録が無ければnull</summary>
+    decimal? AvailabilityRate,
+    /// <summary>作業指示に紐づいた稼働時間（h。重なる区間は按分する）</summary>
+    decimal CoveredRunningHours,
+    /// <summary>カバー率（%）＝紐づいた稼働時間÷稼働時間。指標をどれだけ信用してよいかを示す</summary>
+    decimal? CoverageRate,
+    /// <summary>対象稼働区間の産出数（良品＋不良。作業指示の実績を稼働時間で按分した値）</summary>
+    decimal ProducedQuantity,
+    decimal GoodQuantity,
+    /// <summary>性能稼働率（%）＝(標準作業時間×産出数)÷紐づいた稼働時間。100%を超えることがある（標準より速い）</summary>
+    decimal? PerformanceRate,
+    /// <summary>良品率（%）＝良品数÷産出数</summary>
+    decimal? QualityRate,
+    /// <summary>OEE（%）。3要素のいずれかが算出できなければnull</summary>
+    decimal? Oee);
 
 // ---- 保全計画（E-30-10）----
 
@@ -70,21 +105,51 @@ public record MaintenanceOrderCreateRequest(
     MaintenanceRequestType RequestType,
     string? Note);
 
+/// <summary>
+/// 保全で消費した部材1行（E-40-30-01）。指定した現品を在庫から引き落とす。
+/// 品目はロットから導けるので指定しない。
+/// </summary>
+public record MaintenanceRecordPartRequest(
+    int LotId,
+    int LocationId,
+    [Range(0.0001, double.MaxValue)] decimal Quantity,
+    [MaxLength(500)] string? Note);
+
+public record MaintenanceRecordPartResponse(
+    int Id, int ProductId, string ProductCode, string ProductName, string Unit,
+    int LotId, string LotNumber, int LocationId, string LocationCode,
+    decimal Quantity, string? Note);
+
 /// <summary>保全実績登録（E-40-30-01。登録と同時に指示は完了になる）</summary>
 public record MaintenanceRecordRequest(
     DateTimeOffset StartedAt,
     DateTimeOffset? EndedAt,
-    /// <summary>消費部材・交換部品</summary>
+    /// <summary>消費部材・交換部品の自由記述（補足。在庫を動かす部材は Parts に入れる）</summary>
     string? PartsUsed,
     string? Result,
     string? Note,
     /// <summary>治工具メンテ完了時に寿命カウンタをリセットするか（E-60-30）</summary>
-    bool ResetToolLife = false);
+    bool ResetToolLife = false,
+    /// <summary>消費した部材（在庫から引き落とす。未指定なら在庫は動かさない）</summary>
+    List<MaintenanceRecordPartRequest>? Parts = null);
 
 public record MaintenanceRecordResponse(
     int Id, string PerformedByUserId, string? PerformedByName,
     DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
-    string? PartsUsed, string? Result, string? Note);
+    string? PartsUsed, string? Result, string? Note,
+    List<MaintenanceRecordPartResponse> Parts);
+
+/// <summary>
+/// 消耗材の消費実績サマリ（E-20-10-04 消耗材モニタリング）。
+/// 期間内の保全実績で引き落とした部材を品目ごとに集計する。
+/// </summary>
+public record MaintenancePartConsumptionRow(
+    int ProductId, string ProductCode, string ProductName, string Unit,
+    decimal Quantity,
+    /// <summary>消費した保全実績の件数</summary>
+    int RecordCount,
+    /// <summary>現在の在庫合計（発注・補充の判断に使う）</summary>
+    decimal StockOnHand);
 
 public record MaintenanceOrderResponse(
     int Id, string OrderNo,
@@ -118,3 +183,50 @@ public record ToolLifeStatusRow(
     /// <summary>閾値到達（要交換・廃棄）</summary>
     bool IsLifeReached,
     DateTimeOffset? LifeResetAt);
+
+// ---- 治工具の引当・払出（B-20-30）----
+
+/// <summary>治工具の引当（B-20-30-01。作業指示に対して確保する）</summary>
+public record ToolAllocateRequest(int ToolId, int WorkOrderId, string? Note);
+
+/// <summary>払出・受領確認（B-20-30-02〜03。受領者を省略すると操作者本人）</summary>
+public record ToolIssueReceiveRequest(string? IssuedToUserId);
+
+/// <summary>返却・取消の共通要求（理由は任意）</summary>
+public record ToolIssueCloseRequest(string? Note);
+
+public record ToolIssueResponse(
+    int Id, int ToolId, string ToolCode, string ToolName,
+    int WorkOrderId, string WorkOrderNo, string ProductCode, string ProcessCode,
+    ToolIssueStatus Status,
+    DateTimeOffset AllocatedAt,
+    DateTimeOffset? IssuedAt, string? IssuedToUserId, string? IssuedToName,
+    DateTimeOffset? ReturnedAt,
+    string? Note);
+
+// ---- 治工具の寿命分析（E-60-20-03）----
+
+/// <summary>
+/// 治工具の寿命分析（E-60-20-03）。期間内の使用ペースから寿命到達を見込み、交換の準備に使う。
+/// <para>
+/// 見込みが立たない治工具（寿命閾値が未設定、期間内に使用が無い、すでに寿命到達）は
+/// 予測日を null で返す。適当な日付を置くと交換計画が実態と外れるため。
+/// </para>
+/// </summary>
+public record ToolLifeAnalysisRow(
+    int ToolId, string ToolCode, string ToolName, ToolStatus Status,
+    int? LifeThresholdCount, int CumulativeCount,
+    /// <summary>寿命まで残り（回数。閾値未設定はnull。到達済みは0）</summary>
+    int? RemainingCount,
+    /// <summary>期間内の使用回数</summary>
+    int PeriodUsageCount,
+    /// <summary>期間内に使用実績のあった日数</summary>
+    int UsageDays,
+    /// <summary>1日あたりの平均使用回数（使用のあった日で割る）</summary>
+    decimal? AveragePerDay,
+    /// <summary>期間内に使用した作業指示の数</summary>
+    int WorkOrderCount,
+    /// <summary>作業指示1件あたりの平均使用回数</summary>
+    decimal? AveragePerWorkOrder,
+    /// <summary>このペースで使い続けた場合に寿命へ達する見込み日</summary>
+    DateOnly? EstimatedLifeReachedOn);

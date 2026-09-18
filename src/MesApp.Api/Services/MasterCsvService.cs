@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -30,13 +30,20 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.Products => await ExportProductsAsync(includeInactive, ct),
             MasterCsvKinds.Processes => await ExportProcessesAsync(includeInactive, ct),
             MasterCsvKinds.Equipments => await ExportEquipmentsAsync(includeInactive, ct),
+            MasterCsvKinds.EquipmentParts => await ExportEquipmentPartsAsync(ct),
             MasterCsvKinds.Tools => await ExportToolsAsync(includeInactive, ct),
+            MasterCsvKinds.WorkCenters => await ExportWorkCentersAsync(includeInactive, ct),
             MasterCsvKinds.Locations => await ExportLocationsAsync(includeInactive, ct),
             MasterCsvKinds.InspectionItems => await ExportInspectionItemsAsync(includeInactive, ct),
+            MasterCsvKinds.ControlItems => await ExportControlItemsAsync(includeInactive, ct),
             MasterCsvKinds.Checklists => await ExportChecklistsAsync(includeInactive, ct),
+            MasterCsvKinds.DefectReasons => await ExportDefectReasonsAsync(includeInactive, ct),
             MasterCsvKinds.Skills => await ExportSkillsAsync(includeInactive, ct),
             MasterCsvKinds.Bom => await ExportBomAsync(ct),
             MasterCsvKinds.Routing => await ExportRoutingAsync(ct),
+            MasterCsvKinds.WorkProcedures => await ExportWorkProceduresAsync(includeInactive, ct),
+            MasterCsvKinds.Shifts => await ExportShiftsAsync(includeInactive, ct),
+            MasterCsvKinds.InspectionDevices => await ExportInspectionDevicesAsync(includeInactive, ct),
             MasterCsvKinds.Users => await ExportUsersAsync(includeInactive, ct),
             MasterCsvKinds.UserSkills => await ExportUserSkillsAsync(ct),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
@@ -46,12 +53,13 @@ public sealed partial class MasterCsvService(
 
     private async Task<List<string?[]>> ExportProductsAsync(bool includeInactive, CancellationToken ct)
     {
-        var items = await db.Products.AsNoTracking()
+        var items = await db.Products.AsNoTracking().Include(p => p.DefaultLocation)
             .Where(p => includeInactive || p.IsActive)
             .OrderBy(p => p.Code).ToListAsync(ct);
         return [.. items.Select(p => new string?[]
         {
-            p.Code, p.Name, p.Unit, p.Specification, p.Type.ToString(), Num(p.StandardDefectRate), Bool(p.IsActive),
+            p.Code, p.Name, p.Unit, p.Specification, p.Type.ToString(), Num(p.StandardDefectRate),
+            p.DefaultLocation?.Code, Bool(p.IsActive),
         })];
     }
 
@@ -65,13 +73,25 @@ public sealed partial class MasterCsvService(
 
     private async Task<List<string?[]>> ExportEquipmentsAsync(bool includeInactive, CancellationToken ct)
     {
-        var items = await db.Equipments.AsNoTracking()
+        var items = await db.Equipments.AsNoTracking().Include(e => e.WorkCenter)
             .Where(e => includeInactive || e.IsActive)
             .OrderBy(e => e.AssetNo).ToListAsync(ct);
         return [.. items.Select(e => new string?[]
         {
-            e.AssetNo, e.Name, e.Site, e.Status.ToString(), e.MaintenanceType.ToString(),
+            e.AssetNo, e.Name, e.WorkCenter?.Code, e.Site, e.Status.ToString(), e.MaintenanceType.ToString(),
             Num(e.MaintenanceThreshold), e.MaintenanceParts, Bool(e.IsActive),
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportEquipmentPartsAsync(CancellationToken ct)
+    {
+        var items = await db.EquipmentParts.AsNoTracking()
+            .Include(p => p.Equipment).Include(p => p.Product)
+            .OrderBy(p => p.Equipment!.AssetNo).ThenBy(p => p.Product!.Code)
+            .ToListAsync(ct);
+        return [.. items.Select(p => new string?[]
+        {
+            p.Equipment!.AssetNo, p.Product!.Code, p.Category.ToString(), Num(p.QuantityPer), p.Note,
         })];
     }
 
@@ -87,14 +107,39 @@ public sealed partial class MasterCsvService(
         })];
     }
 
+    private async Task<List<string?[]>> ExportWorkCentersAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.WorkCenters.AsNoTracking().Include(w => w.Parent)
+            .Where(w => includeInactive || w.IsActive)
+            .OrderBy(w => w.Code).ToListAsync(ct);
+        // 上の段から出力すると、取り込み直したときに上位が先に現れて人が読みやすい。
+        // Levelは文字列で保存しているためDB側では段の順に並ばず、取得後に並べ直す
+        return [.. items.OrderBy(w => w.Level).ThenBy(w => w.Code, StringComparer.Ordinal)
+            .Select(w => new string?[]
+        {
+            w.Code, w.Name, w.Level.ToString(), w.Parent?.Code, Bool(w.IsActive),
+        })];
+    }
+
     private async Task<List<string?[]>> ExportLocationsAsync(bool includeInactive, CancellationToken ct)
     {
-        var items = await db.Locations.AsNoTracking()
+        var items = await db.Locations.AsNoTracking().Include(l => l.WorkCenter)
             .Where(l => includeInactive || l.IsActive)
             .OrderBy(l => l.Code).ToListAsync(ct);
         return [.. items.Select(l => new string?[]
         {
-            l.Code, l.AreaType.ToString(), l.ShelfNo, Bool(l.IsActive),
+            l.Code, l.WorkCenter?.Code, l.AreaType.ToString(), l.ShelfNo, Bool(l.IsActive),
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportDefectReasonsAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.DefectReasons.AsNoTracking()
+            .Where(r => includeInactive || r.IsActive)
+            .OrderBy(r => r.Code).ToListAsync(ct);
+        return [.. items.Select(r => new string?[]
+        {
+            r.Code, r.Name, r.Category.ToString(), Bool(r.IsActive),
         })];
     }
 
@@ -109,6 +154,19 @@ public sealed partial class MasterCsvService(
             i.Code, i.Name, i.TargetProduct?.Code, i.TargetProcess?.Code, i.Type.ToString(),
             Num(i.LowerLimit), Num(i.UpperLimit), Num(i.StandardValue), i.Method, Num(i.SamplingCount),
             Bool(i.IsActive), i.Version.ToString(CultureInfo.InvariantCulture),
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportControlItemsAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.ControlItems.AsNoTracking()
+            .Include(i => i.TargetProduct).Include(i => i.TargetProcess)
+            .Where(i => includeInactive || i.IsActive)
+            .OrderBy(i => i.Code).ToListAsync(ct);
+        return [.. items.Select(i => new string?[]
+        {
+            i.Code, i.Name, i.Unit, i.TargetProduct?.Code, i.TargetProcess?.Code,
+            Num(i.TargetValue), Num(i.LowerLimit), Num(i.UpperLimit), Bool(i.IsActive),
         })];
     }
 
@@ -156,7 +214,7 @@ public sealed partial class MasterCsvService(
         return [.. items.Select(b => new string?[]
         {
             b.ParentProduct!.Code, b.ChildProduct!.Code, Num(b.QuantityPer),
-            b.MakeOrBuy.ToString(), b.AlternativeGroup,
+            b.MakeOrBuy.ToString(), b.AlternativeGroup, Bool(b.IsAlternative),
         })];
     }
 
@@ -165,20 +223,36 @@ public sealed partial class MasterCsvService(
         var items = await db.Routings.AsNoTracking()
             .Include(r => r.Product).Include(r => r.Process)
             .Include(r => r.RequiredSkill).Include(r => r.Equipment)
-            .Include(r => r.Tool).Include(r => r.Checklist)
+            .Include(r => r.Tool).Include(r => r.Checklist).Include(r => r.WorkCenter)
+            .Include(r => r.WorkProcedure)
+            .Include(r => r.EquipmentCandidates).ThenInclude(c => c.Equipment)
             .OrderBy(r => r.Product!.Code).ThenBy(r => r.Sequence)
             .ToListAsync(ct);
         return [.. items.Select(r => new string?[]
         {
             r.Product!.Code, Num(r.Sequence), r.Process!.Code,
             Num(r.StandardWorkMinutes), Num(r.StandardSetupMinutes),
-            r.RequiredSkill?.Code, r.Equipment?.AssetNo, r.Tool?.Code, r.Checklist?.Code, r.ControlItems,
+            r.RequiredSkill?.Code, r.Equipment?.AssetNo,
+            string.Join(";", r.EquipmentCandidates.Select(c => c.Equipment!.AssetNo).Order(StringComparer.Ordinal)),
+            r.Tool?.Code, r.WorkCenter?.Code,
+            r.Checklist?.Code, r.ControlItems, r.WorkProcedure?.ProcedureNo,
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportWorkProceduresAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.WorkProcedures.AsNoTracking()
+            .Where(p => includeInactive || p.IsActive)
+            .OrderBy(p => p.ProcedureNo).ToListAsync(ct);
+        return [.. items.Select(p => new string?[]
+        {
+            p.ProcedureNo, p.Title, p.Steps, p.Reference, Bool(p.IsActive),
         })];
     }
 
     private async Task<List<string?[]>> ExportUsersAsync(bool includeInactive, CancellationToken ct)
     {
-        var users = await db.Users.AsNoTracking()
+        var users = await db.Users.AsNoTracking().Include(u => u.WorkCenter).Include(u => u.Shift)
             .Where(u => includeInactive || u.IsActive)
             .OrderBy(u => u.UserName).ToListAsync(ct);
         var roles = await RoleNamesByUserAsync(ct);
@@ -187,7 +261,34 @@ public sealed partial class MasterCsvService(
         {
             u.UserName, u.DisplayName,
             roles.TryGetValue(u.Id, out var names) ? string.Join(";", names) : null,
-            Bool(u.IsActive), null,
+            u.WorkCenter?.Code, u.Department, u.Shift?.Code, Bool(u.IsActive), null,
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportShiftsAsync(bool includeInactive, CancellationToken ct)
+    {
+        var shifts = await db.Shifts.AsNoTracking()
+            .Where(s => includeInactive || s.IsActive)
+            .ToListAsync(ct);
+        // 直は時間帯で並べる（一覧APIと同じ並び。TimeOnlyはSQLiteで並べ替えられないため取り出してから）
+        return [.. shifts
+            .OrderBy(s => s.StartTime).ThenBy(s => s.Code, StringComparer.Ordinal)
+            .Select(s => new string?[]
+            {
+                s.Code, s.Name, s.StartTime.ToString("HH:mm"), s.EndTime.ToString("HH:mm"), Bool(s.IsActive),
+            })];
+    }
+
+    private async Task<List<string?[]>> ExportInspectionDevicesAsync(bool includeInactive, CancellationToken ct)
+    {
+        var devices = await db.InspectionDevices.AsNoTracking()
+            .Where(d => includeInactive || d.IsActive)
+            .OrderBy(d => d.Code)
+            .ToListAsync(ct);
+        return [.. devices.Select(d => new string?[]
+        {
+            d.Code, d.Name, d.SerialNo, d.Location, Date(d.CalibratedOn), Date(d.CalibrationDueOn),
+            d.CalibrationCycleDays?.ToString(CultureInfo.InvariantCulture), d.Note, Bool(d.IsActive),
         })];
     }
 

@@ -1,0 +1,144 @@
+﻿@inject HttpClient Http
+
+@* 品目のMBOM（Spec.md 5.1、A-40-10）。品目マスタタブで選んだ品目に対して開く *@
+<div class="card">
+    <h2 style="margin-top:0;">@Product.Code @Product.Name の MBOM（A-40-10）</h2>
+    <Notice Error="@_error" Message="@_message" />
+    <table class="table">
+        <thead><tr><th>子品目</th><th>必要数量（親1単位）</th><th>内外製</th><th>代替グループ</th><th>代替部品</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var line in _lines)
+            {
+                <tr>
+                    <td>@(Products.FirstOrDefault(p => p.Id == line.ChildProductId)?.Code)</td>
+                    <td>@line.QuantityPer</td>
+                    <td>@(line.MakeOrBuy == MakeOrBuy.InHouse ? "内製" : "外注")</td>
+                    <td>@(line.AlternativeGroup ?? "-")</td>
+                    <td>@(line.IsAlternative ? "代替" : "主")</td>
+                    <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">削除</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="bom">
+        <div class="form-grid">
+            <div class="form-field">
+                <label>子品目</label>
+                <select @bind="_childId">
+                    <option value="0">選択してください</option>
+                    @foreach (var product in Products)
+                    {
+                        <option value="@product.Id">@product.Code @product.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>必要数量</label>
+                <input type="number" step="any" @bind="_quantity" />
+            </div>
+            <div class="form-field">
+                <label>内外製区分</label>
+                <select @bind="_makeOrBuy">
+                    <option value="@MakeOrBuy.InHouse">内製</option>
+                    <option value="@MakeOrBuy.Outsourced">外注</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>代替部品グループ</label>
+                <input @bind="_altGroup" />
+            </div>
+            @* 代替部品の投入には理由の記録を求める（A-40-10-04） *@
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" @bind="_isAlternative" style="width:auto;" />
+                    代替部品（主材料でない）
+                </label>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn btn-secondary" @onclick="AddLine">明細に追加</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">MBOMを保存（一括置換）</button>
+        </div>
+    </AuthorizeView>
+</div>
+
+@code {
+    /// <summary>編集対象の品目。切り替わったら明細を読み直す</summary>
+    [Parameter, EditorRequired] public ProductResponse Product { get; set; } = default!;
+
+    /// <summary>子品目の選択肢（親が読み込んだ品目一覧を借りる）</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<ProductResponse> Products { get; set; } = [];
+
+    /// <summary>保存後に親へ知らせる（設計変更の影響を読み直すため）</summary>
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private readonly List<BomItemRequest> _lines = [];
+    private int _loadedProductId;
+
+    private int _childId;
+    private decimal _quantity = 1;
+    private MakeOrBuy _makeOrBuy = MakeOrBuy.InHouse;
+    private string? _altGroup;
+    private bool _isAlternative;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedProductId != Product.Id)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    /// <summary>明細を読み直す（品目の切り替えとCSV取込の後に呼ばれる）</summary>
+    public async Task ReloadAsync()
+    {
+        _loadedProductId = Product.Id;
+        _lines.Clear();
+        var bom = await Http.GetFromJsonAsync<List<BomItemResponse>>($"api/products/{Product.Id}/bom") ?? [];
+        _lines.AddRange(bom.Select(b =>
+            new BomItemRequest(b.ChildProductId, b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup,
+                b.IsAlternative)));
+        // 親から呼ばれたときはパラメータが変わらないため、自分で再描画を要求する
+        StateHasChanged();
+    }
+
+    private void AddLine()
+    {
+        if (_childId == 0 || _quantity <= 0)
+        {
+            _error = "子品目と必要数量を指定してください。";
+            return;
+        }
+        _error = null;
+        _lines.Add(new BomItemRequest(_childId, _quantity, _makeOrBuy,
+            string.IsNullOrWhiteSpace(_altGroup) ? null : _altGroup, _isAlternative));
+        _childId = 0;
+        _isAlternative = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/products/{Product.Id}/bom", _lines);
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = "MBOMを保存しました。";
+            await OnSaved.InvokeAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

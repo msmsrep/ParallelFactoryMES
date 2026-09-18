@@ -1,0 +1,140 @@
+﻿# CodeMap — 業務機能 → 実装ファイル 対応表
+
+`Orchestration.md` §6.3 の資産。**探索（Glob→Grep→Read）を1回の参照に置換するための表**であり、
+「どこを触ればよいか」はまずここで確認する。ここで足りないときだけ grep する。
+
+- MES No は『MES/MOM導入のための標準業務一覧』（ENAA）の業務プロセス番号。詳細は `MES.md`（ローカルのみ）を grep する。
+- 仕様の詳細は `Spec.md` の該当節のみを grep する。
+- 表にないファイル（`Migrations/` など）は読まない。
+- **新規モジュールを追加したら、このファイルへの行追加を DoD に含める。**
+
+パスの略記：`Api/` = `src/MesApp.Api/`、`Core/` = `src/MesApp.Core/`、`Web/` = `src/MesApp.Client.Web/`、
+`Infra/` = `src/MesApp.Infrastructure/`、`Tests/` = `tests/MesApp.Api.Tests/`。
+
+---
+
+## A. 生産管理
+
+| 業務 | MES No | API | エンティティ | 画面 | テスト |
+|:--|:--|:--|:--|:--|:--|
+| 製造指図（発行・承認・変更・工程展開） | A-20 / B-10-10 | `Api/Controllers/ManufacturingOrdersController.cs`<br>`api/manufacturing-orders` | `Core/Entities/Production.cs`<br>ManufacturingOrder / **ManufacturingOrderMaterial**（予定材料＝展開時のMBOM固定） / WorkOrder（工順スナップショット付き） / Lot | `/manufacturing-orders` `Web/Pages/ManufacturingOrders.razor`<br>`/manufacturing-orders/{id}` `ManufacturingOrderDetail.razor` | `Tests/ProductionTests.cs` |
+| 品目マスタ・MBOM・工順/BOP（工順の作業区は**最下段のみ**。展開時に作業指示へスナップショット） | A-40-10 / A-40-20 | `ProductsController.cs` `api/products`<br>MBOM・工順の一括置換は `Api/Services/ProductStructureService.cs`<br>`ProcessesController.cs` `api/processes` | `Core/Entities/Masters.cs`<br>Product / BomItem / ProcessMaster / Routing | `/masters` `Web/Pages/Masters/ProductsTab.razor` / `ProcessesTab.razor` | `Tests/MasterTests.cs` |
+| 設計変更の影響確認（**展開済み指図には改訂が届かない**ことを改訂者に見せる） | J-40-40-01/03 | `ProductsController.cs` `api/products/{id}/change-impact`（集計は `ProductStructureService.GetChangeImpactAsync`。進行中指図＋部材の在庫・所要。**現行MBOMと指図スナップショットの和集合**） | 新規エンティティなし（ManufacturingOrderMaterial / InventoryStock の集計） | `/masters` `Web/Pages/Masters/ProductsTab.razor`（MBOM・工順の下に表示） | `Tests/MasterTests.cs` |
+| 作業手順書（SOP。版数管理） | I-30-40 / I-30-20-12 / B-10-30-03 | `WorkProceduresController.cs` `api/work-procedures`（更新で版数+1。**工順から参照中は無効化できない**。CSV取込も同じ判定） | Masters.cs: WorkProcedure（対象品目・工程は持たない。紐付けは `Routing.WorkProcedureId` 側）<br>本文を置けない手順書は `Reference`（文書番号・URL）だけでよい | `/masters` `Masters/WorkProceduresTab.razor`<br>工順への紐付けは `Masters/ProductsTab.razor`<br>作業指示での閲覧は `ProductionRecordEntry.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
+| 作業指示の手順書表示 | B-10-30-03 | `WorkOrdersController.cs` `GET api/work-orders/{id}/procedure`（紐付けなしは404） | Production.cs: WorkOrder（`WorkProcedureId` ＋ `WorkProcedureVersion`）<br>**本文は固定せず版数だけスナップショット**。表示はマスタ現在値で、版数が食い違えば `IsRevised`（他のスナップショットとは方針が逆。Spec.md 5.7） | `/work-orders/{id}` `ProductionRecordEntry.razor` | `Tests/ProductionTests.cs` |
+| マスタCSV一括入出力 | Spec.md 3.1 | `MasterCsvController.cs` `api/masters/csv`<br>ZIP一括取込・一括出力は `api/masters/csv/bundle`／`api/actuals/csv/bundle`（`Api/Services/CsvBundle.cs`。全ファイル1トランザクション・ファイル名昇順・種別はファイル名の「_」以降。出力の番号は `MasterCsvKinds.ImportOrder`。画面は `Web/Shared/CsvBundlePanel.razor`）<br>`Api/Services/MasterCsvService.cs` / `.Import.cs` / `MasterCsvKinds.cs` / `CsvTable.cs` / `CsvFile.cs`<br>**無効化したマスタを戻せるのはCSVの `IsActive` 列だけ**（画面に再有効化の導線は無い。全マスタ共通） | （各マスタ） | `Web/Shared/CsvIoPanel.razor`（各Tabに配置） | `Tests/MasterCsvTests.cs` |
+| 実績CSV一括取込（取込のみ。常に新規登録） | Spec.md 3.8 / D-10-10-02 / A-20-10-01 / B-10-10-01 / B-20-50 / B-30-10 / B-30-20 / B-40-10 / B-30-30-04 / C-20 / B-30-30-02 / B-60-10 | `ActualCsvController.cs` `api/actuals/csv`<br>`Api/Services/ActualCsvService.cs` / `ActualCsvKinds.cs`（種別ごとの取込ロール＝単票APIと同じ定数）<br>列・行数の検証と結果は `CsvImport.cs` をマスタCSVと共有<br>**行ごとに単票APIと同じ業務サービスを呼ぶ**（受入は `ReceivingService`、製造指図の登録・承認・展開は `ManufacturingOrderService`、実行記録は `WorkOrderExecutionService`、検査は `InspectionService`、作業時間・トラブルは `ShopFloorReportService`。トランザクションは呼び出し側。失敗行では `ChangeTracker.Clear()`）<br>作業指示は「指図番号＋工程順序」で指す（指図番号の手入力はCSVのみ。`MO〜` は拒否） | （各実績） | `/actual-csv` `Web/Pages/ActualCsvImport.razor`（`CsvIoPanel` を `BaseUrl="api/actuals/csv"` `CanExport="false"` で並べる。取込欄のロールは kinds の `WriteRoles`） | `Tests/InventoryTests.cs`（受入）<br>`Tests/ProductionTests.cs`（製造指図）<br>`Tests/ExecutionTests.cs`（実行記録）<br>`Tests/QualityTests.cs`（検査・作業時間・トラブル）<br>`Tests/MasterCsvTests.cs`（`samples/actual-csv` の通し取込） |
+
+## B. 製造実行
+
+| 業務 | MES No | API | エンティティ | 画面 | テスト |
+|:--|:--|:--|:--|:--|:--|
+| 作業指示・差立（作業員/設備割当・着手順） | B-10-20 / F-20-30-01 | `WorkOrdersController.cs` `api/work-orders`<br>差立の検証・反映は `Api/Services/WorkOrderDispatchService.cs`<br>候補設備は `api/work-orders/{id}/equipment-candidates`（**候補があればその中からしか割り当てられない**。候補は工順マスタの現在値。**新しく割り当てる設備は `Status`＝稼働可能のみ**） | Production.cs: WorkOrder<br>Masters.cs: **RoutingEquipment**（工順の候補設備） | `/work-orders` `WorkOrders.razor`<br>`/dispatch` `Dispatch.razor` | `Tests/ExecutionTests.cs` |
+| 実行系（着手・段取り・チェックリスト・部材投入・実績報告・製造条件データ・状態履歴） | B-30-30-01 / B-20-50 / B-40-40 | `WorkOrderExecutionController.cs`<br>`api/work-orders/{id:int}`<br>着手・承認・判定・在庫計上は `Api/Services/WorkOrderExecutionService.cs`（CSV取込と共有） | `Core/Entities/Execution.cs`<br>SetupRecord / ChecklistRecord / ChecklistResultItem / MaterialConsumption / ProductionRecord / ProductionDataRecord | `/work-orders/{id}/setup` `WorkOrderSetup.razor`<br>`/work-orders/{id}/record` `ProductionRecordEntry.razor`（部材投入・製造条件データ・訂正・状態履歴もここ）<br>`/process-progress` `ProcessProgress.razor` | `Tests/ExecutionTests.cs` |
+| 製造履歴訂正（訂正履歴＋監査ログ） | B-70-30-01 | `ProductionRecordsController.cs` `api/production-records`（数量だけを訂正する。**直は記録時に固定した値なので動かない**） | Execution.cs: ProductionRecord / **ProductionRecordCorrection**（訂正前の値。Spec.md 5.7） | `ProductionRecordEntry.razor` の実績一覧から訂正<br>`/traceability` の履歴タブに訂正履歴を表示 | `Tests/ExecutionTests.cs` / `QualityTests.cs` |
+| 作業時間記録（直接/間接） | B-30-30-02 / F-30-20-02 | `WorkTimeRecordsController.cs` `api/work-time-records` | Execution.cs: WorkTimeRecord | `/work-time` `WorkTime.razor` | `Tests/ExecutionTests.cs` |
+| 製造トラブル報告 | B-40-10-06 / B-60-10 | `TroubleReportsController.cs` `api/trouble-reports` | Execution.cs: TroubleReport | `ProcessProgress.razor` 内 | `Tests/ExecutionTests.cs` |
+| 工程間搬送・移動指示 | B-50-10 / D-30-10-04 | `TransferOrdersController.cs` `api/transfer-orders`（更新系は在庫権限） | Execution.cs: TransferOrder | `/transfer-orders` `TransferOrders.razor`（`Inventory.razor` の「振替」は別機能の `api/inventory/transfer`） | `Tests/InventoryTests.cs` |
+| 設備稼働報告・稼働監視 | B-40-20 / E-20-10 | `EquipmentLogsController.cs` `api/equipment-logs`（`?workOrderId=` で絞り込み）<br>稼働サマリは `GET summary?from=&to=`（**製造日基準**。稼働の開始時刻が属する製造日で振り分ける。省略時は全期間） | `Core/Entities/Maintenance.cs`: EquipmentLog（`WorkOrderId` 任意＝**PQC×EQCの交差点**。ロット履歴 H-30-10-04 はこれを辿る。`EquipmentLogStatus` への追加は**末尾のみ**：JSONが数値） | `/maintenance` `Maintenance/EquipmentLogsTab.razor` | `Tests/MaintenanceTests.cs` |
+
+| 生産性モニタリング（歩留まり・直行率・標準時間予実） | B-60-10-05 | `ProductivityController.cs` `api/productivity`（製造日で期間指定。**リワーク指図の産出は分母に入れない**＝救済分は歩留まりの分子だけ） | Execution.cs: ProductionRecord / WorkTimeRecord / SetupRecord<br>Production.cs: WorkOrder（標準時間は**展開時の工順スナップショット**。マスタ現在値で引き直さない） | `/productivity` `Web/Pages/Productivity.razor`<br>`Web/Shared/ProductivityTable.razor` | `Tests/ProductionTests.cs` |
+
+## C. 品質管理
+
+| 業務 | MES No | API | エンティティ | 画面 | テスト |
+|:--|:--|:--|:--|:--|:--|
+| 工程管理項目マスタ（指示値・許容範囲。版数付き） | B-30-30-04 | `ControlItemsController.cs` `api/control-items`<br>展開時のスナップショット取得は `WorkOrdersController.ControlItems` `api/work-orders/{id}/control-items` | Masters.cs: ControlItem<br>Production.cs: **WorkOrderControlItem**（展開時点の指示値。判定・表示はこちらを使い、マスタ現在値を参照しない） | `/masters` `Masters/ControlItemsTab.razor` | `Tests/MasterTests.cs` / `MasterCsvTests.cs` |
+| 検査機・測定器マスタ／校正管理 | C-20-50-03 | `InspectionDevicesController.cs` `api/inspection-devices`<br>校正の記録は `POST {id}/calibrations`（次回期限は校正周期から自動）／期限接近は `GET expiring?withinDays=` | Masters.cs: InspectionDevice（現在の校正状態）／InspectionDeviceCalibration（実施履歴） | `/masters` `Masters/InspectionDevicesTab.razor` | `Tests/MasterTests.cs` / `MasterCsvTests.cs` |
+| 検査項目・基準マスタ | C-10-10 | `InspectionItemsController.cs` `api/inspection-items` | Masters.cs: InspectionItem | `/masters` `Masters/InspectionItemsTab.razor` | `Tests/MasterTests.cs` |
+| 検査指示・実績・判定・成績書 | C-20 | `InspectionOrdersController.cs` `api/inspection-orders`（発行・実績・判定の処理は `Api/Services/InspectionService.cs`。実績登録時に**検査機の校正期限を判定**：`InspectionDeviceCalibrationPolicy`） | `Core/Entities/Quality.cs`<br>InspectionOrder / InspectionOrderItem（**発行時点の基準スナップショット**。判定・成績書はこちらを使い、マスタ現在値を参照しない：Spec.md 5.7） / InspectionResult / **InspectionResultCorrection**（訂正前の記録。詳細画面・成績書に表示） | `/inspections` `Inspections.razor`<br>`/inspections/{id}` `InspectionDetail.razor`<br>`/print/inspection/{id}` `Print/InspectionCertificate.razor` | `Tests/QualityTests.cs` |
+| 不適合・逸脱管理（特採・廃棄・保留） | C-30 / B-40-30 | `NonconformanceController.cs` `api/nonconformances`<br>記録・対応指示・承認と不適合の連鎖は `Api/Services/NonconformanceService.cs` | Quality.cs: NonconformanceReport | `/nonconformances` `Nonconformances.razor` | `Tests/QualityTests.cs` |
+| 品質分析（不良理由別・品目別・工程別・**直別**・期間別） | C-40-10 | `QualityAnalysisController.cs` `api/quality/summary` | Execution.cs: ProductionDefect（不良理由別の内訳）<br>ProductionRecord.`ShiftId`（**記録時に固定**。集計で引き直さない） | `/quality-analysis` `QualityAnalysis.razor`<br>`Web/Shared/BarMeter.razor` | `Tests/QualityTests.cs` |
+| 不良理由マスタ | C-40-10-01 | `DefectReasonsController.cs` `api/defect-reasons` | Masters.cs: DefectReason | `/masters` `Masters/DefectReasonsTab.razor` | `Tests/MasterTests.cs` / `MasterCsvTests.cs` |
+| チェックリストマスタ（HSE含む） | B-30-10 / G-20-20-02 | `ChecklistsController.cs` `api/checklists` | Masters.cs: Checklist / ChecklistItem | `/masters` `Masters/ChecklistsTab.razor` | `Tests/MasterTests.cs` |
+
+## D. 物流／在庫管理
+
+| 業務 | MES No | API | エンティティ | 画面 | テスト |
+|:--|:--|:--|:--|:--|:--|
+| 受入・受入ロット採番 | D-10-10 | `ReceivingController.cs` `api/receiving` | `Core/Entities/Inventory.cs`: InventoryStock / InventoryTransaction<br>Production.cs: Lot | `/receiving` `Receiving.razor` | `Tests/InventoryTests.cs` |
+| 在庫オペレーション（照会・移動・調整・分割/統合・廃棄・期限） | D-10-30 / D-30-10 / D-40-40 | `InventoryController.cs` `api/inventory`<br>更新系（移動・調整・ステータス変更・分割・統合・振替・廃棄・返品・払出戻し）は `Api/Services/LotOperationService.cs`<br>在庫数量の増減そのものは `Api/Services/InventoryService.cs` | Inventory.cs: InventoryStock / InventoryTransaction | `/inventory` `Inventory.razor` | `Tests/InventoryTests.cs` |
+| 出庫・ピッキング・工程払出（FEFO自動引当） | D-20-10 / D-20-20 | `PickingOrdersController.cs` `api/picking-orders`<br>作成・実行・取消は `Api/Services/PickingService.cs` | Inventory.cs: PickingOrder / PickingLine | `/picking` `Picking.razor` | `Tests/InventoryTests.cs` |
+| 出荷（出荷判定ゲート付き） | D-40 / H-10-10 | `ShippingOrdersController.cs` `api/shipping-orders`<br>作成・出荷実行・取消は `Api/Services/ShippingService.cs` | Inventory.cs: ShippingOrder / ShippingLine | `/shipping` `Shipping.razor`<br>`/print/shipping/{id}` `Print/ShippingSlip.razor` | `Tests/InventoryTests.cs` |
+| 棚卸（スナップショット→実棚→差異→確定） | D-50-10 | `StocktakesController.cs` `api/stocktakes`<br>作成・実棚登録・確定・取消は `Api/Services/StocktakeService.cs` | Inventory.cs: Stocktake / StocktakeLine | `/stocktakes` `Stocktakes.razor`<br>`/print/stocktake/{id}` `Print/StocktakeSheet.razor` | `Tests/InventoryTests.cs` |
+| ロケーション・棚番管理 | D-50-20-01 | `LocationsController.cs` `api/locations` | Masters.cs: Location（`WorkCenterId`＝所属する資源。**段は問わない**） | `/masters` `Masters/LocationsTab.razor` | `Tests/MasterTests.cs` |
+| 倉庫業務進捗管理（**受入は対象外**。指示を持たないため） | D-50-30-07 | `InventoryController.cs` `api/inventory/warehouse-progress?from=&to=`（出庫ピッキング・出荷・在庫移動・棚卸。取消は数えない） | 新規エンティティなし（既存の指示を数え直す） | `/warehouse-operations` `Web/Pages/WarehouseOperations.razor` | `Tests/InventoryTests.cs` |
+| サンプル品保管管理（採取時に**在庫から抜く**。保管棚は引当の対象にしない） | D-40-50-01 | `SampleStoragesController.cs` `api/sample-storages`（採取・払出/廃棄。期限判定は業務日付で取得後に埋める） | Inventory.cs: SampleStorage<br>`InventoryTransactionType.SampleRetention` | `/warehouse-operations` `Web/Pages/WarehouseOperations.razor` | `Tests/InventoryTests.cs` |
+| 推奨ロケーション指示（**理由を添えて出すだけ**。強制しない） | D-10-30-03 / D-40-40-03 | `LocationsController.cs` `api/locations/recommendations?productId=`（①品目の既定ロケーション ②同じ品目の在庫がある場所 ③品目区分の既定エリア の順） | Masters.cs: Product.**DefaultLocationId**（既定の入庫先）<br>在庫の集計は InventoryStock | `/receiving` `Receiving.razor`<br>`ProductionRecordEntry.razor`（入庫先）<br>既定の設定は `Masters/ProductsTab.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
+
+## E. 設備保全
+
+| 業務 | MES No | API | エンティティ | 画面 | テスト |
+|:--|:--|:--|:--|:--|:--|
+| 作業区／資源階層（BOR。工場/ライン/エリア/作業区） | I-10-20-02 | `WorkCentersController.cs` `api/work-centers`<br>`Api/Policies/WorkCenterHierarchyPolicy.cs`（段の妥当性・循環。単票APIとCSV取込の**両方**から呼ぶ） | Masters.cs: WorkCenter（自己参照。`Level` は文字列保存のため**DB側で並べると段の順にならない**。取得後に並べ直す） | `/masters` `Masters/WorkCentersTab.razor` | `Tests/MasterTests.cs` / `MasterCsvTests.cs` |
+| 設備台帳／BOE・保全部品 | E-10-10 / I-10-20 | `EquipmentsController.cs` `api/equipments`<br>保全部品は `api/equipments/{id}/parts`（**設備ごとの一括置換**） | Masters.cs: Equipment（`WorkCenterId`＝設置場所の正。**作業区（最下段）のみ**。`Site` は移行用の旧項目）<br>Masters.cs: **EquipmentPart**（品目参照。資産管理部品/消耗品の区分。`MaintenanceParts` の自由記述は移行元） | `/masters` `Masters/EquipmentsTab.razor` | `Tests/MasterTests.cs` |
+| 保全手順書（版数管理） | E-10-20 / E-20-30 | `MaintenanceProceduresController.cs` `api/maintenance-procedures` | Maintenance.cs: MaintenanceProcedure | `/maintenance` `Maintenance/MaintenanceProceduresTab.razor` | `Tests/MaintenanceTests.cs` |
+| 保全計画（中長期・年次） | E-30-10 | `MaintenancePlansController.cs` `api/maintenance-plans`<br>取消（状態変更）は `Api/Services/MaintenanceOrderService.CancelPlanAsync` | Maintenance.cs: MaintenancePlan | `/maintenance` `Maintenance/MaintenancePlansTab.razor` | `Tests/MaintenanceTests.cs` |
+| 保全指示・実績・突発依頼 | E-30-20 / E-30-30 / E-40 | `MaintenanceOrdersController.cs` `api/maintenance-orders`<br>作成・実績登録・取消（指示と元計画の状態変更）は `Api/Services/MaintenanceOrderService.cs`<br>消費部材の在庫引落しは `POST {id}/record` の `parts`（**`InventoryService.RemoveAsync` 経由**。区分 `MaintenanceIssue`） | Maintenance.cs: MaintenanceOrder / MaintenanceRecord / **MaintenanceRecordPart**（ロット単位の消費明細。`PartsUsed` の自由記述は補足） | `/maintenance` `Maintenance/MaintenanceOrdersTab.razor` | `Tests/MaintenanceTests.cs` |
+| 設備総合効率（OEE） | E-20-30-03 | `OeeController.cs` `api/oee`（**稼働サマリとは別**。あちらは稼働監視の素の時間区分、こちらは製造実績と突き合わせた評価指標）<br>負荷時間＝記録済み総時間（**計画休止の区分は無い**）。理論CTは作業指示の標準作業時間（1個あたり） | Maintenance.cs: EquipmentLog（`WorkOrderId` が無い稼働は**対象外**＝カバー率で開示）<br>Execution.cs: ProductionRecord | `/maintenance` `Maintenance/EquipmentLogsTab.razor`（稼働監視タブ） | `Tests/MaintenanceTests.cs` |
+| 消耗材モニタリング | E-20-10-04 | `MaintenanceOrdersController.cs` `GET api/maintenance-orders/parts-consumption`（品目別の消費数量＋現在庫） | Maintenance.cs: MaintenanceRecordPart | `/maintenance` `Maintenance/MaintenancePartsTab.razor`（消耗材モニタリングタブ） | `Tests/MaintenanceTests.cs` |
+| 治工具の引当・払出・受領確認 | B-20-30 | `ToolIssuesController.cs` `api/tool-issues`（引当／`{id}/issue` 払出・受領／`{id}/return` 返却／`{id}/cancel` 取消。`?openOnly=true` で現場に出ている分）<br>引当・払出・返却・取消は `Api/Services/ToolIssueService.cs`<br>可否判定は `Api/Policies/ToolIssuePolicy.cs`（**引当時と払出時の両方で通す**） | Maintenance.cs: ToolIssue（現物の所在。寿命の累計は ToolUsage 側で別物） | `/work-orders/{id}/setup` `WorkOrderSetup.razor`<br>一覧は `/tool-management` `ToolManagement.razor` | `Tests/MaintenanceTests.cs` |
+| 治工具マスタ・寿命管理・利用実績 | E-60 | `ToolsController.cs` `api/tools`（**使用中は引当から決まり手で付け外しできない**。判定は `Policies/ToolIssuePolicy.CheckManualStatus`、CSV取込も同じ）<br>`ToolUsagesController.cs` `api/tool-usages`（寿命分析は `GET life-analysis?from=&to=`。**使用実績のあった日**で割り、見込みが立たないものは null） | Masters.cs: Tool<br>Maintenance.cs: ToolUsage | `/masters` `Masters/ToolsTab.razor`<br>`/tool-management` `ToolManagement.razor` | `Tests/MaintenanceTests.cs` |
+
+## F. 従業員管理
+
+| 業務 | MES No | API | エンティティ | 画面 | テスト |
+|:--|:--|:--|:--|:--|:--|
+| 工場従業員（ユーザー）管理・論理削除 | F-10-10 | `UsersController.cs` `api/users` | `Core/Entities/AppUser.cs`（`WorkCenterId`＝作業場所・`Department`＝所属・`ShiftId`＝所属する直） | `/masters` `Masters/UsersTab.razor` | `Tests/MasterTests.cs` |
+| 勤務シフト（直） | F-10-10-01 | `ShiftsController.cs` `api/shifts`（**時間帯が重なる直は登録不可**。所属者がいる直は無効化不可。いずれもCSV取込と同じ判定。製造日の境界をまたぐ直は登録できるが警告を返す） | Masters.cs: Shift（夜勤は `EndTime <= StartTime` で日跨ぎを表す。翌日フラグは持たない） | `/masters` `Masters/ShiftsTab.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
+| スキル・資格マスタと割当（有効期限） | F-20-10 | `SkillsController.cs` `api/skills` | Masters.cs: SkillMaster / UserSkill | `/masters` `Masters/SkillsTab.razor` | `Tests/MasterTests.cs` |
+
+## H. 出荷判定・トレーサビリティ
+
+| 業務 | MES No | API | エンティティ | 画面 | テスト |
+|:--|:--|:--|:--|:--|:--|
+| 出荷判定（可／保留／特採・単段階承認） | H-10-10 | `ShipmentJudgmentsController.cs` `api/shipment-judgments` | Quality.cs: ShipmentJudgment | `/shipment-judgments` `ShipmentJudgments.razor`<br>`/print/shipment-judgment/{id}` `Print/ShipmentJudgmentDoc.razor` | `Tests/QualityTests.cs`<br>出荷ゲートは `InventoryTests.cs` |
+| ロットトレーサビリティ（前方・後方追跡） | H-30-10 | `TraceabilityController.cs` `api/traceability`（`/history` は製造・検査・在庫・状態・訂正・**設備稼働**の履歴を返す。製造行には作業者と**直**を並べる。文字列の組み立てはSQLに載せず取り出してから行う） | Production.cs: Lot<br>Execution.cs: MaterialConsumption<br>Maintenance.cs: EquipmentLog | `/traceability` `Traceability.razor`<br>`Web/Shared/TraceTree.razor` | `Tests/QualityTests.cs` |
+
+---
+
+## 基盤・横断（業務機能ではないが変更頻度が高い）
+
+| 関心事 | 実装 | 備考 |
+|:--|:--|:--|
+| 認証（JWT＋リフレッシュ） | `Api/Controllers/AuthController.cs` `api/auth`<br>`Api/Services/JwtTokenService.cs` / `RefreshTokenService.cs` / `SigningKeyProvider.cs` / `JwtOptions.cs`<br>`Web/Auth/AuthService.cs` / `AuthMessageHandler.cs` / `TokenStore.cs` / `ApiAuthenticationStateProvider.cs` | Spec.md 7.4。`/login` `Login.razor`、`/change-password`。`Tests/AuthTests.cs` / `TestAuth.cs` |
+| エラー応答（競合の変換） | `Api/MesAppExceptionFilter.cs`<br>`Api/MesAppHost.cs`（`AddProblemDetails` / `UseExceptionHandler`） | Spec.md 3.9「競合時の応答」。楽観ロック（`DbUpdateConcurrencyException`）・採番衝突（`DbUpdateException`）を409、`InventoryException`を400の日本語ProblemDetailsへ。**コントローラ側に例外処理を増やさない** |
+| 初回パスワード変更の強制 | `Api/MustChangePasswordFilter.cs`（＋`AllowPendingPasswordChange`属性）<br>`Core/Constants/MesClaimTypes.cs`<br>`Api/Services/JwtTokenService.cs`（クレーム付与）<br>`Web/Layout/MainLayout.razor`（画面誘導） | Spec.md 7.4。未変更のトークンは参照系も403。素通しするアクションには`[AllowPendingPasswordChange]`を付ける（現状は`api/auth/me`と`api/auth/change-password`のみ）。`Tests/AuthTests.cs` |
+| ロール定義・権限グループ | `Core/Constants/MesRoles.cs`（7ロール）<br>`Api/RoleGroups.cs`（MasterWrite / ProductionManage / UserAdmin / InventoryManage 等） | 新しい組み合わせが要るときだけ RoleGroups に追加 |
+| 初期セットアップ（初期管理者） | `Api/Controllers/SetupController.cs` `api/setup`<br>`Api/Services/IdentitySeeder.cs`（`SeedAsync` / `IsInitialPasswordPendingAsync`） | Spec.md 2.2 E。`/setup` `Setup.razor`。パスワードは `MesAdmin:Password` の指定か `MesAdmin:GeneratePassword=true` の自動生成のいずれか。**両方ないときは作らない**。自動生成値は保存しないため、変更が済むまで起動のたびに再生成する（デスクトップの案内表示用）。`Tests/SetupTests.cs` |
+| 選択肢（ドロップダウン） | `Core/Contracts/Common/Selection.cs`（`OptionQuery` / `OptionsResult<T>`）<br>`Api/QueryableOptionsExtensions.cs`（`ToOptionsResultAsync`）<br>`Web/Shared/OptionSelect.razor`<br>API: `api/inventory/stocks/options` / `api/work-orders/options` / `api/shipping-orders/options` / `api/products/options` / `api/users/options`（作業者。差立で使う。ユーザー管理の一覧は管理者専用のまま） | Spec.md 7.5。**一覧（ページング）とは別物**。件数が増えたときに要るのは検索であってページ送りではない。上限超過は `truncated` で画面に伝える（黙って切らない）。スキャンしたコードをそのまま `q` に渡せる。`Tests/InventoryTests.cs` / `ProductionTests.cs` / `Client.Web.Tests/OptionSelectTests.cs` |
+| 遅延検知（納期超過・標準時間超過） | `WorkOrdersController.Delays` `api/work-orders/delays?overrunPercent=`<br>`Core/Contracts/Production`: `WorkOrderDelayRow` / `WorkOrderDelayKind` | Spec.md 3.1（A-30-20-01）。**通知は持たず画面表示まで**。着手時刻は `WorkOrderStatusHistory` の最初の「着手」から取る（作業指示に着手時刻の列は無い）。出口は `/process-progress` と `/`（件数）。`Tests/ProductionTests.cs` |
+| 工程別進捗の集計 | `WorkOrdersController.ProcessSummary` `api/work-orders/process-summary`（`?workCenterId=` で作業区絞り込み。**上位を指定すると配下へ展開**する：`WorkCenterHierarchyPolicy.SelfAndDescendantIds`）<br>`Core/Contracts/Production`: `ProcessProgressRow` | Spec.md 7.5。一覧を全件取って画面で数えない。`/process-progress` の「工程別の進捗」が使う。`Tests/ProductionTests.cs` |
+| 一覧のページング | `Core/Contracts/Common/Paging.cs`（`PageQuery` / `PagedResult<T>`）<br>`Api/QueryablePagingExtensions.cs`（`ToPagedResultAsync`）<br>`Web/Shared/Pager.razor` | Spec.md 7.5。**アクションの引数名は `paging`**（`page` にするとクエリの `page` とプレフィックスが衝突して `pageSize` が効かない）。エンティティで取得してから組み立てる一覧は `PagedResult.Map(...)`。対象外の一覧（選択肢用・クライアント側絞り込み）はSpec.md 7.5参照。`Tests/InventoryTests.cs` / `Client.Web.Tests/PagerTests.cs` |
+| ビルド共通設定 | `Directory.Build.props` | `TreatWarningsAsErrors` でDoD 1（新規の警告を増やさない）をビルドで担保する。`TargetFramework` は Desktop だけ `net10.0-windows` のため各csprojに残す |
+| クライアントのエラー処理 | `Web/Layout/MainLayout.razor`（`ErrorBoundary`）<br>`Web/Auth/AuthMessageHandler.cs`（401時のリフレッシュ→失敗ならログイン画面へ）<br>`Web/Auth/AuthService.cs`（`EndSession`） | 画面のGET失敗でアプリ全体が操作不能にならないようにする。書き込み系は各画面の`_error` + `<Notice>` が担当（従来どおり） |
+| 監査ログ | `Core/Abstractions/IAuditLogger.cs`<br>`Infra/Services/AuditLogger.cs`<br>`Core/Entities/AuditLog.cs` | `Api/Controllers/AuditLogsController.cs` `api/audit-logs`（参照専用・システム管理者のみ）<br>`/audit-logs` `Web/Pages/AuditLogs.razor`<br>`Tests/AuditLogTests.cs`。Spec.md 7.6。**全ての書き込み系アクションで呼ぶ**。変更前後を追跡する操作は `detail:` に匿名オブジェクト（`{ before, after, reason }`）を渡す＝JSON保存。要約でよい操作は文字列のまま |
+| 採番（指図番号・ロット番号等） | `Api/Services/NumberingService.cs`<br>`Core/Entities/NumberSequence.cs` | Spec.md 3.9。新しい採番区分はここに追加。払い出しは採番テーブルの1行を更新してから読む（最大値+1にしない）。**変更追跡を使わない**（呼び出し側の未確定の変更を書き込まないため`ExecuteUpdate`と生SQL）。`Tests/InventoryTests.cs` |
+| ロット使用可否（投入・引当・出荷の共通判定） | `Api/Policies/LotUsabilityPolicy.cs` | Spec.md 3.9。ステータス・有効期限の条件は**ここだけ**に置く。呼び先は `WorkOrderExecutionService.AddConsumptionAsync`（投入）／`InventoryService.AllocateFefoAsync`（FEFO）／`ShippingService.ShipAsync`（出荷） |
+| 製造条件の逸脱判定 | `Api/Policies/ControlItemDeviationPolicy.cs` | Spec.md 5.7。基準は**マスタ現在値ではなく作業指示のスナップショット**（`WorkOrderControlItem`）。数値なし・上下限なしは判定せず`null`のまま（`false`にしない）。呼び先は `WorkOrderExecutionService.AddDataRecordsAsync` |
+| 直（シフト）の時間帯判定 | `Api/Policies/ShiftSchedulePolicy.cs` | Spec.md 5.7。日跨ぎ（`EndTime <= StartTime`）・重なり判定・時刻→直の解決・**製造日の境界またぎの警告**（`CheckBusinessDateBoundary`。拒否ではなく `ShiftResponse.BoundaryWarning` で返す）。単票APIとCSV取込の両方から通す。重なり判定は**1日を分に開いて突き合わせる**（開始・終了の大小比較だと 22:00〜06:00 と 05:00〜09:00 の重なりを見落とす） |
+| 工順・品目から参照できるマスタ | `Api/Policies/ProductStructurePolicy.cs` | Spec.md 5.7。工順の作業区（最下段かつ有効）・作業手順書（有効）・品目の既定ロケーション（有効）・候補設備（代表設備を含める）。呼び先は `ProductStructureService` / `ProductsController` と `MasterCsvService.Import` の `ImportProductsAsync`・`ImportRoutingAsync`。`Tests/MasterTests.cs` / `MasterCsvTests.cs` |
+| 部材投入の照合（予定材料） | `Api/Policies/MaterialIssuePolicy.cs` | Spec.md 3.9・5.7。基準はMBOMの現在値ではなく**指図の予定材料**。呼び先は `WorkOrderExecutionService.AddConsumptionAsync` |
+| 作業指示ステータス変更（＋状態履歴） | `Api/Services/WorkOrderStatusService.cs`<br>`Core/Entities/Production.cs`: WorkOrderStatusHistory | Spec.md 5.2。`WorkOrder.Status` を**直接代入しない**。履歴は `GET api/work-orders/{id}/status-history` |
+| システム管理者を失わない | `Api/Policies/LastAdminPolicy.cs` | Spec.md 3.6。有効なシステム管理者が0人になる無効化・降格を拒否する。呼び先は `UsersController.Update`（1件ずつ判定）／`MasterCsvService.Import.ImportUsersAsync`（**全行の適用後**に判定。行順で引き継ぎを弾かないため）。`Tests/MasterTests.cs` / `MasterCsvTests.cs` |
+| 参照中マスタの無効化拒否 | `Api/Policies/MasterDeactivationPolicy.cs` | Spec.md 3.8。工順から参照中の作業手順書／在籍中の従業員が所属する直の無効化を拒否する。呼び先は `WorkProceduresController.Deactivate`・`ShiftsController.Deactivate` と `MasterCsvService.Import` の `ImportWorkProceduresAsync`・`ImportShiftsAsync`（**単票APIにだけ書くとCSVから迂回できる**）。`Tests/MasterTests.cs` / `MasterCsvTests.cs` |
+| マスタの無効化（論理削除）の定型処理 | `Api/MasterDeactivationExtensions.cs`（`DeactivateMasterAsync`）<br>`Core/Abstractions/IDeactivatableMaster.cs`（`IsActive` を持つマスタ15種） | 「存在確認 → 無効化してよいかの判定 → IsActive を false → 保存 → 監査ログ」は全マスタで同じなのでここに集める（`DELETE api/xxx/{id}` は1行で呼ぶだけ）。マスタ固有の判定は `precheck:` で渡し、判定そのものは `MasterDeactivationPolicy` 側に置く（CSV取込と同じ文面で弾くため）。監査ログの区分・操作名が既定（"Master"/"Deactivate"）と違うのは保全手順書だけ |
+| 出荷判定ゲート | `Api/Policies/ShipmentGatePolicy.cs` | Spec.md 3.9。承認済みの「可／特採」判定の条件はここだけに置く |
+| ロット在庫ステータス変更（＋状態履歴） | `Api/Services/LotStatusService.cs`<br>`Core/Entities/Production.cs`: LotStatusHistory | Spec.md 5.3。`Lot.StockStatus` を**直接代入しない**。呼び先は `LotOperationService`／`InspectionService`／`NonconformanceService`／`ReceivingController` |
+| ロット系譜（分割・統合・振替） | `Core/Entities/Production.cs`: LotGenealogy<br>`LotOperationService.AddGenealogy` | Spec.md 5.3・5.7。追跡の正は `Lot.ParentLotId` ではなくこちら。`TraceabilityController` はこの関係を辿る |
+| 製造日（業務日付）境界 | `Core/Abstractions/IBusinessDateService.cs`<br>`Api/Services/BusinessDateService.cs`<br>`Api/Controllers/BusinessDateController.cs` `api/business-date`（現在の製造日と境界時刻） | Spec.md 3.9。**画面は境界時刻を知らないので「当日」を暦日で代用しない**（境界をまたぐ時間帯に夜勤の実績が前日・当日へずれる）。`Tests/BusinessDateTests.cs` |
+| ダッシュボード（当日KPI） | `Web/Pages/Home.razor`（`/`） | Spec.md 3.8。集計は既存APIを製造日で絞って呼ぶだけで、**画面では数えない**（`api/quality/summary`・`api/equipment-logs/summary`・`api/manufacturing-orders/progress`）。KPIが取れなくても進捗一覧は出す |
+| DB・DbContext・スキーマ | `Infra/MesAppDbContext.cs`（`DbSet` と enum の文字列変換）<br>`Infra/Configurations/<領域>Configurations.cs`（エンティティごとの索引・最大長・関連。System / Master / Production / Execution / Inventory / Quality / Maintenance）<br>`Infra/DependencyInjection.cs`（起動時 `MigrateAsync`）<br>`Infra/DatabaseOptions.cs` | SQLite。`Infra/Migrations/` は**読まない** |
+| 列挙型（全業務共通） | `Core/Entities/Enums.cs`（36種） | ステータス追加はここ。UI表示名は `Web/Shared/Labels.cs` |
+| DTO | `Core/Contracts/{Auth,Execution,Inventory,Maintenance,Masters,Production,Quality,Setup,Users}/` | すべて `record`。エンティティを直接返さない |
+| 共通UIコンポーネント | `Web/Shared/`<br>Notice / CsvIoPanel / StatusBadge / BarMeter / ScanInput / PrintButton / TraceTree / Labels.cs / Code39.cs | 新規CSSクラスを増やさない |
+| 画面導線 | `Web/Layout/NavMenu.razor` / `MainLayout.razor` / `EmptyLayout.razor`（印刷用） | 新規画面は NavMenu 登録を忘れない |
+| Webアプリの組み立て（DI・パイプライン） | `Api/MesAppHost.cs`（`Build` / `InitializeAsync`）<br>`Api/Program.cs`（サーバー実行の1行だけ） | サービス登録・ミドルウェアの追加は**ここ**。サーバー実行とデスクトップ実行の共通の起点 |
+| 静的配信（WASMをAPIが配信） | `Api/MesAppHost.cs`（`UseStaticWebAssets` / `UseBlazorFrameworkFiles`） | Spec.md 2.1。`Tests/StaticHostingTests.cs` |
+| データ保存先（DB・署名鍵） | `Infra/MesAppDataDirectory.cs` | Spec.md 4章。相対パスは `%LOCALAPPDATA%\ParallelFactoryMES` 基準に解決。環境変数 `MESAPP_DATA_DIR` で変更可 |
+| デスクトップ配布（MSIX） | `src/MesApp.Desktop/`（`Program.cs` / `MainForm.cs` / `Package.appxmanifest` / `Assets/`）<br>`build/Pack-Msix.ps1` / `New-MsixAssets.ps1` / `msix-identity.json` | Spec.md 7.8。手順は `docs-dev/MsixRelease.md`。業務ロジックは持たない（Kestrel起動＋WebView2表示のみ） |
+| テスト基盤 | `Tests/ApiFactory.cs`（一時SQLite）/ `TestAuth.cs` / `Phase3TestData.cs`<br>`tests/MesApp.Client.Web.Tests/`（bUnit。`LayoutTests.cs`） | APIテストの基盤は増やさない。bUnit側は**全画面に効く横断的な振る舞いだけ**（`MainLayout` の初期パスワード誘導・`ErrorBoundary`）。画面ごとのテストは作らない |

@@ -1,3 +1,4 @@
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -34,12 +35,16 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ToolResponse>> Create(ToolRequest request, CancellationToken ct)
     {
         if (await db.Tools.AnyAsync(t => t.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"治工具コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"治工具コード '{request.Code}' は既に存在します。");
+        }
+        if (ToolIssuePolicy.CheckManualStatus(request.Code, null, request.Status, hasOpenIssue: false) is { } reason)
+        {
+            return this.ConflictProblem(reason);
         }
         var t = new Tool
         {
@@ -58,7 +63,7 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ToolResponse>> Update(int id, ToolRequest request, CancellationToken ct)
     {
         var t = await db.Tools.FindAsync([id], ct);
@@ -68,7 +73,13 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
         }
         if (await db.Tools.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"治工具コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"治工具コード '{request.Code}' は既に存在します。");
+        }
+        var hasOpenIssue = await db.ToolIssues.AnyAsync(i => i.ToolId == id
+            && (i.Status == ToolIssueStatus.Allocated || i.Status == ToolIssueStatus.Issued), ct);
+        if (ToolIssuePolicy.CheckManualStatus(request.Code, t.Status, request.Status, hasOpenIssue) is { } reason)
+        {
+            return this.ConflictProblem(reason);
         }
         t.Code = request.Code;
         t.Name = request.Name;
@@ -83,20 +94,9 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var t = await db.Tools.FindAsync([id], ct);
-        if (t is null)
-        {
-            return NotFound();
-        }
-        t.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(Tool), id.ToString(),
-            detail: $"code={t.Code}", ct: ct);
-        return NoContent();
-    }
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<Tool>(db, auditLogger, id, t => $"code={t.Code}", ct);
 
     private static ToolResponse ToResponse(Tool t) =>
         new(t.Id, t.Code, t.Name, t.ToolType, t.LifeThresholdCount, t.LifeThresholdHours, t.Status, t.IsActive);

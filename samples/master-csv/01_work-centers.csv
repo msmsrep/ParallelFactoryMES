@@ -1,0 +1,13 @@
+﻿Code,Name,Level,ParentCode,IsActive
+PL-1,第1工場,Plant,,true
+LN-MC,加工ライン,Line,PL-1,true
+LN-AS,組立ライン,Line,PL-1,true
+LN-LG,物流・品質,Line,PL-1,true
+AR-MC,加工エリア,Area,LN-MC,true
+AR-AS,組立エリア,Area,LN-AS,true
+AR-QC,検査室,Area,LN-LG,true
+AR-SH,出荷エリア,Area,LN-LG,true
+WC-MC1,マシニング加工,WorkCenter,AR-MC,true
+WC-AS1,ポンプ組立,WorkCenter,AR-AS,true
+WC-QC1,最終検査,WorkCenter,AR-QC,true
+WC-PK1,梱包,WorkCenter,AR-SH,true

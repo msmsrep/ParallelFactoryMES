@@ -1,6 +1,8 @@
+﻿using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -13,11 +15,15 @@ namespace MesApp.Api.Controllers;
 
 /// <summary>
 /// ユーザー/工場従業員管理（F-10-10）とスキル・資格の割当（F-20-10-02〜05）。
-/// システム管理者専用。削除は論理削除（IsActive=false。退職時は無効化しログイン不可にする）。
+/// 管理はシステム管理者専用。削除は論理削除（IsActive=false。退職時は無効化しログイン不可にする）。
+/// <para>
+/// クラスではロールを絞らない（Spec.md 7.4）。絞ると差立（B-10-20）で作業者を選ぶための
+/// <see cref="Options"/> まで管理者専用になり、生産管理担当者が作業者を割り当てられなくなる。
+/// </para>
 /// </summary>
 [ApiController]
 [Route("api/users")]
-[Authorize(Roles = RoleGroups.UserAdmin)]
+[Authorize]
 public class UsersController(
     UserManager<AppUser> userManager,
     MesAppDbContext db,
@@ -25,7 +31,27 @@ public class UsersController(
     IBusinessDateService businessDate,
     IAuditLogger auditLogger) : ControllerBase
 {
+    /// <summary>
+    /// 作業者の選択肢（Spec.md 7.5）。差立で作業者を選ばせるために全ロールへ開く。
+    /// 有効なユーザーだけを、氏名の分かる最小限の項目で返す
+    /// </summary>
+    [HttpGet("options")]
+    public async Task<ActionResult<OptionsResult<UserOptionResponse>>> Options(
+        [FromQuery] OptionQuery options, CancellationToken ct = default)
+    {
+        var keyword = options.Keyword;
+        return await userManager.Users.AsNoTracking()
+            .Where(u => u.IsActive)
+            .Where(u => keyword == null
+                || u.DisplayName.Contains(keyword)
+                || (u.UserName != null && u.UserName.Contains(keyword)))
+            .OrderBy(u => u.DisplayName)
+            .Select(u => new UserOptionResponse(u.Id, u.UserName!, u.DisplayName))
+            .ToOptionsResultAsync(options, ct);
+    }
+
     [HttpGet]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<List<UserSummaryResponse>>> List(
         [FromQuery] bool includeInactive = false, CancellationToken ct = default)
     {
@@ -43,6 +69,7 @@ public class UsersController(
     }
 
     [HttpGet("{id}")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<UserSummaryResponse>> Get(string id)
     {
         var user = await userManager.FindByIdAsync(id);
@@ -50,12 +77,19 @@ public class UsersController(
     }
 
     [HttpPost]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<UserSummaryResponse>> Create(CreateUserRequest request, CancellationToken ct)
     {
         var invalidRoles = request.Roles.Except(MesRoles.All).ToList();
         if (invalidRoles.Count > 0)
         {
-            return BadRequest(new ProblemDetails { Title = $"不明なロールが含まれています: {string.Join(", ", invalidRoles)}" });
+            return this.BadRequestProblem($"不明なロールが含まれています: {string.Join(", ", invalidRoles)}");
+        }
+
+        // 検証はユーザーを作る前に通す（作成後に弾くと、所属だけ入っていないユーザーが残る）
+        if (await CheckAssignmentAsync(request.WorkCenterId, request.ShiftId, ct) is { } assignmentError)
+        {
+            return this.BadRequestProblem(assignmentError);
         }
 
         var user = new AppUser
@@ -65,6 +99,9 @@ public class UsersController(
             IsActive = true,
             // 管理者が発行した初期パスワードは初回ログイン時に変更を強制する
             MustChangePassword = true,
+            WorkCenterId = request.WorkCenterId,
+            Department = request.Department,
+            ShiftId = request.ShiftId,
         };
         var result = await userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
@@ -83,6 +120,7 @@ public class UsersController(
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<UserSummaryResponse>> Update(string id, UpdateUserRequest request, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(id);
@@ -93,10 +131,25 @@ public class UsersController(
         var invalidRoles = request.Roles.Except(MesRoles.All).ToList();
         if (invalidRoles.Count > 0)
         {
-            return BadRequest(new ProblemDetails { Title = $"不明なロールが含まれています: {string.Join(", ", invalidRoles)}" });
+            return this.BadRequestProblem($"不明なロールが含まれています: {string.Join(", ", invalidRoles)}");
+        }
+
+        // 最後のシステム管理者を無効化・降格すると誰も権限操作できなくなる（復旧はDB操作のみ）
+        var lastAdmin = await LastAdminPolicy.CheckUpdateAsync(userManager, user, request.IsActive, request.Roles);
+        if (lastAdmin is not null)
+        {
+            return this.ConflictProblem(lastAdmin);
+        }
+
+        if (await CheckAssignmentAsync(request.WorkCenterId, request.ShiftId, ct) is { } assignmentError)
+        {
+            return this.BadRequestProblem(assignmentError);
         }
 
         user.DisplayName = request.DisplayName;
+        user.WorkCenterId = request.WorkCenterId;
+        user.Department = request.Department;
+        user.ShiftId = request.ShiftId;
         var deactivated = user.IsActive && !request.IsActive;
         user.IsActive = request.IsActive;
         await userManager.UpdateAsync(user);
@@ -115,8 +168,34 @@ public class UsersController(
         return await ToSummaryAsync(user);
     }
 
+    /// <summary>
+    /// 作業場所（作業区）と所属する直の指定が使える値かを確認する。使えない場合は日本語の理由を返す。
+    /// 登録と更新で同じ判定を通す（片方にだけ書くと、登録した内容が編集で弾かれる食い違いが出る）。
+    /// </summary>
+    private async Task<string?> CheckAssignmentAsync(int? workCenterId, int? shiftId, CancellationToken ct)
+    {
+        // 作業場所は段を問わない（工場単位で働く担当者も表せるようにするため。Spec.md 5.7）
+        var workCenter = workCenterId is { } wcId
+            ? await db.WorkCenters.AsNoTracking().FirstOrDefaultAsync(w => w.Id == wcId, ct)
+            : null;
+        if (workCenterId is { } missingWc && workCenter is null)
+        {
+            return $"作業区（ID {missingWc}）が見つかりません。";
+        }
+        if (WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } wcReason)
+        {
+            return wcReason;
+        }
+        if (shiftId is { } sid && !await db.Shifts.AnyAsync(s => s.Id == sid && s.IsActive, ct))
+        {
+            return $"直（ID {sid}）が見つからないか無効です。";
+        }
+        return null;
+    }
+
     /// <summary>パスワードリセット（管理者操作。次回ログイン時に変更を強制）</summary>
     [HttpPost("{id}/reset-password")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<IActionResult> ResetPassword(string id, ResetPasswordRequest request, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(id);
@@ -144,6 +223,7 @@ public class UsersController(
     // ---- スキル・資格（F-20-10）----
 
     [HttpGet("{id}/skills")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<List<UserSkillResponse>>> GetSkills(string id, CancellationToken ct)
     {
         if (await userManager.FindByIdAsync(id) is null)
@@ -163,6 +243,7 @@ public class UsersController(
 
     /// <summary>スキル・資格の一括置換（登録・変更・有効期間の管理 F-20-10-02〜05）</summary>
     [HttpPut("{id}/skills")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<List<UserSkillResponse>>> ReplaceSkills(
         string id, List<UserSkillRequest> skills, CancellationToken ct)
     {
@@ -172,13 +253,13 @@ public class UsersController(
         }
         if (skills.GroupBy(s => s.SkillId).Any(g => g.Count() > 1))
         {
-            return BadRequest(new ProblemDetails { Title = "同一スキルが重複しています。" });
+            return this.BadRequestProblem("同一スキルが重複しています。");
         }
         var skillIds = skills.Select(s => s.SkillId).ToList();
         var found = await db.Skills.CountAsync(s => skillIds.Contains(s.Id), ct);
         if (found != skillIds.Count)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しないスキルIDが含まれています。" });
+            return this.BadRequestProblem("存在しないスキルIDが含まれています。");
         }
 
         var existing = await db.UserSkills.Where(s => s.UserId == id).ToListAsync(ct);
@@ -199,8 +280,16 @@ public class UsersController(
     private async Task<UserSummaryResponse> ToSummaryAsync(AppUser user)
     {
         var roles = await userManager.GetRolesAsync(user);
+        var workCenter = user.WorkCenterId is { } id
+            ? await db.WorkCenters.AsNoTracking().FirstOrDefaultAsync(w => w.Id == id)
+            : null;
+        var shift = user.ShiftId is { } shiftId
+            ? await db.Shifts.AsNoTracking().FirstOrDefaultAsync(s => s.Id == shiftId)
+            : null;
         return new UserSummaryResponse(
             user.Id, user.UserName ?? string.Empty, user.DisplayName,
-            user.IsActive, user.MustChangePassword, roles.ToList());
+            user.IsActive, user.MustChangePassword, roles.ToList(),
+            user.WorkCenterId, workCenter?.Code, workCenter?.Name,
+            user.Department, user.ShiftId, shift?.Code, shift?.Name);
     }
 }

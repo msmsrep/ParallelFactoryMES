@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
@@ -15,7 +16,8 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/maintenance-plans")]
 [Authorize]
-public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
+public class MaintenancePlansController(
+    MesAppDbContext db, IAuditLogger auditLogger, MaintenanceOrderService maintenanceOrders) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<MaintenancePlanResponse>>> List(
@@ -52,14 +54,14 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenancePlanResponse>> Create(
         MaintenancePlanRequest request, CancellationToken ct)
     {
         var equipment = await db.Equipments.FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
         if (equipment is null || !equipment.IsActive)
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）設備IDです。" });
+            return this.BadRequestProblem("存在しない（または無効な）設備IDです。");
         }
 
         var plan = new MaintenancePlan
@@ -81,7 +83,7 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
 
     /// <summary>計画の変更（E-30-10-03。指示発行前のみ）</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenancePlanResponse>> Update(
         int id, MaintenancePlanRequest request, CancellationToken ct)
     {
@@ -92,11 +94,11 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
         }
         if (plan.Status is not MaintenancePlanStatus.Planned)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{plan.Status}' の保全計画は変更できません。" });
+            return this.ConflictProblem($"状態 '{plan.Status}' の保全計画は変更できません。");
         }
         if (!await db.Equipments.AnyAsync(e => e.Id == request.EquipmentId && e.IsActive, ct))
         {
-            return BadRequest(new ProblemDetails { Title = "存在しない（または無効な）設備IDです。" });
+            return this.BadRequestProblem("存在しない（または無効な）設備IDです。");
         }
 
         plan.EquipmentId = request.EquipmentId;
@@ -111,22 +113,16 @@ public class MaintenancePlansController(MesAppDbContext db, IAuditLogger auditLo
     }
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleGroups.MaintenanceManage)]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenancePlanResponse>> Cancel(int id, CancellationToken ct)
     {
-        var plan = await db.MaintenancePlans.FindAsync([id], ct);
-        if (plan is null)
+        var outcome = await maintenanceOrders.CancelPlanAsync(id, ct);
+        return outcome.Kind switch
         {
-            return NotFound();
-        }
-        if (plan.Status is MaintenancePlanStatus.Completed or MaintenancePlanStatus.Canceled)
-        {
-            return Conflict(new ProblemDetails { Title = $"状態 '{plan.Status}' の保全計画は取消できません。" });
-        }
-        plan.Status = MaintenancePlanStatus.Canceled;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Maintenance", "PlanCancel", nameof(MaintenancePlan), id.ToString(), ct: ct);
-        return await GetResponseAsync(id, ct);
+            OutcomeError.None => await GetResponseAsync(id, ct),
+            OutcomeError.NotFound => NotFound(),
+            _ => this.ConflictProblem(outcome.Error),
+        };
     }
 
     private async Task<MaintenancePlanResponse> GetResponseAsync(int id, CancellationToken ct) =>

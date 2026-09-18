@@ -49,7 +49,7 @@
                     <tr><th>ロット番号</th><th>品目</th><th>ロケーション</th><th>数量</th><th>ステータス</th><th>有効期限</th><th></th></tr>
                 </thead>
                 <tbody>
-                    @foreach (var stock in _stocks)
+                    @foreach (var stock in _stocks.Items)
                     {
                         <tr>
                             <td>@stock.LotNumber</td>
@@ -68,23 +68,22 @@
                     }
                 </tbody>
             </table>
+            <Pager TItem="StockResponse" Result="_stocks" OnPageChanged="LoadStocksPageAsync" />
         }
     </div>
 }
 else if (_tab == "ops")
 {
+    <AuthorizeView Roles="@MesRoleGroups.InventoryManage">
     <div class="card">
         <h2 style="margin-top:0;">対象在庫の選択</h2>
         <div class="form-grid">
             <div class="form-field">
                 <label>ロット</label>
-                <select @bind="_op.LotId">
-                    <option value="0">選択してください</option>
-                    @foreach (var stock in _stocks ?? [])
-                    {
-                        <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode / @stock.LocationCode / @stock.Quantity）</option>
-                    }
-                </select>
+                <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                              @bind-Value="_op.LotId"
+                              ValueOf="s => s.LotId"
+                              LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode} / {s.LocationCode} / {s.Quantity}）")' />
             </div>
             <div class="form-field">
                 <label>対象ロケーション</label>
@@ -144,23 +143,18 @@ else if (_tab == "ops")
             </div>
             <div class="form-field">
                 <label>振替先品目（品目振替時）</label>
-                <select @bind="_op.NewProductId">
-                    <option value="0">同一品目</option>
-                    @foreach (var product in _products)
-                    {
-                        <option value="@product.Id">@product.Code @product.Name</option>
-                    }
-                </select>
+                <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                              @bind-Value="_op.NewProductId"
+                              EmptyLabel="同一品目"
+                              ValueOf="p => p.Id"
+                              LabelOf='@(p => $"{p.Code} {p.Name}")' />
             </div>
             <div class="form-field">
                 <label>統合先ロット（統合時）</label>
-                <select @bind="_op.TargetLotId">
-                    <option value="0">選択してください</option>
-                    @foreach (var stock in _stocks ?? [])
-                    {
-                        <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode）</option>
-                    }
-                </select>
+                <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                              @bind-Value="_op.TargetLotId"
+                              ValueOf="s => s.LotId"
+                              LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode}）")' />
             </div>
         </div>
         <div class="actions">
@@ -191,6 +185,7 @@ else if (_tab == "ops")
             <button class="btn btn-secondary" disabled="@_busy" @onclick="IssueReturnAsync">払出戻し</button>
         </div>
     </div>
+    </AuthorizeView>
 }
 else if (_tab == "expiring")
 {
@@ -256,7 +251,7 @@ else
                     <tr><th>日時</th><th>区分</th><th>ロット</th><th>品目</th><th>数量</th><th>移動元</th><th>移動先</th><th>備考</th></tr>
                 </thead>
                 <tbody>
-                    @foreach (var transaction in _transactions)
+                    @foreach (var transaction in _transactions.Items)
                     {
                         <tr>
                             <td>@transaction.Timestamp.ToLocalTime().ToString("MM/dd HH:mm")</td>
@@ -271,6 +266,8 @@ else
                     }
                 </tbody>
             </table>
+            <Pager TItem="TransactionResponse" Result="_transactions"
+                   OnPageChanged="LoadTransactionsAsync" Busy="@_busy" />
         }
     </div>
 }
@@ -291,11 +288,10 @@ else
     }
 
     private string _tab = "stocks";
-    private List<StockResponse>? _stocks;
+    private PagedResult<StockResponse>? _stocks;
     private List<StockResponse>? _expiring;
-    private List<TransactionResponse>? _transactions;
+    private PagedResult<TransactionResponse>? _transactions;
     private List<LocationResponse> _locations = [];
-    private List<ProductResponse> _products = [];
     private readonly OpForm _op = new();
     private string? _searchLot;
     private int _filterLocationId;
@@ -307,7 +303,6 @@ else
     protected override async Task OnInitializedAsync()
     {
         _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
-        _products = await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? [];
         await LoadStocksAsync();
     }
 
@@ -324,7 +319,7 @@ else
         }
         else if (tab == "transactions")
         {
-            _transactions = await Http.GetFromJsonAsync<List<TransactionResponse>>("api/inventory/transactions");
+            await LoadTransactionsAsync(1);
         }
         else
         {
@@ -332,27 +327,46 @@ else
         }
     }
 
-    private async Task LoadStocksAsync()
+    private async Task LoadTransactionsAsync(int page) =>
+        _transactions = await Http.GetFromJsonAsync<PagedResult<TransactionResponse>>(
+            $"api/inventory/transactions?page={page}");
+
+    private Task LoadStocksAsync() => LoadStocksPageAsync(1);
+
+    private async Task LoadStocksPageAsync(int page)
     {
-        var url = "api/inventory/stocks";
+        var url = $"api/inventory/stocks?page={page}";
         if (_filterLocationId != 0)
         {
-            url += $"?locationId={_filterLocationId}";
+            url += $"&locationId={_filterLocationId}";
         }
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>(url);
+        _stocks = await Http.GetFromJsonAsync<PagedResult<StockResponse>>(url);
     }
 
     private async Task LoadExpiringAsync() =>
         _expiring = await Http.GetFromJsonAsync<List<StockResponse>>(
             $"api/inventory/expiring?withinDays={_withinDays}");
 
+    /// <summary>
+    /// スキャン・入力したロット番号で在庫を絞る。在庫は全件を手元に持たないため、
+    /// 選択肢APIでロットIDを引いてから、そのロットの在庫を取り直す
+    /// </summary>
     private async Task OnLotScanAsync(string lotNumber)
     {
-        await LoadStocksAsync();
-        _stocks = _stocks?
-            .Where(s => s.LotNumber.Contains(lotNumber, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        _message = _stocks?.Count > 0 ? null : $"ロット '{lotNumber}' の在庫は見つかりませんでした。";
+        var keyword = lotNumber.Trim();
+        var options = await Http.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            $"api/inventory/stocks/options?includeEmpty=true&q={Uri.EscapeDataString(keyword)}");
+        var match = options?.Items.FirstOrDefault(s =>
+            string.Equals(s.LotNumber, keyword, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+        {
+            _stocks = new PagedResult<StockResponse>([], 0, 1, PageQuery.DefaultPageSize);
+            _message = $"ロット '{lotNumber}' の在庫は見つかりませんでした。";
+            return;
+        }
+        _stocks = await Http.GetFromJsonAsync<PagedResult<StockResponse>>(
+            $"api/inventory/stocks?lotId={match.LotId}");
+        _message = null;
     }
 
     private void SelectStock(StockResponse stock)
@@ -412,9 +426,9 @@ else
         try
         {
             var response = await Http.PostAsJsonAsync(url, body);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "操作に失敗しました。";
+                _error = error;
                 return;
             }
             _message = successMessage;
@@ -442,6 +456,7 @@ else
         InventoryTransactionType.Merge => "統合",
         InventoryTransactionType.StocktakeAdjust => "棚卸調整",
         InventoryTransactionType.Ship => "出荷",
+        InventoryTransactionType.MaintenanceIssue => "保全消費",
         _ => type.ToString(),
     };
 }

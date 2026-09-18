@@ -121,6 +121,7 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 | リフレッシュトークン有効期限（時間） | `Jwt__RefreshTokenLifetimeHours` | `12` |
 | JWT署名鍵ファイル | `Jwt__SigningKeyFile` | `jwt-signing.key`（未存在なら自動生成） |
 | 初期管理者の自動作成 | `MesAdmin__UserName` / `MesAdmin__Password` / `MesAdmin__DisplayName` | 未設定 |
+| データの保存先（DB・署名鍵） | `MESAPP_DATA_DIR` | `%LOCALAPPDATA%\ParallelFactoryMES` |
 
 無人セットアップの例（ユーザーが0件のときのみ適用され、初回ログイン時にパスワード変更を強制します）。
 
@@ -157,4 +158,5 @@ tests/
   MesApp.Api.Tests       APIの統合テスト
 samples/
   master-csv             マスタ一括登録用のサンプルCSV（取込順にファイル名を採番）
+  actual-csv             実績一括登録用のサンプルCSV（master-csv の取込後に番号順で取り込む）
 ```

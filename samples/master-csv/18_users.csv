@@ -1,0 +1,8 @@
+﻿UserName,DisplayName,Roles,WorkCenterCode,Department,ShiftCode,IsActive,InitialPassword
+pm001,生産 管理太郎,ProductionManager,PL-1,生産管理課,D,true,ChangeMe0001
+op001,加工 一郎,Operator,WC-MC1,製造一課,D,true,ChangeMe0002
+op002,組立 二郎,Operator,WC-AS1,製造二課,D,true,ChangeMe0003
+op003,加工 三平,Operator,WC-MC1,製造一課,N,true,ChangeMe0007
+qc001,品質 三子,QualityControl;QualityAssurance,WC-QC1,品質保証課,D,true,ChangeMe0004
+lg001,物流 四郎,Logistics,AR-SH,物流課,D,true,ChangeMe0005
+mt001,保全 五郎,Maintenance,PL-1,保全課,D,true,ChangeMe0006

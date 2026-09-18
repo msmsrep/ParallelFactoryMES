@@ -1,0 +1,86 @@
+﻿@inject HttpClient Http
+
+@* 消耗材モニタリング（Spec.md 3.1。E-20-10-04）。保全実績で引き落とした部材と現在庫を並べる *@
+<div class="card">
+    <h2 style="margin-top:0;">消耗材の消費実績（E-20-10-04）</h2>
+    <p class="text-muted">保全実績で在庫から引き落とした部材の集計。現在庫と見比べて補充の要否を判断する。</p>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>開始日</label>
+            <input type="date" @bind="_partsFrom" />
+        </div>
+        <div class="form-field">
+            <label>終了日</label>
+            <input type="date" @bind="_partsTo" />
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn" disabled="@_busy" @onclick="LoadPartsConsumptionAsync">集計</button>
+    </div>
+</div>
+
+<div class="card">
+    @if (_partsConsumption is null)
+    {
+        <p class="text-muted">読み込み中...</p>
+    }
+    else if (_partsConsumption.Count == 0)
+    {
+        <p class="text-muted">該当期間の消費実績はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>品目</th><th>名称</th><th>消費数量</th><th>保全件数</th><th>現在庫</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _partsConsumption)
+                {
+                    <tr>
+                        <td>@row.ProductCode</td>
+                        <td>@row.ProductName</td>
+                        <td>@row.Quantity @row.Unit</td>
+                        <td>@row.RecordCount</td>
+                        <td>@row.StockOnHand @row.Unit</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<MaintenancePartConsumptionRow>? _partsConsumption;
+    private DateTime? _partsFrom = DateTime.Today.AddMonths(-1);
+    private DateTime? _partsTo = DateTime.Today;
+
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadPartsConsumptionAsync();
+
+    /// <summary>参照だけのタブなので Notice は持たない（GET の失敗は ErrorBoundary が拾う）</summary>
+    private async Task LoadPartsConsumptionAsync()
+    {
+        _busy = true;
+        _partsConsumption = null;
+        var query = new List<string>();
+        if (_partsFrom is { } from)
+        {
+            query.Add($"from={from:yyyy-MM-dd}");
+        }
+        if (_partsTo is { } to)
+        {
+            query.Add($"to={to:yyyy-MM-dd}");
+        }
+        try
+        {
+            _partsConsumption = await Http.GetFromJsonAsync<List<MaintenancePartConsumptionRow>>(
+                $"api/maintenance-orders/parts-consumption?{string.Join('&', query)}") ?? [];
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

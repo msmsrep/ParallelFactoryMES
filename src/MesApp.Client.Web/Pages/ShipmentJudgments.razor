@@ -9,29 +9,23 @@
 
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityAssurance}")">
+<AuthorizeView Roles="@MesRoleGroups.QaManage">
     <div class="card">
         <h2 style="margin-top:0;">出荷判定の登録</h2>
         <div class="form-grid">
             <div class="form-field">
                 <label>対象出荷指示</label>
-                <select @bind="_shippingOrderId">
-                    <option value="0">なし</option>
-                    @foreach (var shipping in _shippingOrders)
-                    {
-                        <option value="@shipping.Id">@shipping.ShippingNo（@shipping.Destination）</option>
-                    }
-                </select>
+                <OptionSelect TItem="ShippingOrderResponse" Endpoint="api/shipping-orders/options"
+                              @bind-Value="_shippingOrderId" EmptyLabel="なし"
+                              ValueOf="s => s.Id"
+                              LabelOf='@(s => $"{s.ShippingNo}（{s.Destination}）")' />
             </div>
             <div class="form-field">
                 <label>対象ロット</label>
-                <select @bind="_lotId">
-                    <option value="0">なし</option>
-                    @foreach (var stock in _stocks)
-                    {
-                        <option value="@stock.LotId">@stock.LotNumber（@stock.ProductCode）</option>
-                    }
-                </select>
+                <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                              @bind-Value="_lotId" EmptyLabel="なし"
+                              ValueOf="s => s.LotId"
+                              LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode}）")' />
             </div>
             <div class="form-field">
                 <label>判定</label>
@@ -57,7 +51,7 @@
     {
         <p class="text-muted">読み込み中...</p>
     }
-    else if (_judgments.Count == 0)
+    else if (_judgments.Total == 0)
     {
         <p class="text-muted">出荷判定はありません。</p>
     }
@@ -68,7 +62,7 @@
                 <tr><th>判定書番号</th><th>対象出荷</th><th>対象ロット</th><th>判定</th><th>判定者</th><th>判定日</th><th>承認</th><th></th></tr>
             </thead>
             <tbody>
-                @foreach (var judgment in _judgments)
+                @foreach (var judgment in _judgments.Items)
                 {
                     <tr>
                         <td>@judgment.JudgmentNo</td>
@@ -79,7 +73,7 @@
                         <td>@judgment.JudgedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
                         <td>@(judgment.ApprovedAt is null ? "未承認" : "承認済")</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.QualityAssurance}")" Context="qa">
+                            <AuthorizeView Roles="@MesRoleGroups.QaManage" Context="qa">
                                 @if (judgment.ApprovedAt is null)
                                 {
                                     <button class="btn btn-sm" disabled="@_busy"
@@ -92,13 +86,12 @@
                 }
             </tbody>
         </table>
+        <Pager TItem="ShipmentJudgmentResponse" Result="_judgments" OnPageChanged="LoadPageAsync" />
     }
 </div>
 
 @code {
-    private List<ShipmentJudgmentResponse>? _judgments;
-    private List<ShippingOrderResponse> _shippingOrders = [];
-    private List<StockResponse> _stocks = [];
+    private PagedResult<ShipmentJudgmentResponse>? _judgments;
 
     private int _shippingOrderId;
     private int _lotId;
@@ -110,13 +103,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _shippingOrders = await Http.GetFromJsonAsync<List<ShippingOrderResponse>>("api/shipping-orders") ?? [];
-        _stocks = await Http.GetFromJsonAsync<List<StockResponse>>("api/inventory/stocks") ?? [];
         await LoadAsync();
     }
 
-    private async Task LoadAsync() =>
-        _judgments = await Http.GetFromJsonAsync<List<ShipmentJudgmentResponse>>("api/shipment-judgments");
+    private Task LoadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int page) =>
+        _judgments = await Http.GetFromJsonAsync<PagedResult<ShipmentJudgmentResponse>>(
+            $"api/shipment-judgments?page={page}");
 
     private async Task CreateAsync()
     {
@@ -135,9 +129,9 @@
                     _lotId == 0 ? null : _lotId,
                     _shippingOrderId == 0 ? null : _shippingOrderId,
                     _result, _note));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "登録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "出荷判定を登録しました。承認すると出荷実行が可能になります。";
@@ -158,9 +152,9 @@
         try
         {
             var response = await Http.PostAsync($"api/shipment-judgments/{id}/approve", null);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "承認に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "判定を承認しました。";

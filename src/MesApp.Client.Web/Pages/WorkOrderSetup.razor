@@ -1,4 +1,4 @@
-@page "/work-orders/{Id:int}/setup"
+﻿@page "/work-orders/{Id:int}/setup"
 @attribute [Authorize]
 @inject HttpClient Http
 
@@ -41,7 +41,9 @@ else
                 <input @bind="_abnormality" placeholder="異常があれば記入" />
             </div>
         </div>
-        <button class="btn" disabled="@_busy" @onclick="AddSetupAsync">段取り実績を記録</button>
+        <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord">
+            <button class="btn" disabled="@_busy" @onclick="AddSetupAsync">段取り実績を記録</button>
+        </AuthorizeView>
 
         @if (_setupRecords.Count > 0)
         {
@@ -58,6 +60,79 @@ else
                             <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
                             <td>@record.PerformedByName</td>
                             <td>@(record.AbnormalityNote ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    @* 治工具の引当・払出・受領確認（B-20-30-01〜03）。現物の所在を追う。寿命の累計は治工具管理で記録する *@
+    <div class="card">
+        <h2 style="margin-top:0;">治工具の引当・払出（B-20-30）</h2>
+        <AuthorizeView Roles="@MesRoleGroups.ProductionManage" Context="toolAllocate">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>治工具</label>
+                    <select @bind="_allocateToolId">
+                        <option value="0">選択してください</option>
+                        @foreach (var tool in _tools)
+                        {
+                            <option value="@tool.Id">@tool.Code @tool.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>備考</label>
+                    <input @bind="_allocateNote" />
+                </div>
+            </div>
+            <button class="btn" disabled="@_busy" @onclick="AllocateToolAsync">引き当てる</button>
+            <p class="text-muted">
+                メンテナンス中・廃棄済み・寿命に達した治工具、他の作業指示に引当中の治工具は引き当てられない。
+            </p>
+        </AuthorizeView>
+
+        @if (_toolIssues.Count == 0)
+        {
+            <p class="text-muted">この作業指示への治工具の引当はありません。</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr><th>治工具</th><th>状態</th><th>引当日時</th><th>払出日時</th><th>受領者</th><th>返却日時</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var issue in _toolIssues)
+                    {
+                        <tr>
+                            <td>@issue.ToolCode @issue.ToolName</td>
+                            <td><StatusBadge Status="@issue.Status.ToString()" /></td>
+                            <td>@issue.AllocatedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                            <td>@(issue.IssuedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
+                            <td>@(issue.IssuedToName ?? "-")</td>
+                            <td>@(issue.ReturnedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
+                            <td class="actions">
+                                @if (issue.Status == ToolIssueStatus.Allocated)
+                                {
+                                    <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="toolIssue">
+                                        <button class="btn btn-sm" disabled="@_busy"
+                                                @onclick="() => IssueToolAsync(issue.Id)">受領（払出）</button>
+                                    </AuthorizeView>
+                                    <AuthorizeView Roles="@MesRoleGroups.ProductionManage" Context="toolCancel">
+                                        <button class="btn btn-secondary btn-sm" disabled="@_busy"
+                                                @onclick="() => CancelToolIssueAsync(issue.Id)">引当取消</button>
+                                    </AuthorizeView>
+                                }
+                                else if (issue.Status == ToolIssueStatus.Issued)
+                                {
+                                    <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="toolReturn">
+                                        <button class="btn btn-secondary btn-sm" disabled="@_busy"
+                                                @onclick="() => ReturnToolAsync(issue.Id)">返却</button>
+                                    </AuthorizeView>
+                                }
+                            </td>
                         </tr>
                     }
                 </tbody>
@@ -102,7 +177,9 @@ else
                     }
                 </tbody>
             </table>
-            <button class="btn mt-2" disabled="@_busy" @onclick="SubmitChecklistAsync">チェックリストを記録</button>
+            <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="checklistWrite">
+                <button class="btn mt-2" disabled="@_busy" @onclick="SubmitChecklistAsync">チェックリストを記録</button>
+            </AuthorizeView>
         }
 
         @if (_checklistRecords.Count > 0)
@@ -141,6 +218,10 @@ else
     private List<SetupRecordResponse> _setupRecords = [];
     private List<ChecklistResponse> _checklists = [];
     private List<ChecklistRecordResponse> _checklistRecords = [];
+    private List<ToolResponse> _tools = [];
+    private List<ToolIssueResponse> _toolIssues = [];
+    private int _allocateToolId;
+    private string? _allocateNote;
     private ChecklistResponse? _selectedChecklist;
     private readonly Dictionary<int, CheckState> _checks = [];
 
@@ -157,6 +238,7 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _checklists = await Http.GetFromJsonAsync<List<ChecklistResponse>>("api/checklists") ?? [];
+        _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
         await LoadAsync();
     }
 
@@ -167,6 +249,8 @@ else
             $"api/work-orders/{Id}/setup-records") ?? [];
         _checklistRecords = await Http.GetFromJsonAsync<List<ChecklistRecordResponse>>(
             $"api/work-orders/{Id}/checklist-records") ?? [];
+        _toolIssues = await Http.GetFromJsonAsync<List<ToolIssueResponse>>(
+            $"api/tool-issues?workOrderId={Id}") ?? [];
     }
 
     private void OnChecklistChanged()
@@ -189,9 +273,9 @@ else
             var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/setup-records",
                 new SetupRecordRequest(_setupType, new DateTimeOffset(_startedAt),
                     _endedAt is null ? null : new DateTimeOffset(_endedAt.Value), _abnormality));
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "段取り実績を記録しました。";
@@ -220,10 +304,10 @@ else
                 .ToList();
             var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/checklist-records",
                 new ChecklistRecordRequest(_selectedChecklist.Id, results));
-            if (!response.IsSuccessStatusCode)
+            // 必須項目が未チェックの場合はここでエラーになる
+            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
             {
-                // 必須項目が未チェックの場合はここでエラーになる
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "記録に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "チェックリストを記録しました。";
@@ -246,4 +330,59 @@ else
         ChecklistCategory.Hse => "HSE",
         _ => category.ToString(),
     };
+
+    private async Task AllocateToolAsync()
+    {
+        if (_allocateToolId == 0)
+        {
+            _error = "治工具を選択してください。";
+            return;
+        }
+        await RunToolActionAsync(
+            () => Http.PostAsJsonAsync("api/tool-issues",
+                new ToolAllocateRequest(_allocateToolId, Id, _allocateNote)),
+            "引き当てました。",
+            () =>
+            {
+                _allocateToolId = 0;
+                _allocateNote = null;
+            });
+    }
+
+    private Task IssueToolAsync(int issueId) => RunToolActionAsync(
+        () => Http.PostAsJsonAsync($"api/tool-issues/{issueId}/issue", new ToolIssueReceiveRequest(null)),
+        "受領（払出）を記録しました。");
+
+    private Task ReturnToolAsync(int issueId) => RunToolActionAsync(
+        () => Http.PostAsJsonAsync($"api/tool-issues/{issueId}/return", new ToolIssueCloseRequest(null)),
+        "返却を記録しました。");
+
+    private Task CancelToolIssueAsync(int issueId) => RunToolActionAsync(
+        () => Http.PostAsJsonAsync($"api/tool-issues/{issueId}/cancel", new ToolIssueCloseRequest(null)),
+        "引当を取り消しました。");
+
+    /// <summary>治工具の操作は成否の見せ方が同じなのでまとめる（各画面の _error / _message の作法に合わせる）</summary>
+    private async Task RunToolActionAsync(
+        Func<Task<HttpResponseMessage>> action, string success, Action? onSuccess = null)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await action();
+            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = success;
+            onSuccess?.Invoke();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 }

@@ -1,4 +1,4 @@
-using MesApp.Core.Contracts.Masters;
+﻿using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Services;
@@ -12,13 +12,20 @@ public static class MasterCsvKinds
     public const string Products = "products";
     public const string Processes = "processes";
     public const string Equipments = "equipments";
+    public const string EquipmentParts = "equipment-parts";
     public const string Tools = "tools";
+    public const string WorkCenters = "work-centers";
     public const string Locations = "locations";
     public const string InspectionItems = "inspection-items";
+    public const string ControlItems = "control-items";
     public const string Checklists = "checklists";
+    public const string DefectReasons = "defect-reasons";
     public const string Skills = "skills";
     public const string Bom = "bom";
     public const string Routing = "routing";
+    public const string WorkProcedures = "work-procedures";
+    public const string Shifts = "shifts";
+    public const string InspectionDevices = "inspection-devices";
     public const string Users = "users";
     public const string UserSkills = "user-skills";
 
@@ -32,6 +39,7 @@ public static class MasterCsvKinds
             new("Specification", "規格", false, null),
             new("Type", "品目区分", false, "Product（製品）/ SemiFinished（半製品）/ Material（部材）"),
             new("StandardDefectRate", "標準不良率(%)", false, "0〜100"),
+            new("DefaultLocationCode", "既定ロケーション", false, "推奨ロケーションの第一候補。空欄で解除"),
             new("IsActive", "有効", false, "true / false。falseで無効化"),
         ]),
         new(Processes, "工程", false,
@@ -45,12 +53,21 @@ public static class MasterCsvKinds
         [
             new("AssetNo", "資産番号", true, null),
             new("Name", "設備名", true, null),
-            new("Site", "設置場所", false, null),
+            new("WorkCenterCode", "作業区コード", false, "登録済みの作業区コード（段が作業区のもの）"),
+            new("Site", "設置場所（旧項目）", false, "作業区を整備するまでの自由記述。設置場所の正は WorkCenterCode"),
             new("Status", "状態", false, "Available / Stopped / UnderMaintenance / Retired"),
             new("MaintenanceType", "保全タイプ", false, "None / Calendar（日数）/ RunTime（時間）/ Count（回数）"),
             new("MaintenanceThreshold", "保全閾値", false, "保全タイプに応じた日数・時間・回数"),
             new("MaintenanceParts", "保全部品", false, null),
             new("IsActive", "有効", false, "true / false"),
+        ]),
+        new(EquipmentParts, "設備の保全部品", false,
+        [
+            new("EquipmentAssetNo", "設備の資産番号", true, "同じ設備の保全部品を一括置換する"),
+            new("ProductCode", "部品の品目コード", true, "登録済みの品目コード"),
+            new("Category", "管理区分", false, "Asset（資産管理部品）/ Consumable（消耗品）"),
+            new("QuantityPer", "1回あたり数量", false, "0以上"),
+            new("Note", "備考", false, null),
         ]),
         new(Tools, "治工具", false,
         [
@@ -62,9 +79,19 @@ public static class MasterCsvKinds
             new("Status", "状態", false, "Available / InUse / UnderMaintenance / Retired"),
             new("IsActive", "有効", false, "true / false"),
         ]),
+        new(WorkCenters, "作業区", false,
+        [
+            new("Code", "作業区コード", true, "既存コードと一致すれば更新、無ければ新規登録"),
+            new("Name", "名称", true, null),
+            new("Level", "段", false, "Plant（工場）/ Line（ライン）/ Area（エリア）/ WorkCenter（作業区）"),
+            new("ParentCode", "上位の作業区コード", false,
+                "1つ上の段のコード。工場は空欄。同じファイル内で上位を先に定義しなくてもよい"),
+            new("IsActive", "有効", false, "true / false"),
+        ]),
         new(Locations, "ロケーション", false,
         [
             new("Code", "ロケーションコード", true, null),
+            new("WorkCenterCode", "所属する作業区コード", false, "登録済みの作業区コード（段は問わない）"),
             new("AreaType", "区分", false,
                 "MaterialWarehouse（部材倉庫）/ InProcess（工程内）/ ProductWarehouse（製品倉庫）/ ShippingArea（出荷場）"),
             new("ShelfNo", "棚番", false, null),
@@ -85,6 +112,18 @@ public static class MasterCsvKinds
             new("IsActive", "有効", false, "true / false"),
             new("Version", "版数", false, "出力のみ。基準値が変わる更新で自動採番"),
         ]),
+        new(ControlItems, "工程管理項目", false,
+        [
+            new("Code", "工程管理項目コード", true, null),
+            new("Name", "名称", true, null),
+            new("Unit", "単位", false, "℃ / rpm など"),
+            new("TargetProductCode", "対象品目コード", false, "登録済みの品目コード"),
+            new("TargetProcessCode", "対象工程コード", false, "登録済みの工程コード"),
+            new("TargetValue", "指示値", false, "許容範囲の内側であること"),
+            new("LowerLimit", "許容下限", false, null),
+            new("UpperLimit", "許容上限", false, null),
+            new("IsActive", "有効", false, "true / false"),
+        ]),
         new(Checklists, "チェックリスト", false,
         [
             new("Code", "チェックリストコード", true, "同じコードの複数行が1つのチェックリストになる"),
@@ -95,6 +134,13 @@ public static class MasterCsvKinds
             new("Text", "チェック内容", false, null),
             new("IsRequired", "必須項目", false, "true / false"),
         ]),
+        new(DefectReasons, "不良理由", false,
+        [
+            new("Code", "不良理由コード", true, "既存コードと一致すれば更新、無ければ新規登録"),
+            new("Name", "不良理由名", true, null),
+            new("Category", "区分", false, "Material / Process / Equipment / Human / Other"),
+            new("IsActive", "有効", false, "true / false"),
+        ]),
         new(Skills, "スキル・資格", false,
         [
             new("Code", "スキル・資格コード", true, null),
@@ -102,7 +148,11 @@ public static class MasterCsvKinds
             new("Type", "種別", false, "Skill（スキル）/ Certification（資格）"),
             new("RequiresExpiry", "有効期限管理", false, "true / false"),
             new("IsActive", "有効", false, "true / false"),
-        ]),
+        ])
+        {
+            // 単票の api/skills がシステム管理者専用（SkillsController）。CSVも同じ権限で絞る
+            UserAdminWrite = true,
+        },
         new(Bom, "MBOM（部品構成）", false,
         [
             new("ParentProductCode", "親品目コード", true, "同じ親の明細を一括置換する"),
@@ -110,6 +160,7 @@ public static class MasterCsvKinds
             new("QuantityPer", "必要数量（親1単位）", true, "0より大きい数値"),
             new("MakeOrBuy", "内外製区分", false, "InHouse（内製）/ Outsourced（外注）"),
             new("AlternativeGroup", "代替部品グループ", false, null),
+            new("IsAlternative", "代替部品", false, "true / false。trueの行を投入するには理由の記録が必要"),
         ]),
         new(Routing, "工順（BOP）", false,
         [
@@ -119,10 +170,41 @@ public static class MasterCsvKinds
             new("StandardWorkMinutes", "標準作業時間(分)", false, null),
             new("StandardSetupMinutes", "標準段取り時間(分)", false, null),
             new("RequiredSkillCode", "必要スキル・資格コード", false, null),
-            new("EquipmentAssetNo", "使用設備の資産番号", false, null),
+            new("EquipmentAssetNo", "代表設備の資産番号", false, "候補設備の1つとして扱う"),
+            new("EquipmentAssetNos", "候補設備の資産番号", false, "セミコロン区切り。空なら差立で設備を限定しない"),
             new("ToolCode", "使用治工具コード", false, null),
+            new("WorkCenterCode", "作業区コード", false, "登録済みの作業区コード（段が作業区のもの）"),
             new("ChecklistCode", "チェックリストコード", false, null),
             new("ControlItems", "工程管理項目", false, "温度・回転数 など"),
+            new("WorkProcedureNo", "作業手順書番号", false, "登録済みで有効な手順書の番号"),
+        ]),
+        new(WorkProcedures, "作業手順書（SOP）", true,
+        [
+            new("ProcedureNo", "手順書番号", true, "既存と一致すれば更新（版数+1）、無ければ新規登録"),
+            new("Title", "表題", true, null),
+            new("Steps", "手順ステップ", false, "手順書の所在を書かない場合は必須"),
+            new("Reference", "手順書の所在", false, "別システムの文書番号・URLなど。手順ステップを書かない場合は必須"),
+            new("IsActive", "有効", false, "true / false"),
+        ]),
+        new(Shifts, "勤務シフト（直）", true,
+        [
+            new("Code", "シフトコード", true, "既存と一致すれば更新、無ければ新規登録"),
+            new("Name", "名称", true, "昼勤 / 夜勤 など"),
+            new("StartTime", "開始時刻", true, "HH:mm"),
+            new("EndTime", "終了時刻", true, "HH:mm。開始時刻以下なら翌日にまたぐ夜勤として扱う"),
+            new("IsActive", "有効", false, "true / false"),
+        ]),
+        new(InspectionDevices, "検査機・測定器", true,
+        [
+            new("Code", "検査機コード", true, "既存と一致すれば更新、無ければ新規登録"),
+            new("Name", "名称", true, null),
+            new("SerialNo", "製造番号・管理番号", false, null),
+            new("Location", "設置場所", false, null),
+            new("CalibratedOn", "最終校正日", false, "yyyy-MM-dd"),
+            new("CalibrationDueOn", "次回校正期限", false, "yyyy-MM-dd。空欄なら期限の判定を行わない"),
+            new("CalibrationCycleDays", "校正周期（日）", false, "校正の記録時に次回期限を置くのに使う"),
+            new("Note", "備考", false, null),
+            new("IsActive", "有効", false, "true / false"),
         ]),
         new(Users, "ユーザー", true,
         [
@@ -130,6 +212,9 @@ public static class MasterCsvKinds
             new("DisplayName", "氏名（表示名）", true, null),
             new("Roles", "ロール", false,
                 "セミコロン区切り。SystemAdmin / ProductionManager / Operator / Logistics / QualityControl / QualityAssurance / Maintenance"),
+            new("WorkCenterCode", "作業場所の作業区コード", false, "登録済みの作業区コード（段は問わない）"),
+            new("Department", "所属（部署・課）", false, null),
+            new("ShiftCode", "所属する直のシフトコード", false, "登録済みで有効なシフトコード"),
             new("IsActive", "在籍", false, "false で無効化（ログイン不可・セッション失効）"),
             new("InitialPassword", "初期パスワード", false,
                 "新規登録時のみ必須。8文字以上で英小文字と数字を含む。初回ログイン時に変更を強制"),
@@ -141,6 +226,18 @@ public static class MasterCsvKinds
             new("AcquiredOn", "取得日", false, "yyyy-MM-dd"),
             new("ExpiresOn", "有効期限", false, "yyyy-MM-dd"),
         ]),
+    ];
+
+    /// <summary>
+    /// 一括出力で付ける番号の順（＝取り込む順）。後の種別が前の種別のコードを参照する
+    /// （ロケーション→品目の既定ロケーション、作業区→設備・工順、手順書→工順、直→ユーザー など）。
+    /// 種別を追加したら、参照先より後ろに置く
+    /// </summary>
+    public static readonly IReadOnlyList<string> ImportOrder =
+    [
+        WorkCenters, Processes, Locations, Products, Skills, Shifts, Equipments, EquipmentParts, Tools,
+        Checklists, DefectReasons, InspectionItems, ControlItems, InspectionDevices, Bom, WorkProcedures,
+        Routing, Users, UserSkills,
     ];
 
     public static CsvKindInfo? Find(string kind) =>
@@ -158,6 +255,29 @@ public static class CsvEnumLabels
         ("半製品・中間品", ProductType.SemiFinished),
         ("部材", ProductType.Material));
 
+    public static readonly IReadOnlyDictionary<string, ManufacturingOrderType> OrderTypes = Build(
+        ("通常", ManufacturingOrderType.Normal), ("突発", ManufacturingOrderType.Spot),
+        ("リワーク", ManufacturingOrderType.Rework));
+
+    public static readonly IReadOnlyDictionary<string, SetupType> SetupTypes = Build(
+        ("前段取り", SetupType.Pre), ("後段取り", SetupType.Post));
+
+    public static readonly IReadOnlyDictionary<string, InspectionOrderType> InspectionOrderTypes = Build(
+        ("受入検査", InspectionOrderType.Receiving), ("工程内検査", InspectionOrderType.InProcess),
+        ("製品完成品検査", InspectionOrderType.FinalProduct), ("完成品検査", InspectionOrderType.FinalProduct),
+        ("サンプル検査", InspectionOrderType.Sample), ("再検査", InspectionOrderType.Reinspection));
+
+    public static readonly IReadOnlyDictionary<string, InspectionJudgment> InspectionJudgments = Build(
+        ("合格", InspectionJudgment.Pass), ("不合格", InspectionJudgment.Fail));
+
+    public static readonly IReadOnlyDictionary<string, WorkTimeType> WorkTimeTypes = Build(
+        ("直接作業", WorkTimeType.Direct), ("直接", WorkTimeType.Direct),
+        ("間接作業", WorkTimeType.Indirect), ("間接", WorkTimeType.Indirect));
+
+    public static readonly IReadOnlyDictionary<string, TroubleCategory> TroubleCategories = Build(
+        ("品質", TroubleCategory.Quality), ("コスト", TroubleCategory.Cost),
+        ("納期", TroubleCategory.Delivery), ("安全", TroubleCategory.Safety));
+
     public static readonly IReadOnlyDictionary<string, MakeOrBuy> MakeOrBuys = Build(
         ("内製", MakeOrBuy.InHouse), ("外注", MakeOrBuy.Outsourced));
 
@@ -165,6 +285,10 @@ public static class CsvEnumLabels
         ("稼働可能", EquipmentStatus.Available), ("停止中", EquipmentStatus.Stopped),
         ("保全中", EquipmentStatus.UnderMaintenance), ("廃棄", EquipmentStatus.Retired),
         ("除却", EquipmentStatus.Retired));
+
+    public static readonly IReadOnlyDictionary<string, MaintenancePartCategory> MaintenancePartCategories = Build(
+        ("資産管理部品", MaintenancePartCategory.Asset), ("資産", MaintenancePartCategory.Asset),
+        ("消耗品", MaintenancePartCategory.Consumable), ("消耗材", MaintenancePartCategory.Consumable));
 
     public static readonly IReadOnlyDictionary<string, MaintenanceType> MaintenanceTypes = Build(
         ("対象外", MaintenanceType.None), ("カレンダ", MaintenanceType.Calendar),
@@ -174,9 +298,19 @@ public static class CsvEnumLabels
         ("使用可能", ToolStatus.Available), ("使用中", ToolStatus.InUse),
         ("メンテナンス中", ToolStatus.UnderMaintenance), ("廃棄", ToolStatus.Retired));
 
+    public static readonly IReadOnlyDictionary<string, WorkCenterLevel> WorkCenterLevels = Build(
+        ("工場", WorkCenterLevel.Plant), ("ライン", WorkCenterLevel.Line),
+        ("エリア", WorkCenterLevel.Area), ("作業区", WorkCenterLevel.WorkCenter));
+
     public static readonly IReadOnlyDictionary<string, LocationAreaType> LocationAreaTypes = Build(
         ("部材倉庫", LocationAreaType.MaterialWarehouse), ("工程内", LocationAreaType.InProcess),
         ("製品倉庫", LocationAreaType.ProductWarehouse), ("出荷場", LocationAreaType.ShippingArea));
+
+    public static readonly IReadOnlyDictionary<string, DefectReasonCategory> DefectReasonCategories = Build(
+        ("材質・部材", DefectReasonCategory.Material), ("材質", DefectReasonCategory.Material),
+        ("加工・作業", DefectReasonCategory.Process), ("加工", DefectReasonCategory.Process),
+        ("設備", DefectReasonCategory.Equipment), ("人的要因", DefectReasonCategory.Human),
+        ("その他", DefectReasonCategory.Other));
 
     public static readonly IReadOnlyDictionary<string, InspectionType> InspectionTypes = Build(
         ("受入検査", InspectionType.Receiving), ("工程内検査", InspectionType.InProcess),

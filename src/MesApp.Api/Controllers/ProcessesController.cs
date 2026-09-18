@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -36,12 +36,12 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ProcessResponse>> Create(ProcessRequest request, CancellationToken ct)
     {
         if (await db.Processes.AnyAsync(p => p.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"工程コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"工程コード '{request.Code}' は既に存在します。");
         }
         var p = new ProcessMaster { Code = request.Code, Name = request.Name, Category = request.Category };
         db.Processes.Add(p);
@@ -53,7 +53,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public async Task<ActionResult<ProcessResponse>> Update(int id, ProcessRequest request, CancellationToken ct)
     {
         var p = await db.Processes.FindAsync([id], ct);
@@ -63,7 +63,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
         }
         if (await db.Processes.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"工程コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"工程コード '{request.Code}' は既に存在します。");
         }
         p.Code = request.Code;
         p.Name = request.Name;
@@ -75,18 +75,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var p = await db.Processes.FindAsync([id], ct);
-        if (p is null)
-        {
-            return NotFound();
-        }
-        p.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(ProcessMaster), id.ToString(),
-            detail: $"code={p.Code}", ct: ct);
-        return NoContent();
-    }
+    [Authorize(Roles = MesRoleGroups.MasterWrite)]
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<ProcessMaster>(db, auditLogger, id, p => $"code={p.Code}", ct);
 }

@@ -99,6 +99,28 @@
                 <ul>@foreach (var line in _history.InspectionHistory) { <li>@line</li> }</ul>
             }
 
+            <h2>製造条件の逸脱（B-30-30-04）</h2>
+            @* 許容範囲から外れた記録だけを出す。範囲内まで並べると見るべきものが埋もれる *@
+            @if (_history.ControlItemDeviations.Count == 0)
+            {
+                <p class="text-muted">逸脱はありません。</p>
+            }
+            else
+            {
+                <ul>@foreach (var line in _history.ControlItemDeviations) { <li>@line</li> }</ul>
+            }
+
+            <h2>設備稼働履歴（H-30-10-04）</h2>
+            @* このロットを産出した作業指示に紐づく稼働区間。品質不良の原因を設備の状態から追う *@
+            @if (_history.EquipmentHistory.Count == 0)
+            {
+                <p class="text-muted">記録はありません（稼働実績が作業指示に紐付いていません）。</p>
+            }
+            else
+            {
+                <ul>@foreach (var line in _history.EquipmentHistory) { <li>@line</li> }</ul>
+            }
+
             <h2>在庫履歴</h2>
             @if (_history.InventoryHistory.Count == 0)
             {
@@ -107,6 +129,72 @@
             else
             {
                 <ul>@foreach (var line in _history.InventoryHistory) { <li>@line</li> }</ul>
+            }
+
+            <h2>状態履歴（H-30-10-04）</h2>
+            @if (_history.StatusHistory.Count == 0)
+            {
+                <p class="text-muted">記録はありません。</p>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>日時</th>
+                            <th>遷移</th>
+                            <th>契機</th>
+                            <th>理由</th>
+                            <th>変更者</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in _history.StatusHistory)
+                        {
+                            <tr>
+                                <td>@entry.ChangedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@Labels.LotStatus(entry.FromStatus) → @Labels.LotStatus(entry.ToStatus)</td>
+                                <td>@Labels.LotStatusSource(entry.Source)</td>
+                                <td>@(entry.Reason ?? "-")</td>
+                                <td>@(entry.ChangedByName ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <h2>実績訂正履歴（B-70-30-01）</h2>
+            @if (_history.CorrectionHistory.Count == 0)
+            {
+                <p class="text-muted">記録はありません。</p>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>日時</th>
+                            <th>作業指示</th>
+                            <th>訂正前（良品/不良/廃棄/再作業）</th>
+                            <th>訂正後（良品/不良/廃棄/再作業）</th>
+                            <th>理由</th>
+                            <th>訂正者</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in _history.CorrectionHistory)
+                        {
+                            <tr>
+                                <td>@entry.CorrectedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@entry.WorkOrderNo</td>
+                                <td>@entry.BeforeGoodQuantity / @entry.BeforeDefectQuantity / @entry.BeforeScrapQuantity / @entry.BeforeReworkQuantity</td>
+                                <td>@entry.AfterGoodQuantity / @entry.AfterDefectQuantity / @entry.AfterScrapQuantity / @entry.AfterReworkQuantity</td>
+                                <td>@entry.Reason</td>
+                                <td>@(entry.CorrectedByName ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             }
         </div>
     }
@@ -162,11 +250,13 @@
         _forward = null;
         _history = null;
 
-        // ロット番号 → ロットIDの解決（在庫が0のロットも追跡できるよう includeEmpty で検索）
-        var stocks = await Http.GetFromJsonAsync<List<StockResponse>>(
-            "api/inventory/stocks?includeEmpty=true") ?? [];
-        var match = stocks.FirstOrDefault(s =>
-            string.Equals(s.LotNumber, lotNumber.Trim(), StringComparison.OrdinalIgnoreCase));
+        // ロット番号 → ロットIDの解決（在庫が0のロットも追跡できるよう includeEmpty で検索）。
+        // 全件を取らずに、選択肢APIへロット番号を渡して引く
+        var keyword = lotNumber.Trim();
+        var stocks = await Http.GetFromJsonAsync<OptionsResult<StockResponse>>(
+            $"api/inventory/stocks/options?includeEmpty=true&q={Uri.EscapeDataString(keyword)}");
+        var match = stocks?.Items.FirstOrDefault(s =>
+            string.Equals(s.LotNumber, keyword, StringComparison.OrdinalIgnoreCase));
         if (match is null)
         {
             _error = $"ロット '{lotNumber}' が見つかりません。";

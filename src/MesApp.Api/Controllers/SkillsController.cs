@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -37,12 +37,12 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
     }
 
     [HttpPost]
-    [Authorize(Roles = RoleGroups.UserAdmin)]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<SkillResponse>> Create(SkillRequest request, CancellationToken ct)
     {
         if (await db.Skills.AnyAsync(s => s.Code == request.Code, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"スキル・資格コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"スキル・資格コード '{request.Code}' は既に存在します。");
         }
         var s = new SkillMaster
         {
@@ -60,7 +60,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = RoleGroups.UserAdmin)]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<SkillResponse>> Update(int id, SkillRequest request, CancellationToken ct)
     {
         var s = await db.Skills.FindAsync([id], ct);
@@ -70,7 +70,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
         }
         if (await db.Skills.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return Conflict(new ProblemDetails { Title = $"スキル・資格コード '{request.Code}' は既に存在します。" });
+            return this.ConflictProblem($"スキル・資格コード '{request.Code}' は既に存在します。");
         }
         s.Code = request.Code;
         s.Name = request.Name;
@@ -83,18 +83,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleGroups.UserAdmin)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var s = await db.Skills.FindAsync([id], ct);
-        if (s is null)
-        {
-            return NotFound();
-        }
-        s.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(SkillMaster), id.ToString(),
-            detail: $"code={s.Code}", ct: ct);
-        return NoContent();
-    }
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<SkillMaster>(db, auditLogger, id, s => $"code={s.Code}", ct);
 }

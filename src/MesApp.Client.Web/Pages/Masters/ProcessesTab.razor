@@ -3,7 +3,7 @@
 @* 工程マスタ（Spec.md 5.1 Process） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "工程の登録" : $"工程の編集（ID {_editingId}）")</h2>
         <div class="form-grid">
@@ -53,7 +53,7 @@
                         <td>@(item.Category == MakeOrBuy.InHouse ? "内製" : "外注")</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
                                 @if (item.IsActive)
                                 {
@@ -116,9 +116,9 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/processes", request)
                 : await Http.PutAsJsonAsync($"api/processes/{_editingId}", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保存しました。";
@@ -138,9 +138,9 @@
         try
         {
             var response = await Http.DeleteAsync($"api/processes/{id}");
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "無効化しました。";

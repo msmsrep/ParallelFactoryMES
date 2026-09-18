@@ -3,7 +3,7 @@
 @* ロケーションマスタ（Spec.md 5.1 Location。D-50-20-01 棚番号・ロケーション管理） *@
 <Notice Error="@_error" Message="@_message" />
 
-<AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")">
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
         <h2 style="margin-top:0;">@(_editingId is null ? "ロケーションの登録" : $"ロケーションの編集（{_code}）")</h2>
         <div class="form-grid">
@@ -18,6 +18,16 @@
                     <option value="@LocationAreaType.InProcess">工程内</option>
                     <option value="@LocationAreaType.ProductWarehouse">製品倉庫</option>
                     <option value="@LocationAreaType.ShippingArea">出荷場</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>所属する作業区</label>
+                <select @bind="_workCenterId">
+                    <option value="0">なし</option>
+                    @foreach (var wc in _workCenters ?? [])
+                    {
+                        <option value="@wc.Id">@wc.Code @wc.Name</option>
+                    }
                 </select>
             </div>
             <div class="form-field">
@@ -45,17 +55,18 @@
     else
     {
         <table class="table">
-            <thead><tr><th>コード</th><th>区分</th><th>棚番</th><th>状態</th><th></th></tr></thead>
+            <thead><tr><th>コード</th><th>区分</th><th>作業区</th><th>棚番</th><th>状態</th><th></th></tr></thead>
             <tbody>
                 @foreach (var item in _items)
                 {
                     <tr>
                         <td>@item.Code</td>
                         <td>@AreaLabel(item.AreaType)</td>
+                        <td>@(item.WorkCenterCode is null ? "-" : $"{item.WorkCenterCode} {item.WorkCenterName}")</td>
                         <td>@(item.ShelfNo ?? "-")</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
-                            <AuthorizeView Roles="@($"{MesRoles.SystemAdmin},{MesRoles.ProductionManager}")" Context="pm">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
                                 @if (item.IsActive)
                                 {
@@ -77,14 +88,20 @@
     private string _code = string.Empty;
     private LocationAreaType _areaType = LocationAreaType.MaterialWarehouse;
     private string? _shelfNo;
+    private int _workCenterId;
+    /// <summary>倉庫は工場直下に置かれることがあるため、段を問わず全件から選ばせる（Spec.md 5.1 Location）</summary>
+    private List<WorkCenterResponse>? _workCenters;
     private string? _error;
     private string? _message;
     private bool _busy;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private async Task LoadAsync() =>
+    private async Task LoadAsync()
+    {
         _items = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations?includeInactive=true");
+        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers");
+    }
 
     private void Edit(LocationResponse item)
     {
@@ -92,6 +109,7 @@
         _code = item.Code;
         _areaType = item.AreaType;
         _shelfNo = item.ShelfNo;
+        _workCenterId = item.WorkCenterId ?? 0;
     }
 
     private void ResetForm()
@@ -100,6 +118,7 @@
         _code = string.Empty;
         _areaType = LocationAreaType.MaterialWarehouse;
         _shelfNo = null;
+        _workCenterId = 0;
     }
 
     private async Task SaveAsync()
@@ -114,13 +133,13 @@
         _message = null;
         try
         {
-            var request = new LocationRequest(_code, _areaType, _shelfNo);
+            var request = new LocationRequest(_code, _areaType, _shelfNo, _workCenterId == 0 ? null : _workCenterId);
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/locations", request)
                 : await Http.PutAsJsonAsync($"api/locations/{_editingId}", request);
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "保存に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "保存しました。";
@@ -140,9 +159,9 @@
         try
         {
             var response = await Http.DeleteAsync($"api/locations/{id}");
-            if (!response.IsSuccessStatusCode)
+            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
             {
-                _error = await AuthService.ReadProblemTitleAsync(response) ?? "無効化に失敗しました。";
+                _error = error;
                 return;
             }
             _message = "無効化しました。";

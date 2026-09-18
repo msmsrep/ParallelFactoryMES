@@ -1,6 +1,6 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MesApp.Api.Services;
-using MesApp.Core.Abstractions;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -13,20 +13,24 @@ namespace MesApp.Api.Controllers;
 /// <summary>
 /// 出荷（D-40-20 出荷指示、D-40-30 出荷実行・完了報告）。
 /// 出荷実行はロット・ロケーション指定で在庫を引き落とす。部分出荷可能で、
-/// 全明細が出荷済みになると完了になる。出荷判定との連動はPhase 4で追加予定。
+/// 全明細が出荷済みになると完了になる。出荷には承認済みの出荷判定（H-10-10）が必要で、
+/// 併せてロットの使用可否（Spec.md 3.9。LotUsabilityPolicy）を満たす必要がある。
+/// 参照系は認証済みユーザー全員に開放し、更新系のみ在庫権限に絞る（Spec.md 7.4）。
+/// <b>クラスへ <c>[Authorize(Roles = ...)]</c> を付けてはならない</b>：認可属性はクラスとアクションで
+/// 合成されるため、アクション側の <c>[Authorize]</c> では開放できず、参照系まで在庫ロール限定になる。
 /// </summary>
 [ApiController]
 [Route("api/shipping-orders")]
-[Authorize(Roles = RoleGroups.InventoryManage)]
+[Authorize]
 public class ShippingOrdersController(
     MesAppDbContext db,
-    InventoryService inventory,
-    NumberingService numbering,
-    IAuditLogger auditLogger) : ControllerBase
+    ShippingService shipping) : ControllerBase
 {
+    private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
+
     [HttpGet]
-    [Authorize]
-    public async Task<ActionResult<List<ShippingOrderResponse>>> List(
+    public async Task<ActionResult<PagedResult<ShippingOrderResponse>>> List(
+        [FromQuery] PageQuery paging,
         [FromQuery] ShippingOrderStatus? status = null, CancellationToken ct = default)
     {
         var query = BaseQuery();
@@ -34,12 +38,11 @@ public class ShippingOrdersController(
         {
             query = query.Where(s => s.Status == status);
         }
-        var orders = await query.OrderByDescending(s => s.Id).ToListAsync(ct);
-        return orders.Select(ToResponse).ToList();
+        var orders = await query.OrderByDescending(s => s.Id).ToPagedResultAsync(paging, ct);
+        return orders.Map(ToResponse);
     }
 
     [HttpGet("{id:int}")]
-    [Authorize]
     public async Task<ActionResult<ShippingOrderResponse>> Get(int id, CancellationToken ct)
     {
         var order = await BaseQuery().FirstOrDefaultAsync(s => s.Id == id, ct);
@@ -48,35 +51,17 @@ public class ShippingOrdersController(
 
     /// <summary>出荷指示の作成（D-40-20-01）</summary>
     [HttpPost]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<ShippingOrderResponse>> Create(
         ShippingOrderCreateRequest request, CancellationToken ct)
     {
-        if (request.Lines.Count == 0)
+        var outcome = await shipping.CreateAsync(request, CurrentUserId, ct);
+        if (outcome.Failed)
         {
-            return BadRequest(new ProblemDetails { Title = "明細がありません。" });
+            return ToProblem(outcome);
         }
-        var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
-        if (await db.Products.CountAsync(p => productIds.Contains(p.Id), ct) != productIds.Count)
-        {
-            return BadRequest(new ProblemDetails { Title = "存在しない品目IDが含まれています。" });
-        }
-
-        var order = new ShippingOrder
-        {
-            ShippingNo = await numbering.NextShippingNoAsync(ct),
-            Destination = request.Destination,
-            PlannedDate = request.PlannedDate,
-            CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-            Lines = request.Lines
-                .Select(l => new ShippingLine { ProductId = l.ProductId, Quantity = l.Quantity })
-                .ToList(),
-        };
-        db.ShippingOrders.Add(order);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "ShippingCreate", nameof(ShippingOrder), order.Id.ToString(),
-            detail: $"shippingNo={order.ShippingNo}, dest={order.Destination}", ct: ct);
-        var saved = await BaseQuery().FirstAsync(s => s.Id == order.Id, ct);
-        return CreatedAtAction(nameof(Get), new { id = order.Id }, ToResponse(saved));
+        var id = outcome.Value!.Id;
+        return CreatedAtAction(nameof(Get), new { id }, await ToResponseAsync(id, ct));
     }
 
     /// <summary>
@@ -84,115 +69,52 @@ public class ShippingOrdersController(
     /// 部分出荷可。全明細が満たされると完了（D-40-30-05））
     /// </summary>
     [HttpPost("{id:int}/ship")]
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<ShippingOrderResponse>> Ship(
-        int id, ShipExecuteRequest request, CancellationToken ct)
-    {
-        var order = await db.ShippingOrders.Include(s => s.Lines)
-            .FirstOrDefaultAsync(s => s.Id == id, ct);
-        if (order is null)
-        {
-            return NotFound();
-        }
-        if (order.Status != ShippingOrderStatus.Instructed)
-        {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の出荷指示は実行できません。" });
-        }
-        if (request.Lines.Count == 0)
-        {
-            return BadRequest(new ProblemDetails { Title = "出荷明細がありません。" });
-        }
-
-        // 出荷判定ゲート（H-10-10、Spec.md 5.3 出荷判定参照）：
-        // この出荷指示を対象とする承認済みの「可」または「特採」判定が必要
-        var hasApprovedJudgment = await db.ShipmentJudgments.AnyAsync(j =>
-            j.ShippingOrderId == id
-            && j.ApprovedAt != null
-            && (j.Result == ShipmentJudgmentResult.Approved
-                || j.Result == ShipmentJudgmentResult.SpecialAcceptance), ct);
-        if (!hasApprovedJudgment)
-        {
-            return Conflict(new ProblemDetails
-            {
-                Title = "承認済みの出荷判定（可または特採）がないため出荷できません（H-10-10）。",
-            });
-        }
-
-        var lotIds = request.Lines.Select(l => l.LotId).Distinct().ToList();
-        var lots = await db.Lots.Where(l => lotIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, ct);
-
-        // ロットの品目単位で出荷指示明細との突合を行う
-        var shipTotals = new Dictionary<int, decimal>(); // productId -> qty
-        foreach (var line in request.Lines)
-        {
-            if (!lots.TryGetValue(line.LotId, out var lot))
-            {
-                return BadRequest(new ProblemDetails { Title = "存在しないロットIDが含まれています。" });
-            }
-            shipTotals[lot.ProductId] = shipTotals.GetValueOrDefault(lot.ProductId) + line.Quantity;
-        }
-        foreach (var (productId, qty) in shipTotals)
-        {
-            var orderLine = order.Lines.FirstOrDefault(l => l.ProductId == productId);
-            if (orderLine is null)
-            {
-                return BadRequest(new ProblemDetails { Title = "出荷指示に含まれない品目のロットが指定されています。" });
-            }
-            if (orderLine.ShippedQuantity + qty > orderLine.Quantity)
-            {
-                return BadRequest(new ProblemDetails
-                {
-                    Title = $"出荷数量が指示数量を超えています（指示 {orderLine.Quantity}、出荷済 {orderLine.ShippedQuantity}、今回 {qty}）。",
-                });
-            }
-        }
-
-        try
-        {
-            foreach (var line in request.Lines)
-            {
-                await inventory.RemoveAsync(lots[line.LotId], line.LocationId, line.Quantity,
-                    InventoryTransactionType.Ship, User.FindFirstValue(ClaimTypes.NameIdentifier),
-                    shippingOrderId: order.Id, note: $"出荷 {order.ShippingNo}", ct: ct);
-            }
-        }
-        catch (InventoryException ex)
-        {
-            return BadRequest(new ProblemDetails { Title = ex.Message });
-        }
-
-        foreach (var (productId, qty) in shipTotals)
-        {
-            order.Lines.First(l => l.ProductId == productId).ShippedQuantity += qty;
-        }
-        if (order.Lines.All(l => l.ShippedQuantity >= l.Quantity))
-        {
-            order.Status = ShippingOrderStatus.Completed;
-            order.ShippedAt = DateTimeOffset.UtcNow;
-            order.ShippedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        }
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "Ship", nameof(ShippingOrder), id.ToString(),
-            detail: $"shippingNo={order.ShippingNo}, completed={order.Status == ShippingOrderStatus.Completed}", ct: ct);
-        var saved = await BaseQuery().FirstAsync(s => s.Id == id, ct);
-        return ToResponse(saved);
-    }
+        int id, ShipExecuteRequest request, CancellationToken ct) =>
+        await ToResponseAsync(await shipping.ShipAsync(id, request, CurrentUserId, ct), id, ct);
 
     [HttpPost("{id:int}/cancel")]
-    public async Task<ActionResult<ShippingOrderResponse>> Cancel(int id, CancellationToken ct)
+    [Authorize(Roles = MesRoleGroups.InventoryManage)]
+    public async Task<ActionResult<ShippingOrderResponse>> Cancel(int id, CancellationToken ct) =>
+        await ToResponseAsync(await shipping.CancelAsync(id, ct), id, ct);
+
+    private async Task<ActionResult<ShippingOrderResponse>> ToResponseAsync(
+        Outcome<ShippingOrder> outcome, int id, CancellationToken ct) =>
+        outcome.Failed ? ToProblem(outcome) : await ToResponseAsync(id, ct);
+
+    /// <summary>応答は明細・品目を読み直して返す（サービスが返すのは追跡中の本体のみのため）</summary>
+    private async Task<ShippingOrderResponse> ToResponseAsync(int id, CancellationToken ct) =>
+        ToResponse(await BaseQuery().FirstAsync(s => s.Id == id, ct));
+
+    private ActionResult ToProblem(Outcome<ShippingOrder> outcome) => outcome.Kind switch
     {
-        var order = await db.ShippingOrders.FindAsync([id], ct);
-        if (order is null)
+        OutcomeError.NotFound => NotFound(),
+        OutcomeError.Conflict => this.ConflictProblem(outcome.Error),
+        _ => this.BadRequestProblem(outcome.Error),
+    };
+
+    /// <summary>
+    /// 出荷指示選択用の選択肢（出荷判定・出荷向けピッキングの対象指定）。
+    /// 出荷番号・出荷先の部分一致で絞り込む。
+    /// </summary>
+    [HttpGet("options")]
+    public async Task<ActionResult<OptionsResult<ShippingOrderResponse>>> Options(
+        [FromQuery] OptionQuery options,
+        [FromQuery] ShippingOrderStatus? status = null,
+        CancellationToken ct = default)
+    {
+        var query = BaseQuery();
+        if (status is not null)
         {
-            return NotFound();
+            query = query.Where(s => s.Status == status);
         }
-        if (order.Status != ShippingOrderStatus.Instructed)
+        if (options.Keyword is { } keyword)
         {
-            return Conflict(new ProblemDetails { Title = $"状態 '{order.Status}' の出荷指示は取消できません。" });
+            query = query.Where(s => s.ShippingNo.Contains(keyword) || s.Destination.Contains(keyword));
         }
-        order.Status = ShippingOrderStatus.Canceled;
-        await db.SaveChangesAsync(ct);
-        var saved = await BaseQuery().FirstAsync(s => s.Id == id, ct);
-        return ToResponse(saved);
+        var result = await query.OrderByDescending(s => s.Id).ToOptionsResultAsync(options, ct);
+        return new OptionsResult<ShippingOrderResponse>([.. result.Items.Select(ToResponse)], result.Truncated);
     }
 
     private IQueryable<ShippingOrder> BaseQuery() =>
