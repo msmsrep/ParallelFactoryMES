@@ -1,6 +1,7 @@
-﻿@inject HttpClient Http
+@inject HttpClient Http
 
-@* 品目マスタ＋MBOM＋工順（BOP）（Spec.md 5.1、A-40-10／A-40-20） *@
+@* 品目マスタ（Spec.md 5.1、A-40-10／A-40-20）。
+   選んだ品目のMBOM・工順・設計変更の影響は Masters/Products/ の子コンポーネントが持つ *@
 <Notice Error="@_error" Message="@_message" />
 
 <AuthorizeView Roles="@MesRoleGroups.MasterWrite">
@@ -103,301 +104,27 @@
 
 @if (_selected is not null)
 {
-    <div class="card">
-        <h2 style="margin-top:0;">@_selected.Code @_selected.Name の MBOM（A-40-10）</h2>
-        <table class="table">
-            <thead><tr><th>子品目</th><th>必要数量（親1単位）</th><th>内外製</th><th>代替グループ</th><th>代替部品</th><th></th></tr></thead>
-            <tbody>
-                @foreach (var line in _bomLines)
-                {
-                    <tr>
-                        <td>@(_products?.FirstOrDefault(p => p.Id == line.ChildProductId)?.Code)</td>
-                        <td>@line.QuantityPer</td>
-                        <td>@(line.MakeOrBuy == MakeOrBuy.InHouse ? "内製" : "外注")</td>
-                        <td>@(line.AlternativeGroup ?? "-")</td>
-                        <td>@(line.IsAlternative ? "代替" : "主")</td>
-                        <td><button class="btn btn-danger btn-sm" @onclick="() => _bomLines.Remove(line)">削除</button></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-        <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="bom">
-            <div class="form-grid">
-                <div class="form-field">
-                    <label>子品目</label>
-                    <select @bind="_bomChildId">
-                        <option value="0">選択してください</option>
-                        @foreach (var product in _products ?? [])
-                        {
-                            <option value="@product.Id">@product.Code @product.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-field">
-                    <label>必要数量</label>
-                    <input type="number" step="any" @bind="_bomQuantity" />
-                </div>
-                <div class="form-field">
-                    <label>内外製区分</label>
-                    <select @bind="_bomMakeOrBuy">
-                        <option value="@MakeOrBuy.InHouse">内製</option>
-                        <option value="@MakeOrBuy.Outsourced">外注</option>
-                    </select>
-                </div>
-                <div class="form-field">
-                    <label>代替部品グループ</label>
-                    <input @bind="_bomAltGroup" />
-                </div>
-                @* 代替部品の投入には理由の記録を求める（A-40-10-04） *@
-                <div class="form-field">
-                    <label>
-                        <input type="checkbox" @bind="_bomIsAlternative" style="width:auto;" />
-                        代替部品（主材料でない）
-                    </label>
-                </div>
-            </div>
-            <div class="actions">
-                <button class="btn btn-secondary" @onclick="AddBomLine">明細に追加</button>
-                <button class="btn" disabled="@_busy" @onclick="SaveBomAsync">MBOMを保存（一括置換）</button>
-            </div>
-        </AuthorizeView>
-    </div>
+    <ProductBomEditor @ref="_bomEditor" Product="_selected" Products="_products ?? []"
+                      OnSaved="ReloadImpactAsync" />
+    <ProductRoutingEditor @ref="_routingEditor" Product="_selected" OnSaved="ReloadImpactAsync" />
 
-    <div class="card">
-        <h2 style="margin-top:0;">@_selected.Code の 工順（BOP。A-40-20）</h2>
-        <table class="table">
-            <thead>
-                <tr><th>順序</th><th>工程</th><th>標準作業(分)</th><th>標準段取(分)</th><th>必要スキル</th><th>候補設備</th><th>治工具</th><th>チェックリスト</th><th>管理項目</th><th>作業手順書</th><th></th></tr>
-            </thead>
-            <tbody>
-                @foreach (var step in _routingSteps.OrderBy(s => s.Sequence))
-                {
-                    <tr>
-                        <td>@step.Sequence</td>
-                        <td>@(_processes.FirstOrDefault(p => p.Id == step.ProcessId)?.Code)</td>
-                        <td>@step.StandardWorkMinutes</td>
-                        <td>@step.StandardSetupMinutes</td>
-                        <td>@(_skills.FirstOrDefault(s => s.Id == step.RequiredSkillId)?.Name ?? "-")</td>
-                        <td>@CandidateLabel(step)</td>
-                        <td>@(_tools.FirstOrDefault(t => t.Id == step.ToolId)?.Code ?? "-")</td>
-                        <td>@(_checklists.FirstOrDefault(c => c.Id == step.ChecklistId)?.Code ?? "-")</td>
-                        <td>@(step.ControlItems ?? "-")</td>
-                        <td>@(_workProcedures.FirstOrDefault(w => w.Id == step.WorkProcedureId)?.ProcedureNo ?? "-")</td>
-                        <td><button class="btn btn-danger btn-sm" @onclick="() => _routingSteps.Remove(step)">削除</button></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-        <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="routing">
-            <div class="form-grid">
-                <div class="form-field">
-                    <label>工程順序</label>
-                    <input type="number" @bind="_stepSequence" />
-                </div>
-                <div class="form-field">
-                    <label>工程</label>
-                    <select @bind="_stepProcessId">
-                        <option value="0">選択してください</option>
-                        @foreach (var process in _processes)
-                        {
-                            <option value="@process.Id">@process.Code @process.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-field">
-                    <label>標準作業時間(分)</label>
-                    <input type="number" step="any" @bind="_stepWork" />
-                </div>
-                <div class="form-field">
-                    <label>標準段取り時間(分)</label>
-                    <input type="number" step="any" @bind="_stepSetup" />
-                </div>
-                <div class="form-field">
-                    <label>必要スキル・資格</label>
-                    <select @bind="_stepSkillId">
-                        <option value="0">なし</option>
-                        @foreach (var skill in _skills)
-                        {
-                            <option value="@skill.Id">@skill.Code @skill.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-field">
-                    @* 候補設備（B-10-20-02）。複数選ぶと差立でその中から選ばせる。空なら限定しない *@
-                    <label>候補設備（Ctrl/Shiftで複数選択）</label>
-                    <select multiple size="4" @onchange="OnCandidatesChanged">
-                        @foreach (var equipment in _equipments)
-                        {
-                            <option value="@equipment.Id" selected="@_stepEquipmentIds.Contains(equipment.Id)">
-                                @equipment.AssetNo @equipment.Name
-                            </option>
-                        }
-                    </select>
-                </div>
-                <div class="form-field">
-                    <label>作業区</label>
-                    <select @bind="_stepWorkCenterId">
-                        <option value="0">なし</option>
-                        @foreach (var wc in _workCenters)
-                        {
-                            <option value="@wc.Id">@wc.Code @wc.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-field">
-                    <label>使用治工具</label>
-                    <select @bind="_stepToolId">
-                        <option value="0">なし</option>
-                        @foreach (var tool in _tools)
-                        {
-                            <option value="@tool.Id">@tool.Code @tool.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-field">
-                    <label>チェックリスト</label>
-                    <select @bind="_stepChecklistId">
-                        <option value="0">なし</option>
-                        @foreach (var checklist in _checklists)
-                        {
-                            <option value="@checklist.Id">@checklist.Code @checklist.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-field">
-                    <label>工程管理項目</label>
-                    <input @bind="_stepControlItems" placeholder="例：温度、回転数" />
-                </div>
-                <div class="form-field">
-                    @* 作業手順書の紐付け（I-30-20-12）。作業者は作業指示からこれを辿る *@
-                    <label>作業手順書（SOP）</label>
-                    <select @bind="_stepWorkProcedureId">
-                        <option value="0">なし</option>
-                        @foreach (var procedure in _workProcedures)
-                        {
-                            <option value="@procedure.Id">@procedure.ProcedureNo @procedure.Title（v@(procedure.Version)）</option>
-                        }
-                    </select>
-                </div>
-            </div>
-            <div class="actions">
-                <button class="btn btn-secondary" @onclick="AddRoutingStep">工程を追加</button>
-                <button class="btn" disabled="@_busy" @onclick="SaveRoutingAsync">工順を保存（一括置換）</button>
-            </div>
-        </AuthorizeView>
-    </div>
-}
-
-@* 設計変更の影響確認（J-40-40-01/03）。改訂を保存する前に、届く指図と届かない指図を見せる *@
-@if (_selected is not null && _impact is not null)
-{
-    <div class="card">
-        <h2 style="margin-top:0;">@_selected.Code の 設計変更の影響（J-40-40-01/03）</h2>
-        <p class="text-muted">
-            指図は展開した時点のMBOM・工順を写し取って持つため、<strong>展開済みの指図に上の改訂は届かない</strong>。
-            改訂後の条件で作り直すなら、その指図を取り消して作り直す必要がある。
-        </p>
-
-        <h3>進行中の製造指図</h3>
-        @if (_impact.Orders.Count == 0)
-        {
-            <p class="text-muted">進行中の指図はない。改訂の影響を受ける指図はない。</p>
-        }
-        else
-        {
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>指図番号</th><th>状態</th><th>数量</th><th>納期</th>
-                        <th>作業指示</th><th>着手済</th><th>改訂の反映</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var order in _impact.Orders)
-                    {
-                        <tr>
-                            <td>@order.OrderNo</td>
-                            <td><StatusBadge Status="@order.Status.ToString()" /></td>
-                            <td>@order.Quantity.ToString("0.##")</td>
-                            <td>@(order.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
-                            <td>@order.WorkOrderCount</td>
-                            <td>@order.StartedWorkOrderCount</td>
-                            <td>
-                                @if (order.IsSnapshotFixed)
-                                {
-                                    <span class="badge badge-warning">届かない（展開済）</span>
-                                }
-                                else
-                                {
-                                    <span class="badge badge-info">展開時に反映される</span>
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
-
-        <h3>部材の在庫と所要</h3>
-        @if (_impact.Materials.Count == 0)
-        {
-            <p class="text-muted">部材がない。</p>
-        }
-        else
-        {
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>部材</th><th>名称</th><th>現行の原単位</th>
-                        <th>進行中指図の予定数量</th><th>現在庫</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var material in _impact.Materials)
-                    {
-                        <tr>
-                            <td>
-                                @material.Code
-                                @if (!material.InCurrentBom)
-                                {
-                                    <span>&nbsp;</span>
-                                    <span class="badge badge-warning">現行MBOMに無い</span>
-                                }
-                            </td>
-                            <td>@material.Name</td>
-                            <td>@(material.QuantityPer?.ToString("0.####") ?? "-")</td>
-                            <td>@material.PlannedQuantityInProgress.ToString("0.##")</td>
-                            <td>@material.StockQuantity.ToString("0.##") @material.Unit</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-            <p class="text-muted">
-                「現行MBOMに無い」部材は、改訂で外したが進行中の指図がまだ必要としているもの。
-                その在庫を先に使い切るか、指図を作り直すかを判断する材料になる。
-            </p>
-        }
-    </div>
+    @if (_impact is not null)
+    {
+        <DesignChangeImpactView Product="_selected" Impact="_impact" />
+    }
 }
 
 @code {
     private List<ProductResponse>? _products;
-    private List<ProcessResponse> _processes = [];
-    private List<SkillResponse> _skills = [];
-    private List<EquipmentResponse> _equipments = [];
-    private List<ToolResponse> _tools = [];
-    private List<ChecklistResponse> _checklists = [];
-    private List<WorkProcedureResponse> _workProcedures = [];
-    /// <summary>工順の作業区は最下段のみ（Spec.md 5.7 資源階層への紐付け）</summary>
-    private List<WorkCenterResponse> _workCenters = [];
     /// <summary>既定ロケーションの選択肢（推奨ロケーション指示 D-10-30-03 の第一候補）</summary>
     private List<LocationResponse> _locations = [];
 
     private ProductResponse? _selected;
-    private readonly List<BomItemRequest> _bomLines = [];
-    private readonly List<RoutingStepRequest> _routingSteps = [];
-    /// <summary>設計変更の影響（J-40-40-01/03）。品目を選ぶたびに読み直す</summary>
+    /// <summary>設計変更の影響（J-40-40-01/03）。品目を選ぶたび、MBOM・工順を保存するたびに読み直す</summary>
     private DesignChangeImpactResponse? _impact;
+
+    private ProductBomEditor? _bomEditor;
+    private ProductRoutingEditor? _routingEditor;
 
     private int? _editingId;
     private string _code = string.Empty;
@@ -408,39 +135,12 @@
     private decimal _defectRate;
     private int _defaultLocationId;
 
-    private int _bomChildId;
-    private decimal _bomQuantity = 1;
-    private MakeOrBuy _bomMakeOrBuy = MakeOrBuy.InHouse;
-    private string? _bomAltGroup;
-    private bool _bomIsAlternative;
-
-    private int _stepSequence = 1;
-    private int _stepProcessId;
-    private decimal _stepWork;
-    private decimal _stepSetup;
-    private int _stepSkillId;
-    /// <summary>候補設備（B-10-20-02）。画面ではこちらに一本化する（代表設備はCSV・既存データの移行用）</summary>
-    private readonly List<int> _stepEquipmentIds = [];
-    private int _stepToolId;
-    private int _stepChecklistId;
-    private int _stepWorkProcedureId;
-    private int _stepWorkCenterId;
-    private string? _stepControlItems;
-
     private string? _error;
     private string? _message;
     private bool _busy;
 
     protected override async Task OnInitializedAsync()
     {
-        _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
-        _skills = await Http.GetFromJsonAsync<List<SkillResponse>>("api/skills") ?? [];
-        _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
-        _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
-        _checklists = await Http.GetFromJsonAsync<List<ChecklistResponse>>("api/checklists") ?? [];
-        _workProcedures = await Http.GetFromJsonAsync<List<WorkProcedureResponse>>("api/work-procedures") ?? [];
-        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>(
-            $"api/work-centers?level={WorkCenterLevel.WorkCenter}") ?? [];
         _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
         await LoadAsync();
     }
@@ -528,157 +228,37 @@
     /// <summary>CSV取込後、選択中の品目のMBOM・工順を読み直す</summary>
     private async Task ReloadSelectedAsync()
     {
-        if (_selected is not null)
+        if (_selected is null)
         {
-            await SelectAsync(_selected);
+            return;
         }
+        if (_bomEditor is not null)
+        {
+            await _bomEditor.ReloadAsync();
+        }
+        if (_routingEditor is not null)
+        {
+            await _routingEditor.ReloadAsync();
+        }
+        await ReloadImpactAsync();
     }
 
     private async Task SelectAsync(ProductResponse product)
     {
         _selected = product;
-        _bomLines.Clear();
-        _routingSteps.Clear();
         _impact = null;
+        await ReloadImpactAsync();
+    }
 
-        var bom = await Http.GetFromJsonAsync<List<BomItemResponse>>($"api/products/{product.Id}/bom") ?? [];
-        _bomLines.AddRange(bom.Select(b =>
-            new BomItemRequest(b.ChildProductId, b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup,
-                b.IsAlternative)));
-
-        var routing = await Http.GetFromJsonAsync<List<RoutingStepResponse>>(
-            $"api/products/{product.Id}/routing") ?? [];
-        _routingSteps.AddRange(routing.Select(r => new RoutingStepRequest(
-            r.Sequence, r.ProcessId, r.StandardWorkMinutes, r.StandardSetupMinutes,
-            r.RequiredSkillId, r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId,
-            r.WorkCenterId, r.EquipmentIds, r.WorkProcedureId)));
-        _stepSequence = _routingSteps.Count == 0 ? 1 : _routingSteps.Max(s => s.Sequence) + 1;
-
+    /// <summary>設計変更の影響を読み直す（MBOM・工順の保存後に子から呼ばれる）</summary>
+    private async Task ReloadImpactAsync()
+    {
+        if (_selected is null)
+        {
+            return;
+        }
         _impact = await Http.GetFromJsonAsync<DesignChangeImpactResponse>(
-            $"api/products/{product.Id}/change-impact");
-    }
-
-    private void AddBomLine()
-    {
-        if (_bomChildId == 0 || _bomQuantity <= 0)
-        {
-            _error = "子品目と必要数量を指定してください。";
-            return;
-        }
-        _error = null;
-        _bomLines.Add(new BomItemRequest(_bomChildId, _bomQuantity, _bomMakeOrBuy,
-            string.IsNullOrWhiteSpace(_bomAltGroup) ? null : _bomAltGroup, _bomIsAlternative));
-        _bomChildId = 0;
-        _bomIsAlternative = false;
-    }
-
-    private async Task SaveBomAsync()
-    {
-        if (_selected is null)
-        {
-            return;
-        }
-        _busy = true;
-        _error = null;
-        _message = null;
-        try
-        {
-            var response = await Http.PutAsJsonAsync($"api/products/{_selected.Id}/bom", _bomLines);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
-            {
-                _error = error;
-                return;
-            }
-            _message = "MBOMを保存しました。";
-            _impact = await Http.GetFromJsonAsync<DesignChangeImpactResponse>(
-                $"api/products/{_selected.Id}/change-impact");
-        }
-        finally
-        {
-            _busy = false;
-        }
-    }
-
-    private void AddRoutingStep()
-    {
-        if (_stepProcessId == 0)
-        {
-            _error = "工程を選択してください。";
-            return;
-        }
-        if (_routingSteps.Any(s => s.Sequence == _stepSequence))
-        {
-            _error = "工程順序が重複しています。";
-            return;
-        }
-        _error = null;
-        _routingSteps.Add(new RoutingStepRequest(_stepSequence, _stepProcessId, _stepWork, _stepSetup,
-            _stepSkillId == 0 ? null : _stepSkillId,
-            null,
-            _stepToolId == 0 ? null : _stepToolId,
-            string.IsNullOrWhiteSpace(_stepControlItems) ? null : _stepControlItems,
-            _stepChecklistId == 0 ? null : _stepChecklistId,
-            _stepWorkCenterId == 0 ? null : _stepWorkCenterId,
-            _stepEquipmentIds.Count == 0 ? null : [.. _stepEquipmentIds],
-            _stepWorkProcedureId == 0 ? null : _stepWorkProcedureId));
-        _stepSequence = _routingSteps.Max(s => s.Sequence) + 1;
-        _stepControlItems = null;
-        _stepEquipmentIds.Clear();
-    }
-
-    /// <summary>複数選択の設備一覧から候補を取り込む</summary>
-    private void OnCandidatesChanged(ChangeEventArgs e)
-    {
-        _stepEquipmentIds.Clear();
-        foreach (var value in (string[])(e.Value ?? Array.Empty<string>()))
-        {
-            if (int.TryParse(value, out var id))
-            {
-                _stepEquipmentIds.Add(id);
-            }
-        }
-    }
-
-    /// <summary>一覧に出す候補設備の表示（多いときは件数で省略する）</summary>
-    private string CandidateLabel(RoutingStepRequest step)
-    {
-        var ids = step.EquipmentIds ?? (step.EquipmentId is { } single ? [single] : []);
-        if (ids.Count == 0)
-        {
-            return "-";
-        }
-        var codes = ids
-            .Select(id => _equipments.FirstOrDefault(e => e.Id == id)?.AssetNo)
-            .Where(code => code is not null)
-            .ToList();
-        return codes.Count <= 3 ? string.Join("、", codes) : $"{string.Join("、", codes.Take(3))} ほか{codes.Count - 3}件";
-    }
-
-    private async Task SaveRoutingAsync()
-    {
-        if (_selected is null)
-        {
-            return;
-        }
-        _busy = true;
-        _error = null;
-        _message = null;
-        try
-        {
-            var response = await Http.PutAsJsonAsync($"api/products/{_selected.Id}/routing", _routingSteps);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
-            {
-                _error = error;
-                return;
-            }
-            _message = "工順（BOP）を保存しました。";
-            _impact = await Http.GetFromJsonAsync<DesignChangeImpactResponse>(
-                $"api/products/{_selected.Id}/change-impact");
-        }
-        finally
-        {
-            _busy = false;
-        }
+            $"api/products/{_selected.Id}/change-impact");
     }
 
     private static string TypeLabel(ProductType type) => type switch
