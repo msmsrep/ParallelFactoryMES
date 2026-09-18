@@ -1,9 +1,11 @@
-﻿@page "/work-orders/{Id:int}/record"
+@page "/work-orders/{Id:int}/record"
 @attribute [Authorize]
 @inject HttpClient Http
 
 <PageTitle>実績入力 - Parallel Factory MES</PageTitle>
 
+@* 実績入力（B-40-10-01）。着手・出来高報告・訂正・承認だけをここに置き、
+   部材投入・作業手順書・製造条件・状態履歴は Pages/ProductionRecord/ の各節が自分で読み込む *@
 @if (_workOrder is null)
 {
     <p class="text-muted">読み込み中...</p>
@@ -34,7 +36,7 @@ else
         </div>
     }
 
-    @if (_workOrder.Status is not (WorkOrderStatus.Approved or WorkOrderStatus.Canceled))
+    @if (Editable)
     {
         <div class="card">
             <h2 style="margin-top:0;">出来高報告（B-40-10-01）</h2>
@@ -228,236 +230,13 @@ else
     }
     </AuthorizeView>
 
-    @* 部材投入（B-30-20-01）。指図の予定材料と照合され、代替部品には理由が要る *@
-    <h2>部材投入</h2>
-    @if (_consumptions.Count == 0)
-    {
-        <p class="text-muted">投入の記録はまだありません。</p>
-    }
-    else
-    {
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>品目</th><th>ロット</th><th>数量</th>
-                    <th>投入日時</th><th>方法</th><th>代替理由</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var consumption in _consumptions)
-                {
-                    <tr>
-                        <td>@consumption.ProductCode @consumption.ProductName</td>
-                        <td>@consumption.LotNumber</td>
-                        <td>@consumption.Quantity</td>
-                        <td>@consumption.ConsumedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                        <td>@(consumption.Method == ConsumptionMethod.Backflush ? "バックフラッシュ" : "手動")</td>
-                        <td>@(consumption.IsSubstitute ? consumption.SubstituteReason ?? "（代替）" : "-")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+    <MaterialConsumptionSection @ref="_consumptionSection" WorkOrderId="Id" Editable="Editable" />
 
-    <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="issue">
-        @if (_workOrder.Status is not (WorkOrderStatus.Approved or WorkOrderStatus.Canceled))
-        {
-            <div class="card">
-                <h2 style="margin-top:0;">部材を投入する（B-30-20-01）</h2>
-                <div class="form-grid">
-                    <div class="form-field">
-                        <label>投入ロット（スキャン可）</label>
-                        <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
-                                      @bind-Value="_consumeLotId" SelectedItemChanged="OnConsumeStockSelected"
-                                      ValueOf="stock => stock.LotId"
-                                      LabelOf='@(stock => $"{stock.LotNumber}（{stock.ProductCode} / {stock.LocationCode} 残{stock.Quantity}）")' />
-                    </div>
-                    <div class="form-field">
-                        <label>数量</label>
-                        <input type="number" step="any" @bind="_consumeQuantity" min="0" />
-                    </div>
-                    <div class="form-field">
-                        <label>代替理由（代替部品を投入するときは必須）</label>
-                        <input @bind="_substituteReason" />
-                    </div>
-                </div>
-                <button class="btn" disabled="@_busy" @onclick="AddConsumptionAsync">投入を記録</button>
-            </div>
-        }
-    </AuthorizeView>
+    <WorkProcedureSection WorkOrderId="Id" />
 
-    @* 作業手順書（B-10-30-03）。本文はマスタの現在値で、版数だけが展開時点のスナップショット *@
-    @if (_procedure is { } procedure)
-    {
-        <h2>作業手順書（@procedure.ProcedureNo @procedure.Title）</h2>
-        <div class="card">
-            <p class="text-muted">
-                版数 v@(procedure.CurrentVersion)
-                @if (procedure.PlannedVersion is { } planned)
-                {
-                    <span>／計画時 v@(planned)</span>
-                }
-            </p>
-            @if (procedure.IsRevised)
-            {
-                <p class="text-muted">
-                    <span class="badge badge-danger">改訂あり</span>
-                    この作業指示を展開した時点から手順書が改訂されています。最新の手順で作業してください。
-                </p>
-            }
-            @if (!procedure.IsActive)
-            {
-                <p class="text-muted">
-                    <span class="badge badge-danger">無効</span>
-                    この手順書は無効化されています。作業前に手順を確認してください。
-                </p>
-            }
-            @if (!string.IsNullOrWhiteSpace(procedure.Steps))
-            {
-                <pre style="white-space:pre-wrap;">@procedure.Steps</pre>
-            }
-            @if (procedure.Reference is { } reference)
-            {
-                <p class="text-muted">手順書の所在：@reference</p>
-            }
-        </div>
-    }
+    <ControlItemDataSection WorkOrderId="Id" Editable="Editable" />
 
-    @* 工程管理項目の指示（展開時点のスナップショット。Spec.md 5.7） *@
-    @if (_controlItems.Count > 0)
-    {
-        <h2>製造条件の指示（この指示が展開された時点の条件）</h2>
-        <table class="table">
-            <thead><tr><th>項目</th><th>指示値</th><th>許容範囲</th><th>版数</th></tr></thead>
-            <tbody>
-                @foreach (var item in _controlItems)
-                {
-                    <tr>
-                        <td>@item.ItemCode @item.ItemName</td>
-                        <td>@(item.TargetValue?.ToString() ?? "-") @item.Unit</td>
-                        <td>@(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")</td>
-                        <td>v@(item.ItemVersion)</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
-
-    @* 製造条件データ（B-30-30-04。温度・回転数などを手入力で残す） *@
-    <h2>製造条件データ</h2>
-    @if (_dataRecords.Count == 0)
-    {
-        <p class="text-muted">記録はまだありません。</p>
-    }
-    else
-    {
-        <table class="table">
-            <thead><tr><th>項目</th><th>値</th><th>許容範囲</th><th>判定</th><th>記録日時</th></tr></thead>
-            <tbody>
-                @foreach (var data in _dataRecords)
-                {
-                    <tr>
-                        <td>@data.Item</td>
-                        <td>@data.Value</td>
-                        <td>
-                            @if (data.WorkOrderControlItemId is null)
-                            {
-                                <span class="text-muted">-</span>
-                            }
-                            else
-                            {
-                                @($"{data.LowerLimit?.ToString() ?? "-"} 〜 {data.UpperLimit?.ToString() ?? "-"}")
-                            }
-                        </td>
-                        <td>
-                            @if (data.IsDeviation == true)
-                            {
-                                <span class="badge badge-danger">逸脱</span>
-                            }
-                            else if (data.IsDeviation == false)
-                            {
-                                <span class="badge badge-success">範囲内</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted">-</span>
-                            }
-                        </td>
-                        <td>@data.RecordedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
-
-    <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="dataWrite">
-        @if (_workOrder.Status is not (WorkOrderStatus.Approved or WorkOrderStatus.Canceled))
-        {
-            <div class="card">
-                <h2 style="margin-top:0;">製造条件を記録する（B-30-30-04）</h2>
-                <div class="form-grid">
-                    @if (_controlItems.Count > 0)
-                    {
-                        <div class="form-field">
-                            <label>指示項目（選ぶと許容範囲と照合する）</label>
-                            <select @bind="_dataControlItemId" @bind:after="OnControlItemSelected">
-                                <option value="0">指示に紐づけない（自由記述）</option>
-                                @foreach (var item in _controlItems)
-                                {
-                                    <option value="@item.Id">@item.ItemCode @item.ItemName</option>
-                                }
-                            </select>
-                        </div>
-                    }
-                    <div class="form-field">
-                        <label>項目（例：加熱温度）</label>
-                        <input @bind="_dataItem" />
-                    </div>
-                    @if (_dataControlItemId == 0)
-                    {
-                        <div class="form-field">
-                            <label>値（例：180℃）</label>
-                            <input @bind="_dataValue" />
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="form-field">
-                            <label>実績値（数値。@(SelectedControlItem?.Unit)）</label>
-                            <input type="number" step="any" @bind="_dataNumericValue" />
-                        </div>
-                    }
-                </div>
-                <button class="btn" disabled="@_busy" @onclick="AddDataRecordAsync">条件を記録</button>
-            </div>
-        }
-    </AuthorizeView>
-
-    @* 状態の履歴（Spec.md 5.2 WorkOrderStatusHistory）。現在の状態だけでは経緯を説明できないため *@
-    <h2>状態の履歴</h2>
-    @if (_statusHistory.Count == 0)
-    {
-        <p class="text-muted">履歴はまだありません。</p>
-    }
-    else
-    {
-        <table class="table">
-            <thead><tr><th>日時</th><th>変更前</th><th>変更後</th><th>契機</th><th>備考</th><th>変更者</th></tr></thead>
-            <tbody>
-                @foreach (var history in _statusHistory)
-                {
-                    <tr>
-                        <td>@history.ChangedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                        <td><StatusBadge Status="@history.FromStatus.ToString()" /></td>
-                        <td><StatusBadge Status="@history.ToStatus.ToString()" /></td>
-                        <td>@Labels.WorkOrderStatusSource(history.Source)</td>
-                        <td>@(history.Note ?? "-")</td>
-                        <td>@(history.ChangedByName ?? "-")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+    <WorkOrderStatusHistorySection @ref="_historySection" WorkOrderId="Id" />
 
     <AuthorizeView Roles="@MesRoleGroups.ProductionManage">
         @if (_workOrder.Status == WorkOrderStatus.Completed)
@@ -478,24 +257,9 @@ else
     private List<LocationOption> _locations = [];
     /// <summary>産出品の推奨入庫先（D-40-40-03）。作業指示の品目から引く</summary>
     private List<LocationRecommendationResponse>? _locationRecommendations;
-    private List<ConsumptionResponse> _consumptions = [];
-    private List<DataRecordResponse> _dataRecords = [];
-    private List<WorkOrderStatusHistoryEntry> _statusHistory = [];
 
-    // 部材投入（B-30-20-01）
-    private int _consumeLotId;
-    private int _consumeLocationId;
-    private decimal _consumeQuantity;
-    private string? _substituteReason;
-
-    // 製造条件データ（B-30-30-04）
-    /// <summary>展開時点の指示（マスタの現在値ではない。Spec.md 5.7）</summary>
-    private List<WorkOrderControlItemResponse> _controlItems = [];
-    private WorkOrderProcedureResponse? _procedure;
-    private int _dataControlItemId;
-    private decimal? _dataNumericValue;
-    private string _dataItem = string.Empty;
-    private string _dataValue = string.Empty;
+    private MaterialConsumptionSection? _consumptionSection;
+    private WorkOrderStatusHistorySection? _historySection;
 
     // 実績訂正（B-70-30-01）
     private ProductionRecordResponse? _correcting;
@@ -522,6 +286,11 @@ else
 
     // ロケーションはコード表示のみ使用（MasterContractsのLocationResponseはenumを含むため簡易DTOで受ける）
     private sealed record LocationOption(int Id, string Code);
+
+    /// <summary>入力を受け付けてよい状態か（承認済・取消では各節の入力欄を出さない）</summary>
+    private bool Editable =>
+        _workOrder is not null &&
+        _workOrder.Status is not (WorkOrderStatus.Approved or WorkOrderStatus.Canceled);
 
     private decimal GetDefectQuantity(int reasonId) =>
         _defectByReason.TryGetValue(reasonId, out var quantity) ? quantity : 0;
@@ -555,134 +324,16 @@ else
         }
         _records = await Http.GetFromJsonAsync<List<ProductionRecordResponse>>(
             $"api/work-orders/{Id}/production-records") ?? [];
-        _consumptions = await Http.GetFromJsonAsync<List<ConsumptionResponse>>(
-            $"api/work-orders/{Id}/consumptions") ?? [];
-        _dataRecords = await Http.GetFromJsonAsync<List<DataRecordResponse>>(
-            $"api/work-orders/{Id}/data-records") ?? [];
-        _statusHistory = await Http.GetFromJsonAsync<List<WorkOrderStatusHistoryEntry>>(
-            $"api/work-orders/{Id}/status-history") ?? [];
-        _controlItems = await Http.GetFromJsonAsync<List<WorkOrderControlItemResponse>>(
-            $"api/work-orders/{Id}/control-items") ?? [];
-        // 手順書が紐付いていない作業指示は404になる（工順に登録が無い運用でも画面は開ける）
-        var procedure = await Http.GetAsync($"api/work-orders/{Id}/procedure");
-        _procedure = procedure.IsSuccessStatusCode
-            ? await procedure.Content.ReadFromJsonAsync<WorkOrderProcedureResponse>()
-            : null;
-    }
 
-    /// <summary>投入ロットの選択に合わせて、引き落とすロケーションも決める（在庫はロット×棚で持つため）</summary>
-    private void OnConsumeStockSelected(StockResponse? stock) =>
-        _consumeLocationId = stock?.LocationId ?? 0;
-
-    private async Task AddConsumptionAsync()
-    {
-        if (_busy)
+        // 着手・実績登録・承認は状態履歴を増やし、バックフラッシュは部材投入も増やす。
+        // 初回は各節が自分で読み込むため、参照が入っているとき（2回目以降）だけ読み直す
+        if (_historySection is not null)
         {
-            return;
+            await _historySection.ReloadAsync();
         }
-        if (_consumeLotId == 0 || _consumeLocationId == 0)
+        if (_consumptionSection is not null)
         {
-            _error = "投入するロットを選択してください。";
-            return;
-        }
-        if (_consumeQuantity <= 0)
-        {
-            _error = "投入数量は0より大きい必要があります。";
-            return;
-        }
-        _busy = true;
-        _error = null;
-        _message = null;
-        try
-        {
-            var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/consumptions",
-                new ConsumptionRequest(_consumeLotId, _consumeLocationId, _consumeQuantity,
-                    string.IsNullOrWhiteSpace(_substituteReason) ? null : _substituteReason));
-            // 予定材料との照合エラー（代替理由の未入力を含む）もここに出る
-            if (await response.ReadErrorAsync("部材投入に失敗しました。") is { } error)
-            {
-                _error = error;
-                return;
-            }
-            _message = "部材投入を記録しました。";
-            _consumeLotId = 0;
-            _consumeLocationId = 0;
-            _consumeQuantity = 0;
-            _substituteReason = null;
-            await LoadAsync();
-        }
-        finally
-        {
-            _busy = false;
-        }
-    }
-
-    /// <summary>選択中の指示（単位や許容範囲の表示に使う）</summary>
-    private WorkOrderControlItemResponse? SelectedControlItem =>
-        _controlItems.FirstOrDefault(i => i.Id == _dataControlItemId);
-
-    /// <summary>指示を選んだら項目名を埋める（同じ内容を二度入力させない）</summary>
-    private void OnControlItemSelected()
-    {
-        if (SelectedControlItem is { } item)
-        {
-            _dataItem = $"{item.ItemCode} {item.ItemName}";
-            _dataNumericValue ??= item.TargetValue;
-        }
-    }
-
-    private async Task AddDataRecordAsync()
-    {
-        if (_busy)
-        {
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(_dataItem))
-        {
-            _error = "項目を入力してください。";
-            return;
-        }
-        if (_dataControlItemId == 0 && string.IsNullOrWhiteSpace(_dataValue))
-        {
-            _error = "値を入力してください。";
-            return;
-        }
-        if (_dataControlItemId != 0 && _dataNumericValue is null)
-        {
-            _error = "実績値を入力してください。";
-            return;
-        }
-        _busy = true;
-        _error = null;
-        _message = null;
-        try
-        {
-            // 指示に紐づけるときは、表示用の値を数値＋単位から組み立てる（入力を二重にさせない）
-            var value = _dataControlItemId == 0
-                ? _dataValue
-                : $"{_dataNumericValue}{SelectedControlItem?.Unit}";
-            var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/data-records",
-                new List<DataRecordRequest>
-                {
-                    new(_dataItem, value,
-                        _dataControlItemId == 0 ? null : _dataControlItemId,
-                        _dataControlItemId == 0 ? null : _dataNumericValue),
-                });
-            if (await response.ReadErrorAsync("製造条件の記録に失敗しました。") is { } error)
-            {
-                _error = error;
-                return;
-            }
-            _message = "製造条件を記録しました。";
-            _dataItem = string.Empty;
-            _dataValue = string.Empty;
-            _dataNumericValue = null;
-            _dataControlItemId = 0;
-            await LoadAsync();
-        }
-        finally
-        {
-            _busy = false;
+            await _consumptionSection.ReloadAsync();
         }
     }
 

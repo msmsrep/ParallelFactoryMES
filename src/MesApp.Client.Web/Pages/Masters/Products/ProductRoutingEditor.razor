@@ -1,4 +1,4 @@
-@inject HttpClient Http
+﻿@inject HttpClient Http
 
 @* 品目の工順（BOP）（Spec.md 5.1、A-40-20）。品目マスタタブで選んだ品目に対して開く *@
 <div class="card">
@@ -194,6 +194,8 @@
             r.RequiredSkillId, r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId,
             r.WorkCenterId, r.EquipmentIds, r.WorkProcedureId)));
         _sequence = _steps.Count == 0 ? 1 : _steps.Max(s => s.Sequence) + 1;
+        // 親から呼ばれたときはパラメータが変わらないため、自分で再描画を要求する
+        StateHasChanged();
     }
 
     private void AddStep()

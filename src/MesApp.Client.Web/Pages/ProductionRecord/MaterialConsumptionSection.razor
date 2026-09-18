@@ -1,0 +1,145 @@
+﻿@inject HttpClient Http
+
+@* 部材投入（B-30-20-01）。指図の予定材料と照合され、代替部品には理由が要る *@
+<h2>部材投入</h2>
+<Notice Error="@_error" Message="@_message" />
+@if (_consumptions.Count == 0)
+{
+    <p class="text-muted">投入の記録はまだありません。</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>品目</th><th>ロット</th><th>数量</th>
+                <th>投入日時</th><th>方法</th><th>代替理由</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var consumption in _consumptions)
+            {
+                <tr>
+                    <td>@consumption.ProductCode @consumption.ProductName</td>
+                    <td>@consumption.LotNumber</td>
+                    <td>@consumption.Quantity</td>
+                    <td>@consumption.ConsumedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                    <td>@(consumption.Method == ConsumptionMethod.Backflush ? "バックフラッシュ" : "手動")</td>
+                    <td>@(consumption.IsSubstitute ? consumption.SubstituteReason ?? "（代替）" : "-")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="issue">
+    @if (Editable)
+    {
+        <div class="card">
+            <h2 style="margin-top:0;">部材を投入する（B-30-20-01）</h2>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>投入ロット（スキャン可）</label>
+                    <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
+                                  @bind-Value="_consumeLotId" SelectedItemChanged="OnConsumeStockSelected"
+                                  ValueOf="stock => stock.LotId"
+                                  LabelOf='@(stock => $"{stock.LotNumber}（{stock.ProductCode} / {stock.LocationCode} 残{stock.Quantity}）")' />
+                </div>
+                <div class="form-field">
+                    <label>数量</label>
+                    <input type="number" step="any" @bind="_consumeQuantity" min="0" />
+                </div>
+                <div class="form-field">
+                    <label>代替理由（代替部品を投入するときは必須）</label>
+                    <input @bind="_substituteReason" />
+                </div>
+            </div>
+            <button class="btn" disabled="@_busy" @onclick="AddConsumptionAsync">投入を記録</button>
+        </div>
+    }
+</AuthorizeView>
+
+@code {
+    /// <summary>対象の作業指示</summary>
+    [Parameter, EditorRequired] public int WorkOrderId { get; set; }
+
+    /// <summary>投入フォームを出してよいか（承認済・取消の作業指示には投入できない）</summary>
+    [Parameter] public bool Editable { get; set; }
+
+    private List<ConsumptionResponse> _consumptions = [];
+    private int _loadedWorkOrderId;
+
+    private int _consumeLotId;
+    private int _consumeLocationId;
+    private decimal _consumeQuantity;
+    private string? _substituteReason;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedWorkOrderId != WorkOrderId)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    /// <summary>投入の記録を読み直す（バックフラッシュでも増えるため、親の実績登録後にも呼ばれる）</summary>
+    public async Task ReloadAsync()
+    {
+        _loadedWorkOrderId = WorkOrderId;
+        _consumptions = await Http.GetFromJsonAsync<List<ConsumptionResponse>>(
+            $"api/work-orders/{WorkOrderId}/consumptions") ?? [];
+        // 親から呼ばれたときはパラメータが変わらないため、自分で再描画を要求する
+        StateHasChanged();
+    }
+
+    /// <summary>投入ロットの選択に合わせて、引き落とすロケーションも決める（在庫はロット×棚で持つため）</summary>
+    private void OnConsumeStockSelected(StockResponse? stock) =>
+        _consumeLocationId = stock?.LocationId ?? 0;
+
+    private async Task AddConsumptionAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+        if (_consumeLotId == 0 || _consumeLocationId == 0)
+        {
+            _error = "投入するロットを選択してください。";
+            return;
+        }
+        if (_consumeQuantity <= 0)
+        {
+            _error = "投入数量は0より大きい必要があります。";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/work-orders/{WorkOrderId}/consumptions",
+                new ConsumptionRequest(_consumeLotId, _consumeLocationId, _consumeQuantity,
+                    string.IsNullOrWhiteSpace(_substituteReason) ? null : _substituteReason));
+            // 予定材料との照合エラー（代替理由の未入力を含む）もここに出る
+            if (await response.ReadErrorAsync("部材投入に失敗しました。") is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = "部材投入を記録しました。";
+            _consumeLotId = 0;
+            _consumeLocationId = 0;
+            _consumeQuantity = 0;
+            _substituteReason = null;
+            await ReloadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,53 @@
+﻿@inject HttpClient Http
+
+@* 状態の履歴（Spec.md 5.2 WorkOrderStatusHistory）。現在の状態だけでは経緯を説明できないため *@
+<h2>状態の履歴</h2>
+@if (_statusHistory.Count == 0)
+{
+    <p class="text-muted">履歴はまだありません。</p>
+}
+else
+{
+    <table class="table">
+        <thead><tr><th>日時</th><th>変更前</th><th>変更後</th><th>契機</th><th>備考</th><th>変更者</th></tr></thead>
+        <tbody>
+            @foreach (var history in _statusHistory)
+            {
+                <tr>
+                    <td>@history.ChangedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                    <td><StatusBadge Status="@history.FromStatus.ToString()" /></td>
+                    <td><StatusBadge Status="@history.ToStatus.ToString()" /></td>
+                    <td>@Labels.WorkOrderStatusSource(history.Source)</td>
+                    <td>@(history.Note ?? "-")</td>
+                    <td>@(history.ChangedByName ?? "-")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    /// <summary>対象の作業指示</summary>
+    [Parameter, EditorRequired] public int WorkOrderId { get; set; }
+
+    private List<WorkOrderStatusHistoryEntry> _statusHistory = [];
+    private int _loadedWorkOrderId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedWorkOrderId != WorkOrderId)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    /// <summary>履歴を読み直す（着手・実績登録・承認のたびに親から呼ばれる）</summary>
+    public async Task ReloadAsync()
+    {
+        _loadedWorkOrderId = WorkOrderId;
+        _statusHistory = await Http.GetFromJsonAsync<List<WorkOrderStatusHistoryEntry>>(
+            $"api/work-orders/{WorkOrderId}/status-history") ?? [];
+        // 親から呼ばれたときはパラメータが変わらないため、自分で再描画を要求する
+        StateHasChanged();
+    }
+}

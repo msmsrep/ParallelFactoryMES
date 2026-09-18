@@ -102,6 +102,8 @@
         _lines.AddRange(bom.Select(b =>
             new BomItemRequest(b.ChildProductId, b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup,
                 b.IsAlternative)));
+        // 親から呼ばれたときはパラメータが変わらないため、自分で再描画を要求する
+        StateHasChanged();
     }
 
     private void AddLine()
