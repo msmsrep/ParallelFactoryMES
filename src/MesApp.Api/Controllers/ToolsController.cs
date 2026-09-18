@@ -1,4 +1,4 @@
-using MesApp.Api.Policies;
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -95,19 +95,8 @@ public class ToolsController(MesAppDbContext db, IAuditLogger auditLogger) : Con
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var t = await db.Tools.FindAsync([id], ct);
-        if (t is null)
-        {
-            return NotFound();
-        }
-        t.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(Tool), id.ToString(),
-            detail: $"code={t.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<Tool>(db, auditLogger, id, t => $"code={t.Code}", ct);
 
     private static ToolResponse ToResponse(Tool t) =>
         new(t.Id, t.Code, t.Name, t.ToolType, t.LifeThresholdCount, t.LifeThresholdHours, t.Status, t.IsActive);

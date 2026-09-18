@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -120,19 +120,8 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var i = await db.InspectionItems.FindAsync([id], ct);
-        if (i is null)
-        {
-            return NotFound();
-        }
-        i.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(InspectionItem), id.ToString(),
-            detail: $"code={i.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<InspectionItem>(db, auditLogger, id, i => $"code={i.Code}", ct);
 
     private async Task<string?> ValidateTargetsAsync(InspectionItemRequest request, CancellationToken ct)
     {

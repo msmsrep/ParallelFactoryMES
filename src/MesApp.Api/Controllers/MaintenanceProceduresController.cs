@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -111,19 +111,10 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var procedure = await db.MaintenanceProcedures.FindAsync([id], ct);
-        if (procedure is null)
-        {
-            return NotFound();
-        }
-        procedure.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Maintenance", "ProcedureDeactivate", nameof(MaintenanceProcedure),
-            id.ToString(), detail: $"procedureNo={procedure.ProcedureNo}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<MaintenanceProcedure>(db, auditLogger, id,
+            p => $"procedureNo={p.ProcedureNo}", ct,
+            category: "Maintenance", action: "ProcedureDeactivate");
 
     private async Task<string?> ValidateTargetsAsync(MaintenanceProcedureRequest request, CancellationToken ct)
     {

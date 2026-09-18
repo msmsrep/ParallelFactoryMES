@@ -1,4 +1,4 @@
-using MesApp.Api.Policies;
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -109,19 +109,8 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var e = await db.Equipments.FindAsync([id], ct);
-        if (e is null)
-        {
-            return NotFound();
-        }
-        e.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(Equipment), id.ToString(),
-            detail: $"assetNo={e.AssetNo}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<Equipment>(db, auditLogger, id, e => $"assetNo={e.AssetNo}", ct);
 
     // ---- 保全部品（E-10-10-01、E-20-10-04）----
 

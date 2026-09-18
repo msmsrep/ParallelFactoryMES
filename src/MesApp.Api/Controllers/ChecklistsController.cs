@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -96,19 +96,8 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var c = await db.Checklists.FindAsync([id], ct);
-        if (c is null)
-        {
-            return NotFound();
-        }
-        c.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(Checklist), id.ToString(),
-            detail: $"code={c.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<Checklist>(db, auditLogger, id, c => $"code={c.Code}", ct);
 
     private static ChecklistResponse ToResponse(Checklist c) =>
         new(c.Id, c.Code, c.Name, c.Category, c.IsActive,

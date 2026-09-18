@@ -128,20 +128,9 @@ public class ProductsController(
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var product = await db.Products.FindAsync([id], ct);
-        if (product is null)
-        {
-            return NotFound();
-        }
-        product.IsActive = false;
-        product.UpdatedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(Product), id.ToString(),
-            detail: $"code={product.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<Product>(db, auditLogger, id, p => $"code={p.Code}", ct,
+            onDeactivating: p => p.UpdatedAt = DateTimeOffset.UtcNow);
 
     // ---- MBOM（A-40-10）----
 

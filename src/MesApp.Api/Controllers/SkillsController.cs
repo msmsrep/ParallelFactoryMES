@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -84,17 +84,6 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.UserAdmin)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var s = await db.Skills.FindAsync([id], ct);
-        if (s is null)
-        {
-            return NotFound();
-        }
-        s.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(SkillMaster), id.ToString(),
-            detail: $"code={s.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<SkillMaster>(db, auditLogger, id, s => $"code={s.Code}", ct);
 }

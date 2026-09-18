@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
@@ -166,20 +166,8 @@ public class InspectionDevicesController(
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var device = await db.InspectionDevices.FindAsync([id], ct);
-        if (device is null)
-        {
-            return NotFound();
-        }
-
-        device.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(InspectionDevice), id.ToString(),
-            detail: $"code={device.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<InspectionDevice>(db, auditLogger, id, device => $"code={device.Code}", ct);
 
     private static void Apply(InspectionDevice device, InspectionDeviceRequest request)
     {

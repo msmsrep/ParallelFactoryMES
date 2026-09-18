@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -115,19 +115,8 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var item = await db.ControlItems.FindAsync([id], ct);
-        if (item is null)
-        {
-            return NotFound();
-        }
-        item.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(ControlItem), id.ToString(),
-            detail: $"code={item.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<ControlItem>(db, auditLogger, id, item => $"code={item.Code}", ct);
 
     /// <summary>上下限の整合と参照先の存在を確認する。問題があれば日本語の理由を返す</summary>
     private async Task<string?> ValidateAsync(ControlItemRequest request, CancellationToken ct)

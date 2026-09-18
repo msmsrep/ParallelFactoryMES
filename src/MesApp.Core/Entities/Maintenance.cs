@@ -1,7 +1,9 @@
-﻿namespace MesApp.Core.Entities;
+﻿using MesApp.Core.Abstractions;
+
+namespace MesApp.Core.Entities;
 
 /// <summary>保全手順書（Spec.md 5.1 MaintenanceProcedure。E-10-20）</summary>
-public class MaintenanceProcedure
+public class MaintenanceProcedure : IDeactivatableMaster
 {
     public int Id { get; set; }
 

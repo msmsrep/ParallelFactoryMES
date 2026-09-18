@@ -1,7 +1,9 @@
-﻿namespace MesApp.Core.Entities;
+﻿using MesApp.Core.Abstractions;
+
+namespace MesApp.Core.Entities;
 
 /// <summary>品目マスタ（Spec.md 5.1 Product）</summary>
-public class Product
+public class Product : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -62,7 +64,7 @@ public class BomItem
 }
 
 /// <summary>工程マスタ（Spec.md 5.1 Process）</summary>
-public class ProcessMaster
+public class ProcessMaster : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -153,7 +155,7 @@ public class Routing
 /// 手順書側にも対象を持たせると、同じ手順書をどちらで紐付けたかで運用が割れる。
 /// </para>
 /// </summary>
-public class WorkProcedure
+public class WorkProcedure : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -194,7 +196,7 @@ public class RoutingEquipment
 }
 
 /// <summary>設備台帳/BOE（Spec.md 5.1 Equipment。E-10-10、I-10-20）</summary>
-public class Equipment
+public class Equipment : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -272,7 +274,7 @@ public class EquipmentPart
 /// 従業員には所属する直を既定として持たせ、実績の直は記録時刻から引く。
 /// </para>
 /// </summary>
-public class Shift
+public class Shift : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -307,7 +309,7 @@ public class Shift
 /// 検査機は日付で管理され、期限切れの影響が「使えない」ではなく「測定結果を信用できない」だからである。
 /// </para>
 /// </summary>
-public class InspectionDevice
+public class InspectionDevice : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -365,7 +367,7 @@ public class InspectionDeviceCalibration
 }
 
 /// <summary>治工具マスタ（Spec.md 5.1 Tool。E-60）</summary>
-public class Tool
+public class Tool : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -396,7 +398,7 @@ public class Tool
 /// 工場・ライン・エリア・作業区を1つの自己参照ツリーで表す（資源構成全体＝BOR）。
 /// 最下段の作業区が作業の管理単位になる。
 /// </summary>
-public class WorkCenter
+public class WorkCenter : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -416,7 +418,7 @@ public class WorkCenter
 }
 
 /// <summary>ロケーション（Spec.md 5.1 Location。D-50-20-01）</summary>
-public class Location
+public class Location : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -438,7 +440,7 @@ public class Location
 }
 
 /// <summary>検査項目・基準（Spec.md 5.1 InspectionItem。C-10-10）</summary>
-public class InspectionItem
+public class InspectionItem : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -487,7 +489,7 @@ public class InspectionItem
 /// 違いは、検査が結果を測るのに対し、こちらは作る前に与える条件だという点。
 /// </para>
 /// </summary>
-public class ControlItem
+public class ControlItem : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -523,7 +525,7 @@ public class ControlItem
 }
 
 /// <summary>チェックリストマスタ（Spec.md 5.1 Checklist。B-30-10、G-20/G-30）</summary>
-public class Checklist
+public class Checklist : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -561,7 +563,7 @@ public class ChecklistItem
 /// 生産実績の不良数の内訳（<see cref="ProductionDefect"/>）と不良項目別分析の集計軸に使う。
 /// 粒度は「現場が迷わず選べて、集計にも使える」範囲で定義する
 /// </summary>
-public class DefectReason
+public class DefectReason : IDeactivatableMaster
 {
     public int Id { get; set; }
 
@@ -576,7 +578,7 @@ public class DefectReason
 }
 
 /// <summary>スキル・資格マスタ（Spec.md 5.1 SkillMaster。F-20-10-01）</summary>
-public class SkillMaster
+public class SkillMaster : IDeactivatableMaster
 {
     public int Id { get; set; }
 

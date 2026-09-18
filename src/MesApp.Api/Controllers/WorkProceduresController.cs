@@ -98,31 +98,18 @@ public class WorkProceduresController(MesAppDbContext db, IAuditLogger auditLogg
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var procedure = await db.WorkProcedures.FindAsync([id], ct);
-        if (procedure is null)
-        {
-            return NotFound();
-        }
-        // 工順から参照されている手順書を無効化すると、作業者が手順を辿れない作業指示ができる。
-        // 判定は MasterDeactivationPolicy に置き、CSV取込と同じ条件・同じ文面で弾く
-        var referencing = await db.Routings.AsNoTracking()
-            .Where(r => r.WorkProcedureId == id)
-            .Select(r => r.Product!.Code)
-            .Distinct()
-            .ToListAsync(ct);
-        if (MasterDeactivationPolicy.CheckWorkProcedure(procedure.ProcedureNo, referencing) is { } error)
-        {
-            return this.ConflictProblem(error);
-        }
-
-        procedure.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(WorkProcedure), id.ToString(),
-            detail: $"procedureNo={procedure.ProcedureNo}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<WorkProcedure>(db, auditLogger, id,
+            p => $"procedureNo={p.ProcedureNo}", ct,
+            // 工順から参照されている手順書を無効化すると、作業者が手順を辿れない作業指示ができる。
+            // 判定は MasterDeactivationPolicy に置き、CSV取込と同じ条件・同じ文面で弾く
+            precheck: async procedure => MasterDeactivationPolicy.CheckWorkProcedure(
+                procedure.ProcedureNo,
+                await db.Routings.AsNoTracking()
+                    .Where(r => r.WorkProcedureId == id)
+                    .Select(r => r.Product!.Code)
+                    .Distinct()
+                    .ToListAsync(ct)));
 
     /// <summary>手順が辿れる形になっているかを確認する。問題があれば日本語の理由を返す</summary>
     private static string? Validate(WorkProcedureRequest request)

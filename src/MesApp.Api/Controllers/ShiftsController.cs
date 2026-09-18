@@ -102,27 +102,12 @@ public class ShiftsController(
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var shift = await db.Shifts.FindAsync([id], ct);
-        if (shift is null)
-        {
-            return NotFound();
-        }
-        // 所属する直として使われている間は無効化しない（従業員の所属が宙に浮く）。
-        // 判定は MasterDeactivationPolicy に置き、CSV取込と同じ条件・同じ文面で弾く
-        var assigned = await db.Users.CountAsync(u => u.ShiftId == id && u.IsActive, ct);
-        if (MasterDeactivationPolicy.CheckShift(shift.Code, assigned) is { } error)
-        {
-            return this.ConflictProblem(error);
-        }
-
-        shift.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(Shift), id.ToString(),
-            detail: $"code={shift.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<Shift>(db, auditLogger, id, s => $"code={s.Code}", ct,
+            // 所属する直として使われている間は無効化しない（従業員の所属が宙に浮く）。
+            // 判定は MasterDeactivationPolicy に置き、CSV取込と同じ条件・同じ文面で弾く
+            precheck: async shift => MasterDeactivationPolicy.CheckShift(
+                shift.Code, await db.Users.CountAsync(u => u.ShiftId == id && u.IsActive, ct)));
 
     /// <summary>時間帯の整合（自分以外の有効な直との重なり）を確認する</summary>
     private async Task<string?> CheckScheduleAsync(ShiftRequest request, int? excludeId, CancellationToken ct)

@@ -102,19 +102,8 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var l = await db.Locations.FindAsync([id], ct);
-        if (l is null)
-        {
-            return NotFound();
-        }
-        l.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(Location), id.ToString(),
-            detail: $"code={l.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<Location>(db, auditLogger, id, l => $"code={l.Code}", ct);
 
     private async Task<WorkCenter?> FindWorkCenterAsync(int? id, CancellationToken ct) =>
         id is { } value

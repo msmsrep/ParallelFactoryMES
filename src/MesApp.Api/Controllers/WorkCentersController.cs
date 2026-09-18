@@ -1,4 +1,4 @@
-using MesApp.Api.Policies;
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
@@ -134,24 +134,12 @@ public class WorkCentersController(MesAppDbContext db, IAuditLogger auditLogger)
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
-    public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
-    {
-        var w = await db.WorkCenters.FindAsync([id], ct);
-        if (w is null)
-        {
-            return NotFound();
-        }
-        // 有効な下位が残ったまま上位を無効化すると、階層を辿れない資源ができる
-        if (await db.WorkCenters.AnyAsync(x => x.ParentId == id && x.IsActive, ct))
-        {
-            return this.ConflictProblem(
-                $"'{w.Code}' には有効な下位の資源があるため、無効化できません" +
-                "（下位の資源を先に無効化するか、付け替えてください）。");
-        }
-        w.IsActive = false;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Deactivate", nameof(WorkCenter), id.ToString(),
-            detail: $"code={w.Code}", ct: ct);
-        return NoContent();
-    }
+    public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
+        this.DeactivateMasterAsync<WorkCenter>(db, auditLogger, id, w => $"code={w.Code}", ct,
+            // 有効な下位が残ったまま上位を無効化すると、階層を辿れない資源ができる
+            precheck: async w =>
+                await db.WorkCenters.AnyAsync(x => x.ParentId == id && x.IsActive, ct)
+                    ? $"'{w.Code}' には有効な下位の資源があるため、無効化できません" +
+                      "（下位の資源を先に無効化するか、付け替えてください）。"
+                    : null);
 }
