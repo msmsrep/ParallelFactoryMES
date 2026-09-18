@@ -1,4 +1,4 @@
-using MesApp.Api.Services;
+﻿using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -80,6 +80,7 @@ public static class MesAppHost
         builder.Services.AddScoped<InventoryService>();
         builder.Services.AddScoped<LotStatusService>();
         builder.Services.AddScoped<LotOperationService>();
+        builder.Services.AddScoped<NonconformanceService>();
         builder.Services.AddScoped<ProductStructureService>();
         builder.Services.AddScoped<WorkOrderStatusService>();
         builder.Services.AddScoped<WorkOrderDispatchService>();
