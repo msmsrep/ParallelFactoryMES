@@ -133,8 +133,10 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 
 ## 運用上の注意
 
-- **HTTPS**: 現時点ではHTTPS強制を実装していません。LAN運用ではリバースプロキシ（IIS / nginx）で
-  HTTPS終端してください。なお**カメラによるバーコード読み取りは、ブラウザの制約により
+- **HTTPS**: アプリ自身はHTTPSを強制しません。LAN運用ではリバースプロキシ（IIS / nginx）で
+  HTTPSを終端し、プロキシのIPを `ReverseProxy__KnownProxies__0` に設定してください（設定しないと
+  リフレッシュCookieに `Secure` が付かず、監査ログの接続元IPがプロキシのものになります）。
+  手順は [管理者向け運用](docs/operations.md) の「HTTPSで運用する」。なお**カメラによるバーコード読み取りは、ブラウザの制約により
   `localhost` 以外ではHTTPSが必須**です（USB HIDリーダーと手入力はHTTPでも動作します）。
 - **バックアップ**: SQLiteはWALモードで動作するため、**稼働中のDBファイルの単純コピーは行わないでください**。
   停止中にコピーするか、`VACUUM INTO` を使用します。
