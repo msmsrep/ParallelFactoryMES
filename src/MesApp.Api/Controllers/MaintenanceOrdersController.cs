@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -26,7 +26,8 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class MaintenanceOrdersController(
     MesAppDbContext db,
-    MaintenanceOrderService maintenanceOrders) : ControllerBase
+    MaintenanceOrderService maintenanceOrders,
+    IBusinessDateService businessDate) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -119,6 +120,7 @@ public class MaintenanceOrdersController(
     /// <summary>
     /// 消耗材モニタリング（E-20-10-04）。期間内の保全実績で引き落とした部材を品目ごとに集計し、
     /// 現在の在庫合計を並べて返す。補充の要否をこの1画面で判断できるようにする。
+    /// <para>期間は製造日（業務日付）基準（Spec.md 3.9）。他の期間APIと同じ半開区間で切る。</para>
     /// </summary>
     [HttpGet("parts-consumption")]
     public async Task<ActionResult<List<MaintenancePartConsumptionRow>>> PartsConsumption(
@@ -140,14 +142,18 @@ public class MaintenanceOrdersController(
                                rec.StartedAt,
                            }).ToListAsync(ct);
 
+        // 期間の区切りは製造日の境界（既定6時・工場TZ。Spec.md 3.9）に揃える。
+        // 暦日のUTC 0時で切ると、工場の時刻とUTCがずれる時間帯（日本なら0〜9時）の保全実績が
+        // 隣の日へ寄り、他の期間API（品質分析・稼働サマリ等）と数字が合わなくなる
         if (from is { } fromDate)
         {
-            var fromMoment = new DateTimeOffset(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var fromMoment = businessDate.GetRange(fromDate).Start;
             lines = [.. lines.Where(p => p.StartedAt >= fromMoment)];
         }
         if (to is { } toDate)
         {
-            var toMoment = new DateTimeOffset(toDate.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            // 終端は翌製造日の開始時刻。他の期間APIと同じ半開区間にして二重計上を防ぐ
+            var toMoment = businessDate.GetRange(toDate).End;
             lines = [.. lines.Where(p => p.StartedAt < toMoment)];
         }
 

@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Infrastructure.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -33,6 +33,8 @@ public static class DependencyInjection
             }
         });
 
+        // AuditLogger は記録日を工場のタイムゾーンで持つため IBusinessDateService に依存する。
+        // 実装（BusinessDateService）はホスト側（MesApp.Api）で登録する
         services.AddScoped<IAuditLogger, AuditLogger>();
         return services;
     }
@@ -82,6 +84,12 @@ public static class DependencyInjection
     /// <c>Timestamp</c> はオフセット付きISO形式のTEXTで保存されるため、SQLite側でローカル時刻へ
     /// 直してから日付を取る（記録日はローカル日付。<c>AuditLog.RecordedOn</c> 参照）。
     /// 既定値の行だけを対象にするので、2回目以降は索引で即座に0件になる。
+    /// <para>
+    /// ここだけはサーバーのローカルタイム（SQLiteの <c>'localtime'</c>）で埋める。SQLiteは任意の
+    /// タイムゾーンへ変換できず、<c>BusinessDay:TimeZone</c> を当てられないため。対象は列の追加前に
+    /// 書かれた過去行だけの一度きりの穴埋めなので、近似で足りる（以降は <c>AuditLogger</c> が
+    /// 工場のタイムゾーンで書く）。
+    /// </para>
     /// </remarks>
     private static async Task BackfillAuditRecordedOnAsync(MesAppDbContext db) =>
         await db.Database.ExecuteSqlRawAsync(

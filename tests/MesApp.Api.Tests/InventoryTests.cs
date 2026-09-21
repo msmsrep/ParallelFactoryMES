@@ -667,6 +667,31 @@ public class InventoryTests
                 $"/api/inventory/warehouse-progress?from={twoDaysAgo:yyyy-MM-dd}");
         }
         Assert.Equal(2, progress!.Rows.Single(r => r.Kind == "在庫移動").OldestOpenAgeDays);
+
+        // 製造日の境界ちょうどに作られた指示は、翌製造日の側だけに数える（半開区間）。
+        // 閉区間で切ると前日と当日の両方に出て、2日ぶんの合計が実件数を超える
+        DateOnly today;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesApp.Infrastructure.MesAppDbContext>();
+            var businessDate = scope.ServiceProvider.GetRequiredService<MesApp.Core.Abstractions.IBusinessDateService>();
+            today = businessDate.Today;
+            foreach (var order in await db.TransferOrders.ToListAsync())
+            {
+                // 「昨日の製造日の終わり」＝「今日の製造日の始まり」の瞬間に揃える
+                order.CreatedAt = businessDate.GetRange(today.AddDays(-1)).End;
+            }
+            await db.SaveChangesAsync();
+        }
+
+        var yesterday = today.AddDays(-1);
+        var onYesterday = await admin.GetFromJsonAsync<WarehouseProgressResponse>(
+            $"/api/inventory/warehouse-progress?from={yesterday:yyyy-MM-dd}&to={yesterday:yyyy-MM-dd}");
+        Assert.Equal(0, onYesterday!.Rows.Single(r => r.Kind == "在庫移動").TotalCount);
+
+        var onToday = await admin.GetFromJsonAsync<WarehouseProgressResponse>(
+            $"/api/inventory/warehouse-progress?from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}");
+        Assert.Equal(2, onToday!.Rows.Single(r => r.Kind == "在庫移動").TotalCount);
     }
 
 }
