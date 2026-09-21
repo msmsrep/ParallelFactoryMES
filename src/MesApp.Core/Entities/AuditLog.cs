@@ -1,7 +1,7 @@
 ﻿namespace MesApp.Core.Entities;
 
 /// <summary>
-/// 監査ログ（Spec.md 7.6：誰が・いつ・何を変更したか。実績訂正・検査訂正・マスタ変更・シート端末操作は必須記録）
+/// 監査ログ（Spec.md 7.6：誰が・いつ・何を変更したか。実績訂正・検査訂正・マスタ変更は必須記録）
 /// </summary>
 public class AuditLog
 {
@@ -31,7 +31,7 @@ public class AuditLog
     /// <summary>操作時点のユーザー名（ユーザー削除後も追跡できるよう非正規化して保持）</summary>
     public string? UserName { get; set; }
 
-    /// <summary>機能分類（Auth / Setup / Master / Production / Inventory / Quality / Equipment / License など）</summary>
+    /// <summary>機能分類（Auth / Setup / Master / Production / Inventory / Quality / Equipment など）</summary>
     public string Category { get; set; } = string.Empty;
 
     /// <summary>操作内容（Login / Create / Update / Delete / Approve / Correct など）</summary>
