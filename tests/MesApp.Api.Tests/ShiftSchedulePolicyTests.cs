@@ -1,4 +1,4 @@
-using MesApp.Api.Policies;
+﻿using MesApp.Api.Policies;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Tests;
@@ -46,6 +46,48 @@ public class ShiftSchedulePolicyTests
         // 終了が0時ちょうどの直と、0時から始まる直も重ならない
         Assert.Null(ShiftSchedulePolicy.Check(
             new TimeOnly(0, 0), new TimeOnly(6, 0), [Shift(new(18, 0), new(0, 0))]));
+    }
+
+    [Theory]
+    // 昼勤（日跨ぎなし）：開始は含み、終了は含まない
+    [InlineData(6, 0, 18, 0, 6, 0, true)]
+    [InlineData(6, 0, 18, 0, 17, 59, true)]
+    [InlineData(6, 0, 18, 0, 18, 0, false)]
+    [InlineData(6, 0, 18, 0, 5, 59, false)]
+    // 夜勤（日跨ぎ）：開始以降と、翌日の終了より前の両方が当たる
+    [InlineData(18, 0, 6, 0, 18, 0, true)]
+    [InlineData(18, 0, 6, 0, 23, 0, true)]
+    [InlineData(18, 0, 6, 0, 0, 0, true)]
+    [InlineData(18, 0, 6, 0, 2, 0, true)]
+    [InlineData(18, 0, 6, 0, 5, 59, true)]
+    [InlineData(18, 0, 6, 0, 6, 0, false)]
+    [InlineData(18, 0, 6, 0, 7, 0, false)]
+    [InlineData(18, 0, 6, 0, 17, 59, false)]
+    public void 時間帯の判定は開始を含み終了を含まない(
+        int startHour, int startMinute, int endHour, int endMinute,
+        int hour, int minute, bool expected)
+    {
+        var shift = Shift(new TimeOnly(startHour, startMinute), new TimeOnly(endHour, endMinute));
+
+        Assert.Equal(expected, ShiftSchedulePolicy.Covers(shift, new TimeOnly(hour, minute)));
+    }
+
+    [Fact]
+    public void 時刻から直を引ける()
+    {
+        var day = Shift(new(6, 0), new(18, 0), "D");
+        var night = Shift(new(18, 0), new(6, 0), "N");
+        List<Shift> shifts = [day, night];
+
+        Assert.Equal("N", ShiftSchedulePolicy.Resolve(shifts, new TimeOnly(23, 30))?.Code);
+        Assert.Equal("N", ShiftSchedulePolicy.Resolve(shifts, new TimeOnly(2, 0))?.Code);
+        Assert.Equal("D", ShiftSchedulePolicy.Resolve(shifts, new TimeOnly(6, 0))?.Code);
+
+        // 無効な直は当たらない。どの直にも入らない時刻は null
+        // （直を登録していない運用・時間帯に穴がある運用では実績の直が付かない）
+        night.IsActive = false;
+        Assert.Null(ShiftSchedulePolicy.Resolve(shifts, new TimeOnly(23, 30)));
+        Assert.Null(ShiftSchedulePolicy.Resolve([], new TimeOnly(10, 0)));
     }
 
     [Fact]
