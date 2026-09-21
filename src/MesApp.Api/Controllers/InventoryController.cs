@@ -296,7 +296,9 @@ public class InventoryController(
         {
             // 取消は指示が無かったのと同じ扱いにする（分母にも完了にも数えない）
             var items = source
-                .Where(x => !x.Canceled && x.CreatedAt >= start && x.CreatedAt <= end)
+                // 終端は翌製造日の開始時刻なので半開区間で切る（他の期間APIと同じ）。
+                // 閉区間にすると境界ちょうどに作られた指示が前日と当日の両方に数えられる
+                .Where(x => !x.Canceled && x.CreatedAt >= start && x.CreatedAt < end)
                 .ToList();
             var open = items.Where(x => x.Open).ToList();
             // 経過日数は製造日同士で引く。作成日時をUTCの暦日にすると、工場の時刻とUTCで日付がずれる

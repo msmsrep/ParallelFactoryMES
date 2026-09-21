@@ -244,6 +244,55 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 消耗材モニタリングの期間は製造日の境界で切られる()
+    {
+        // 暦日のUTC 0時で切っていると、JSTの 05:59 と 06:01 はどちらも同じ「UTC前日」に入り
+        // 振り分けられない。製造日境界（6時・Asia/Tokyo）で切れていれば前日と当日に分かれる
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["BusinessDay:BoundaryHour"] = "6",
+            ["BusinessDay:TimeZone"] = "Asia/Tokyo",
+        });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, _, lot, locationId) = await SetupConsumablePartAsync(admin, 10m);
+
+        var jst = TimeSpan.FromHours(9);
+        var targetDate = new DateOnly(2026, 9, 3);
+        // 境界の直前＝前日（9/2）の製造日、直後＝当日（9/3）の製造日
+        await RecordConsumptionAsync(admin, equipment.Id, lot.Id, locationId, 1m,
+            new DateTimeOffset(2026, 9, 3, 5, 59, 0, jst));
+        await RecordConsumptionAsync(admin, equipment.Id, lot.Id, locationId, 2m,
+            new DateTimeOffset(2026, 9, 3, 6, 1, 0, jst));
+
+        var onTarget = await admin.GetFromJsonAsync<List<MaintenancePartConsumptionRow>>(
+            $"/api/maintenance-orders/parts-consumption?from={targetDate:yyyy-MM-dd}&to={targetDate:yyyy-MM-dd}");
+        Assert.Equal(2m, Assert.Single(onTarget!).Quantity);
+
+        var onPrevious = await admin.GetFromJsonAsync<List<MaintenancePartConsumptionRow>>(
+            $"/api/maintenance-orders/parts-consumption?from={targetDate.AddDays(-1):yyyy-MM-dd}" +
+            $"&to={targetDate.AddDays(-1):yyyy-MM-dd}");
+        Assert.Equal(1m, Assert.Single(onPrevious!).Quantity);
+
+        // 2日をまとめて指定すれば両方入る（終端は翌製造日の開始時刻＝半開区間）
+        var both = await admin.GetFromJsonAsync<List<MaintenancePartConsumptionRow>>(
+            $"/api/maintenance-orders/parts-consumption?from={targetDate.AddDays(-1):yyyy-MM-dd}" +
+            $"&to={targetDate:yyyy-MM-dd}");
+        Assert.Equal(3m, Assert.Single(both!).Quantity);
+    }
+
+    /// <summary>指定時刻に始まった保全実績を1件記録する（部材を1行消費する）</summary>
+    private static async Task RecordConsumptionAsync(
+        HttpClient admin, int equipmentId, int lotId, int locationId,
+        decimal quantity, DateTimeOffset startedAt)
+    {
+        var order = await CreateSpotOrderAsync(admin, equipmentId);
+        var recorded = await admin.PostAsJsonAsync($"/api/maintenance-orders/{order.Id}/record",
+            new MaintenanceRecordRequest(startedAt, startedAt.AddMinutes(30), null, "交換完了", null, false,
+                [new MaintenanceRecordPartRequest(lotId, locationId, quantity, null)]));
+        recorded.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
     public async Task 資産管理部品と在庫不足は保全実績の消費部材にできない()
     {
         using var factory = new ApiFactory();

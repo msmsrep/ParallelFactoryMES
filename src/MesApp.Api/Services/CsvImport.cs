@@ -1,4 +1,4 @@
-using MesApp.Core.Contracts.Masters;
+﻿using MesApp.Core.Contracts.Masters;
 
 namespace MesApp.Api.Services;
 
@@ -52,8 +52,13 @@ public static class CsvImport
     }
 
     /// <summary>取込結果を組み立てる（失敗時は件数を0にし、エラーは上限件数で打ち切る）</summary>
+    /// <param name="warnings">
+    /// 取り込めたが伝えたいこと。エラーと違いロールバックしないので <c>Succeeded</c> には影響しない。
+    /// 取込が失敗した場合は捨てる（取り消された内容についての警告は読み手を混乱させるだけ）
+    /// </param>
     public static CsvImportResult Result(
-        CsvKindInfo kind, int dataRows, int created, int updated, bool dryRun, List<CsvImportError> errors)
+        CsvKindInfo kind, int dataRows, int created, int updated, bool dryRun,
+        List<CsvImportError> errors, List<CsvImportError>? warnings = null)
     {
         var succeeded = errors.Count == 0;
         if (errors.Count > MaxReportedErrors)
@@ -65,7 +70,10 @@ public static class CsvImport
             kind.Kind, dataRows,
             succeeded ? created : 0,
             succeeded ? updated : 0,
-            dryRun, succeeded, errors);
+            dryRun, succeeded, errors)
+        {
+            Warnings = succeeded && warnings is not null ? warnings : [],
+        };
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Entities;
@@ -23,7 +23,10 @@ namespace MesApp.Api.Controllers;
 [Route("api/audit-logs")]
 [Authorize(Roles = MesRoleGroups.UserAdmin)]
 public class AuditLogsController(
-    MesAppDbContext db, IAuditLogger auditLogger, IConfiguration configuration) : ControllerBase
+    MesAppDbContext db,
+    IAuditLogger auditLogger,
+    IConfiguration configuration,
+    IBusinessDateService businessDate) : ControllerBase
 {
     /// <summary>保持期間の既定（年）。Spec.md 7.6</summary>
     private const int DefaultRetentionYears = 5;
@@ -34,7 +37,7 @@ public class AuditLogsController(
     {
         var query = db.AuditLogs.AsNoTracking();
 
-        // 期間は RecordedOn（記録日・サーバーのローカル日付）で絞る。画面の表示もローカル時刻。
+        // 期間は RecordedOn（記録日・工場のローカル暦日）で絞る。画面の表示もローカル時刻。
         // SQLiteは DateTimeOffset の比較をSQLへ変換できず、Timestamp では絞り込めない
         if (filter.From is DateOnly from)
         {
@@ -126,7 +129,10 @@ public class AuditLogsController(
     private DateOnly RetentionCutoff()
     {
         var years = configuration.GetValue("Audit:RetentionYears", DefaultRetentionYears);
-        // 記録日はサーバーのローカル日付なので、境界も同じ基準で求める
-        return DateOnly.FromDateTime(DateTime.Now).AddYears(-years).AddDays(-1);
+        // 記録日は工場のローカル暦日なので、境界も同じ基準で求める。
+        // DateTime.Now（サーバーのローカル）で求めると、UTCのコンテナに置いたときに
+        // 境界だけ現場とずれ、消せるはずの日／消せない日が1日食い違う
+        var today = DateOnly.FromDateTime(businessDate.ToFactoryTime(DateTimeOffset.UtcNow).DateTime);
+        return today.AddYears(-years).AddDays(-1);
     }
 }

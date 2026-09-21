@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using MesApp.Core.Contracts.Execution;
@@ -897,5 +897,61 @@ public class ExecutionTests
         // 参照は従来どおり可能
         Assert.Equal(HttpStatusCode.OK,
             (await qc.GetAsync($"/api/work-orders/{finalWo.Id}/production-records")).StatusCode);
+    }
+
+    [Fact]
+    public async Task 実績の直は開始時刻を工場の時刻に直して決まる()
+    {
+        // 直の解決は開始時刻を工場のタイムゾーンへ直してから行う（Spec.md 5.7）。
+        // UTCのまま時刻を見ると、日本では9時間ずれて夜勤の実績に昼勤の直が付く
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["BusinessDay:TimeZone"] = "Asia/Tokyo",
+        });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrder = order.WorkOrders[0];
+        (await admin.PostAsync($"/api/work-orders/{workOrder.Id}/start", null)).EnsureSuccessStatusCode();
+
+        // 直を登録していなければ実績の直は付かない（集計では「（直なし）」にまとまる）
+        var beforeShifts = await RecordAsync(new DateTimeOffset(2026, 9, 3, 14, 30, 0, TimeSpan.Zero));
+        Assert.Null(beforeShifts.ShiftId);
+
+        (await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("D", "昼勤", new TimeOnly(6, 0), new TimeOnly(18, 0)))).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/shifts",
+            new ShiftRequest("N", "夜勤", new TimeOnly(18, 0), new TimeOnly(6, 0)))).EnsureSuccessStatusCode();
+
+        // UTC 14:30 = JST 23:30。UTCの時刻（14:30）で引くと昼勤になってしまう
+        var night = await RecordAsync(new DateTimeOffset(2026, 9, 3, 14, 30, 0, TimeSpan.Zero));
+        Assert.Equal("N", night.ShiftCode);
+        Assert.Equal("夜勤", night.ShiftName);
+
+        // 同じ瞬間を別のオフセットで送っても結果は変わらない（送信側のTZに依存しない）
+        var sameMoment = await RecordAsync(new DateTimeOffset(2026, 9, 3, 23, 30, 0, TimeSpan.FromHours(9)));
+        Assert.Equal("N", sameMoment.ShiftCode);
+
+        // UTC 01:00 = JST 10:00 は昼勤
+        var day = await RecordAsync(new DateTimeOffset(2026, 9, 3, 1, 0, 0, TimeSpan.Zero));
+        Assert.Equal("D", day.ShiftCode);
+
+        // 直の時間帯を後から変えても、記録済みの実績の直は動かない（記録時に固定する）
+        var shifts = (await admin.GetFromJsonAsync<List<ShiftResponse>>("/api/shifts"))!;
+        var nightShift = shifts.Single(s => s.Code == "N");
+        (await admin.PutAsJsonAsync($"/api/shifts/{nightShift.Id}",
+            new ShiftRequest("N", "夜勤", new TimeOnly(20, 0), new TimeOnly(6, 0)))).EnsureSuccessStatusCode();
+        var reread = (await admin.GetFromJsonAsync<List<ProductionRecordResponse>>(
+            $"/api/work-orders/{workOrder.Id}/production-records"))!;
+        Assert.Equal("N", reread.Single(r => r.Id == night.Id).ShiftCode);
+
+        async Task<ProductionRecordResponse> RecordAsync(DateTimeOffset startedAt)
+        {
+            var response = await admin.PostAsJsonAsync(
+                $"/api/work-orders/{workOrder.Id}/production-records",
+                new ProductionRecordRequest(1m, 0m, startedAt, startedAt.AddHours(1), null, false));
+            response.EnsureSuccessStatusCode();
+            return (await response.Content.ReadFromJsonAsync<ProductionRecordResponse>())!;
+        }
     }
 }

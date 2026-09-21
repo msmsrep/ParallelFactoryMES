@@ -115,7 +115,7 @@ public class ShiftsController(
         var others = await db.Shifts.AsNoTracking()
             .Where(s => s.IsActive && (excludeId == null || s.Id != excludeId))
             .ToListAsync(ct);
-        return ShiftSchedulePolicy.Check(request.Code, request.StartTime, request.EndTime, others);
+        return ShiftSchedulePolicy.Check(request.StartTime, request.EndTime, others);
     }
 
     private ShiftResponse ToResponse(Shift s) =>
