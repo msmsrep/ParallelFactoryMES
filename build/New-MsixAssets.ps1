@@ -1,66 +1,59 @@
-# MSIX用タイル画像とアプリアイコンを生成する。
-# ロゴを差し替えるときはこのスクリプトの Draw-Mark を書き換えて再実行する。
+# MSIX用タイル画像とアプリアイコンを build/icon.svg から生成する。
+# 図柄を差し替えるときは build/icon.svg だけを書き換えて再実行する（このスクリプトは配置係）。
+#
+# 前提: Inkscape（SVGのラスタライズに使う）。既定の場所に無い場合は -InkscapePath で渡す。
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\src\MesApp.Desktop\Assets')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\src\MesApp.Desktop\Assets'),
+    [string]$SvgPath = (Join-Path $PSScriptRoot 'icon.svg'),
+    [string]$InkscapePath
 )
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
-$background = [System.Drawing.Color]::FromArgb(255, 31, 42, 68)   # 濃紺（マニフェストのBackgroundColorと合わせる）
-$accent = [System.Drawing.Color]::FromArgb(255, 92, 200, 168)     # 稼働中を表す緑
-$light = [System.Drawing.Color]::White
-
-# 「並列に流れる3本の工程」を表す3本のバー。16px でも潰れない太さにする
-function Draw-Mark {
-    param([System.Drawing.Graphics]$G, [int]$Size)
-
-    $G.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $G.Clear($background)
-
-    $unit = $Size / 16.0
-    $barWidth = $unit * 2.4
-    $gap = $unit * 1.6
-    $totalWidth = ($barWidth * 3) + ($gap * 2)
-    $left = ($Size - $totalWidth) / 2.0
-    $bottom = $Size - ($unit * 3.4)
-    # PowerShellはカンマが乗算より強く結合するため、要素ごとに括弧が必要
-    $heights = @(($unit * 5.0), ($unit * 9.2), ($unit * 7.0))
-    $colors = @($light, $accent, $light)
-
-    for ($i = 0; $i -lt 3; $i++) {
-        $brush = New-Object System.Drawing.SolidBrush($colors[$i])
-        $x = $left + ($i * ($barWidth + $gap))
-        $y = $bottom - $heights[$i]
-        $G.FillRectangle($brush, [float]$x, [float]$y, [float]$barWidth, [float]($heights[$i]))
-        $brush.Dispose()
-    }
-
-    # 底辺のライン（生産ラインを表す）
-    $lineBrush = New-Object System.Drawing.SolidBrush($accent)
-    $G.FillRectangle($lineBrush, [float]$left, [float]($bottom + $unit * 0.8), [float]$totalWidth, [float]($unit * 1.0))
-    $lineBrush.Dispose()
+if (-not $InkscapePath) {
+    $candidates = @(
+        (Get-Command inkscape -ErrorAction SilentlyContinue).Source,
+        'C:\Program Files\Inkscape\bin\inkscape.exe',
+        'C:\Program Files (x86)\Inkscape\bin\inkscape.exe'
+    )
+    $InkscapePath = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+}
+if (-not $InkscapePath) {
+    throw 'Inkscape が見つかりません。インストールするか -InkscapePath で場所を指定してください。'
 }
 
+$SvgPath = (Resolve-Path $SvgPath).Path
+$temp = Join-Path ([IO.Path]::GetTempPath()) ("mes-assets-" + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $temp -Force | Out-Null
+
+# SVGを指定ピクセルでラスタライズする（背景は透過のまま）
+function Convert-Svg {
+    param([int]$Size)
+
+    $path = Join-Path $temp "mark-$Size.png"
+    if (-not (Test-Path $path)) {
+        & $InkscapePath --export-type=png -w $Size -h $Size --export-filename=$path $SvgPath | Out-Null
+        if (-not (Test-Path $path)) { throw "Inkscape がPNGを出力しませんでした（$Size px）。" }
+    }
+    return $path
+}
+
+# 透過キャンバスの中央にマークを置く。$Fill はマークがキャンバスの短辺に占める割合
 function New-Tile {
-    param([int]$Width, [int]$Height, [string]$Path)
+    param([int]$Width, [int]$Height, [string]$Path, [double]$Fill)
+
+    $side = [int][Math]::Round([Math]::Min($Width, $Height) * $Fill)
+    $mark = [System.Drawing.Image]::FromFile((Convert-Svg -Size $side))
 
     $bmp = New-Object System.Drawing.Bitmap($Width, $Height)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
-
-    # 横長タイルは正方形のマークを中央に置く
-    $side = [Math]::Min($Width, $Height)
-    $g.Clear($background)
-    $inner = New-Object System.Drawing.Bitmap($side, $side)
-    $ig = [System.Drawing.Graphics]::FromImage($inner)
-    Draw-Mark -G $ig -Size $side
-    $ig.Dispose()
-    $g.DrawImage($inner, [int](($Width - $side) / 2), [int](($Height - $side) / 2), $side, $side)
-    $inner.Dispose()
+    $g.DrawImage($mark, [int](($Width - $side) / 2), [int](($Height - $side) / 2), $side, $side)
+    $g.Dispose()
+    $mark.Dispose()
 
     $bmp.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
-    $g.Dispose()
     $bmp.Dispose()
     Write-Host "  $([IO.Path]::GetFileName($Path)) ($Width x $Height)"
 }
@@ -69,14 +62,7 @@ function New-Icon {
     param([string]$Path, [int[]]$Sizes)
 
     $streams = foreach ($size in $Sizes) {
-        $bmp = New-Object System.Drawing.Bitmap($size, $size)
-        $g = [System.Drawing.Graphics]::FromImage($bmp)
-        Draw-Mark -G $g -Size $size
-        $g.Dispose()
-        $ms = New-Object System.IO.MemoryStream
-        $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-        $bmp.Dispose()
-        , $ms.ToArray()
+        , [IO.File]::ReadAllBytes((Convert-Svg -Size $size))
     }
 
     # ICO（Vista以降が対応するPNG格納形式）を手で組み立てる
@@ -104,20 +90,26 @@ function New-Icon {
 $OutputDirectory = (New-Item -ItemType Directory -Path $OutputDirectory -Force).FullName
 Write-Host "生成先: $OutputDirectory"
 
-# ストア／タイルに必要な画像
-New-Tile -Width 50  -Height 50  -Path (Join-Path $OutputDirectory 'StoreLogo.png')
-New-Tile -Width 44  -Height 44  -Path (Join-Path $OutputDirectory 'Square44x44Logo.png')
-New-Tile -Width 71  -Height 71  -Path (Join-Path $OutputDirectory 'Square71x71Logo.png')
-New-Tile -Width 150 -Height 150 -Path (Join-Path $OutputDirectory 'Square150x150Logo.png')
-New-Tile -Width 310 -Height 310 -Path (Join-Path $OutputDirectory 'Square310x310Logo.png')
-New-Tile -Width 310 -Height 150 -Path (Join-Path $OutputDirectory 'Wide310x150Logo.png')
+try {
+    # ストア／タイルに必要な画像。
+    # 中〜大タイルはマークを小さめに置く（タイルは周囲に余白があるほうが収まりがよい）
+    New-Tile -Width 50  -Height 50  -Fill 0.86 -Path (Join-Path $OutputDirectory 'StoreLogo.png')
+    New-Tile -Width 44  -Height 44  -Fill 0.86 -Path (Join-Path $OutputDirectory 'Square44x44Logo.png')
+    New-Tile -Width 71  -Height 71  -Fill 0.78 -Path (Join-Path $OutputDirectory 'Square71x71Logo.png')
+    New-Tile -Width 150 -Height 150 -Fill 0.62 -Path (Join-Path $OutputDirectory 'Square150x150Logo.png')
+    New-Tile -Width 310 -Height 310 -Fill 0.62 -Path (Join-Path $OutputDirectory 'Square310x310Logo.png')
+    New-Tile -Width 310 -Height 150 -Fill 0.62 -Path (Join-Path $OutputDirectory 'Wide310x150Logo.png')
 
-# タスクバー・スタートメニューが参照するターゲットサイズ版
-foreach ($size in 16, 24, 32, 48, 256) {
-    New-Tile -Width $size -Height $size -Path (Join-Path $OutputDirectory "Square44x44Logo.targetsize-$size.png")
+    # タスクバー・スタートメニューが参照するターゲットサイズ版（小さいので余白は最小限）
+    foreach ($size in 16, 24, 32, 48, 256) {
+        New-Tile -Width $size -Height $size -Fill 1.0 -Path (Join-Path $OutputDirectory "Square44x44Logo.targetsize-$size.png")
+    }
+
+    # 実行ファイルのアイコン
+    New-Icon -Path (Join-Path $OutputDirectory 'AppIcon.ico') -Sizes @(16, 32, 48, 256)
 }
-
-# 実行ファイルのアイコン
-New-Icon -Path (Join-Path $OutputDirectory 'AppIcon.ico') -Sizes @(16, 32, 48, 256)
+finally {
+    Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host "完了しました。"

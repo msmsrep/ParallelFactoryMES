@@ -191,18 +191,22 @@ Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
 | ログインできず機能を確認できない | 初回ログイン前はウィンドウ上端に資格情報を常時表示する実装済み。加えて認定メモにも書く（上記） |
 | プライバシーポリシー未記載 | `docs/privacy.md` を公開済み。提出時にURLを入力する |
 | WebView2 未導入環境で起動しない | 起動時に検出して案内済み。認定メモにも前提として書いておく |
-| タイル画像が既定のまま | `build/New-MsixAssets.ps1` の `Draw-Mark` を書き換えて再生成する |
+| タイル画像が既定のまま | `build/icon.svg` を書き換えて `build/New-MsixAssets.ps1` で再生成する（7節） |
 
 ---
 
-## 7. タイル画像・アイコンを差し替える
+## 7. 画像を作り直す
+
+### タイル画像・アイコン
 
 ```powershell
 ./build/New-MsixAssets.ps1
 ```
 
-`build/New-MsixAssets.ps1` の `Draw-Mark` 関数が唯一の描画箇所。
-既製のPNGに差し替える場合は `src/MesApp.Desktop/Assets/` の同名ファイルを上書きする
-（必要なサイズはスクリプト末尾の一覧のとおり）。
+図柄の定義は **`build/icon.svg` だけ**（濃紺のライン画＋右下にずらしたパステル面）。
+スクリプトはそれを各サイズにラスタライズして `src/MesApp.Desktop/Assets/` へ並べるだけなので、
+**変えたいときは SVG を直す**。実行には Inkscape が要る（`-InkscapePath` で場所を渡せる）。
 
+生成物は背景が透過のPNG。タイルの下地はマニフェストの `BackgroundColor`（白）が受け持つ。
+既製のPNGに差し替える場合は `src/MesApp.Desktop/Assets/` の同名ファイルを上書きする。
 実行ファイルのアイコンは `Assets/AppIcon.ico`（csproj の `ApplicationIcon`）。
