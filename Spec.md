@@ -89,6 +89,7 @@
 改訂89: 2026-09-21（CSV取込の結果に**警告**（`CsvImportResult.Warnings`）を追加し、直の製造日境界またぎ（改訂60）をCSVからの登録でも伝えるようにした。重なりの拒否と無効化の拒否は「単票APIと同じ判定をCSVでも通す」形になっていたのに、警告だけ単票APIにしか無く、CSVで入れた直に限って登録時に気づけなかった。警告は**エラーと違いロールバックしない**（`Succeeded` に影響しない）。取込が失敗した場合の警告は捨てる（取り消された内容についての警告は読み手を混乱させる）。位置引数ではなく既定値を持つプロパティとして足し、ZIP一括取込を含む既存の応答の組み立てを壊さない。5.7節に反映）
 改訂90: 2026-09-21（**シート・端末のライセンス管理を実装しないことに決定**し、本システムのライセンスを AGPL-3.0 のみとした。改訂10で将来の実装候補として残置していた2.2節A・B・D（ライセンス購入・端末アクティベーション・割当解除）、Cの端末認証、3.8節のシート・端末管理、5.6節（LicenseEntitlement・Device・SeatAssignment・ActivationCode）と5.7節のシート計算、6.1節の端末アクティベーション画面・シート・端末管理画面、6.2節（WPFライセンスアプリ）、7.1節（Store公開・アドオン課金）、7.4節のデバイストークン・アクティベーションコード関連、8〜9章のライセンスアプリ・Store API、Phase 8〜9を削除した。節・画面・フェーズの番号は他所からの参照を壊さないよう欠番として残す。Microsoft Store 配布は単独PC向けの MesApp.Desktop（7.8節）のみ）
 改訂91: 2026-09-21（**DBプロバイダーをPostgreSQL・SQL Serverへ切り替えられるようにした**（4章。Phase 10のうちDB切替）。`Database:Provider`に`PostgreSql`/`SqlServer`を指定すると、それぞれ専用プロジェクトのマイグレーションを起動時に適用する。1つのモデルから3プロバイダーのスキーマを作るため、PostgreSQLでは`DateTimeOffset`をUTCで書き込み、SQL Serverでは多重連鎖を避けるため`SET NULL`をEF側の処理に移し、SQLite以外では精度未指定の`decimal`を`(18,6)`にした。SQLiteのスキーマは変えていない。採番（`NumberingService`）の生SQLは表名・列名をプロバイダーの引用符で囲み、同時作成で一意制約違反になったときはセーブポイントまで戻してから再試行する（PostgreSQLは失敗した文のあとトランザクションを受け付けないため）。テストは環境変数（`MESAPP_TEST_PROVIDER` / `MESAPP_TEST_CONNECTION`）で実DBに向けられ、PostgreSQL 18・SQL Server（LocalDB）で全件通過を確認した。PostgreSQL・SQL Serverでは小数桁固定の`decimal`が`1.500000`のように返るため、読み出し時に末尾ゼロを落としてSQLiteと同じ値の見え方にした。既存SQLiteデータの移行ツールと、実DBでの自動テストの常時実行は将来拡張とした）
+改訂92: 2026-09-21（**3プロバイダー分のマイグレーションをまとめて追加するスクリプト**（`scripts/Migrations.ps1`）を用意し、4章の将来拡張から「3プロバイダー分を作る運用の省力化」を外した。1つのマイグレーションで3プロバイダーを兼ねる形は、列の型がプロバイダーごとに生成されるため手修正が毎回必要になり採らない。あわせて、マイグレーションに生SQLを書かない規約を4章に加えた）
 参考: みんなのMES（min-MES） https://min-mes.com/ / OSS: https://github.com/mihatama/open-mes-project
 
 ---
@@ -339,13 +340,13 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
 
 - **接続文字列の`Data Source`が相対パスのときは、書き込み可能なユーザーデータディレクトリ（既定`%LOCALAPPDATA%\ParallelFactoryMES`、環境変数`MESAPP_DATA_DIR`で変更可）を基準に絶対パス化する**（`MesAppDataDirectory`）。実行ファイルの隣に作るとMSIX配布時にインストール先が読み取り専用で書き込めないため。JWT署名鍵（`Jwt:SigningKeyFile`）も同じ規則で解決する。絶対パス指定はそのまま使う。
 - `MesApp.Infrastructure`内でプロバイダーごとの`UseSqlite` / `UseNpgsql` / `UseSqlServer`を設定値に応じて切り替える（`DependencyInjection.UseProvider`。設定できる名前は`DatabaseProviders`）。
-- マイグレーションはプロバイダーごとに作成が必要（EF Coreの制約）。SQLiteは`MesApp.Infrastructure/Migrations`、PostgreSQLは`MesApp.Migrations.PostgreSql`、SQL Serverは`MesApp.Migrations.SqlServer`に置き、起動時の`MigrateAsync()`は設定中のプロバイダーの分を適用する。**スキーマを変えるときは3プロバイダーすべてで追加する**（作り忘れは`DatabaseProviderTests`が落とす）。
+- マイグレーションはプロバイダーごとに作成が必要（EF Coreの制約）。SQLiteは`MesApp.Infrastructure/Migrations`、PostgreSQLは`MesApp.Migrations.PostgreSql`、SQL Serverは`MesApp.Migrations.SqlServer`に置き、起動時の`MigrateAsync()`は設定中のプロバイダーの分を適用する。**スキーマを変えるときは3プロバイダーすべてで同じ名前で追加する**。追加は`scripts/Migrations.ps1 -Add <名前>`で3つまとめて行い、最後に`DatabaseProviderTests`で3つともモデルに追いついていることを確かめる（作り忘れもこのテストが落とす）。マイグレーションには生SQL（データの修正・移行）を書かない（3方言で書き分けることになるため。既存データの手当ては起動時の処理やサービス側にC#で書く）。
 - プロバイダー間でスキーマを1つのモデルから作るための調整（SQLiteのスキーマは変えない）：
   - PostgreSQL：`timestamptz`はオフセット0の値しか書けないため、`DateTimeOffset`は書き込み時にUTCへ直す。読み出した値はUTCになる（同じ時点を指すので比較・表示には影響しない）。
   - SQL Server：削除の連鎖が同じ表へ複数経路で届く形・循環を許さないため、`SET NULL`の外部キーはDB側では何もせず、読み込み済みの子だけEFがnullにする（`ClientSetNull`）。`SET NULL`の親（利用者・設備・作業指示・ロット等）はアプリから物理削除しないため実運用上の差はない。
   - SQLite以外：精度未指定の`decimal`は`decimal(18,6)`とする（SQL Serverの既定`decimal(18,2)`では測定値・数量の小数3桁目以降が切り捨てられるため）。読み出した値は末尾ゼロを落とす（`1.500000`→`1.5`。CSV・APIの出力をSQLiteとそろえる）。
   - 文字列比較：SQL Serverの既定照合順序は大文字・小文字を区別しない（コード`ABC`と`abc`が重複扱いになる、検索も区別しない）。SQLite・PostgreSQLは区別する。照合順序は変えず、この差を仕様とする。
-- **［将来拡張］** 既存のSQLiteデータをPostgreSQL/SQL Serverへ移すツール。スキーマ変更ごとに3プロバイダー分のマイグレーションを作る運用の省力化。実DB（PostgreSQL/SQL Server）に対する自動テストの常時実行。
+- **［将来拡張］** 既存のSQLiteデータをPostgreSQL/SQL Serverへ移すツール。実DB（PostgreSQL/SQL Server）に対する自動テストの常時実行。
 - SQLite利用時の同時アクセス対策：ASP.NET Coreは並行リクエストを処理するため、SQLiteでも書き込み競合は発生し得る。WALモードを有効化し、busy timeoutを設定し、書き込み競合時（SQLITE_BUSY）のリトライを実装する。数十端末規模まではこの構成で運用可能とするが、高負荷が想定される場合はPostgreSQL等への切替を推奨する旨をドキュメントに明記する。
 - 在庫数量等の同時更新対策（プロバイダー非依存・アプリレイヤ）：`InventoryStock`など同時更新が起こり得るエンティティにはEF Coreの**楽観的同時実行制御（同時実行トークン／RowVersion）**を設定し、競合検出時は再読込・再計算のうえリトライする。マイナス在庫の防止判定は更新トランザクション内で行い、同時実績入力による在庫の二重引落し・引落し漏れを防ぐ。
 
