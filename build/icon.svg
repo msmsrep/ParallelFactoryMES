@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Parallel Factory MES のアイコン（唯一の図柄の定義）。
+  濃紺のライン画 + 右下にずらした一色のパステル面という作りに揃えている。
+  モチーフは従来どおり「並列に流れる3本の工程」と生産ラインを表す底辺。
+  アクセント色は緑の濃淡（#CDEBDF → #8FD2BE → #5CC8A8）。従来の稼働色 #5CC8A8 を
+  いちばん高いバーの右隣に置き、左から淡→濃と並べて工程が進む感じを出している。
+
+  PNG・ICO は build/New-MsixAssets.ps1 がこのファイルから生成する。図柄を変えるときはここだけを直す。
+-->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <defs>
+    <!-- 3本のバー（角丸）。ライン画とパステル面で同じ形を使い回す -->
+    <g id="mes-bars">
+      <rect x="12" y="50" width="21" height="26" rx="6" />
+      <rect x="40" y="24" width="21" height="52" rx="6" />
+      <rect x="68" y="38" width="21" height="38" rx="6" />
+    </g>
+  </defs>
+
+  <!-- 16px でも潰れないよう、図柄を キャンバス いっぱいに寄せる -->
+  <g transform="translate(-5.5,-9.5) scale(1.06)">
+    <!-- 右下へずらしたパステル面（ライン画の内側からのぞく）。バーごとに濃さを変える -->
+    <rect x="19" y="58" width="21" height="26" rx="6" fill="#CDEBDF" />
+    <rect x="47" y="32" width="21" height="52" rx="6" fill="#8FD2BE" />
+    <rect x="75" y="46" width="21" height="38" rx="6" fill="#5CC8A8" />
+
+    <!-- ライン画 -->
+    <g fill="none" stroke="#18193F" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+      <use href="#mes-bars" />
+      <path d="M13 88 H88" />
+    </g>
+  </g>
+</svg>

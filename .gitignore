@@ -28,3 +28,8 @@ MES.md
 
 ref/
 artifacts/
+参考/
+参考2/
+
+# ストア掲載画像の素材（アプリの実画面。build/Capture-AppScreens.js でいつでも撮り直せる）
+build/store/raw/

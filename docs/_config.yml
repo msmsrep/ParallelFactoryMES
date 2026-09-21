@@ -64,3 +64,5 @@ nav:
         url: troubleshooting.html
       - title: 管理者向け運用
         url: operations.html
+      - title: プライバシーポリシー
+        url: privacy.html
