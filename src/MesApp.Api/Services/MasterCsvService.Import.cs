@@ -1267,7 +1267,7 @@ public sealed partial class MasterCsvService
             }
             // 時間帯の重なりは単票APIと同じ条件で弾く（重なると実績の直が一意に決まらない）
             var others = byCode.Values.Where(s => s.IsActive && !ReferenceEquals(s, shift)).ToList();
-            if (isActive && ShiftSchedulePolicy.Check(code, startTime, endTime, others) is { } scheduleError)
+            if (isActive && ShiftSchedulePolicy.Check(startTime, endTime, others) is { } scheduleError)
             {
                 reader.Fail(scheduleError);
                 continue;

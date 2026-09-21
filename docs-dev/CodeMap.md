@@ -85,7 +85,7 @@
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
 | 工場従業員（ユーザー）管理・論理削除 | F-10-10 | `UsersController.cs` `api/users` | `Core/Entities/AppUser.cs`（`WorkCenterId`＝作業場所・`Department`＝所属・`ShiftId`＝所属する直） | `/masters` `Masters/UsersTab.razor` | `Tests/MasterTests.cs` |
-| 勤務シフト（直） | F-10-10-01 | `ShiftsController.cs` `api/shifts`（**時間帯が重なる直は登録不可**。所属者がいる直は無効化不可。いずれもCSV取込と同じ判定。製造日の境界をまたぐ直は登録できるが警告を返す。**CSV取込も同じで、警告は `CsvImportResult.Warnings` に載る＝ロールバックしない**） | Masters.cs: Shift（夜勤は `EndTime <= StartTime` で日跨ぎを表す。翌日フラグは持たない） | `/masters` `Masters/ShiftsTab.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
+| 勤務シフト（直） | F-10-10-01 | `ShiftsController.cs` `api/shifts`（**時間帯が重なる直は登録不可**。所属者がいる直は無効化不可。いずれもCSV取込と同じ判定。製造日の境界をまたぐ直は登録できるが警告を返す。**CSV取込も同じで、警告は `CsvImportResult.Warnings` に載る＝ロールバックしない**） | Masters.cs: Shift（夜勤は `EndTime <= StartTime` で日跨ぎを表す。翌日フラグは持たない） | `/masters` `Masters/ShiftsTab.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` `Tests/ShiftSchedulePolicyTests.cs` |
 | スキル・資格マスタと割当（有効期限） | F-20-10 | `SkillsController.cs` `api/skills` | Masters.cs: SkillMaster / UserSkill | `/masters` `Masters/SkillsTab.razor` | `Tests/MasterTests.cs` |
 
 ## H. 出荷判定・トレーサビリティ
@@ -116,7 +116,7 @@
 | 採番（指図番号・ロット番号等） | `Api/Services/NumberingService.cs`<br>`Core/Entities/NumberSequence.cs` | Spec.md 3.9。新しい採番区分はここに追加。払い出しは採番テーブルの1行を更新してから読む（最大値+1にしない）。**変更追跡を使わない**（呼び出し側の未確定の変更を書き込まないため`ExecuteUpdate`と生SQL）。`Tests/InventoryTests.cs` |
 | ロット使用可否（投入・引当・出荷の共通判定） | `Api/Policies/LotUsabilityPolicy.cs` | Spec.md 3.9。ステータス・有効期限の条件は**ここだけ**に置く。呼び先は `WorkOrderExecutionService.AddConsumptionAsync`（投入）／`InventoryService.AllocateFefoAsync`（FEFO）／`ShippingService.ShipAsync`（出荷） |
 | 製造条件の逸脱判定 | `Api/Policies/ControlItemDeviationPolicy.cs` | Spec.md 5.7。基準は**マスタ現在値ではなく作業指示のスナップショット**（`WorkOrderControlItem`）。数値なし・上下限なしは判定せず`null`のまま（`false`にしない）。呼び先は `WorkOrderExecutionService.AddDataRecordsAsync` |
-| 直（シフト）の時間帯判定 | `Api/Policies/ShiftSchedulePolicy.cs` | Spec.md 5.7。日跨ぎ（`EndTime <= StartTime`）・重なり判定・時刻→直の解決・**製造日の境界またぎの警告**（`CheckBusinessDateBoundary`。拒否ではなく `ShiftResponse.BoundaryWarning` で返す）。単票APIとCSV取込の両方から通す。重なり判定は**1日を分に開いて突き合わせる**（開始・終了の大小比較だと 22:00〜06:00 と 05:00〜09:00 の重なりを見落とす） |
+| 直（シフト）の時間帯判定 | `Api/Policies/ShiftSchedulePolicy.cs` | Spec.md 5.7。日跨ぎ（`EndTime <= StartTime`）・重なり判定・時刻→直の解決・**製造日の境界またぎの警告**（`CheckBusinessDateBoundary`。拒否ではなく `ShiftResponse.BoundaryWarning` で返す）。単票APIとCSV取込の両方から通す。重なり判定は**0時で切って区間に開いてから突き合わせる**（開始・終了の大小比較だと 22:00〜06:00 と 05:00〜09:00 の重なりを見落とす）。判定の単体テストは `Tests/ShiftSchedulePolicyTests.cs`（1440分の総当たりを期待値にした網羅テストで等価性を固定） |
 | 工順・品目から参照できるマスタ | `Api/Policies/ProductStructurePolicy.cs` | Spec.md 5.7。工順の作業区（最下段かつ有効）・作業手順書（有効）・品目の既定ロケーション（有効）・候補設備（代表設備を含める）。呼び先は `ProductStructureService` / `ProductsController` と `MasterCsvService.Import` の `ImportProductsAsync`・`ImportRoutingAsync`。`Tests/MasterTests.cs` / `MasterCsvTests.cs` |
 | 部材投入の照合（予定材料） | `Api/Policies/MaterialIssuePolicy.cs` | Spec.md 3.9・5.7。基準はMBOMの現在値ではなく**指図の予定材料**。呼び先は `WorkOrderExecutionService.AddConsumptionAsync` |
 | 作業指示ステータス変更（＋状態履歴） | `Api/Services/WorkOrderStatusService.cs`<br>`Core/Entities/Production.cs`: WorkOrderStatusHistory | Spec.md 5.2。`WorkOrder.Status` を**直接代入しない**。履歴は `GET api/work-orders/{id}/status-history` |

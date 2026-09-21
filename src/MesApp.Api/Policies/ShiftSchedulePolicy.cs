@@ -37,7 +37,7 @@ public static class ShiftSchedulePolicy
     /// 登録・更新しようとしている直が成立するかを確認する。問題があれば日本語の理由を返す。
     /// </summary>
     /// <param name="others">自分以外の有効な直（重なりの確認に使う）</param>
-    public static string? Check(string code, TimeOnly start, TimeOnly end, IEnumerable<Shift> others)
+    public static string? Check(TimeOnly start, TimeOnly end, IEnumerable<Shift> others)
     {
         if (start == end)
         {
@@ -83,21 +83,34 @@ public static class ShiftSchedulePolicy
             : $"{start:HH:mm}〜{end:HH:mm}";
 
     /// <summary>
-    /// 2つの時間帯が重なるか。日跨ぎがあるので、1日を分に開いて突き合わせる
-    /// （開始・終了の大小比較だけでは 22:00〜06:00 と 05:00〜09:00 の重なりを見落とす）
+    /// 2つの時間帯が重なるか。
+    /// <para>
+    /// 日跨ぎの直（22:00〜06:00）はそのままでは start &gt; end で区間として扱えないため、
+    /// <b>0時で切って「開始〜24:00」と「0時〜終了」の2本に分けてから</b>突き合わせる。
+    /// こうすると、どの断片も start &lt; end の素直な区間になり、重なりは
+    /// 「一方の開始が他方の終了より前」の組み合わせだけで判定できる。
+    /// 開始・終了の大小比較だけで済ませると 22:00〜06:00 と 05:00〜09:00 の重なりを見落とす。
+    /// </para>
     /// </summary>
-    private static bool Overlaps(TimeOnly startA, TimeOnly endA, TimeOnly startB, TimeOnly endB)
+    private static bool Overlaps(TimeOnly startA, TimeOnly endA, TimeOnly startB, TimeOnly endB) =>
+        Split(startA, endA).Any(a => Split(startB, endB).Any(b => a.Start < b.End && b.Start < a.End));
+
+    /// <summary>
+    /// 時間帯を、0時をまたがない1〜2本の区間（分単位・終了は含まない）に開く。
+    /// 終端は「24:00」を表す 24*60 で持つ（<see cref="TimeOnly"/> では0時と区別できないため）
+    /// </summary>
+    private static (int Start, int End)[] Split(TimeOnly start, TimeOnly end)
     {
-        for (var minute = 0; minute < 24 * 60; minute += 1)
-        {
-            var time = new TimeOnly(minute / 60, minute % 60);
-            if (InRange(startA, endA, time) && InRange(startB, endB, time))
-            {
-                return true;
-            }
-        }
-        return false;
+        const int endOfDay = 24 * 60;
+        var from = Minutes(start);
+        var to = Minutes(end);
+        return CrossesMidnight(start, end)
+            // 日跨ぎ：当日ぶんと翌日ぶん。終了が0時ちょうどなら翌日ぶんは空なので持たない
+            ? to == 0 ? [(from, endOfDay)] : [(from, endOfDay), (0, to)]
+            : [(from, to)];
     }
+
+    private static int Minutes(TimeOnly time) => time.Hour * 60 + time.Minute;
 
     private static bool InRange(TimeOnly start, TimeOnly end, TimeOnly time) =>
         CrossesMidnight(start, end)
