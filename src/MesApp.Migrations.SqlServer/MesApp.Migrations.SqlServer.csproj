@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SQL Server 用のマイグレーション（Spec.md 4章）。SQLite用は MesApp.Infrastructure/Migrations にある -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MesApp.Infrastructure\MesApp.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -114,8 +114,8 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 
 | 設定 | 環境変数 | 既定値 |
 |---|---|---|
-| DBファイルの場所 | `Database__ConnectionString` | `Data Source=mesapp.db` |
-| DBプロバイダー | `Database__Provider` | `Sqlite`（他はPhase 10で対応） |
+| DB接続文字列（SQLiteはファイルの場所） | `Database__ConnectionString` | `Data Source=mesapp.db` |
+| DBプロバイダー | `Database__Provider` | `Sqlite`（`PostgreSql` / `SqlServer` も可） |
 | 業務日付の境界時刻 | `BusinessDay__BoundaryHour` | `6`（午前6時） |
 | アクセストークン有効期限（分） | `Jwt__AccessTokenLifetimeMinutes` | `60` |
 | リフレッシュトークン有効期限（時間） | `Jwt__RefreshTokenLifetimeHours` | `12` |
@@ -137,8 +137,15 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 - **バックアップ**: SQLiteはWALモードで動作するため、**稼働中のDBファイルの単純コピーは行わないでください**。
   停止中にコピーするか、`VACUUM INTO` を使用します。
 - **DBのリセット**: `mesapp.db*` を削除して再起動すると初期状態に戻ります。
-- **PostgreSQL / SQL Server**: Phase 10で対応予定です。現在 `Database__Provider` に指定すると
-  起動時にエラーになります。
+- **PostgreSQL / SQL Server**: `Database__Provider` と `Database__ConnectionString` を指定すると、
+  起動時にそのDBへスキーマを作成します（DB自体とログインは事前に作成しておく）。
+  `DateTimeOffset` はPostgreSQLではUTCで保存され、SQL Serverの既定照合順序ではコードの大文字・小文字を
+  区別しません（Spec.md 4章）。**既存のSQLiteデータを移す機能はありません**。テストは実DBでも流せます（CLAUDE.md「コマンド」）。
+
+  ```powershell
+  $env:Database__Provider="PostgreSql"; $env:Database__ConnectionString="Host=db;Database=mesapp;Username=mesapp;Password=..."
+  $env:Database__Provider="SqlServer"; $env:Database__ConnectionString="Server=db;Database=mesapp;User Id=mesapp;Password=...;TrustServerCertificate=True"
+  ```
 
 ## テスト
 

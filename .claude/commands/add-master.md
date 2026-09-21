@@ -19,7 +19,7 @@ allowed-tools: Read, Grep, Glob, Edit, Write, PowerShell, Bash
 
 1. **エンティティ**: `Core/Entities/Masters.cs` にクラス追加。`Id` / 一意コード / `IsActive` を持たせる。ステータス系は `Core/Entities/Enums.cs` に追加。
 2. **DbContext**: `Infra/MesAppDbContext.cs` に `DbSet` を、`Infra/Configurations/MasterConfigurations.cs` に `IEntityTypeConfiguration<T>` のクラス（一意インデックス・必須・最大長）を追加（`ApplyConfigurationsFromAssembly` で自動で読み込まれる）。既存マスタの記述に揃える。
-3. **マイグレーション**: `dotnet ef migrations add Add<Name>Master --project src/MesApp.Infrastructure --startup-project src/MesApp.Api`
+3. **マイグレーション**: CLAUDE.md「コマンド」の3行（SQLite / PostgreSQL / SQL Server）を `<Name>` = `Add<Name>Master` で**すべて**実行する（1つでも欠けると `DatabaseProviderTests` が落ちる）。
    生成物は**開かない・編集しない**。
 4. **DTO**: `Core/Contracts/Masters/` に `<Name>Request` / `<Name>Response` を `record` で追加。
 5. **Controller**: `Api/Controllers/<Name>sController.cs`。

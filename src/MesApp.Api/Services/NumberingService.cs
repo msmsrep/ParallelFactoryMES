@@ -3,6 +3,9 @@ using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace MesApp.Api.Services;
 
@@ -170,17 +173,41 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
             .DefaultIfEmpty(0)
             .Max() + 1;
 
+        // PostgreSQLは失敗した文があるとトランザクション全体が以降の文を受け付けなくなるため、
+        // 一意制約違反からの再試行に備えてセーブポイントまで戻せるようにしておく
+        var transaction = db.Database.CurrentTransaction
+                          ?? throw new InvalidOperationException("採番はトランザクション内で行います。");
+        await transaction.CreateSavepointAsync(CreateSequenceSavepoint, ct);
         try
         {
-            await db.Database.ExecuteSqlAsync(
-                $"INSERT INTO NumberSequences (Prefix, LastValue) VALUES ({prefix}, {value})", ct);
+            await db.Database.ExecuteSqlRawAsync(InsertSequenceSql(), [prefix, value], ct);
             return value;
         }
         catch (DbException)
         {
             // 同時に別のリクエストが作った。作られた行を進めて払い出す
+            await transaction.RollbackToSavepointAsync(CreateSequenceSavepoint, ct);
             return await IncrementAsync(prefix, ct)
                    ?? throw new InvalidOperationException($"採番列 '{prefix}' を作成できませんでした。");
         }
+    }
+
+    private const string CreateSequenceSavepoint = "create_number_sequence";
+
+    /// <summary>
+    /// 採番行を追加するSQL。表名・列名はモデルから引き、プロバイダーの引用符で囲む
+    /// （PostgreSQLは引用符の無い識別子を小文字に畳むため、そのままの名前では表が見つからない。Spec.md 4章）
+    /// </summary>
+    private string InsertSequenceSql()
+    {
+        var entity = db.Model.FindEntityType(typeof(NumberSequence))!;
+        var table = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+        var sql = db.GetService<ISqlGenerationHelper>();
+        string Column(string property) =>
+            sql.DelimitIdentifier(entity.FindProperty(property)!.GetColumnName(table)!);
+
+        return "INSERT INTO " + sql.DelimitIdentifier(table.Name, table.Schema)
+               + " (" + Column(nameof(NumberSequence.Prefix)) + ", " + Column(nameof(NumberSequence.LastValue))
+               + ") VALUES ({0}, {1})";
     }
 }

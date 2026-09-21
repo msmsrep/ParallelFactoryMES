@@ -15,29 +15,33 @@ public static class DependencyInjection
         var options = configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>()
                       ?? new DatabaseOptions();
 
-        services.AddDbContext<MesAppDbContext>(db =>
-        {
-            switch (options.Provider)
-            {
-                case "Sqlite":
-                    db.UseSqlite(ResolveSqliteConnectionString(options.ConnectionString), sqlite =>
-                        sqlite.CommandTimeout(30));
-                    break;
-                case "PostgreSql":
-                case "SqlServer":
-                    throw new NotSupportedException(
-                        $"DBプロバイダー '{options.Provider}' はPhase 10で対応予定です。現時点では 'Sqlite' を指定してください。");
-                default:
-                    throw new InvalidOperationException(
-                        $"不明なDBプロバイダー '{options.Provider}' が設定されています（Database:Provider）。");
-            }
-        });
+        services.AddDbContext<MesAppDbContext>(db => UseProvider(db, options));
 
         // AuditLogger は記録日を工場のタイムゾーンで持つため IBusinessDateService に依存する。
         // 実装（BusinessDateService）はホスト側（MesApp.Api）で登録する
         services.AddScoped<IAuditLogger, AuditLogger>();
         return services;
     }
+
+    /// <summary>
+    /// 設定されたプロバイダーでDbContextを構成する（Spec.md 4章）。
+    /// PostgreSQL・SQL Serverはマイグレーションを専用プロジェクトから読む
+    /// </summary>
+    public static DbContextOptionsBuilder UseProvider(DbContextOptionsBuilder db, DatabaseOptions options) =>
+        options.Provider switch
+        {
+            DatabaseProviders.Sqlite => db.UseSqlite(ResolveSqliteConnectionString(options.ConnectionString),
+                sqlite => sqlite.CommandTimeout(30)),
+            DatabaseProviders.PostgreSql => db.UseNpgsql(options.ConnectionString, npgsql => npgsql
+                .MigrationsAssembly(DatabaseProviders.PostgreSqlMigrationsAssembly)
+                .CommandTimeout(30)),
+            DatabaseProviders.SqlServer => db.UseSqlServer(options.ConnectionString, sqlServer => sqlServer
+                .MigrationsAssembly(DatabaseProviders.SqlServerMigrationsAssembly)
+                .CommandTimeout(30)),
+            _ => throw new InvalidOperationException(
+                $"不明なDBプロバイダー '{options.Provider}' が設定されています（Database:Provider）。" +
+                $"'{DatabaseProviders.Sqlite}' / '{DatabaseProviders.PostgreSql}' / '{DatabaseProviders.SqlServer}' のいずれかを指定してください。"),
+        };
 
     /// <summary>
     /// SQLite接続文字列のData Sourceを書き込み可能な絶対パスへ解決する。

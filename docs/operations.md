@@ -52,8 +52,8 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 
 | 設定 | 環境変数 | 既定値 |
 |---|---|---|
-| DBファイルの場所 | `Database__ConnectionString` | `Data Source=mesapp.db` |
-| DBプロバイダー | `Database__Provider` | `Sqlite` |
+| DB接続文字列（SQLiteはファイルの場所） | `Database__ConnectionString` | `Data Source=mesapp.db` |
+| DBプロバイダー | `Database__Provider` | `Sqlite`（`PostgreSql` / `SqlServer` も可） |
 | 業務日付の境界時刻 | `BusinessDay__BoundaryHour` | `6`（午前6時） |
 | 監査ログの保持期間（年） | `Audit__RetentionYears` | `5` |
 | アクセストークン有効期限（分） | `Jwt__AccessTokenLifetimeMinutes` | `60` |
@@ -184,7 +184,7 @@ SQLiteはWALモードで動作するため、コピーしたファイルが壊�
 
 | 項目 | 状況 |
 |---|---|
-| PostgreSQL / SQL Server | 未対応。`Database__Provider` に指定すると起動時にエラーになります |
+| PostgreSQL / SQL Server | 対応（起動時にスキーマを作成）。PostgreSQL 18・SQL Server（LocalDB）で全テスト通過を確認済み、既存SQLiteデータの移行機能は無し（Spec.md 4章） |
 | Docker化・Zip配布 | 未対応 |
 | HTTPS強制 | 未実装（リバースプロキシで対応） |
 | 設備・秤量機からの自動データ収集 | 未対応（手入力） |

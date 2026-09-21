@@ -26,6 +26,8 @@
     <ProjectReference Include="..\MesApp.Client.Web\MesApp.Client.Web.csproj" />
     <ProjectReference Include="..\MesApp.Core\MesApp.Core.csproj" />
     <ProjectReference Include="..\MesApp.Infrastructure\MesApp.Infrastructure.csproj" />
+    <ProjectReference Include="..\MesApp.Migrations.PostgreSql\MesApp.Migrations.PostgreSql.csproj" />
+    <ProjectReference Include="..\MesApp.Migrations.SqlServer\MesApp.Migrations.SqlServer.csproj" />
   </ItemGroup>
 
 </Project>
