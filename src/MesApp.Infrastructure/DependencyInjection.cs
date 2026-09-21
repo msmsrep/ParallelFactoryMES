@@ -25,23 +25,28 @@ public static class DependencyInjection
 
     /// <summary>
     /// 設定されたプロバイダーでDbContextを構成する（Spec.md 4章）。
-    /// PostgreSQL・SQL Serverはマイグレーションを専用プロジェクトから読む
+    /// マイグレーションはプロバイダーごとに別物になる（EF Coreの制約）ため、SQLiteはこのプロジェクトの
+    /// <c>Migrations/</c>、PostgreSQL・SQL Serverはそれぞれ専用のプロジェクトから読む
     /// </summary>
     public static DbContextOptionsBuilder UseProvider(DbContextOptionsBuilder db, DatabaseOptions options) =>
         options.Provider switch
         {
             DatabaseProviders.Sqlite => db.UseSqlite(ResolveSqliteConnectionString(options.ConnectionString),
-                sqlite => sqlite.CommandTimeout(30)),
+                sqlite => sqlite.CommandTimeout(CommandTimeoutSeconds)),
             DatabaseProviders.PostgreSql => db.UseNpgsql(options.ConnectionString, npgsql => npgsql
-                .MigrationsAssembly(DatabaseProviders.PostgreSqlMigrationsAssembly)
-                .CommandTimeout(30)),
+                .MigrationsAssembly(PostgreSqlMigrationsAssembly)
+                .CommandTimeout(CommandTimeoutSeconds)),
             DatabaseProviders.SqlServer => db.UseSqlServer(options.ConnectionString, sqlServer => sqlServer
-                .MigrationsAssembly(DatabaseProviders.SqlServerMigrationsAssembly)
-                .CommandTimeout(30)),
+                .MigrationsAssembly(SqlServerMigrationsAssembly)
+                .CommandTimeout(CommandTimeoutSeconds)),
             _ => throw new InvalidOperationException(
                 $"不明なDBプロバイダー '{options.Provider}' が設定されています（Database:Provider）。" +
-                $"'{DatabaseProviders.Sqlite}' / '{DatabaseProviders.PostgreSql}' / '{DatabaseProviders.SqlServer}' のいずれかを指定してください。"),
+                $"{string.Join(" / ", DatabaseProviders.All.Select(p => $"'{p}'"))} のいずれかを指定してください。"),
         };
+
+    private const int CommandTimeoutSeconds = 30;
+    private const string PostgreSqlMigrationsAssembly = "MesApp.Migrations.PostgreSql";
+    private const string SqlServerMigrationsAssembly = "MesApp.Migrations.SqlServer";
 
     /// <summary>
     /// SQLite接続文字列のData Sourceを書き込み可能な絶対パスへ解決する。
@@ -64,7 +69,7 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// 起動時のDB初期化：マイグレーション適用と、SQLite利用時のWALモード有効化（Spec.md 4章）
+    /// 起動時のDB初期化：マイグレーション適用と、SQLite利用時の追加処理（Spec.md 4章）
     /// </summary>
     public static async Task InitializeDatabaseAsync(this IServiceProvider serviceProvider)
     {
@@ -74,10 +79,18 @@ public static class DependencyInjection
 
         if (db.Database.IsSqlite())
         {
-            // WALは一度設定するとDBファイルに永続化される。busy_timeoutは接続ごとのためEF側のCommandTimeoutと併用
-            await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
-            await BackfillAuditRecordedOnAsync(db);
+            await InitializeSqliteAsync(db);
         }
+    }
+
+    /// <summary>
+    /// SQLiteだけの初期化：WALモードの有効化と、以前からあるDBの監査ログ記録日の埋め戻し
+    /// </summary>
+    private static async Task InitializeSqliteAsync(MesAppDbContext db)
+    {
+        // WALは一度設定するとDBファイルに永続化される。busy_timeoutは接続ごとのためEF側のCommandTimeoutと併用
+        await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
+        await BackfillAuditRecordedOnAsync(db);
     }
 
     /// <summary>
