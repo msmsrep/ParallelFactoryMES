@@ -32,11 +32,10 @@ $env:MESAPP_TEST_PROVIDER=$null; $env:MESAPP_TEST_CONNECTION=$null
 dotnet test tests/MesApp.Api.Tests --filter FullyQualifiedName~MasterCsvTests -v n
 ```
 
-マイグレーション（`dotnet tool restore` が前提。EF ツールは `dotnet-tools.json` で固定）。**スキーマを変えたら3プロバイダーすべてで同じ名前で追加する**（1つでも欠けると `DatabaseProviderTests` が落ちる。接続はしないので接続文字列は形式だけでよい）:
+マイグレーション（EF ツールは `dotnet-tools.json` で固定）。**スキーマを変えたら3プロバイダーすべてで同じ名前で追加する**ので、手で3回打たずスクリプトを使う（最後に `DatabaseProviderTests` で同期を確認する。DBには接続しない）。**マイグレーションに生SQLを書かない**（3方言になる。データの手当ては C# の起動時処理かサービス側で行う）:
 ```powershell
-dotnet ef migrations add <Name> --project src/MesApp.Infrastructure --startup-project src/MesApp.Api
-dotnet ef migrations add <Name> --project src/MesApp.Migrations.PostgreSql --startup-project src/MesApp.Api --no-build -- --Database:Provider=PostgreSql "--Database:ConnectionString=Host=localhost;Database=mesapp"
-dotnet ef migrations add <Name> --project src/MesApp.Migrations.SqlServer --startup-project src/MesApp.Api --no-build -- --Database:Provider=SqlServer "--Database:ConnectionString=Server=localhost;Database=mesapp"
+./scripts/Migrations.ps1 -Add <Name>      # 3プロバイダーに追加して検査（/add-migration でも可）
+./scripts/Migrations.ps1 -RemoveLast      # 3プロバイダーの最新を取り消す
 ```
 
 アプリ起動は `.claude/launch.json` の `mesapp`（preview_start）を使う。シェルから `dotnet run` を常駐させない。
@@ -60,7 +59,7 @@ DB は既定 SQLite（`mesapp.db`）、`Database:Provider` で PostgreSQL / SQL 
 **まず `docs-dev/CodeMap.md`**（業務機能 → Controller / エンティティ / 画面 / テストの対応表）を見る。
 ここで対象ファイルが分かれば grep しない。足りないときだけ Grep（`-n`・パス限定）で補う。
 
-補助コマンド: `/task-card`（タスクカード生成）、`/verify`（ビルド＋テスト＋DoD判定）、`/add-master`（マスタ追加の定型手順）。
+補助コマンド: `/task-card`（タスクカード生成）、`/verify`（ビルド＋テスト＋DoD判定）、`/add-master`（マスタ追加の定型手順）、`/add-migration`（3プロバイダーのマイグレーション追加）。
 
 ## 読み込み禁止・注意
 
