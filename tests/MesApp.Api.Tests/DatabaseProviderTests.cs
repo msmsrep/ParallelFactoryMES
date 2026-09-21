@@ -20,8 +20,7 @@ public class DatabaseProviderTests
         [DatabaseProviders.SqlServer] = "Server=localhost;Database=mesapp;User Id=mesapp;Password=dummy;TrustServerCertificate=True",
     };
 
-    public static TheoryData<string> Providers =>
-        [DatabaseProviders.Sqlite, DatabaseProviders.PostgreSql, DatabaseProviders.SqlServer];
+    public static TheoryData<string> Providers => new(DatabaseProviders.All);
 
     private static MesAppDbContext Create(string provider)
     {

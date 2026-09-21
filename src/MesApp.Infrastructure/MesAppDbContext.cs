@@ -1,7 +1,6 @@
 ﻿using MesApp.Core.Entities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace MesApp.Infrastructure;
 
@@ -134,35 +133,9 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<LotStatusChangeSource>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<WorkOrderStatusChangeSource>().HaveConversion<string>().HaveMaxLength(30);
 
-        // PostgreSQLの timestamptz はオフセット0（UTC）の値しか書き込めない（Npgsqlの仕様）。
-        // 工場のタイムゾーン付きで作った時刻をそのまま保存できるよう、書き込み時にUTCへ直す。
-        // 読み出した値はUTCになるが、同じ時点を指すので比較・表示（画面側で LocalDateTime）には影響しない
-        if (Database.ProviderName == NpgsqlProviderName)
-        {
-            builder.Properties<DateTimeOffset>().HaveConversion<UtcDateTimeOffsetConverter>();
-        }
-
-        // 精度を指定していない decimal は、SQL Serverでは decimal(18,2) になり測定値・数量の小数3桁目以降が
-        // 黙って切り捨てられる。SQLite以外では小数6桁まで持たせる（個別に HasPrecision した列はそちらが優先）。
-        // SQLiteは精度を持たない（TEXTで保存）ため、スキーマを変えないよう対象外にする
-        // 小数桁を固定した列は読み出すと 1.500000 のように末尾ゼロ付きで返り、そのままCSV・APIに出てしまうため、
-        // 読み出し時に末尾ゼロを落としてSQLiteと同じ見え方にする
-        if (!Database.IsSqlite())
-        {
-            builder.Properties<decimal>().HavePrecision(18, 6).HaveConversion<TrimmedDecimalConverter>();
-        }
+        // プロバイダーごとの型の扱い（Spec.md 4章）
+        ProviderModelConventions.ApplyConventions(builder, Database);
     }
-
-    private sealed class TrimmedDecimalConverter() : ValueConverter<decimal, decimal>(
-        v => v, v => TrimTrailingZeros(v));
-
-    /// <summary>値を変えずに末尾ゼロ（スケール）だけを落とす。1.500000 → 1.5</summary>
-    private static decimal TrimTrailingZeros(decimal value) => value / 1.0000000000000000000000000000m;
-
-    private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
-
-    private sealed class UtcDateTimeOffsetConverter() : ValueConverter<DateTimeOffset, DateTimeOffset>(
-        v => v.ToUniversalTime(), v => v);
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -171,31 +144,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         // エンティティごとの設定は Configurations/ に領域別に置く
         builder.ApplyConfigurationsFromAssembly(typeof(MesAppDbContext).Assembly);
 
-        if (Database.ProviderName == SqlServerProviderName)
-        {
-            AvoidMultipleCascadePaths(builder);
-        }
-    }
-
-    private const string SqlServerProviderName = "Microsoft.EntityFrameworkCore.SqlServer";
-
-    /// <summary>
-    /// SQL Serverは、削除の連鎖（CASCADE / SET NULL）が同じ表へ複数の経路で届く形や循環を許さない。
-    /// SET NULL はDB側の動作をやめ、読み込み済みの子だけEFが null にする（ClientSetNull）。
-    /// </summary>
-    /// <remarks>
-    /// SET NULL の親（利用者・設備・作業指示・ロット等）はアプリから物理削除しない（無効化で扱う）ため、
-    /// 実運用での差は出ない。SQLite・PostgreSQLのスキーマは変えない。
-    /// 残っていないことは DatabaseProviderTests が確かめる。
-    /// </remarks>
-    private static void AvoidMultipleCascadePaths(ModelBuilder builder)
-    {
-        foreach (var fk in builder.Model.GetEntityTypes().SelectMany(t => t.GetForeignKeys()))
-        {
-            if (fk.DeleteBehavior == DeleteBehavior.SetNull)
-            {
-                fk.DeleteBehavior = DeleteBehavior.ClientSetNull;
-            }
-        }
+        // プロバイダーごとの制約への対応（Spec.md 4章）
+        ProviderModelConventions.ApplyModel(builder, Database);
     }
 }

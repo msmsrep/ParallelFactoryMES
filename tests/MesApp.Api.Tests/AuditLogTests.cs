@@ -157,8 +157,12 @@ public class AuditLogTests
         Assert.Contains("90", logs.Items[0].Detail);
     }
 
+    /// <summary>
+    /// 埋め戻しはSQLiteの既存DBだけが対象（他のプロバイダーは列の追加後に作られるため過去行が無い）。
+    /// 実DB（MESAPP_TEST_PROVIDER）で流したときは何も検査せずに通る（xUnit 2 は実行時にスキップできない）
+    /// </summary>
     [Fact]
-    public async Task 列の追加前からある記録にも記録日が埋まる()
+    public async Task SQLiteでは列の追加前からある記録にも記録日が埋まる()
     {
         using var factory = new ApiFactory();
         using var admin = await TestAuth.CreateAdminClientAsync(factory);
@@ -170,7 +174,6 @@ public class AuditLogTests
             var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
             if (!db.Database.IsSqlite())
             {
-                // 埋め戻しはSQLiteの既存DBだけが対象（他のプロバイダーは列の追加後に作られるため過去行が無い）
                 return;
             }
             await db.Database.ExecuteSqlRawAsync(
