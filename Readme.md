@@ -3,6 +3,7 @@
 製造実績管理システム（MES）。ASP.NET Core Web API（バックエンド）＋ Blazor WebAssembly（Webクライアント）で構成し、
 APIが同一オリジンでWebクライアントも配信します。
 
+- **紹介ページ（画面写真でひととおり見る）**: [Parallel Factory MES の紹介](https://msmsrep.github.io/ParallelFactoryMES/intro.html)
 - **ユーザーガイド（操作マニュアル）**: [ユーザーガイド](https://msmsrep.github.io/ParallelFactoryMES/)
 
 ## ライセンス

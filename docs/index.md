@@ -16,7 +16,10 @@ next_title: 導入と初期設定
 - **ロット単位で追跡**します。どの部材ロットからどの製品ロットができたかを、双方向にたどれます。
 - **記録には必ず「誰が・いつ」が残ります**。実績訂正・検査訂正・マスタ変更・在庫操作・取消は監査ログに記録され、[監査ログ画面](operations.html#audit-log)（システム管理者専用）で確認できます。
 
-画面写真でひととおり見たい方は、[紹介ページ](intro.html)をご覧ください。
+<a class="intro-banner" href="intro.html">
+  <img src="assets/intro/dashboard.webp" width="1440" height="660" alt="" loading="lazy">
+  <span><strong>まずは紹介ページで全体を見る &rarr;</strong><small>製造指図から出荷までの流れと主な画面を、画面写真でひととおり紹介しています。</small></span>
+</a>
 
 ## ガイドの読みかた
 

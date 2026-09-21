@@ -28,6 +28,8 @@ nav:
     items:
       - title: このガイドについて
         url: index.html
+      - title: 紹介ページ（画面写真で見る）
+        url: intro.html
       - title: 導入と初期設定
         url: getting-started.html
       - title: 画面構成と共通操作
