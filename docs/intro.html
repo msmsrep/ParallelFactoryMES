@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Parallel Factory MES の紹介ページ（ユーザーガイドとは別の、アプリの概要を伝えるページ） -->
+<title>Parallel Factory MES</title>
+<meta name="description" content="製造指図から出荷まで、ロット単位で記録・追跡するオープンソースの製造実行システム。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 公開用の最小リセット */
+html{color-scheme:light dark}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+:root{
+  --ground:#F1F3F5; --surface:#FFFFFF; --ink:#15212E; --muted:#56636F; --line:#D9DFE5;
+  --band:#1E2B3A; --band-ink:#E9EEF3; --band-muted:#9FB0C1;
+  --accent:#1F6FC5; --accent-soft:#E3EEF9;
+  --chip-grey-bg:#E4E7EA; --chip-grey:#4A5560;
+  --chip-blue-bg:#CFE3F7; --chip-blue:#1B5A97;
+  --chip-orange-bg:#F8DDB4; --chip-orange:#8A4E00;
+  --chip-green-bg:#D5ECCD; --chip-green:#2D6622;
+  --shadow:0 1px 2px rgba(21,33,46,.06),0 12px 32px -12px rgba(21,33,46,.22);
+  --display:"BIZ UDPGothic","Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --body:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"Consolas",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0F151C; --surface:#17202A; --ink:#E5EBF1; --muted:#9AA7B4; --line:#2A3643;
+    --band:#0A1016; --band-ink:#E5EBF1; --band-muted:#8797A8;
+    --accent:#63A6EE; --accent-soft:#1A2D42;
+    --chip-grey-bg:#2A333D; --chip-grey:#B8C2CC;
+    --chip-blue-bg:#1D3550; --chip-blue:#9CC8F2;
+    --chip-orange-bg:#44331B; --chip-orange:#F2C27D;
+    --chip-green-bg:#20361D; --chip-green:#A6D99A;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0F151C; --surface:#17202A; --ink:#E5EBF1; --muted:#9AA7B4; --line:#2A3643;
+  --band:#0A1016; --band-ink:#E5EBF1; --band-muted:#8797A8;
+  --accent:#63A6EE; --accent-soft:#1A2D42;
+  --chip-grey-bg:#2A333D; --chip-grey:#B8C2CC;
+  --chip-blue-bg:#1D3550; --chip-blue:#9CC8F2;
+  --chip-orange-bg:#44331B; --chip-orange:#F2C27D;
+  --chip-green-bg:#20361D; --chip-green:#A6D99A;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px -14px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.85;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+h1,h2,h3{font-family:var(--display);font-weight:700;text-wrap:balance;letter-spacing:.01em;margin:0}
+p{margin:0}
+.mono{font-family:var(--mono)}
+
+/* 上部バー */
+.top{border-bottom:1px solid var(--line);background:var(--surface)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:14px}
+.brand{white-space:nowrap;font-family:var(--display);font-weight:700;font-size:17px;display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none}
+.brand-mark{width:22px;height:22px;display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.brand-mark i{background:var(--accent);border-radius:2px}
+.brand-mark i:nth-child(2),.brand-mark i:nth-child(3){background:var(--band)}
+:root[data-theme="dark"] .brand-mark i:nth-child(2),:root[data-theme="dark"] .brand-mark i:nth-child(3){background:var(--muted)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .brand-mark i:nth-child(2),:root:not([data-theme="light"]) .brand-mark i:nth-child(3){background:var(--muted)}}
+.top nav{display:flex;gap:20px;font-size:14px;flex-wrap:wrap}
+.top nav a{color:var(--muted);text-decoration:none}
+.top nav a:hover{color:var(--ink)}
+
+/* ヒーロー */
+.hero{padding-block:clamp(40px,7vw,80px) 0}
+.eyebrow{font-size:13px;letter-spacing:.12em;color:var(--muted);font-weight:500;margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.eyebrow .tag{font-family:var(--mono);letter-spacing:.02em;border:1px solid var(--line);padding:1px 8px;border-radius:3px;background:var(--surface)}
+.hero h1{font-size:clamp(30px,5.2vw,54px);line-height:1.3;max-width:17em;word-break:keep-all;overflow-wrap:anywhere}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.lead{margin-top:22px;font-size:clamp(16px,1.6vw,18px);color:var(--muted);max-width:40em}
+.cta{margin-top:30px;display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:6px;font-weight:500;font-size:15px;text-decoration:none;border:1px solid transparent}
+.btn-primary{background:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn-primary{color:#0B1623}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn-primary{color:#0B1623}}
+.btn-ghost{border-color:var(--line);color:var(--ink);background:var(--surface)}
+.btn:hover{filter:brightness(1.06)}
+.hero-shot{margin-top:clamp(36px,5vw,56px);position:relative}
+
+/* 画面フレーム */
+.screen{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:var(--shadow)}
+.screen img{display:block;width:100%;height:auto}
+.screen figcaption{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:var(--ground)}
+.screen figcaption b{font-weight:500;color:var(--ink)}
+.screen figcaption .mono{font-size:11.5px}
+/* 画面写真は常に明るいUIなので、暗いテーマでは少しだけ落とす */
+:root[data-theme="dark"] .screen img{filter:brightness(.92)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .screen img{filter:brightness(.92)}}
+
+/* 流れ */
+.flow-band{background:var(--band);color:var(--band-ink);margin-top:clamp(-120px,-9vw,-60px);padding-block:calc(clamp(60px,9vw,120px) + 48px) 56px}
+.flow-head{display:flex;justify-content:space-between;align-items:end;gap:24px;flex-wrap:wrap;margin-bottom:28px}
+.flow-head h2{font-size:clamp(22px,2.6vw,28px)}
+.flow-head p{color:var(--band-muted);font-size:14.5px;max-width:34em}
+.flow-scroll{overflow-x:auto;padding-bottom:6px}
+.flow{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(11,minmax(92px,1fr));min-width:1040px;counter-reset:s}
+.flow li{position:relative;padding:14px 10px 0 0;counter-increment:s}
+.flow li::before{content:counter(s,decimal-leading-zero);font-family:var(--mono);font-size:11px;color:var(--band-muted);display:block;margin-bottom:6px}
+.flow li::after{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--dept)}
+.flow li strong{display:block;font-size:14.5px;font-weight:700;line-height:1.4}
+.flow li span{display:block;font-size:12px;color:var(--band-muted);margin-top:4px;line-height:1.5}
+.d-plan{--dept:#5BA2EE}.d-floor{--dept:#E9A94B}.d-qc{--dept:#7FC770}.d-log{--dept:#B79CE8}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:22px;font-size:12.5px;color:var(--band-muted)}
+.legend i{display:inline-block;width:14px;height:3px;background:var(--dept);vertical-align:middle;margin-right:6px}
+
+/* 機能 */
+.features{padding-block:clamp(56px,8vw,96px);display:grid;gap:clamp(64px,9vw,112px)}
+.feature{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:clamp(24px,4vw,56px);align-items:start}
+.feature.flip{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.feature.flip .copy{order:2}
+.copy{position:sticky;top:24px}
+.codes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.code{font-family:var(--mono);font-size:11.5px;padding:2px 7px;border-radius:3px;background:var(--accent-soft);color:var(--accent);font-weight:500}
+.copy h3{font-size:clamp(22px,2.6vw,29px);line-height:1.45;word-break:keep-all;overflow-wrap:anywhere}
+.copy p{margin-top:16px;color:var(--muted);max-width:32em}
+.copy ul{margin:18px 0 0;padding:0;list-style:none;display:grid;gap:9px;font-size:14.5px}
+.copy li{padding-left:18px;position:relative;line-height:1.7}
+.copy li::before{content:"";position:absolute;left:0;top:.72em;width:8px;height:2px;background:var(--accent)}
+.stack{display:grid;gap:18px}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.42fr);gap:18px;align-items:start}
+
+/* ステータス */
+.chips{display:flex;flex-wrap:wrap;gap:6px 4px;align-items:center;margin-top:18px;font-size:12.5px;color:var(--muted)}
+.chip{display:inline-block;padding:1px 10px;border-radius:999px;font-size:12px;font-weight:500}
+.c-grey{background:var(--chip-grey-bg);color:var(--chip-grey)}
+.c-blue{background:var(--chip-blue-bg);color:var(--chip-blue)}
+.c-orange{background:var(--chip-orange-bg);color:var(--chip-orange)}
+.c-green{background:var(--chip-green-bg);color:var(--chip-green)}
+
+/* 数字 */
+.clock{margin-top:20px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:14px 16px;font-size:13.5px}
+.clock-bar{position:relative;height:26px;margin:10px 0 6px;border-radius:3px;background:var(--accent-soft);border:1px solid var(--line);overflow:hidden}
+.clock-bar .night{position:absolute;top:0;bottom:0;left:62.5%;right:0;background:repeating-linear-gradient(135deg,var(--chip-orange-bg) 0 5px,transparent 5px 10px)}
+.clock-ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.clock small{display:block;color:var(--muted);margin-top:6px;line-height:1.6}
+
+/* 始め方 */
+.start{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-block:clamp(56px,8vw,88px)}
+.start-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,5vw,64px)}
+.start h2,.scope h2{font-size:clamp(22px,2.6vw,28px)}
+.steps{list-style:none;margin:24px 0 0;padding:0;display:grid;gap:20px;counter-reset:st}
+.steps li{counter-increment:st;display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px}
+.steps li::before{content:counter(st);font-family:var(--mono);font-weight:500;font-size:13px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--accent);margin-top:2px}
+.steps b{display:block;font-weight:700}
+.steps p{color:var(--muted);font-size:14.5px}
+pre{margin:10px 0 0;background:var(--band);color:var(--band-ink);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:13px;line-height:1.6;overflow-x:auto}
+.forms{margin-top:24px;display:grid;gap:12px}
+.form{border:1px solid var(--line);border-radius:6px;padding:16px 18px;background:var(--ground)}
+.form b{font-family:var(--display);font-size:16px}
+.form p{font-size:14px;color:var(--muted);margin-top:4px}
+dl.req{margin:24px 0 0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 20px;font-size:14.5px}
+dl.req dt{color:var(--muted)}
+dl.req dd{margin:0}
+
+/* 範囲 */
+.scope{padding-block:clamp(56px,8vw,88px)}
+.scope-grid{margin-top:24px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px}
+.box{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:20px 22px}
+.box h3{font-size:16px;display:flex;align-items:center;gap:8px}
+.box ul{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:8px;font-size:14.5px}
+.box li{display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:12px;border-top:1px dashed var(--line);padding-top:8px}
+.box li:first-child{border-top:0;padding-top:0}
+.box li b{font-weight:500}
+.box li span{color:var(--muted)}
+.box.not li{grid-template-columns:minmax(0,1fr)}
+
+footer{border-top:1px solid var(--line);padding-block:32px 48px;font-size:13px;color:var(--muted)}
+footer .wrap{display:grid;gap:10px}
+footer p{max-width:62em}
+
+@media (max-width:860px){
+  .feature,.feature.flip{grid-template-columns:minmax(0,1fr)}
+  .feature.flip .copy{order:0}
+  .copy{position:static}
+  .start-grid,.scope-grid{grid-template-columns:minmax(0,1fr)}
+  .pair{grid-template-columns:minmax(0,1fr)}
+  .pair .screen:last-child{max-width:320px}
+}
+@media (max-width:520px){
+  .top nav a.opt{display:none}
+  .box li{grid-template-columns:minmax(0,1fr);gap:0}
+}
+@media (prefers-reduced-motion:no-preference){
+  .hero-shot .screen{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes rise{from{transform:translateY(14px)}to{transform:none}}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Parallel Factory MES</a>
+    <nav>
+      <a class="opt" href="#features">できること</a>
+      <a class="opt" href="#start">始め方</a>
+      <a class="opt" href="index.html">ユーザーガイド</a>
+      <a href="https://github.com/msmsrep/ParallelFactoryMES">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow"><span>製造実行システム（MES）</span><span class="tag">AGPL-3.0</span><span class="tag">.NET 10 / Blazor</span></div>
+    <h1>製造指図から<wbr>出荷まで、<wbr><em>ロット</em>で<wbr>つないで<wbr>記録する。</h1>
+    <p class="lead">Parallel Factory MES は、工場の製造実績をブラウザで記録・追跡するオープンソースのMESです。指図・作業・在庫・検査・出荷を一本の流れとして扱い、どの部材ロットからどの製品ロットができたかを、いつでも両方向にたどれます。</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/msmsrep/ParallelFactoryMES">ソースコードを見る</a>
+      <a class="btn btn-ghost" href="index.html">ユーザーガイドを読む</a>
+    </div>
+    <div class="hero-shot">
+      <figure class="screen">
+        <figcaption><b>ダッシュボード</b><span class="mono">当日＝製造日 · 6時境界</span></figcaption>
+        <img src="assets/intro/dashboard.webp" width="1440" height="660" alt="ダッシュボード画面。当日の良品数68・不良数2・不良率2.86%と、製造指図4件の状態（展開済・承認済・未承認）と工程進捗の一覧">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="flow-band" aria-labelledby="flow-title">
+  <div class="wrap">
+    <div class="flow-head">
+      <h2 id="flow-title">工場の一日を、ひとつの画面群で</h2>
+      <p>部署ごとに別々の表で管理していた記録を、同じロット番号でつなぎます。前の工程が終わっていなければ次へ進めない、検査が通っていなければ出荷できない――そうした業務の順番をシステムが守ります。</p>
+    </div>
+    <div class="flow-scroll" tabindex="0" aria-label="業務の流れ（横にスクロールできます）">
+      <ol class="flow">
+        <li class="d-plan"><strong>マスタ登録</strong><span>品目・工順・設備</span></li>
+        <li class="d-log"><strong>受入</strong><span>部材ロットを計上</span></li>
+        <li class="d-plan"><strong>製造指図</strong><span>登録・承認</span></li>
+        <li class="d-plan"><strong>工程展開</strong><span>作業指示と産出ロット</span></li>
+        <li class="d-plan"><strong>差立</strong><span>作業者・設備を割当</span></li>
+        <li class="d-floor"><strong>段取り</strong><span>チェックリスト</span></li>
+        <li class="d-floor"><strong>実績入力</strong><span>良品・不良・投入</span></li>
+        <li class="d-floor"><strong>完了承認</strong><span>工程の締め</span></li>
+        <li class="d-qc"><strong>検査</strong><span>測定値を自動判定</span></li>
+        <li class="d-qc"><strong>出荷判定</strong><span>可・特採・否</span></li>
+        <li class="d-log"><strong>出荷</strong><span>判定済みだけ出せる</span></li>
+      </ol>
+    </div>
+    <div class="legend">
+      <span class="d-plan"><i></i>生産管理</span>
+      <span class="d-floor"><i></i>現場</span>
+      <span class="d-qc"><i></i>品質</span>
+      <span class="d-log"><i></i>物流・倉庫</span>
+    </div>
+  </div>
+</section>
+
+<section class="features wrap" id="features" aria-label="できること">
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">A-20-10-01</span><span class="code">B-10-20</span></div>
+      <h3>指図を登録すれば、<br>工程ごとの作業指示が並ぶ</h3>
+      <p>製造指図を承認して工程展開すると、品目に登録した工順どおりに作業指示が作られ、産出ロットも自動で採番されます。状態は色で見分けられ、勝手に飛び越すことはできません。</p>
+      <div class="chips" aria-label="製造指図の状態">
+        <span class="chip c-grey">未承認</span>→<span class="chip c-blue">承認済</span>→<span class="chip c-orange">展開済</span>→<span class="chip c-green">完了</span>
+      </div>
+    </div>
+    <div class="stack">
+      <figure class="screen">
+        <figcaption><b>製造指図管理</b><span class="mono">SMP-FG-001 ほか</span></figcaption>
+        <img src="assets/intro/orders.webp" width="1220" height="660" loading="lazy" alt="製造指図管理画面。指図登録フォームと、4件の製造指図の一覧（区分・状態・産出ロット）">
+      </figure>
+      <figure class="screen">
+        <figcaption><b>作業指示一覧</b><span class="mono">指図番号-工程順序</span></figcaption>
+        <img src="assets/intro/workorders.webp" width="1220" height="420" loading="lazy" alt="作業指示一覧。工程ごとの作業指示5件と、段取り・実績入力・指示書のボタン">
+      </figure>
+    </div>
+  </article>
+
+  <article class="feature flip">
+    <div class="copy">
+      <div class="codes"><span class="code">バーコード</span><span class="code">QR</span></div>
+      <h3>紙の指示書と現品票も、<br>そのまま印刷して現場へ</h3>
+      <p>作業指示書にはその工程で使う部品と必要数、記録欄、バーコードが入ります。ロットごとの現品票も発行でき、PDFに書き出せます。</p>
+      <ul>
+        <li>読み取りはUSBのバーコードリーダーでも、タブレットのカメラでも</li>
+        <li>ロット番号や作業指示番号の入力欄はすべてスキャンに対応</li>
+      </ul>
+    </div>
+    <div class="pair">
+      <figure class="screen">
+        <figcaption><b>作業指示書</b><span class="mono">印刷 / PDF</span></figcaption>
+        <img src="assets/intro/print-wo.webp" width="800" height="735" loading="lazy" alt="作業指示書の印刷プレビュー。指示番号・品目・工程、構成部品（MBOM）の表、作業実施記録欄、指示番号のバーコード">
+      </figure>
+      <figure class="screen">
+        <figcaption><b>現品票</b></figcaption>
+        <img src="assets/intro/print-lot.webp" width="320" height="410" loading="lazy" alt="現品票。品目コード・品目名・数量・受入日とロット番号のバーコード">
+      </figure>
+    </div>
+  </article>
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">H-30-10-01</span><span class="code">-02</span></div>
+      <h3>この製品には、どのロットが<br>使われていたか</h3>
+      <p>製品ロットの番号を読み取るだけで、使われた半製品・部材のロットを最後までたどれます（トレースバック）。逆に、ある部材ロットが使われた製品を洗い出すこともできます（トレースフォワード）。</p>
+      <ul>
+        <li>ロットごとに、どの作業指示で投入されたかが並ぶ</li>
+        <li>「このロットを追跡」で次の階層へそのまま移れる</li>
+        <li>製造・検査・入出庫の履歴も同じ画面で</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>ロットトレーサビリティ</b><span class="mono">FG1000-S001</span></figcaption>
+      <img src="assets/intro/trace.webp" width="1220" height="760" loading="lazy" alt="トレーサビリティ画面。製品ロットFG1000-S001のトレースバック結果として、半製品SF2000-S001とその鋳造品ロット、7つの部材ロットが階層表示されている">
+    </figure>
+  </article>
+
+  <article class="feature flip">
+    <div class="copy">
+      <div class="codes"><span class="code">D-10-30-01</span><span class="code">D-10-30</span></div>
+      <h3>在庫は「ロット×場所」で持つ</h3>
+      <p>受入・製造・出荷のたびに在庫が動き、入出庫の履歴が残ります。ロケーション移動、数量調整、分割・統合、保留や廃棄といった操作も、理由とともに記録されます。</p>
+      <ul>
+        <li>有効期限の近いロットを知らせる期限アラート</li>
+        <li>保留・不適合のロットは出庫や投入で止まる</li>
+        <li>棚卸、搬送指示、出庫・払出の画面もあり</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>在庫照会・操作</b><span class="mono">10 ロット</span></figcaption>
+      <img src="assets/intro/inventory.webp" width="1220" height="760" loading="lazy" alt="在庫照会画面。ロット番号・品目・ロケーション・数量・ステータス・有効期限の一覧と、操作・現品票・追跡のボタン">
+    </figure>
+  </article>
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">B-60-10-05</span><span class="code">C-40-10-03</span></div>
+      <h3>数字は「製造日」で締める</h3>
+      <p>直行率・歩留まり・不良率を、品目別・工程別・直別に集計します。夜勤が日付をまたいでも、境界時刻（既定は朝6時）までの実績は同じ製造日にまとまります。</p>
+      <div class="clock" aria-label="製造日の境界の例">
+        <b>9月21日の製造日</b>
+        <div class="clock-bar" aria-hidden="true"><div class="night"></div></div>
+        <div class="clock-ticks" aria-hidden="true"><span>21日 6:00</span><span>12:00</span><span>18:00</span><span>0:00</span><span>22日 6:00</span></div>
+        <small>斜線は21時からの夜勤。日付が変わっても、翌朝6時までの実績は21日の製造日に入ります。境界時刻は設定で変えられます。</small>
+      </div>
+    </div>
+    <div class="stack">
+      <figure class="screen">
+        <figcaption><b>生産性モニタリング</b><span class="mono">直行率 97.14 %</span></figcaption>
+        <img src="assets/intro/productivity.webp" width="1220" height="750" loading="lazy" alt="生産性モニタリング画面。合計の良品数・不良数・直行率・歩留まりと、品目別・工程別の集計表">
+      </figure>
+      <figure class="screen">
+        <figcaption><b>品質分析</b><span class="mono">工程別の不良集計</span></figcaption>
+        <img src="assets/intro/quality.webp" width="1220" height="580" loading="lazy" alt="品質分析画面。品目別と工程別の不良集計表。うち廃棄・うち再作業待ち・不良率を表示">
+      </figure>
+    </div>
+  </article>
+
+  <article class="feature flip">
+    <div class="copy">
+      <div class="codes"><span class="code">監査ログ</span></div>
+      <h3>誰が・いつ・何を変えたか</h3>
+      <p>実績の訂正、検査結果の訂正、マスタの変更、在庫操作、取消。記録を変える操作はすべて監査ログに残り、訂正なら変更前と変更後も保存されます。</p>
+      <ul>
+        <li>ログ自体は書き換えも削除もできない</li>
+        <li>保持期間を過ぎた分の整理も、整理したこと自体が記録に残る</li>
+        <li>権限はロールごと。参照は開いたまま、書き込みの操作だけを絞る</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>監査ログ</b><span class="mono">システム管理者</span></figcaption>
+      <img src="assets/intro/audit.webp" width="1220" height="860" loading="lazy" alt="監査ログ画面。日時・ユーザー・分類・操作・対象・詳細の一覧">
+    </figure>
+  </article>
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">CSV</span><span class="code">ZIP</span></div>
+      <h3>立ち上げは、CSVをまとめて</h3>
+      <p>品目・工順・設備・検査項目などのマスタは、CSVで一括登録・出力できます。ZIPにまとめれば一度に取り込めて、1行でもエラーがあれば全件取り消し。先に「検証のみ」で確かめられます。</p>
+      <ul>
+        <li>UTF-8 と Shift_JIS を自動判別</li>
+        <li>受入・実績・検査などの実績もCSVで取り込める（試験・移行・教育用）</li>
+        <li>そのまま取り込めるサンプルデータ一式つき。このページの画面もそれで作りました</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>マスタ管理</b><span class="mono">15 タブ</span></figcaption>
+      <img src="assets/intro/masters.webp" width="1220" height="580" loading="lazy" alt="マスタ管理画面。品目・MBOM・工順、工程、作業区、設備などのタブと、品目の登録フォーム、CSV入出力パネル">
+    </figure>
+  </article>
+
+</section>
+
+<section class="start" id="start" aria-labelledby="start-title">
+  <div class="wrap start-grid">
+    <div>
+      <h2 id="start-title">動かしてみる</h2>
+      <ol class="steps">
+        <li><div><b>起動する</b><p>リポジトリのルートで実行します。データベース（SQLite）は自動で作られます。</p><pre>dotnet run --project src/MesApp.Api</pre></div></li>
+        <li><div><b>管理者を作る</b><p>ブラウザで <span class="mono">http://localhost:5288</span> を開くと、初期セットアップの案内が出ます。</p></div></li>
+        <li><div><b>サンプルを入れる</b><p><span class="mono">samples/master-csv</span> と <span class="mono">samples/actual-csv</span> をそれぞれZIPにして取り込むと、製造指図から出荷まで試せる状態になります。</p></div></li>
+      </ol>
+    </div>
+    <div>
+      <h2>使いかた</h2>
+      <div class="forms">
+        <div class="form"><b>社内LANのサーバーで</b><p>1台で起動し、現場のPCやタブレットはブラウザで開くだけ。端末へのインストールもライセンス認証も要りません。</p></div>
+        <div class="form"><b>試すだけなら、1台のPCで</b> <span class="chip c-grey">テスト・検証用</span><p>API・データベース・画面をひとつにまとめたWindowsデスクトップ版もあります。サーバーもネット接続も要らないので、機能を試したり検証したりするのに向いています。現場での本番運用は、上のサーバー構成でお使いください。</p></div>
+      </div>
+      <dl class="req">
+        <dt>実行環境</dt><dd>.NET 10（実行だけなら ASP.NET Core 10 ランタイム）</dd>
+        <dt>データベース</dt><dd>SQLite（追加インストール不要）</dd>
+        <dt>端末</dt><dd>Chrome / Edge などのブラウザ</dd>
+        <dt>構成</dt><dd>ASP.NET Core Web API ＋ Blazor WebAssembly</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="scope wrap" aria-labelledby="scope-title">
+  <h2 id="scope-title">いまできること・まだのこと</h2>
+  <div class="scope-grid">
+    <div class="box">
+      <h3><span class="chip c-green">利用できます</span></h3>
+      <ul>
+        <li><b>生産管理</b><span>製造指図・工程展開・進捗・差立</span></li>
+        <li><b>製造実行</b><span>段取り・チェックリスト・実績・作業時間・トラブル報告</span></li>
+        <li><b>物流・在庫</b><span>受入・在庫操作・出庫／払出・出荷・棚卸・搬送指示</span></li>
+        <li><b>品質</b><span>検査指示・実績・判定・不適合・品質分析</span></li>
+        <li><b>品質保証</b><span>出荷判定・トレーサビリティ</span></li>
+        <li><b>設備保全</b><span>稼働記録・保全計画／指示／実績・手順書・治工具寿命</span></li>
+        <li><b>帳票</b><span>指示書・現品票などの印刷、バーコード／QR読み取り</span></li>
+      </ul>
+    </div>
+    <div class="box not">
+      <h3><span class="chip c-grey">まだ使えません</span></h3>
+      <ul>
+        <li>PostgreSQL / SQL Server への接続（現在は SQLite のみ）</li>
+        <li>シート・端末のライセンス管理</li>
+        <li>Docker での配布</li>
+        <li>HTTPS の終端（LANではリバースプロキシで）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Parallel Factory MES — Copyright © 2026 msmsrep。ソースコードとドキュメントは GNU Affero General Public License v3.0 で公開しています。改変版をネットワーク越しに提供する場合は、利用者にそのソースコードを提供する必要があります。</p>
+    <p>機能の範囲は、一般財団法人エンジニアリング協会（ENAA）『MES/MOM導入のための標準業務一覧』（2025年10月）を参照して定めています。画面に出る <span class="mono">A-20-10-01</span> などは同一覧の業務プロセスNoです。一覧の著作権はENAAに帰属します。</p>
+    <p>画面写真はサンプルデータで撮影したものです。</p>
+  </div>
+</footer>
+</body>
+</html>
