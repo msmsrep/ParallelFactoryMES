@@ -170,7 +170,8 @@ Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
    - カテゴリ: 「ビジネス」
    - プライバシーポリシーURL: `https://msmsrep.github.io/ParallelFactoryMES/privacy.html`（`docs/privacy.md`。GitHub Pages を有効にしておくこと）
    - サポート連絡先情報
-5. **Store 掲載情報**：日本語の説明・スクリーンショット（`build/store/screenshot-*-1920x1080.png` の5枚。7節を参照）
+5. **Store 掲載情報**：説明・機能一覧・検索語句・キャプション等の原稿は `docs-dev/StoreListing.md`。
+   スクリーンショットは `build/store/screenshot-*-1920x1080.png` の5枚（7節を参照）
 6. **申請オプション → 認定メモ**：審査員が動かせるよう、以下を必ず書く
 
    ```
