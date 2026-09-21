@@ -14,7 +14,7 @@ next_title: 画面構成と共通操作
 | 項目 | 内容 |
 |---|---|
 | サーバー | .NET 10 SDK（実行のみなら ASP.NET Core 10 ランタイム）がインストールされたPC 1台 |
-| データベース | 不要。SQLiteのファイル（`mesapp.db`）が自動生成されます |
+| データベース | 不要。既定ではSQLiteのファイル（`mesapp.db`）が自動生成されます。PostgreSQL / SQL Server も使えます（[管理者向け運用](operations.html#database)） |
 | 利用端末 | モダンブラウザ（Chrome / Edge など）。専用アプリのインストールは不要です |
 | ネットワーク | 端末からサーバーのURLにアクセスできること |
 
@@ -37,7 +37,7 @@ dotnet run --project src/MesApp.Api --urls http://localhost:5210
 複数PCで使う本番相当の配置手順は[管理者向け運用](operations.html)を参照してください。
 
 <div class="note">
-<p>データベースファイルと署名鍵は<strong>起動したディレクトリ</strong>に自動生成されます。データベースの作成作業は不要です。</p>
+<p>データベースファイルと署名鍵は<strong>データ保存先</strong>（既定 <code>%LOCALAPPDATA%\ParallelFactoryMES</code>）に自動生成されます。データベースの作成作業は不要です。</p>
 </div>
 
 ## 初期管理者アカウントを作る

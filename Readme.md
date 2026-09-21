@@ -38,7 +38,7 @@ Spec.md 中の業務プロセスNo（`A-20-10-01` 等）は、同一覧の項目
 | 5 | 設備保全API（保全計画・指示・実績、治工具寿命管理） | 実装済 |
 | 6〜7 | Blazor WebAssembly クライアント（全画面）、帳票・ラベル出力、バーコード/QRスキャン | 実装済 |
 | 8〜9 | （欠番。シート・端末管理とWPFライセンスアプリは実装しないことにした） | — |
-| 10 | DBプロバイダー切替（PostgreSQL / SQL Server）、Docker化、Zip配布 | 未実装 |
+| 10 | DBプロバイダー切替（PostgreSQL / SQL Server）、Docker化、Zip配布 | 一部実装（DB切替のみ。Docker化・Zip配布は未実装） |
 
 本システムは AGPL-3.0 のみで提供し、シート・端末単位のライセンス管理は持ちません。**アクティベーション不要で全端末から利用できます**。
 
@@ -46,7 +46,8 @@ Spec.md 中の業務プロセスNo（`A-20-10-01` 等）は、同一覧の項目
 
 - **.NET 10 SDK**（実行のみなら ASP.NET Core 10 Runtime）
   - 入手先: https://dotnet.microsoft.com/download
-- データベースは SQLite（追加インストール不要。ファイルは自動生成されます）
+- データベースは既定で SQLite（追加インストール不要。ファイルは自動生成されます）。
+  PostgreSQL / SQL Server にも切り替えられます（[運用上の注意](#運用上の注意)）
 
 ## 起動方法（開発）
 
@@ -67,7 +68,7 @@ dotnet run --project src/MesApp.Api --urls http://localhost:5210
 ユーザー名・氏名・パスワード（8文字以上、英小文字と数字を含む。例: `Passw0rd123`）を入力して
 初期管理者を作成し、ログインします。
 
-DBファイル（`mesapp.db`）とJWT署名鍵（`jwt-signing.key`）は**起動したディレクトリ**（＝`src/MesApp.Api/`）に
+DBファイル（`mesapp.db`）とJWT署名鍵（`jwt-signing.key`）は**データ保存先（既定 `%LOCALAPPDATA%\ParallelFactoryMES`、環境変数 `MESAPP_DATA_DIR` で変更可）**に
 自動生成されます。マイグレーションも起動時に自動適用されるため、DB作成作業は不要です。
 
 ## 初回の操作手順
@@ -140,7 +141,8 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 - **PostgreSQL / SQL Server**: `Database__Provider` と `Database__ConnectionString` を指定すると、
   起動時にそのDBへスキーマを作成します（DB自体とログインは事前に作成しておく）。
   `DateTimeOffset` はPostgreSQLではUTCで保存され、SQL Serverの既定照合順序ではコードの大文字・小文字を
-  区別しません（Spec.md 4章）。**既存のSQLiteデータを移す機能はありません**。テストは実DBでも流せます（CLAUDE.md「コマンド」）。
+  区別しません（Spec.md 4章）。**既存のSQLiteデータを移す機能はありません**。手順・バックアップ・起動しないときの確認点は
+  [管理者向け運用](docs/operations.md#database)を参照してください。
 
   ```powershell
   $env:Database__Provider="PostgreSql"; $env:Database__ConnectionString="Host=db;Database=mesapp;Username=mesapp;Password=..."
@@ -153,6 +155,15 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 dotnet test ParallelFactoryMES.slnx
 ```
 
+既定は一時SQLiteで流れます。環境変数 `MESAPP_TEST_PROVIDER`（`PostgreSql` / `SqlServer`）と
+`MESAPP_TEST_CONNECTION`（データベース名を除いた接続文字列）を設定すると、実DBに対して全テストを流せます
+（テストごとに `mesapp_test_<guid>` を作って消すため、ログインにはDBの作成・削除権限が要ります）。
+
+```powershell
+$env:MESAPP_TEST_PROVIDER="SqlServer"; $env:MESAPP_TEST_CONNECTION="Server=(localdb)\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=True"
+dotnet test tests/MesApp.Api.Tests
+```
+
 ## プロジェクト構成
 
 ```
@@ -160,7 +171,9 @@ src/
   MesApp.Api             ASP.NET Core Web API（業務ロジック、Webクライアントの配信）
   MesApp.Client.Web      Blazor WebAssembly（MES機能のクライアント）
   MesApp.Core            ドメインモデル・DTO・APIコントラクト（API/クライアント共有）
-  MesApp.Infrastructure  EF Core（DbContext、マイグレーション、DBプロバイダー切替）
+  MesApp.Infrastructure  EF Core（DbContext、SQLite用マイグレーション、DBプロバイダー切替）
+  MesApp.Migrations.PostgreSql  PostgreSQL用マイグレーション
+  MesApp.Migrations.SqlServer   SQL Server用マイグレーション
 tests/
   MesApp.Api.Tests       APIの統合テスト
 samples/
