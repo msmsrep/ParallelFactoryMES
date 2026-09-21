@@ -5,6 +5,8 @@ nav_url: operations.html
 lead: サーバーの配置、設定項目、バックアップなど、システム管理者向けの情報です。
 prev_url: troubleshooting.html
 prev_title: 困ったときは
+next_url: privacy.html
+next_title: プライバシーポリシー
 ---
 
 ## 構成

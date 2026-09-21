@@ -168,7 +168,7 @@ Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
 3. **価格と提供状況**：提供する国・地域を選ぶ
 4. **プロパティ**
    - カテゴリ: 「ビジネス」
-   - プライバシーポリシーURL: **必須**。データがローカルPCのみに保存され外部送信がないことを明記する
+   - プライバシーポリシーURL: `https://msmsrep.github.io/ParallelFactoryMES/privacy.html`（`docs/privacy.md`。GitHub Pages を有効にしておくこと）
    - サポート連絡先情報
 5. **Store 掲載情報**：日本語の説明・スクリーンショット（最低1枚、1366×768 以上）
 6. **申請オプション → 認定メモ**：審査員が動かせるよう、以下を必ず書く
@@ -189,7 +189,7 @@ Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
 | 項目 | 対応 |
 |:--|:--|
 | ログインできず機能を確認できない | 初回ログイン前はウィンドウ上端に資格情報を常時表示する実装済み。加えて認定メモにも書く（上記） |
-| プライバシーポリシー未記載 | 必須。ローカル保存のみ・外部送信なしを明記 |
+| プライバシーポリシー未記載 | `docs/privacy.md` を公開済み。提出時にURLを入力する |
 | WebView2 未導入環境で起動しない | 起動時に検出して案内済み。認定メモにも前提として書いておく |
 | タイル画像が既定のまま | `build/New-MsixAssets.ps1` の `Draw-Mark` を書き換えて再生成する |
 
