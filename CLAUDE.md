@@ -17,14 +17,26 @@ dotnet build ParallelFactoryMES.slnx -v q --nologo 2>&1 | Select-String -Pattern
 dotnet test ParallelFactoryMES.slnx -v q --nologo 2>&1 | Select-String -Pattern "error|Failed|Passed!|成功!|失敗|合計" | Select-Object -First 40
 ```
 
+実DB（PostgreSQL / SQL Server）で同じテストを流す（DBに触れる変更のとき。テストごとに `mesapp_test_<guid>` を作って消す）:
+```powershell
+# SQL Server（このPCの LocalDB。Windows認証なのでパスワード不要）
+$env:MESAPP_TEST_PROVIDER='SqlServer'; $env:MESAPP_TEST_CONNECTION='Server=(localdb)\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=True'
+# PostgreSQL（18 は 5432、17 は 5433。パスワードは %APPDATA%\postgresql\pgpass.conf から読まれる）
+$env:MESAPP_TEST_PROVIDER='PostgreSql'; $env:MESAPP_TEST_CONNECTION='Host=localhost;Port=5432;Username=mesapp_test'
+dotnet test tests/MesApp.Api.Tests -v q --nologo 2>&1 | Select-String -Pattern "error|Failed|成功!|失敗" | Select-Object -First 40
+$env:MESAPP_TEST_PROVIDER=$null; $env:MESAPP_TEST_CONNECTION=$null
+```
+
 失敗時のみ該当クラスを単体で再実行して詳細を取る:
 ```powershell
 dotnet test tests/MesApp.Api.Tests --filter FullyQualifiedName~MasterCsvTests -v n
 ```
 
-マイグレーション（`dotnet tool restore` が前提。EF ツールは `dotnet-tools.json` で固定）:
+マイグレーション（`dotnet tool restore` が前提。EF ツールは `dotnet-tools.json` で固定）。**スキーマを変えたら3プロバイダーすべてで同じ名前で追加する**（1つでも欠けると `DatabaseProviderTests` が落ちる。接続はしないので接続文字列は形式だけでよい）:
 ```powershell
 dotnet ef migrations add <Name> --project src/MesApp.Infrastructure --startup-project src/MesApp.Api
+dotnet ef migrations add <Name> --project src/MesApp.Migrations.PostgreSql --startup-project src/MesApp.Api --no-build -- --Database:Provider=PostgreSql "--Database:ConnectionString=Host=localhost;Database=mesapp"
+dotnet ef migrations add <Name> --project src/MesApp.Migrations.SqlServer --startup-project src/MesApp.Api --no-build -- --Database:Provider=SqlServer "--Database:ConnectionString=Server=localhost;Database=mesapp"
 ```
 
 アプリ起動は `.claude/launch.json` の `mesapp`（preview_start）を使う。シェルから `dotnet run` を常駐させない。
@@ -35,6 +47,7 @@ dotnet ef migrations add <Name> --project src/MesApp.Infrastructure --startup-pr
 |:--|:--|
 | `src/MesApp.Core` | エンティティ（`Entities/`）、DTO（`Contracts/<領域>/`、record）、`Constants/MesRoles.cs`・`Constants/MesRoleGroups.cs`、抽象（`Abstractions/`）。外部依存なし |
 | `src/MesApp.Infrastructure` | `MesAppDbContext`、エンティティ設定（`Configurations/<領域>Configurations.cs`）、EF Core (SQLite)、`Migrations/`、`Services/AuditLogger.cs`、DI 拡張 |
+| `src/MesApp.Migrations.PostgreSql` / `.SqlServer` | PostgreSQL・SQL Server 用のマイグレーションだけを置く（SQLite 用は Infrastructure の `Migrations/`。Spec.md 4章） |
 | `src/MesApp.Api` | Controllers、業務サービス（`Services/`）、JWT 認証、Blazor WASM の静的配信 |
 | `src/MesApp.Client.Web` | Blazor WASM。`Pages/`、`Pages/Masters/*Tab.razor`、`Shared/` 共通コンポーネント、`Auth/` |
 | `tests/MesApp.Api.Tests` | xUnit + `WebApplicationFactory`。テストごとに一時 SQLite |
@@ -51,7 +64,7 @@ DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用�
 
 ## 読み込み禁止・注意
 
-- `src/MesApp.Infrastructure/Migrations/**`（`*.Designer.cs`、`MesAppDbContextModelSnapshot.cs` 含む、約13,700行）— **開かない**。スキーマは `Configurations/` とエンティティで確認する。
+- `src/MesApp.Infrastructure/Migrations/**`（`*.Designer.cs`、`MesAppDbContextModelSnapshot.cs` 含む、約13,700行）と `src/MesApp.Migrations.*/Migrations/**` — **開かない**。スキーマは `Configurations/` とエンティティで確認する。
 - `Spec.md`（496行）/ `MES.md`（518行）— **全文を読まない。必ず grep で該当節・該当業務Noだけ**を読む。
 - `MES.md` は ENAA 著作物のためリポジトリに含めない（`.gitignore` 済み・ローカルのみ）。内容を他ファイルに転記しない。
 - 500行超のファイル（`MasterCsvService.Import.cs`、`ActualCsvService.cs` 等）は該当行 ±40行のみ読む。

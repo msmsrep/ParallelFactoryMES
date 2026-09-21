@@ -5,6 +5,8 @@
     <Project Path="src/MesApp.Core/MesApp.Core.csproj" />
     <Project Path="src/MesApp.Desktop/MesApp.Desktop.csproj" />
     <Project Path="src/MesApp.Infrastructure/MesApp.Infrastructure.csproj" />
+    <Project Path="src/MesApp.Migrations.PostgreSql/MesApp.Migrations.PostgreSql.csproj" />
+    <Project Path="src/MesApp.Migrations.SqlServer/MesApp.Migrations.SqlServer.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MesApp.Api.Tests/MesApp.Api.Tests.csproj" />

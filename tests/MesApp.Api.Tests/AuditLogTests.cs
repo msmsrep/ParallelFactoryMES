@@ -168,6 +168,11 @@ public class AuditLogTests
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            if (!db.Database.IsSqlite())
+            {
+                // 埋め戻しはSQLiteの既存DBだけが対象（他のプロバイダーは列の追加後に作られるため過去行が無い）
+                return;
+            }
             await db.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO AuditLogs (Timestamp, RecordedOn, Category, Action, TargetType, TargetId)
@@ -311,10 +316,13 @@ public class AuditLogTests
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
-        await db.Database.ExecuteSqlAsync(
-            $"""
-            INSERT INTO AuditLogs (Timestamp, RecordedOn, Category, Action)
-            VALUES ({recordedOn.ToDateTime(TimeOnly.MinValue)}, {recordedOn}, 'Master', {action})
-            """);
+        db.AuditLogs.Add(new AuditLog
+        {
+            Timestamp = new DateTimeOffset(recordedOn.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+            RecordedOn = recordedOn,
+            Category = "Master",
+            Action = action,
+        });
+        await db.SaveChangesAsync();
     }
 }
