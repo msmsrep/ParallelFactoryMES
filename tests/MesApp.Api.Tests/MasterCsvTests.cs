@@ -932,6 +932,8 @@ public class MasterCsvTests
             """);
         Assert.True(shifts.Succeeded, string.Join(" / ", shifts.Errors.Select(e => e.Message)));
         Assert.Equal(2, shifts.Created);
+        // 境界（既定6時）にちょうど接する直は警告なし
+        Assert.Empty(shifts.Warnings);
         var saved = await client.GetFromJsonAsync<List<ShiftResponse>>("/api/shifts");
         Assert.True(saved!.Single(s => s.Code == "N").CrossesMidnight);
 
@@ -973,6 +975,31 @@ public class MasterCsvTests
             Code,Name,StartTime,EndTime,IsActive
             D,昼勤,06:00,18:00,false
             """)).Succeeded);
+
+        // 製造日の境界をまたぐ直は単票APIと同じく拒否しない。ただし警告は返す（Spec.md 5.7）。
+        // 警告はエラーと違いロールバックしないので、取込そのものは成功する
+        var crossing = await ImportAsync(client, "shifts", """
+            Code,Name,StartTime,EndTime,IsActive
+            N,夜勤,22:00,07:00,true
+            """);
+        Assert.True(crossing.Succeeded, string.Join(" / ", crossing.Errors.Select(e => e.Message)));
+        var warning = Assert.Single(crossing.Warnings);
+        Assert.Equal(2, warning.Line);
+        Assert.Contains("製造日の境界時刻", warning.Message, StringComparison.Ordinal);
+        Assert.Contains("'N'", warning.Message, StringComparison.Ordinal);
+        // 実際に取り込まれている（警告で取り消されていない）
+        var crossed = (await client.GetFromJsonAsync<List<ShiftResponse>>("/api/shifts"))!
+            .Single(s => s.Code == "N");
+        Assert.Equal(new TimeOnly(22, 0), crossed.StartTime);
+        Assert.NotNull(crossed.BoundaryWarning);
+
+        // 境界へ戻せば警告も消える
+        var back = await ImportAsync(client, "shifts", """
+            Code,Name,StartTime,EndTime,IsActive
+            N,夜勤,18:00,06:00,true
+            """);
+        Assert.True(back.Succeeded);
+        Assert.Empty(back.Warnings);
 
         // 列を書かなければ現状維持（作業場所と同じ扱い）
         Assert.True((await ImportAsync(client, "users", """

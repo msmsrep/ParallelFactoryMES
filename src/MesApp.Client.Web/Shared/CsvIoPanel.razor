@@ -1,4 +1,4 @@
-@inject HttpClient Http
+﻿@inject HttpClient Http
 @inject IJSRuntime JS
 
 @* CSV一括入出力（エクスポート／テンプレート／取込）。マスタ（api/masters/csv）と実績（api/actuals/csv。取込のみ）で共用 *@
@@ -64,6 +64,25 @@
                         <span>データ行 @_result.DataRows 件（登録 @_result.Created 件）</span>
                     }
                 </div>
+                @* 警告は取り込めている。エラーと違い取り消されないので、その旨を添えて出す *@
+                @if (_result.Warnings.Count > 0)
+                {
+                    <div class="alert alert-warning mt-2">
+                        警告が @_result.Warnings.Count 件あります（<strong>取込は完了しています</strong>）。
+                    </div>
+                    <table class="table">
+                        <thead><tr><th style="width:80px;">行</th><th>内容</th></tr></thead>
+                        <tbody>
+                            @foreach (var warning in _result.Warnings)
+                            {
+                                <tr>
+                                    <td>@(warning.Line > 0 ? warning.Line.ToString() : "-")</td>
+                                    <td>@warning.Message</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
             }
             else
             {

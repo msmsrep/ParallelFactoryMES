@@ -1,4 +1,4 @@
-/* Parallel Factory MES 共通スタイル（Phase 6：軽量な独自CSS。外部フレームワーク非依存） */
+﻿/* Parallel Factory MES 共通スタイル（Phase 6：軽量な独自CSS。外部フレームワーク非依存） */
 
 :root {
     --primary: #1b6ec2;
@@ -167,6 +167,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 }
 .alert-danger { background: #ffebee; color: var(--danger); border: 1px solid #ef9a9a; }
 .alert-success { background: #e8f5e9; color: var(--success); border: 1px solid #a5d6a7; }
+/* 警告：エラーではない（取込は完了している）ことが色で分かるよう badge-warning と同じ系統にする */
+.alert-warning { background: #fff3e0; color: var(--warning); border: 1px solid #ffcc80; }
 
 .text-muted { color: var(--text-muted); }
 .text-danger { color: var(--danger); }

@@ -16,7 +16,8 @@ public sealed partial class MasterCsvService(
     MesAppDbContext db,
     UserManager<AppUser> userManager,
     RefreshTokenService refreshTokenService,
-    IAuditLogger auditLogger)
+    IAuditLogger auditLogger,
+    IBusinessDateService businessDate)
 {
     /// <summary>ヘッダーのみのテンプレートCSV</summary>
     public static string Template(CsvKindInfo kind) =>
