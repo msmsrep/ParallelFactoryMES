@@ -1,4 +1,4 @@
-using MesApp.Infrastructure;
+﻿using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
@@ -182,6 +182,56 @@ public class AuditLogTests
         var logs = await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>(
             $"/api/audit-logs?action=Legacy&from={expected:yyyy-MM-dd}&to={expected:yyyy-MM-dd}");
         Assert.Equal(1, logs!.Total);
+    }
+
+    [Theory]
+    // この2つは26時間離れているため、どちらの暦日も**常に**食い違う。
+    // サーバーのローカル日付で記録していると、少なくとも片方は必ずずれて落ちる
+    // （1つのタイムゾーンで試すと、たまたま同じ暦日になる時間帯に通ってしまう）
+    [InlineData("Pacific/Kiritimati")]
+    [InlineData("Etc/GMT+12")]
+    public async Task 記録日と保持期間の境界は工場のタイムゾーンで決まる(string timeZoneId)
+    {
+        // サーバーのローカルタイムで日付を取ると、UTCのコンテナに置いたときだけ
+        // 記録日が現場と何時間もずれ、期間の絞り込みと保持期間の判定が見え方と食い違う
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["BusinessDay:TimeZone"] = timeZoneId,
+            // 境界時刻は記録日に効かない（製造日ではなく暦日）ことも同時に確認する
+            ["BusinessDay:BoundaryHour"] = "6",
+            ["Audit:RetentionYears"] = "0",
+        });
+
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        (await admin.PostAsJsonAsync("/api/locations",
+            new LocationRequest("AUD-TZ-01", LocationAreaType.MaterialWarehouse, null)))
+            .EnsureSuccessStatusCode();
+
+        DateOnly recordedOn;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            var log = await db.AuditLogs.AsNoTracking()
+                .FirstAsync(a => a.Action == "Create" && a.TargetType == "Location");
+            // 記録そのものの時刻から期待値を出すので、実行した瞬間に依存しない
+            recordedOn = log.RecordedOn;
+            Assert.Equal(ToLocalDate(log.Timestamp), recordedOn);
+        }
+
+        // 保持期間の境界も同じ基準で求まる。保持0年なら「工場の昨日」以前が削除対象
+        var purged = await admin.PostAsJsonAsync("/api/audit-logs/purge?dryRun=true",
+            new AuditLogPurgeRequest(recordedOn.AddDays(-1), "境界の確認"));
+        purged.EnsureSuccessStatusCode();
+        var result = (await purged.Content.ReadFromJsonAsync<AuditLogPurgeResult>())!;
+        // 記録の直後に求めた境界なので、日付をまたいだ場合だけ1日進む
+        Assert.True(
+            result.RetentionCutoff == recordedOn.AddDays(-1)
+            || result.RetentionCutoff == recordedOn,
+            $"保持期間の境界 {result.RetentionCutoff} が記録日 {recordedOn} の前日と一致しない");
+
+        DateOnly ToLocalDate(DateTimeOffset moment) =>
+            DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(moment, timeZone).DateTime);
     }
 
     [Fact]
