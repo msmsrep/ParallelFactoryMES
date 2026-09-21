@@ -170,7 +170,7 @@ Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
    - カテゴリ: 「ビジネス」
    - プライバシーポリシーURL: `https://msmsrep.github.io/ParallelFactoryMES/privacy.html`（`docs/privacy.md`。GitHub Pages を有効にしておくこと）
    - サポート連絡先情報
-5. **Store 掲載情報**：日本語の説明・スクリーンショット（最低1枚、1366×768 以上）
+5. **Store 掲載情報**：日本語の説明・スクリーンショット（`build/store/screenshot-*-1920x1080.png` の5枚。7節を参照）
 6. **申請オプション → 認定メモ**：審査員が動かせるよう、以下を必ず書く
 
    ```
@@ -210,3 +210,29 @@ Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
 生成物は背景が透過のPNG。タイルの下地はマニフェストの `BackgroundColor`（白）が受け持つ。
 既製のPNGに差し替える場合は `src/MesApp.Desktop/Assets/` の同名ファイルを上書きする。
 実行ファイルのアイコンは `Assets/AppIcon.ico`（csproj の `ApplicationIcon`）。
+
+### ストア掲載用スクリーンショット
+
+1920×1080（ストアの下限 1366×768 を満たす）を5枚、`build/store/` に作る。
+**アプリの実画面を撮り、左に見出しを添える**という二段構えで、撮影と組み立てを別のスクリプトにしてある。
+
+```powershell
+# 1. サンプルデータ入りの空DBでアプリを起動する（既存のDBを汚さないため別ファイルにする）
+dotnet run --project src/MesApp.Api --urls http://localhost:5212 -- `
+  "--Database:ConnectionString=Data Source=C:/temp/shots.db"
+
+# 2. 初期管理者を作り、samples/master-csv → samples/actual-csv の順にZIPで一括取込する
+#    （画面の「ZIPで一括取込」でも、api/masters/csv/bundle・api/actuals/csv/bundle でもよい）
+
+# 3. 実画面を撮る（Edge をヘッドレスで起動してCDPで操作する。追加パッケージ不要）
+node build/Capture-AppScreens.js --base http://localhost:5212 --user admin --password <パスワード>
+
+# 4. 見出し・背景と合成する
+python build/New-StoreScreenshots.py
+```
+
+撮影結果（`build/store/raw/`）はリポジトリに含めない。見出しの文言と対象画面は
+`build/New-StoreScreenshots.py` の `SHOTS`、撮る画面は `build/Capture-AppScreens.js` の `SHOTS` にある。
+
+**実画面をそのまま使うこと**。審査で画面と機能が食い違うと差し戻されるうえ、
+サンプルデータは `samples/` のものなので、実在の取引先や個人の名前が写り込まない。
