@@ -98,6 +98,24 @@ body {
   cursor: pointer;
 }
 
+/* 紹介ページ（intro.html）への導線 */
+.intro-link {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 3px 12px;
+}
+.intro-link:hover { background: var(--accent-soft); }
+/* 狭い画面では導線を優先し、「ユーザーガイド」の副題を隠す */
+@media (max-width: 480px) {
+  .brand-sub { display: none; }
+}
+
 /* ---------- layout ---------- */
 .shell {
   display: flex;
@@ -304,6 +322,27 @@ ol.steps > li::before {
 .cards a:hover { border-color: var(--accent); }
 .cards strong { display: block; color: var(--accent); margin-bottom: 3px; font-size: 15px; }
 .cards small { color: var(--text-muted); font-size: 13px; line-height: 1.6; display: block; }
+
+.intro-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  margin: 20px 0;
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--text);
+  text-decoration: none;
+}
+.intro-banner:hover { box-shadow: 0 4px 16px -8px rgba(0, 0, 0, .35); }
+.intro-banner img { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--border); }
+.intro-banner strong { display: block; color: var(--accent); font-size: 16px; margin-bottom: 4px; }
+.intro-banner small { display: block; color: var(--text-muted); font-size: 13.5px; line-height: 1.7; }
+@media (max-width: 560px) {
+  .intro-banner { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* ---------- pager / footer ---------- */
 .pager {

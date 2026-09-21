@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Parallel Factory MES の紹介ページ（ユーザーガイドとは別の、アプリの概要を伝えるページ） -->
 <title>Parallel Factory MES</title>
+<!-- ファビコンは build/icon.svg と同じ図柄（図柄の定義はそちらが正。変えたらここも合わせる） -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='translate(-5.5,-9.5) scale(1.06)'%3E%3Crect x='19' y='58' width='21' height='26' rx='6' fill='%23CDEBDF'/%3E%3Crect x='47' y='32' width='21' height='52' rx='6' fill='%238FD2BE'/%3E%3Crect x='75' y='46' width='21' height='38' rx='6' fill='%235CC8A8'/%3E%3Cg fill='none' stroke='%2318193F' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='12' y='50' width='21' height='26' rx='6'/%3E%3Crect x='40' y='24' width='21' height='52' rx='6'/%3E%3Crect x='68' y='38' width='21' height='38' rx='6'/%3E%3Cpath d='M13 88 H88'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
 <meta name="description" content="製造指図から出荷まで、ロット単位で記録・追跡するオープンソースの製造実行システム。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,38 +19,48 @@ img{max-width:100%}
 [hidden]{display:none!important}
 
 :root{
-  --ground:#F1F3F5; --surface:#FFFFFF; --ink:#15212E; --muted:#56636F; --line:#D9DFE5;
-  --band:#1E2B3A; --band-ink:#E9EEF3; --band-muted:#9FB0C1;
-  --accent:#1F6FC5; --accent-soft:#E3EEF9;
-  --chip-grey-bg:#E4E7EA; --chip-grey:#4A5560;
-  --chip-blue-bg:#CFE3F7; --chip-blue:#1B5A97;
+  /* 配色はアイコン（build/icon.svg）に合わせる: 濃紺 #18193F のライン＋緑3段 #CDEBDF / #8FD2BE / #5CC8A8 */
+  --ground:#F4F8F6; --surface:#FFFFFF; --ink:#18193F; --muted:#565A78; --line:#D8E2DD;
+  --band:#18193F; --band-ink:#EEF1F7; --band-muted:#A3A8C6;
+  --accent:#17785F; --accent-soft:#E3F3EC;
+  --g1:#CDEBDF; --g2:#8FD2BE; --g3:#5CC8A8;
+  --logo-ink:#18193F;
+  --btn-bg:#18193F; --btn-ink:#FFFFFF;
+  --chip-grey-bg:#E6E8EE; --chip-grey:#4C5070;
+  --chip-blue-bg:#DCE0F5; --chip-blue:#2E3787;
   --chip-orange-bg:#F8DDB4; --chip-orange:#8A4E00;
-  --chip-green-bg:#D5ECCD; --chip-green:#2D6622;
-  --shadow:0 1px 2px rgba(21,33,46,.06),0 12px 32px -12px rgba(21,33,46,.22);
+  --chip-green-bg:#CDEBDF; --chip-green:#145F4B;
+  --shadow:0 1px 2px rgba(24,25,63,.06),0 12px 32px -12px rgba(24,25,63,.24);
   --display:"BIZ UDPGothic","Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
   --body:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,"Consolas",monospace;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --ground:#0F151C; --surface:#17202A; --ink:#E5EBF1; --muted:#9AA7B4; --line:#2A3643;
-    --band:#0A1016; --band-ink:#E5EBF1; --band-muted:#8797A8;
-    --accent:#63A6EE; --accent-soft:#1A2D42;
-    --chip-grey-bg:#2A333D; --chip-grey:#B8C2CC;
-    --chip-blue-bg:#1D3550; --chip-blue:#9CC8F2;
+    --ground:#0F1024; --surface:#171933; --ink:#E8EBF5; --muted:#A0A5C2; --line:#2A2D4F;
+    --band:#0A0B1B; --band-ink:#E8EBF5; --band-muted:#8C91B0;
+    --accent:#5CC8A8; --accent-soft:#16302D;
+    --g1:#1F4A40; --g2:#2F7A66; --g3:#5CC8A8;
+    --logo-ink:#E8EBF5;
+    --btn-bg:#5CC8A8; --btn-ink:#0F1024;
+    --chip-grey-bg:#262947; --chip-grey:#BCC0D8;
+    --chip-blue-bg:#232A55; --chip-blue:#AEB6F0;
     --chip-orange-bg:#44331B; --chip-orange:#F2C27D;
-    --chip-green-bg:#20361D; --chip-green:#A6D99A;
+    --chip-green-bg:#16302D; --chip-green:#8FD2BE;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px -14px rgba(0,0,0,.7);
   }
 }
 :root[data-theme="dark"]{
-  --ground:#0F151C; --surface:#17202A; --ink:#E5EBF1; --muted:#9AA7B4; --line:#2A3643;
-  --band:#0A1016; --band-ink:#E5EBF1; --band-muted:#8797A8;
-  --accent:#63A6EE; --accent-soft:#1A2D42;
-  --chip-grey-bg:#2A333D; --chip-grey:#B8C2CC;
-  --chip-blue-bg:#1D3550; --chip-blue:#9CC8F2;
+  --ground:#0F1024; --surface:#171933; --ink:#E8EBF5; --muted:#A0A5C2; --line:#2A2D4F;
+  --band:#0A0B1B; --band-ink:#E8EBF5; --band-muted:#8C91B0;
+  --accent:#5CC8A8; --accent-soft:#16302D;
+  --g1:#1F4A40; --g2:#2F7A66; --g3:#5CC8A8;
+  --logo-ink:#E8EBF5;
+  --btn-bg:#5CC8A8; --btn-ink:#0F1024;
+  --chip-grey-bg:#262947; --chip-grey:#BCC0D8;
+  --chip-blue-bg:#232A55; --chip-blue:#AEB6F0;
   --chip-orange-bg:#44331B; --chip-orange:#F2C27D;
-  --chip-green-bg:#20361D; --chip-green:#A6D99A;
+  --chip-green-bg:#16302D; --chip-green:#8FD2BE;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px -14px rgba(0,0,0,.7);
 }
 *{box-sizing:border-box}
@@ -64,33 +76,34 @@ p{margin:0}
 .top{border-bottom:1px solid var(--line);background:var(--surface)}
 .top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:14px}
 .brand{white-space:nowrap;font-family:var(--display);font-weight:700;font-size:17px;display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none}
-.brand-mark{width:22px;height:22px;display:grid;grid-template-columns:1fr 1fr;gap:3px}
-.brand-mark i{background:var(--accent);border-radius:2px}
-.brand-mark i:nth-child(2),.brand-mark i:nth-child(3){background:var(--band)}
-:root[data-theme="dark"] .brand-mark i:nth-child(2),:root[data-theme="dark"] .brand-mark i:nth-child(3){background:var(--muted)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .brand-mark i:nth-child(2),:root:not([data-theme="light"]) .brand-mark i:nth-child(3){background:var(--muted)}}
-.top nav{display:flex;gap:20px;font-size:14px;flex-wrap:wrap}
+.brand-mark{width:30px;height:30px;flex:none}
+#logo .l1{fill:var(--g1)}#logo .l2{fill:var(--g2)}#logo .l3{fill:var(--g3)}
+#logo .ln{fill:none;stroke:var(--logo-ink);stroke-width:8;stroke-linecap:round;stroke-linejoin:round}
+.top nav{display:flex;gap:20px;font-size:14px;flex-wrap:wrap;align-items:center}
 .top nav a{color:var(--muted);text-decoration:none}
 .top nav a:hover{color:var(--ink)}
+.gh{display:inline-flex;align-items:center;gap:5px;font-size:12.5px}
+.gh svg{width:14px;height:14px;fill:currentColor}
 
 /* ヒーロー */
 .hero{padding-block:clamp(40px,7vw,80px) 0}
+.hero-logo{width:clamp(64px,8vw,88px);height:auto;display:block;margin-bottom:22px}
 .eyebrow{font-size:13px;letter-spacing:.12em;color:var(--muted);font-weight:500;margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .eyebrow .tag{font-family:var(--mono);letter-spacing:.02em;border:1px solid var(--line);padding:1px 8px;border-radius:3px;background:var(--surface)}
 .hero h1{font-size:clamp(30px,5.2vw,54px);line-height:1.3;max-width:17em;word-break:keep-all;overflow-wrap:anywhere}
-.hero h1 em{font-style:normal;color:var(--accent)}
+.hero h1 em{font-style:normal;background:linear-gradient(transparent 62%,var(--g1) 62%);padding-inline:.06em}
 .lead{margin-top:22px;font-size:clamp(16px,1.6vw,18px);color:var(--muted);max-width:40em}
-.cta{margin-top:30px;display:flex;gap:12px;flex-wrap:wrap}
+.cta{margin-top:30px;display:flex;gap:12px 20px;flex-wrap:wrap;align-items:center}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:6px;font-weight:500;font-size:15px;text-decoration:none;border:1px solid transparent}
-.btn-primary{background:var(--accent);color:#fff}
-:root[data-theme="dark"] .btn-primary{color:#0B1623}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn-primary{color:#0B1623}}
+.btn-primary{background:var(--btn-bg);color:var(--btn-ink);box-shadow:4px 4px 0 var(--g2)}
 .btn-ghost{border-color:var(--line);color:var(--ink);background:var(--surface)}
-.btn:hover{filter:brightness(1.06)}
+.btn:hover{filter:brightness(1.08)}
 .hero-shot{margin-top:clamp(36px,5vw,56px);position:relative}
 
 /* 画面フレーム */
 .screen{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:var(--shadow)}
+/* ヒーローの画面だけ、アイコンと同じ「右下にずらした緑の面」を敷く */
+.hero-shot .screen{box-shadow:10px 10px 0 var(--g1),var(--shadow)}
 .screen img{display:block;width:100%;height:auto}
 .screen figcaption{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:var(--ground)}
 .screen figcaption b{font-weight:500;color:var(--ink)}
@@ -111,7 +124,7 @@ p{margin:0}
 .flow li::after{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--dept)}
 .flow li strong{display:block;font-size:14.5px;font-weight:700;line-height:1.4}
 .flow li span{display:block;font-size:12px;color:var(--band-muted);margin-top:4px;line-height:1.5}
-.d-plan{--dept:#5BA2EE}.d-floor{--dept:#E9A94B}.d-qc{--dept:#7FC770}.d-log{--dept:#B79CE8}
+.d-plan{--dept:#8C95E8}.d-floor{--dept:#E9B45B}.d-qc{--dept:#5CC8A8}.d-log{--dept:#C7A3E0}
 .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:22px;font-size:12.5px;color:var(--band-muted)}
 .legend i{display:inline-block;width:14px;height:3px;background:var(--dept);vertical-align:middle;margin-right:6px}
 
@@ -127,7 +140,7 @@ p{margin:0}
 .copy p{margin-top:16px;color:var(--muted);max-width:32em}
 .copy ul{margin:18px 0 0;padding:0;list-style:none;display:grid;gap:9px;font-size:14.5px}
 .copy li{padding-left:18px;position:relative;line-height:1.7}
-.copy li::before{content:"";position:absolute;left:0;top:.72em;width:8px;height:2px;background:var(--accent)}
+.copy li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:8px;border-radius:2px;background:var(--g2)}
 .stack{display:grid;gap:18px}
 .pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.42fr);gap:18px;align-items:start}
 
@@ -201,12 +214,28 @@ footer p{max-width:62em}
 <body>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Parallel Factory MES</a>
+    <!-- ロゴは build/icon.svg と同じ図柄。暗いテーマでライン色を変えられるようインラインで持つ -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="logo" viewBox="0 0 100 100">
+        <g transform="translate(-5.5,-9.5) scale(1.06)">
+          <rect class="l1" x="19" y="58" width="21" height="26" rx="6"/>
+          <rect class="l2" x="47" y="32" width="21" height="52" rx="6"/>
+          <rect class="l3" x="75" y="46" width="21" height="38" rx="6"/>
+          <g class="ln">
+            <rect x="12" y="50" width="21" height="26" rx="6"/>
+            <rect x="40" y="24" width="21" height="52" rx="6"/>
+            <rect x="68" y="38" width="21" height="38" rx="6"/>
+            <path d="M13 88 H88"/>
+          </g>
+        </g>
+      </symbol>
+    </svg>
+    <a class="brand" href="#"><svg class="brand-mark logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg>Parallel Factory MES</a>
     <nav>
       <a class="opt" href="#features">できること</a>
       <a class="opt" href="#start">始め方</a>
       <a class="opt" href="index.html">ユーザーガイド</a>
-      <a href="https://github.com/msmsrep/ParallelFactoryMES">GitHub</a>
+      <a class="gh" href="https://github.com/msmsrep/ParallelFactoryMES" aria-label="GitHub リポジトリ"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
     </nav>
   </div>
 </header>
@@ -214,12 +243,13 @@ footer p{max-width:62em}
 <main>
 <section class="hero">
   <div class="wrap">
+    <svg class="hero-logo logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg>
     <div class="eyebrow"><span>製造実行システム（MES）</span><span class="tag">AGPL-3.0</span><span class="tag">.NET 10 / Blazor</span></div>
     <h1>製造指図から<wbr>出荷まで、<wbr><em>ロット</em>で<wbr>つないで<wbr>記録する。</h1>
     <p class="lead">Parallel Factory MES は、工場の製造実績をブラウザで記録・追跡するオープンソースのMESです。指図・作業・在庫・検査・出荷を一本の流れとして扱い、どの部材ロットからどの製品ロットができたかを、いつでも両方向にたどれます。</p>
     <div class="cta">
-      <a class="btn btn-primary" href="https://github.com/msmsrep/ParallelFactoryMES">ソースコードを見る</a>
-      <a class="btn btn-ghost" href="index.html">ユーザーガイドを読む</a>
+      <a class="btn btn-primary" href="index.html">ユーザーガイドを読む</a>
+      <a class="btn btn-ghost" href="#start">動かしてみる</a>
     </div>
     <div class="hero-shot">
       <figure class="screen">
