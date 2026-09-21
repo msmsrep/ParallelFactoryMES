@@ -12,12 +12,15 @@ namespace MesApp.Api.Tests;
 /// </summary>
 public class BusinessDateTests
 {
-    private static BusinessDateService Create(string? timeZone, int boundaryHour = 6)
+    private static BusinessDateService Create(string? timeZone, int boundaryHour = 6) =>
+        Create(timeZone, boundaryHour.ToString());
+
+    private static BusinessDateService Create(string? timeZone, string? boundaryHour)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["BusinessDay:BoundaryHour"] = boundaryHour.ToString(),
+                ["BusinessDay:BoundaryHour"] = boundaryHour,
                 ["BusinessDay:TimeZone"] = timeZone,
             })
             .Build();
@@ -104,6 +107,49 @@ public class BusinessDateTests
             var moment = new DateTimeOffset(2026, 9, 3, 12, 0, 0, TimeSpan.Zero);
             Assert.Equal(expected.BusinessDate(moment), service.GetBusinessDate(moment));
         }
+    }
+
+    [Theory]
+    [InlineData("24")]   // 0〜23の範囲外
+    [InlineData("-1")]
+    [InlineData("6.5")]  // 整数でない
+    [InlineData("朝6時")] // 数値でない
+    [InlineData("")]     // 空（未設定と同じ扱い）
+    public void 境界時刻の不正な設定は既定の6時に落ちる(string boundaryHour)
+    {
+        // シングルトンの生成は遅延なので、ここで例外を投げると「起動は成功して
+        // 最初のリクエストで全画面500」になる。原因にたどり着けないため落として使う
+        var service = Create("Asia/Tokyo", boundaryHour);
+
+        Assert.Equal(6, service.BoundaryHour);
+        // 範囲の算出も例外にならない（TimeOnly/DateTime の生成に不正な時刻が渡らない）
+        var (start, end) = service.GetRange(new DateOnly(2026, 9, 3));
+        Assert.Equal(new DateTime(2026, 9, 3, 6, 0, 0), start.DateTime);
+        Assert.Equal(TimeSpan.FromHours(24), end - start);
+    }
+
+    [Fact]
+    public async Task 境界時刻が不正でも起動して製造日APIが既定値を返す()
+    {
+        using var factory = new ApiFactory(
+            new Dictionary<string, string> { ["BusinessDay:BoundaryHour"] = "24" });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var body = await admin.GetFromJsonAsync<BusinessDateResponse>("/api/business-date");
+
+        Assert.Equal(6, body!.BoundaryHour);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(23)]
+    public void 境界時刻は0時と23時を受け付ける(int boundaryHour)
+    {
+        var service = Create("Asia/Tokyo", boundaryHour);
+
+        Assert.Equal(boundaryHour, service.BoundaryHour);
+        Assert.Equal(new TimeSpan(boundaryHour, 0, 0),
+            service.GetRange(new DateOnly(2026, 9, 3)).Start.TimeOfDay);
     }
 
     /// <summary>期待値の計算（テスト側でタイムゾーン変換を再現する）</summary>

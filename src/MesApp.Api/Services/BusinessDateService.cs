@@ -18,7 +18,7 @@ public class BusinessDateService : IBusinessDateService
 
     public BusinessDateService(IConfiguration configuration, ILogger<BusinessDateService> logger)
     {
-        _boundaryHour = configuration.GetValue("BusinessDay:BoundaryHour", 6);
+        _boundaryHour = ResolveBoundaryHour(configuration, logger);
         _timeZone = ResolveTimeZone(configuration.GetValue<string?>("BusinessDay:TimeZone"), logger);
     }
 
@@ -49,6 +49,33 @@ public class BusinessDateService : IBusinessDateService
             businessDate.Year, businessDate.Month, businessDate.Day,
             _boundaryHour, 0, 0, DateTimeKind.Unspecified);
         return new DateTimeOffset(local, _timeZone.GetUtcOffset(local));
+    }
+
+    /// <summary>
+    /// 設定された境界時刻を解決する。0〜23 の範囲外・数値でない値は既定の6時へ落として警告を出す
+    /// （タイムゾーンの解決と同じ扱い）。
+    /// </summary>
+    /// <remarks>
+    /// このサービスはシングルトンだが生成は遅延なので、ここで例外を投げると<b>起動は成功して
+    /// 最初のリクエストで500になる</b>。設定値の書き間違いが「アプリは上がったのに全画面が落ちる」
+    /// という形で出ると原因にたどり着けないため、落として警告で伝える。
+    /// </remarks>
+    private static int ResolveBoundaryHour(IConfiguration configuration, ILogger logger)
+    {
+        const int defaultHour = 6;
+        var raw = configuration.GetValue<string?>("BusinessDay:BoundaryHour");
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return defaultHour;
+        }
+        if (int.TryParse(raw, out var hour) && hour is >= 0 and <= 23)
+        {
+            return hour;
+        }
+        logger.LogWarning(
+            "製造日の境界時刻 '{BoundaryHour}' は0〜23の整数ではありません。既定の{Default}時を使います",
+            raw, defaultHour);
+        return defaultHour;
     }
 
     /// <summary>
