@@ -63,6 +63,8 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 | JWT署名鍵ファイル | `Jwt__SigningKeyFile` | `jwt-signing.key`（未存在なら自動生成） |
 | 初期管理者の自動作成 | `MesAdmin__UserName` / `MesAdmin__Password` / `MesAdmin__DisplayName` | 未設定 |
 | 初期パスワードの自動生成 | `MesAdmin__GeneratePassword` | `false`（デスクトップ版のみ `true`） |
+| 信頼するリバースプロキシのIP | `ReverseProxy__KnownProxies__0`（複数は `__1`, `__2` …） | 未設定（転送ヘッダを読まない） |
+| 信頼するリバースプロキシのネットワーク | `ReverseProxy__KnownNetworks__0`（CIDR。例 `192.168.10.0/24`） | 未設定 |
 
 ### 業務日付の境界時刻
 
@@ -86,8 +88,8 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 ## セキュリティ
 
 <div class="warn">
-<p><strong>現時点ではHTTPS強制を実装していません。</strong> LAN運用では、リバースプロキシ
-（IIS / nginx）でHTTPSを終端することを推奨します。</p>
+<p><strong>アプリ自身はHTTPSを強制しません。</strong> LAN運用では、リバースプロキシ
+（IIS / nginx）でHTTPSを終端してください（<a href="#https">HTTPSで運用する</a>）。</p>
 <p>あわせて、<strong>カメラによるバーコード読み取りは <code>localhost</code> 以外ではHTTPSが必須</strong>です。
 HTTPのままではカメラが使えません（USBリーダーと手入力はHTTPでも動作します）。</p>
 </div>
@@ -95,6 +97,93 @@ HTTPのままではカメラが使えません（USBリーダーと手入力はH
 - 認証は ASP.NET Core Identity ＋ JWT です。
 - 実績訂正・検査訂正・マスタ変更・在庫調整などは監査ログに記録されます（下記）。
 - パスワード要件は8文字以上、英小文字と数字を含むことです。
+
+### HTTPSで運用する  {#https}
+
+ブラウザからのHTTPSはリバースプロキシ（IIS / nginx）が受け、アプリへはHTTPで中継します。
+証明書を持つのはプロキシだけです。
+
+```
+端末のブラウザ ──HTTPS──▶ IIS / nginx（証明書）──HTTP──▶ MesApp（127.0.0.1:5000）
+```
+
+**1. 証明書を用意する。** 社内LANでは公的な証明書を取れないので、社内CAか
+[mkcert](https://github.com/FiloSottile/mkcert) で発行します。mkcert の場合、サーバーで次を実行します。
+
+```bash
+mkcert -install
+mkcert mes.example.local 192.168.10.5
+```
+
+端末から使う名前（ホスト名・IP）をすべて並べます。できた `mes.example.local+1.pem`（証明書）と
+`mes.example.local+1-key.pem`（秘密鍵）をプロキシに設定します。
+
+**2. CA証明書を端末に配る。** `mkcert -CAROOT` で表示されるフォルダの `rootCA.pem` を
+`rootCA.crt` に名前を変えて各端末へ配り、「信頼されたルート証明機関」に入れます
+（端末で `certutil -addstore -f Root rootCA.crt`、台数が多ければグループポリシーで配布）。
+同じフォルダの `rootCA-key.pem` は**配らないでください**（持っている人は任意の証明書を発行できます）。
+
+**3. アプリをプロキシからだけ届くように起動する。** HTTPで直接つながれないよう、
+ループバックでだけ待ち受けます（アプリはHTTPからHTTPSへのリダイレクトをしません）。
+
+```bash
+dotnet publish/MesApp.Api.dll --urls http://127.0.0.1:5000
+```
+
+**4. プロキシを設定する。** 接続元IPとスキームを `X-Forwarded-For` / `X-Forwarded-Proto` で渡します。
+
+nginx の例:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name mes.example.local;
+    ssl_certificate     mes.example.local+1.pem;
+    ssl_certificate_key mes.example.local+1-key.pem;
+    client_max_body_size 50m;   # CSV・ZIPの一括取込のため
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+IIS の場合は URL Rewrite と Application Request Routing（ARR）を入れ、ARRのプロキシを有効にします。
+`X-Forwarded-For` はARRが付けます。`X-Forwarded-Proto` はサーバー変数 `HTTP_X_FORWARDED_PROTO` を
+「許可されたサーバー変数」に追加したうえで、書き換え規則で付けます（`web.config` の例）。
+
+```xml
+<rewrite>
+  <rules>
+    <rule name="MesApp" stopProcessing="true">
+      <match url="(.*)" />
+      <serverVariables>
+        <set name="HTTP_X_FORWARDED_PROTO" value="https" />
+      </serverVariables>
+      <action type="Rewrite" url="http://127.0.0.1:5000/{R:1}" />
+    </rule>
+  </rules>
+</rewrite>
+```
+
+**5. プロキシを信頼する設定を入れる。** アプリは、ここで指定した接続元から来た転送ヘッダだけを読みます。
+プロキシが同じPCなら次のとおりです（別のPCならそのIP）。
+
+```powershell
+$env:ReverseProxy__KnownProxies__0="127.0.0.1"
+```
+
+<div class="warn">
+<p><strong>この設定が無いと、転送ヘッダは読まれません。</strong> HTTPSでつながっていても、
+リフレッシュトークンのCookieに <code>Secure</code> が付かず、監査ログの接続元IPがすべてプロキシのIPになります。
+未設定のときに読まないのは、HTTPで直接つないだ端末がヘッダを偽装して接続元を詐称できないようにするためです。</p>
+</div>
+
+**確認:** 端末からHTTPSでログインし、監査ログの「ログイン」の接続元IPが端末のIPになっていれば完了です。
+`127.0.0.1` のままなら手順5の設定が効いていません。
 
 ## 監査ログ  {#audit-log}
 
@@ -242,7 +331,7 @@ SQLiteはWALモードで動作するため、コピーしたファイルが壊�
 |---|---|
 | PostgreSQL / SQL Server | 対応（[PostgreSQL / SQL Server を使う](#database)）。既存のSQLiteデータを移す機能は無し |
 | Docker化・Zip配布 | 未対応 |
-| HTTPS強制 | 未実装（リバースプロキシで対応） |
+| HTTPS | アプリ側では強制しない（リバースプロキシで終端。[HTTPSで運用する](#https)） |
 | 設備・秤量機からの自動データ収集 | 未対応（手入力） |
 | EDI / ASN連携 | 未対応 |
 | シリアル番号（個体）単位の追跡 | 未対応（ロット単位のみ） |

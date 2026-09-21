@@ -59,7 +59,7 @@ next_title: ロールと権限
 ブラウザのセキュリティ制約によるもので、システム側では回避できません。</p>
 <p>HTTPでLAN運用している場合は、<strong>USBバーコードリーダーの利用を推奨します</strong>。
 カメラを使いたい場合は、リバースプロキシ（IIS / nginx）でHTTPS化してください
-（<a href="operations.html">管理者向け運用</a>）。</p>
+（<a href="operations.html#https">HTTPSで運用する</a>）。</p>
 </div>
 
 カメラが使えない環境では、次のメッセージが表示されます。

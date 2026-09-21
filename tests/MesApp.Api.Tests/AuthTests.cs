@@ -1,10 +1,14 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Auth;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Setup;
 using MesApp.Core.Contracts.Users;
+using Microsoft.AspNetCore.Http;
 
 namespace MesApp.Api.Tests;
 
@@ -223,5 +227,85 @@ public class AuthTests
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
         request.Headers.Add("Cookie", cookie);
         return client.SendAsync(request);
+    }
+
+    // --- リバースプロキシでHTTPSを終端する配置（Spec.md 7.4） ---
+
+    private const string ProxyAddress = "10.0.0.1";
+    private const string ClientAddress = "192.168.1.50";
+
+    [Fact]
+    public async Task 信頼するプロキシ経由のHTTPSではCookieにSecureが付き_監査ログに元の接続元IPが残る()
+    {
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["ReverseProxy:KnownProxies:0"] = ProxyAddress,
+        });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var response = await LoginViaProxyAsync(factory, remoteAddress: ProxyAddress);
+
+        Assert.Equal(StatusCodes.Status200OK, response.Response.StatusCode);
+        Assert.Contains(response.Response.Headers.SetCookie,
+            v => v!.StartsWith("mesapp_rt=") && v.Contains("secure", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(await LoginAuditAddressesAsync(admin), ip => ip == ClientAddress);
+    }
+
+    [Fact]
+    public async Task 信頼していない接続元の転送ヘッダは無視する()
+    {
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["ReverseProxy:KnownProxies:0"] = ProxyAddress,
+        });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        // HTTPで直接つないだ端末がヘッダを偽装した想定
+        var response = await LoginViaProxyAsync(factory, remoteAddress: "10.0.0.99");
+
+        Assert.Equal(StatusCodes.Status200OK, response.Response.StatusCode);
+        Assert.DoesNotContain(response.Response.Headers.SetCookie,
+            v => v!.Contains("secure", StringComparison.OrdinalIgnoreCase));
+        var addresses = await LoginAuditAddressesAsync(admin);
+        Assert.DoesNotContain(ClientAddress, addresses);
+        Assert.Contains("10.0.0.99", addresses);
+    }
+
+    [Fact]
+    public async Task 信頼するプロキシが未設定なら転送ヘッダを受け入れない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var response = await LoginViaProxyAsync(factory, remoteAddress: ProxyAddress);
+
+        Assert.Equal(StatusCodes.Status200OK, response.Response.StatusCode);
+        Assert.DoesNotContain(response.Response.Headers.SetCookie,
+            v => v!.Contains("secure", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(ClientAddress, await LoginAuditAddressesAsync(admin));
+    }
+
+    /// <summary>
+    /// プロキシ（remoteAddress）から、HTTPSで受けた ClientAddress のリクエストを転送された形でログインする。
+    /// HttpClient経由では接続元IPを指定できないため、TestServerに直接HttpContextを組み立てて渡す
+    /// </summary>
+    private static Task<HttpContext> LoginViaProxyAsync(ApiFactory factory, string remoteAddress) =>
+        factory.Server.SendAsync(context =>
+        {
+            context.Connection.RemoteIpAddress = IPAddress.Parse(remoteAddress);
+            context.Request.Method = HttpMethods.Post;
+            context.Request.Path = "/api/auth/login";
+            context.Request.Headers["X-Forwarded-For"] = ClientAddress;
+            context.Request.Headers["X-Forwarded-Proto"] = "https";
+            context.Request.ContentType = "application/json";
+            context.Request.Body = new MemoryStream(JsonSerializer.SerializeToUtf8Bytes(
+                new LoginRequest(TestAuth.AdminUser, TestAuth.AdminPassword), JsonSerializerOptions.Web));
+        });
+
+    private static async Task<List<string?>> LoginAuditAddressesAsync(HttpClient admin)
+    {
+        var page = await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>(
+            "/api/audit-logs?category=Auth&action=Login&pageSize=200");
+        return page!.Items.Select(a => a.IpAddress).ToList();
     }
 }

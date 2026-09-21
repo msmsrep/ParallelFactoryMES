@@ -125,6 +125,10 @@ public static class MesAppHost
 
         var app = builder.Build();
 
+        // リバースプロキシでHTTPSを終端する配置向け。後続（Cookieの Secure・監査ログのIP）が
+        // 元の接続を見られるよう、パイプラインの先頭に置く（Spec.md 7.4）
+        app.UseTrustedForwardedHeaders();
+
         // 想定外の例外のフォールバック（開発環境では先に開発者例外ページが処理する）
         app.UseExceptionHandler();
 
