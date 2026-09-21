@@ -46,14 +46,14 @@ dotnet ef migrations add <Name> --project src/MesApp.Migrations.SqlServer --star
 | プロジェクト | 責務 |
 |:--|:--|
 | `src/MesApp.Core` | エンティティ（`Entities/`）、DTO（`Contracts/<領域>/`、record）、`Constants/MesRoles.cs`・`Constants/MesRoleGroups.cs`、抽象（`Abstractions/`）。外部依存なし |
-| `src/MesApp.Infrastructure` | `MesAppDbContext`、エンティティ設定（`Configurations/<領域>Configurations.cs`）、EF Core (SQLite)、`Migrations/`、`Services/AuditLogger.cs`、DI 拡張 |
+| `src/MesApp.Infrastructure` | `MesAppDbContext`、エンティティ設定（`Configurations/<領域>Configurations.cs`）、EF Core（SQLite / PostgreSQL / SQL Server）、SQLite 用 `Migrations/`、`Services/AuditLogger.cs`、DI 拡張 |
 | `src/MesApp.Migrations.PostgreSql` / `.SqlServer` | PostgreSQL・SQL Server 用のマイグレーションだけを置く（SQLite 用は Infrastructure の `Migrations/`。Spec.md 4章） |
 | `src/MesApp.Api` | Controllers、業務サービス（`Services/`）、JWT 認証、Blazor WASM の静的配信 |
 | `src/MesApp.Client.Web` | Blazor WASM。`Pages/`、`Pages/Masters/*Tab.razor`、`Shared/` 共通コンポーネント、`Auth/` |
-| `tests/MesApp.Api.Tests` | xUnit + `WebApplicationFactory`。テストごとに一時 SQLite |
+| `tests/MesApp.Api.Tests` | xUnit + `WebApplicationFactory`。テストごとに一時 SQLite（環境変数で実DBにも向けられる） |
 | `tests/MesApp.Client.Web.Tests` | xUnit + bUnit。全画面に効く横断的な振る舞い（`MainLayout` 等）だけを対象にする |
 
-DB は SQLite（`mesapp.db`）。起動時に `MigrateAsync()` で自動適用される。
+DB は既定 SQLite（`mesapp.db`）、`Database:Provider` で PostgreSQL / SQL Server に切替可（Spec.md 4章）。起動時に `MigrateAsync()` で自動適用される。
 
 ## 探索の起点
 

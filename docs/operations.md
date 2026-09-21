@@ -18,7 +18,7 @@ Webクライアント（Blazor WebAssembly）は、APIサーバー（ASP.NET Cor
 |---|---|
 | MesApp.Api | 業務ロジックとデータベース。Webクライアントも配信します |
 | MesApp.Client.Web | ブラウザで動作するクライアント |
-| データベース | SQLite（ファイル1つ）。起動時にマイグレーションが自動適用されます |
+| データベース | SQLite（既定。ファイル1つ）、PostgreSQL、SQL Server のいずれか。起動時にマイグレーションが自動適用されます（[PostgreSQL / SQL Server を使う](#database)） |
 
 ## 配布と起動
 
@@ -44,7 +44,8 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 </div>
 
 データベースファイル（`mesapp.db`）とJWT署名鍵（`jwt-signing.key`）は、
-**起動したディレクトリ** に自動生成されます。
+**データ保存先（既定 `%LOCALAPPDATA%\ParallelFactoryMES`、環境変数 `MESAPP_DATA_DIR` で変更可）** に自動生成されます。
+設定値に絶対パスを書いた場合はそのパスを使います。
 
 ## 設定項目  {#settings}
 
@@ -54,6 +55,7 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 |---|---|---|
 | DB接続文字列（SQLiteはファイルの場所） | `Database__ConnectionString` | `Data Source=mesapp.db` |
 | DBプロバイダー | `Database__Provider` | `Sqlite`（`PostgreSql` / `SqlServer` も可） |
+| データの保存先（DB・署名鍵） | `MESAPP_DATA_DIR` | `%LOCALAPPDATA%\ParallelFactoryMES` |
 | 業務日付の境界時刻 | `BusinessDay__BoundaryHour` | `6`（午前6時） |
 | 監査ログの保持期間（年） | `Audit__RetentionYears` | `5` |
 | アクセストークン有効期限（分） | `Jwt__AccessTokenLifetimeMinutes` | `60` |
@@ -165,7 +167,52 @@ POST /api/audit-logs/purge?dryRun=true
 この記録は削除の後に書かれるため、同じ操作では消えません。</p>
 </div>
 
+## PostgreSQL / SQL Server を使う {#database}
+
+既定の SQLite は追加インストールが要らず、数十端末規模までならそのまま運用できます。
+同時に書き込む端末が多い、データ量が大きい、既存のDBサーバーでまとめて管理したい、といった場合は
+PostgreSQL または SQL Server に切り替えます。
+
+1. DBサーバーに**空のデータベース**と接続用のログインを作ります。
+   ログインには、そのデータベースでテーブルを作成・変更できる権限を与えます（起動時にスキーマを作成・更新するため）。
+2. `Database__Provider` と `Database__ConnectionString` を設定して起動します。
+
+```powershell
+# PostgreSQL
+$env:Database__Provider="PostgreSql"; $env:Database__ConnectionString="Host=db;Database=mesapp;Username=mesapp;Password=..."
+# SQL Server
+$env:Database__Provider="SqlServer"; $env:Database__ConnectionString="Server=db;Database=mesapp;User Id=mesapp;Password=...;TrustServerCertificate=True"
+```
+
+3. 起動時にテーブルが作られます。ブラウザで開くと、SQLiteのときと同じく初期セットアップの案内が表示されます。
+   以降のバージョンアップでも、起動時に差分が自動適用されます。
+
+<div class="warn">
+<p><strong>既存のSQLiteのデータは移りません。</strong> 切り替えると空のデータベースから始まります。
+運用を始める前にどのデータベースを使うかを決めてください。設定をSQLiteに戻すと、元の <code>mesapp.db</code> がそのまま使われます（両者のデータは別々です）。</p>
+</div>
+
+### SQLite との違い
+
+| 項目 | 違い |
+|---|---|
+| コードの大文字・小文字 | SQL Server の既定の照合順序では区別しません（`ABC` と `abc` は同じコードとして重複扱いになり、検索も区別しません）。SQLite・PostgreSQL は区別します |
+| 日時 | PostgreSQL ではUTCで保存されます。同じ時点を指すため、画面表示・集計・CSVの結果は変わりません |
+| 小数 | 小数点以下6桁まで保存します（SQLite と同じ値の見え方になるよう末尾のゼロは落とします） |
+| デスクトップ版 | SQLite で使う前提です（1台のPCで完結させる構成のため） |
+
+### 起動しないとき
+
+| 症状 | 対処 |
+|---|---|
+| 「不明なDBプロバイダー」で止まる | `Database__Provider` は `Sqlite` / `PostgreSql` / `SqlServer` のいずれかを、大文字・小文字も含めてそのとおりに書いてください |
+| 接続のタイムアウト・認証エラーで止まる | 接続文字列のホスト名・ポート・ユーザー名・パスワード、DBサーバー側のファイアウォール、SQL Server では TCP/IP 接続が有効かを確認してください |
+| SQL Server で証明書のエラーになる | 社内の自己署名証明書のサーバーなら接続文字列に `TrustServerCertificate=True` を付けるか、信頼された証明書をサーバーに設定してください |
+| 権限エラー（テーブルを作成できない）で止まる | 接続ログインに、対象データベースでのテーブル作成・変更の権限を与えてください |
+
 ## バックアップ
+
+### SQLite
 
 <div class="warn">
 <p><strong>稼働中のDBファイルを単純コピーしないでください。</strong>
@@ -180,11 +227,20 @@ SQLiteはWALモードで動作するため、コピーしたファイルが壊�
 `mesapp.db*`（`-wal` / `-shm` を含む）をすべて削除して再起動すると、初期状態に戻ります。
 検証環境をリセットしたいときに使えます。
 
+### PostgreSQL / SQL Server
+
+各データベースの標準の手段でバックアップします（稼働中でも取得できます）。
+
+- PostgreSQL: `pg_dump -Fc -d mesapp -f mesapp.dump`（復元は `pg_restore`）
+- SQL Server: `BACKUP DATABASE mesapp TO DISK = N'...\mesapp.bak'`（または SQL Server Management Studio のバックアップ）
+
+初期状態に戻すには、データベースを削除して空のデータベースを作り直し、再起動します。
+
 ## 制限事項
 
 | 項目 | 状況 |
 |---|---|
-| PostgreSQL / SQL Server | 対応（起動時にスキーマを作成）。PostgreSQL 18・SQL Server（LocalDB）で全テスト通過を確認済み、既存SQLiteデータの移行機能は無し（Spec.md 4章） |
+| PostgreSQL / SQL Server | 対応（[PostgreSQL / SQL Server を使う](#database)）。既存のSQLiteデータを移す機能は無し |
 | Docker化・Zip配布 | 未対応 |
 | HTTPS強制 | 未実装（リバースプロキシで対応） |
 | 設備・秤量機からの自動データ収集 | 未対応（手入力） |

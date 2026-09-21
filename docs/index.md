@@ -69,10 +69,11 @@ next_title: 導入と初期設定
 - 品質保証（出荷判定・トレーサビリティ）
 - 設備保全（稼働記録・保全計画／指示／実績・手順書）と治工具寿命管理
 - 帳票・ラベル出力、バーコード／QRスキャン
+- データベースは SQLite（既定）・PostgreSQL・SQL Server から選択
 
 **まだ利用できません**
 
-- PostgreSQL / SQL Server への接続（現在はSQLiteのみ）
+- Docker イメージ・Zip パッケージでの配布
 
 <div class="note">
 <p><strong>用語やステータスの意味を調べたいとき</strong>は<a href="reference.html">リファレンス</a>を、
