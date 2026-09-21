@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +12,11 @@ public sealed record CsvBundleEntry(string FileName, string Kind, string Text);
 public sealed record CsvBundleFile<TKind>(string FileName, TKind Kind, string Text);
 
 /// <summary>1ファイル分の取込結果（件数）。保存まで済ませて返す</summary>
-public sealed record CsvFileImportCount(int Created, int Updated);
+public sealed record CsvFileImportCount(int Created, int Updated)
+{
+    /// <summary>取り込めたが伝えたいこと（<see cref="CsvImportResult.Warnings"/> へそのまま載る）</summary>
+    public List<CsvImportError> Warnings { get; init; } = [];
+}
 
 /// <summary>
 /// 複数のCSVをまとめたZIPの一括取込・一括出力（Spec.md 3.8）。マスタCSVと実績CSVで共有する。
@@ -148,7 +152,8 @@ public static class CsvBundle
                 }
             }
             results.Add(new CsvBundleFileResult(file.FileName,
-                CsvImport.Result(info, table?.Rows.Count ?? 0, count.Created, count.Updated, dryRun, errors)));
+                CsvImport.Result(info, table?.Rows.Count ?? 0, count.Created, count.Updated,
+                    dryRun, errors, count.Warnings)));
             if (errors.Count > 0)
             {
                 failed = true;

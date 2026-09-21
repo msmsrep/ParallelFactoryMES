@@ -85,7 +85,7 @@
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
 | 工場従業員（ユーザー）管理・論理削除 | F-10-10 | `UsersController.cs` `api/users` | `Core/Entities/AppUser.cs`（`WorkCenterId`＝作業場所・`Department`＝所属・`ShiftId`＝所属する直） | `/masters` `Masters/UsersTab.razor` | `Tests/MasterTests.cs` |
-| 勤務シフト（直） | F-10-10-01 | `ShiftsController.cs` `api/shifts`（**時間帯が重なる直は登録不可**。所属者がいる直は無効化不可。いずれもCSV取込と同じ判定。製造日の境界をまたぐ直は登録できるが警告を返す） | Masters.cs: Shift（夜勤は `EndTime <= StartTime` で日跨ぎを表す。翌日フラグは持たない） | `/masters` `Masters/ShiftsTab.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
+| 勤務シフト（直） | F-10-10-01 | `ShiftsController.cs` `api/shifts`（**時間帯が重なる直は登録不可**。所属者がいる直は無効化不可。いずれもCSV取込と同じ判定。製造日の境界をまたぐ直は登録できるが警告を返す。**CSV取込も同じで、警告は `CsvImportResult.Warnings` に載る＝ロールバックしない**） | Masters.cs: Shift（夜勤は `EndTime <= StartTime` で日跨ぎを表す。翌日フラグは持たない） | `/masters` `Masters/ShiftsTab.razor` | `Tests/MasterTests.cs` `Tests/MasterCsvTests.cs` |
 | スキル・資格マスタと割当（有効期限） | F-20-10 | `SkillsController.cs` `api/skills` | Masters.cs: SkillMaster / UserSkill | `/masters` `Masters/SkillsTab.razor` | `Tests/MasterTests.cs` |
 
 ## H. 出荷判定・トレーサビリティ

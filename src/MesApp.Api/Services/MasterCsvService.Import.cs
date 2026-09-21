@@ -16,6 +16,9 @@ public sealed partial class MasterCsvService
     {
         public int Created { get; set; }
         public int Updated { get; set; }
+
+        /// <summary>取り込めたが伝えたいこと（エラーと違いロールバックしない。<c>CsvImportResult.Warnings</c>）</summary>
+        public List<CsvImportError> Warnings { get; } = [];
     }
 
     public async Task<CsvImportResult> ImportAsync(
@@ -107,7 +110,7 @@ public sealed partial class MasterCsvService
             await auditLogger.LogAsync("Master", "CsvImport", kind.Kind, null,
                 detail: $"rows={table.Rows.Count}, created={counter.Created}, updated={counter.Updated}", ct: ct);
         }
-        return new CsvFileImportCount(counter.Created, counter.Updated);
+        return new CsvFileImportCount(counter.Created, counter.Updated) { Warnings = counter.Warnings };
     }
 
     // ---- 単票マスタ ----
@@ -1275,6 +1278,15 @@ public sealed partial class MasterCsvService
             {
                 reader.Fail(inUse);
                 continue;
+            }
+
+            // 製造日の境界またぎは単票APIと同じく拒否せず警告で伝える（Spec.md 5.7）。
+            // CSVだけ黙って通すと、取込で入れた直に限って登録時に気づけない
+            if (isActive && ShiftSchedulePolicy.CheckBusinessDateBoundary(
+                    startTime, endTime, businessDate.BoundaryHour) is { } boundaryWarning)
+            {
+                counter.Warnings.Add(new CsvImportError(
+                    reader.Line, $"直 '{code}'：{boundaryWarning}"));
             }
 
             shift.Name = name;

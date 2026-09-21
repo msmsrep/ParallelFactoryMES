@@ -1,4 +1,4 @@
-namespace MesApp.Core.Contracts.Masters;
+﻿namespace MesApp.Core.Contracts.Masters;
 
 /// <summary>CSV取込の行単位エラー（Lineは元CSVの物理行番号。ヘッダー行が1行目）</summary>
 public record CsvImportError(int Line, string Message);
@@ -13,7 +13,18 @@ public record CsvImportResult(
     int Updated,
     bool DryRun,
     bool Succeeded,
-    List<CsvImportError> Errors);
+    List<CsvImportError> Errors)
+{
+    /// <summary>
+    /// 取り込めたが伝えたいこと（<b>エラーではないのでロールバックしない</b>。<c>Succeeded</c> に影響しない）。
+    /// <para>
+    /// 単票APIが応答に載せている警告を、CSVでも同じ条件で返すために置く。現在の用途は
+    /// 直（<c>Shift</c>）が製造日の境界をまたぐ場合（Spec.md 5.7）。位置引数を増やすと
+    /// ZIP一括取込を含む既存の組み立てが全て壊れるため、既定値を持つプロパティとして足す。
+    /// </para>
+    /// </summary>
+    public List<CsvImportError> Warnings { get; init; } = [];
+}
 
 /// <summary>CSV入出力に対応するマスタ種別の情報（列定義は画面のガイド表示にも使う）</summary>
 /// <param name="UserAdminOnly">出力も取込もユーザー管理権限が要る種別（個人に紐づくため参照から絞る）</param>
