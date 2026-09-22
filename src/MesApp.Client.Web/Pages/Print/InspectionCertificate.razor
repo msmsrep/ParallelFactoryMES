@@ -3,30 +3,30 @@
 @inject HttpClient Http
 
 @* 検査成績書（C-20-10-05） *@
-<PageTitle>検査成績書 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["検査成績書 - Parallel Factory MES"]</PageTitle>
 
 @if (_order is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
-    <PrintButton Label="検査成績書を印刷 / PDF出力" />
+    <PrintButton Label="@L["検査成績書を印刷 / PDF出力"]" />
 
     <div class="print-sheet">
-        <h1>検 査 成 績 書</h1>
+        <h1>@L["検 査 成 績 書"]</h1>
         <table class="table">
             <tbody>
                 <tr>
-                    <th>検査指示番号</th><td>@_order.OrderNo</td>
-                    <th>検査種別</th><td>@EnumLabels.Of(_order.Type)</td>
+                    <th>@L["検査指示番号"]</th><td>@_order.OrderNo</td>
+                    <th>@L["検査種別"]</th><td>@EnumLabels.Of(_order.Type)</td>
                 </tr>
                 <tr>
-                    <th>対象</th><td>@(_order.TargetLotNumber ?? _order.TargetWorkOrderNo ?? "-")</td>
-                    <th>発行日</th><td>@_order.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                    <th>@L["対象"]</th><td>@(_order.TargetLotNumber ?? _order.TargetWorkOrderNo ?? "-")</td>
+                    <th>@L["発行日"]</th><td>@_order.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
                 </tr>
                 <tr>
-                    <th>総合判定</th>
+                    <th>@L["総合判定"]</th>
                     <td>
                         @if (_order.OverallJudgment is InspectionJudgment judgment)
                         {
@@ -34,22 +34,22 @@ else
                         }
                         else
                         {
-                            <text>未判定</text>
+                            <text>@L["未判定"]</text>
                         }
                     </td>
-                    <th>判定日</th><td>@(_order.JudgedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
+                    <th>@L["判定日"]</th><td>@(_order.JudgedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
                 </tr>
                 <tr>
-                    <th>承認</th>
-                    <td colspan="3">@(_order.ApprovedAt is null ? "未承認" : $"承認済（{_order.ApprovedAt:yyyy-MM-dd}）")</td>
+                    <th>@L["承認"]</th>
+                    <td colspan="3">@(_order.ApprovedAt is null ? L["未承認"] : L["承認済（{0:yyyy-MM-dd}）", _order.ApprovedAt])</td>
                 </tr>
             </tbody>
         </table>
 
-        <h2>検査結果</h2>
+        <h2>@L["検査結果"]</h2>
         <table class="table">
             <thead>
-                <tr><th>検査項目</th><th>規格値（版）</th><th>検査方法</th><th>測定値</th><th>判定</th><th>検査機</th><th>検査者</th><th>検査日時</th></tr>
+                <tr><th>@L["検査項目"]</th><th>@L["規格値（版）"]</th><th>@L["検査方法"]</th><th>@L["測定値"]</th><th>@L["判定"]</th><th>@L["検査機"]</th><th>@L["検査者"]</th><th>@L["検査日時"]</th></tr>
             </thead>
             <tbody>
                 @foreach (var result in _order.Results)
@@ -62,7 +62,7 @@ else
                             @(item?.LowerLimit?.ToString() ?? "-") 〜 @(item?.UpperLimit?.ToString() ?? "-")
                             @if (item is not null)
                             {
-                                <span class="text-muted">（第@(item.ItemVersion)版）</span>
+                                <span class="text-muted">@L["（第{0}版）", item.ItemVersion]</span>
                             }
                         </td>
                         <td>@(item?.Method ?? "-")</td>
@@ -80,10 +80,10 @@ else
         @* 訂正があった場合は、元の記録を残したまま訂正理由・訂正者を成績書に出す（C-20-50-07） *@
         @if (_order.Corrections.Count > 0)
         {
-            <h2>訂正履歴</h2>
+            <h2>@L["訂正履歴"]</h2>
             <table class="table">
                 <thead>
-                    <tr><th>検査項目</th><th>訂正前</th><th>訂正後</th><th>理由</th><th>訂正者</th><th>訂正日時</th></tr>
+                    <tr><th>@L["検査項目"]</th><th>@L["訂正前"]</th><th>@L["訂正後"]</th><th>@L["理由"]</th><th>@L["訂正者"]</th><th>@L["訂正日時"]</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var correction in _order.Corrections)

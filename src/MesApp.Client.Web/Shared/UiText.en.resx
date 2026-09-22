@@ -1372,7 +1372,7 @@
     <value>Completed</value>
   </data>
   <data name="取消" xml:space="preserve">
-    <value>Canceled</value>
+    <value>Cancel</value>
   </data>
   <data name="産出ロット" xml:space="preserve">
     <value>Output Lot</value>
@@ -2159,5 +2159,1136 @@
   </data>
   <data name="グレード" xml:space="preserve">
     <value>Grade</value>
+  </data>
+  <data name="受入 - Parallel Factory MES" xml:space="preserve">
+    <value>Receiving - Parallel Factory MES</value>
+  </data>
+  <data name="受入登録・在庫計上（D-10-10-02。受入ロット採番含む）、受入取消（D-10-10-04）、ラベル/現品票印刷（D-10-10-03）。" xml:space="preserve">
+    <value>Receiving and stock posting (D-10-10-02, including receipt lot numbering), receipt cancellation (D-10-10-04), label / lot tag printing (D-10-10-03).</value>
+  </data>
+  <data name="受入登録" xml:space="preserve">
+    <value>Register receipt</value>
+  </data>
+  <data name="入庫先ロケーション" xml:space="preserve">
+    <value>Put-away location</value>
+  </data>
+  <data name="{0}：{1}" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="ロット番号（空欄で自動採番）" xml:space="preserve">
+    <value>Lot number (blank for automatic numbering)</value>
+  </data>
+  <data name="納入ロットをスキャン" xml:space="preserve">
+    <value>Scan supplier lot</value>
+  </data>
+  <data name="受入済みロット" xml:space="preserve">
+    <value>Received lots</value>
+  </data>
+  <data name="受入在庫はありません。" xml:space="preserve">
+    <value>No received stock.</value>
+  </data>
+  <data name="ロット番号" xml:space="preserve">
+    <value>Lot number</value>
+  </data>
+  <data name="現品票" xml:space="preserve">
+    <value>Lot tag</value>
+  </data>
+  <data name="受入取消" xml:space="preserve">
+    <value>Cancel receipt</value>
+  </data>
+  <data name="品目・ロケーション・数量（0より大きい値）を指定してください。" xml:space="preserve">
+    <value>Specify the item, location and quantity (greater than 0).</value>
+  </data>
+  <data name="受入登録に失敗しました。" xml:space="preserve">
+    <value>Receiving failed.</value>
+  </data>
+  <data name="受入しました（ロット {0}）。" xml:space="preserve">
+    <value>Received (lot {0}).</value>
+  </data>
+  <data name="取消に失敗しました。" xml:space="preserve">
+    <value>Cancellation failed.</value>
+  </data>
+  <data name="受入を取消しました。" xml:space="preserve">
+    <value>Receipt canceled.</value>
+  </data>
+  <data name="在庫照会・操作 - Parallel Factory MES" xml:space="preserve">
+    <value>Inventory - Parallel Factory MES</value>
+  </data>
+  <data name="在庫照会・在庫オペレーション" xml:space="preserve">
+    <value>Inventory Inquiry and Operations</value>
+  </data>
+  <data name="在庫照会（D-10-30-01）、移動・調整・分割/統合/振替・ステータス変更・廃棄・期限アラート（D-10-30）。" xml:space="preserve">
+    <value>Inventory inquiry (D-10-30-01); move, adjust, split / merge / reassign, status change, scrap and expiry alerts (D-10-30).</value>
+  </data>
+  <data name="在庫照会" xml:space="preserve">
+    <value>Inquiry</value>
+  </data>
+  <data name="在庫操作" xml:space="preserve">
+    <value>Operations</value>
+  </data>
+  <data name="期限アラート" xml:space="preserve">
+    <value>Expiry alerts</value>
+  </data>
+  <data name="入出庫履歴" xml:space="preserve">
+    <value>Transactions</value>
+  </data>
+  <data name="ロット番号で検索（スキャン可）" xml:space="preserve">
+    <value>Search by lot number (scannable)</value>
+  </data>
+  <data name="検索" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="全ロケーション" xml:space="preserve">
+    <value>All locations</value>
+  </data>
+  <data name="操作" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="追跡" xml:space="preserve">
+    <value>Trace</value>
+  </data>
+  <data name="対象在庫の選択" xml:space="preserve">
+    <value>Select stock</value>
+  </data>
+  <data name="{0}（{1} / {2} / {3}）" xml:space="preserve">
+    <value>{0} ({1} / {2} / {3})</value>
+  </data>
+  <data name="対象ロケーション" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="理由・備考" xml:space="preserve">
+    <value>Reason / notes</value>
+  </data>
+  <data name="在庫移動（D-10-30-02）" xml:space="preserve">
+    <value>Stock move (D-10-30-02)</value>
+  </data>
+  <data name="移動先ロケーション" xml:space="preserve">
+    <value>Destination location</value>
+  </data>
+  <data name="移動" xml:space="preserve">
+    <value>Move</value>
+  </data>
+  <data name="数量調整（D-10-30-04。理由必須）" xml:space="preserve">
+    <value>Quantity adjustment (D-10-30-04, reason required)</value>
+  </data>
+  <data name="実棚数量（調整後の数量）" xml:space="preserve">
+    <value>Counted quantity (after adjustment)</value>
+  </data>
+  <data name="数量を調整" xml:space="preserve">
+    <value>Adjust quantity</value>
+  </data>
+  <data name="ロット分割・統合・振替（D-10-30-05〜07）" xml:space="preserve">
+    <value>Lot split / merge / reassignment (D-10-30-05 to 07)</value>
+  </data>
+  <data name="新ロット番号（空欄で自動採番）" xml:space="preserve">
+    <value>New lot number (blank for automatic numbering)</value>
+  </data>
+  <data name="振替先品目（品目振替時）" xml:space="preserve">
+    <value>Target item (for item reassignment)</value>
+  </data>
+  <data name="同一品目" xml:space="preserve">
+    <value>Same item</value>
+  </data>
+  <data name="統合先ロット（統合時）" xml:space="preserve">
+    <value>Target lot (for merge)</value>
+  </data>
+  <data name="{0}（{1}）" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="分割" xml:space="preserve">
+    <value>Split</value>
+  </data>
+  <data name="統合（対象ロット→統合先）" xml:space="preserve">
+    <value>Merge (lot → target)</value>
+  </data>
+  <data name="振替" xml:space="preserve">
+    <value>Reassign</value>
+  </data>
+  <data name="ステータス変更・廃棄・返品（D-10-30-08、D-50-30-01、D-10-10-05）" xml:space="preserve">
+    <value>Status change, scrap and return (D-10-30-08, D-50-30-01, D-10-10-05)</value>
+  </data>
+  <data name="在庫ステータス" xml:space="preserve">
+    <value>Stock status</value>
+  </data>
+  <data name="ステータス変更" xml:space="preserve">
+    <value>Change status</value>
+  </data>
+  <data name="返品" xml:space="preserve">
+    <value>Return to supplier</value>
+  </data>
+  <data name="払出戻し" xml:space="preserve">
+    <value>Return from issue</value>
+  </data>
+  <data name="何日以内の期限を表示するか" xml:space="preserve">
+    <value>Show expiry within (days)</value>
+  </data>
+  <data name="期限接近・超過の在庫はありません。" xml:space="preserve">
+    <value>No stock near or past expiry.</value>
+  </data>
+  <data name="移動元" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="移動先" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="ロット '{0}' の在庫は見つかりませんでした。" xml:space="preserve">
+    <value>No stock was found for lot '{0}'.</value>
+  </data>
+  <data name="在庫を移動しました。" xml:space="preserve">
+    <value>Stock moved.</value>
+  </data>
+  <data name="数量を調整しました。" xml:space="preserve">
+    <value>Quantity adjusted.</value>
+  </data>
+  <data name="在庫ステータスを変更しました。" xml:space="preserve">
+    <value>Stock status changed.</value>
+  </data>
+  <data name="ロットを分割しました。" xml:space="preserve">
+    <value>Lot split.</value>
+  </data>
+  <data name="ロットを統合しました。" xml:space="preserve">
+    <value>Lots merged.</value>
+  </data>
+  <data name="振替しました。" xml:space="preserve">
+    <value>Reassigned.</value>
+  </data>
+  <data name="廃棄しました。" xml:space="preserve">
+    <value>Scrapped.</value>
+  </data>
+  <data name="返品しました。" xml:space="preserve">
+    <value>Returned to supplier.</value>
+  </data>
+  <data name="払出戻しを登録しました。" xml:space="preserve">
+    <value>Return from issue registered.</value>
+  </data>
+  <data name="対象ロットを選択してください。" xml:space="preserve">
+    <value>Select a lot.</value>
+  </data>
+  <data name="出庫・払出 - Parallel Factory MES" xml:space="preserve">
+    <value>Picking - Parallel Factory MES</value>
+  </data>
+  <data name="出庫・工程払出" xml:space="preserve">
+    <value>Picking and Issue to Process</value>
+  </data>
+  <data name="出庫指示・ピッキング指示（D-20-10。ロットは先入れ先出し（有効期限優先）で自動引当）、ピッキング実行・払出（D-20-20）。" xml:space="preserve">
+    <value>Issue and picking orders (D-20-10; lots are allocated automatically by FIFO, earliest expiry first), picking and issue (D-20-20).</value>
+  </data>
+  <data name="ピッキング指示の作成" xml:space="preserve">
+    <value>Create picking order</value>
+  </data>
+  <data name="払出先 作業指示" xml:space="preserve">
+    <value>Issue to work order</value>
+  </data>
+  <data name="払出先 出荷指示" xml:space="preserve">
+    <value>Issue to shipping order</value>
+  </data>
+  <data name="ピッキング指示を作成" xml:space="preserve">
+    <value>Create picking order</value>
+  </data>
+  <data name="ピッキング指示一覧" xml:space="preserve">
+    <value>Picking orders</value>
+  </data>
+  <data name="ピッキング指示はありません。" xml:space="preserve">
+    <value>No picking orders.</value>
+  </data>
+  <data name="払出先：{0}" xml:space="preserve">
+    <value>Issue to: {0}</value>
+  </data>
+  <data name="ピッキング実行" xml:space="preserve">
+    <value>Pick</value>
+  </data>
+  <data name="引当ロット" xml:space="preserve">
+    <value>Allocated lot</value>
+  </data>
+  <data name="照合" xml:space="preserve">
+    <value>Verify</value>
+  </data>
+  <data name="ロットをスキャン" xml:space="preserve">
+    <value>Scan lot</value>
+  </data>
+  <data name="一致" xml:space="preserve">
+    <value>Match</value>
+  </data>
+  <data name="不一致" xml:space="preserve">
+    <value>Mismatch</value>
+  </data>
+  <data name="品目と数量を指定してください。" xml:space="preserve">
+    <value>Specify the item and quantity.</value>
+  </data>
+  <data name="明細を追加してください。" xml:space="preserve">
+    <value>Add at least one line.</value>
+  </data>
+  <data name="作成に失敗しました。" xml:space="preserve">
+    <value>Creation failed.</value>
+  </data>
+  <data name="ピッキング指示を作成しました（先入れ先出しで引当）。" xml:space="preserve">
+    <value>Picking order created (allocated by FIFO).</value>
+  </data>
+  <data name="ピッキングを実行しました（在庫引落し済み）。" xml:space="preserve">
+    <value>Picked (stock deducted).</value>
+  </data>
+  <data name="ピッキング指示を取消しました。" xml:space="preserve">
+    <value>Picking order canceled.</value>
+  </data>
+  <data name="出荷管理 - Parallel Factory MES" xml:space="preserve">
+    <value>Shipping - Parallel Factory MES</value>
+  </data>
+  <data name="出荷指示（D-40-20-01）、出荷実行・完了報告（D-40-30）、出荷伝票発行（D-40-30-07）。出荷には承認済みの出荷判定（可／特採）が必要です（H-10-10）。" xml:space="preserve">
+    <value>Shipping orders (D-40-20-01), shipment and completion report (D-40-30), shipping slips (D-40-30-07). Shipping requires an approved shipment judgment (approved / special acceptance) (H-10-10).</value>
+  </data>
+  <data name="出荷指示の作成" xml:space="preserve">
+    <value>Create shipping order</value>
+  </data>
+  <data name="出荷先" xml:space="preserve">
+    <value>Destination</value>
+  </data>
+  <data name="出荷予定日" xml:space="preserve">
+    <value>Planned ship date</value>
+  </data>
+  <data name="出荷指示を作成" xml:space="preserve">
+    <value>Create shipping order</value>
+  </data>
+  <data name="出荷指示一覧" xml:space="preserve">
+    <value>Shipping orders</value>
+  </data>
+  <data name="出荷指示はありません。" xml:space="preserve">
+    <value>No shipping orders.</value>
+  </data>
+  <data name="予定日 {0}" xml:space="preserve">
+    <value>Planned {0}</value>
+  </data>
+  <data name="出荷伝票" xml:space="preserve">
+    <value>Shipping slip</value>
+  </data>
+  <data name="指示数" xml:space="preserve">
+    <value>Ordered</value>
+  </data>
+  <data name="出荷済" xml:space="preserve">
+    <value>Shipped</value>
+  </data>
+  <data name="出荷実行（ロット指定）" xml:space="preserve">
+    <value>Ship (by lot)</value>
+  </data>
+  <data name="出荷ロット" xml:space="preserve">
+    <value>Lot to ship</value>
+  </data>
+  <data name="{0}（{1} / {2} / 在庫{3}）" xml:space="preserve">
+    <value>{0} ({1} / {2} / stock {3})</value>
+  </data>
+  <data name="出荷実行・完了報告" xml:space="preserve">
+    <value>Ship and report completion</value>
+  </data>
+  <data name="出荷先と明細を指定してください。" xml:space="preserve">
+    <value>Specify the destination and lines.</value>
+  </data>
+  <data name="出荷指示を作成しました。出荷前に出荷判定（可／特採）の承認が必要です。" xml:space="preserve">
+    <value>Shipping order created. An approved shipment judgment (approved / special acceptance) is required before shipping.</value>
+  </data>
+  <data name="出荷ロットと数量を指定してください。" xml:space="preserve">
+    <value>Specify the lot and quantity to ship.</value>
+  </data>
+  <data name="出荷に失敗しました。" xml:space="preserve">
+    <value>Shipping failed.</value>
+  </data>
+  <data name="出荷を実行しました。" xml:space="preserve">
+    <value>Shipped.</value>
+  </data>
+  <data name="出荷指示を取消しました。" xml:space="preserve">
+    <value>Shipping order canceled.</value>
+  </data>
+  <data name="搬送指示 - Parallel Factory MES" xml:space="preserve">
+    <value>Transfer Orders - Parallel Factory MES</value>
+  </data>
+  <data name="工程間搬送・移動指示" xml:space="preserve">
+    <value>Inter-process Transfer Orders</value>
+  </data>
+  <data name="運ぶ前に指示を作り、運び終えてから実行して在庫を動かします（B-50-10）。" xml:space="preserve">
+    <value>Create an order before moving, then execute it after the move to update stock (B-50-10).</value>
+  </data>
+  <data name="その場で動かすだけなら在庫照会・操作の「移動」を使ってください。" xml:space="preserve">
+    <value>To move stock immediately, use "Move" in Inventory.</value>
+  </data>
+  <data name="搬送指示の作成" xml:space="preserve">
+    <value>Create transfer order</value>
+  </data>
+  <data name="対象ロット（スキャン可）" xml:space="preserve">
+    <value>Lot (scannable)</value>
+  </data>
+  <data name="移動元ロケーション" xml:space="preserve">
+    <value>Source location</value>
+  </data>
+  <data name="搬送指示を作成" xml:space="preserve">
+    <value>Create transfer order</value>
+  </data>
+  <data name="指示中" xml:space="preserve">
+    <value>Instructed</value>
+  </data>
+  <data name="搬送指示はありません。" xml:space="preserve">
+    <value>No transfer orders.</value>
+  </data>
+  <data name="作成" xml:space="preserve">
+    <value>Created</value>
+  </data>
+  <data name="実行" xml:space="preserve">
+    <value>Executed</value>
+  </data>
+  <data name="実行（在庫を移動）" xml:space="preserve">
+    <value>Execute (move stock)</value>
+  </data>
+  <data name="ロットと移動元・移動先ロケーションを指定してください。" xml:space="preserve">
+    <value>Specify the lot and the source and destination locations.</value>
+  </data>
+  <data name="搬送指示を作成しました。運び終えたら「実行」で在庫を移動します。" xml:space="preserve">
+    <value>Transfer order created. After the move, click "Execute" to move the stock.</value>
+  </data>
+  <data name="搬送を実行しました（在庫を移動しました）。" xml:space="preserve">
+    <value>Transfer executed (stock moved).</value>
+  </data>
+  <data name="搬送指示を取消しました。" xml:space="preserve">
+    <value>Transfer order canceled.</value>
+  </data>
+  <data name="棚卸 - Parallel Factory MES" xml:space="preserve">
+    <value>Stocktaking - Parallel Factory MES</value>
+  </data>
+  <data name="棚卸指示作成（D-50-10-01）、実棚数登録（-02）、差異一覧（-03）、差異調整・確定（-04〜05）。" xml:space="preserve">
+    <value>Stocktake orders (D-50-10-01), count entry (-02), variances (-03), variance adjustment and finalization (-04 to 05).</value>
+  </data>
+  <data name="棚卸指示の作成" xml:space="preserve">
+    <value>Create stocktake</value>
+  </data>
+  <data name="対象ロケーション（未選択で全ロケーション）" xml:space="preserve">
+    <value>Location (all locations if not selected)</value>
+  </data>
+  <data name="棚卸指示を作成（現在庫をスナップショット）" xml:space="preserve">
+    <value>Create stocktake (snapshot current stock)</value>
+  </data>
+  <data name="棚卸一覧" xml:space="preserve">
+    <value>Stocktakes</value>
+  </data>
+  <data name="棚卸はありません。" xml:space="preserve">
+    <value>No stocktakes.</value>
+  </data>
+  <data name="棚卸番号" xml:space="preserve">
+    <value>Stocktake No.</value>
+  </data>
+  <data name="作成日" xml:space="preserve">
+    <value>Created</value>
+  </data>
+  <data name="確定日" xml:space="preserve">
+    <value>Finalized</value>
+  </data>
+  <data name="明細" xml:space="preserve">
+    <value>Lines</value>
+  </data>
+  <data name="{0} 件" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="開く" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="棚卸表" xml:space="preserve">
+    <value>Count sheet</value>
+  </data>
+  <data name="{0} の明細（実棚入力・差異）" xml:space="preserve">
+    <value>{0} lines (counts and variances)</value>
+  </data>
+  <data name="理論数量" xml:space="preserve">
+    <value>Book qty</value>
+  </data>
+  <data name="実棚数量" xml:space="preserve">
+    <value>Counted qty</value>
+  </data>
+  <data name="差異" xml:space="preserve">
+    <value>Variance</value>
+  </data>
+  <data name="調整" xml:space="preserve">
+    <value>Adjustment</value>
+  </data>
+  <data name="調整済" xml:space="preserve">
+    <value>Adjusted</value>
+  </data>
+  <data name="実棚数を登録" xml:space="preserve">
+    <value>Save counts</value>
+  </data>
+  <data name="確定（差異を棚卸調整）" xml:space="preserve">
+    <value>Finalize (adjust variances)</value>
+  </data>
+  <data name="棚卸指示を作成しました。" xml:space="preserve">
+    <value>Stocktake created.</value>
+  </data>
+  <data name="実棚数を入力してください。" xml:space="preserve">
+    <value>Enter the counted quantities.</value>
+  </data>
+  <data name="実棚数を登録しました。差異を確認して確定してください。" xml:space="preserve">
+    <value>Counts saved. Review the variances and finalize.</value>
+  </data>
+  <data name="棚卸を確定し、差異を調整しました。" xml:space="preserve">
+    <value>Stocktake finalized and variances adjusted.</value>
+  </data>
+  <data name="棚卸を取消しました。" xml:space="preserve">
+    <value>Stocktake canceled.</value>
+  </data>
+  <data name="倉庫業務 - Parallel Factory MES" xml:space="preserve">
+    <value>Warehouse Operations - Parallel Factory MES</value>
+  </data>
+  <data name="倉庫業務進捗管理（D-50-30-07）、サンプル品保管管理（D-40-50-01）。" xml:space="preserve">
+    <value>Warehouse task progress (D-50-30-07), retained sample storage (D-40-50-01).</value>
+  </data>
+  <data name="倉庫業務の進捗（D-50-30-07）" xml:space="preserve">
+    <value>Warehouse task progress (D-50-30-07)</value>
+  </data>
+  <data name="指示から完了までを数える。受入は「指示」を持たず実施の記録だけなので、ここには出さない。" xml:space="preserve">
+    <value>Counts orders from instruction to completion. Receiving has no orders, only records of what was done, so it is not shown here.</value>
+  </data>
+  <data name="業務" xml:space="preserve">
+    <value>Task</value>
+  </data>
+  <data name="指示" xml:space="preserve">
+    <value>Ordered</value>
+  </data>
+  <data name="未完了" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="最古の滞留" xml:space="preserve">
+    <value>Oldest open</value>
+  </data>
+  <data name="残" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="{0}日" xml:space="preserve">
+    <value>{0} d</value>
+  </data>
+  <data name="サンプルの採取（D-40-50-01）" xml:space="preserve">
+    <value>Take sample (D-40-50-01)</value>
+  </data>
+  <data name="採取した分は在庫から抜く（保管棚へ移り、出荷・投入には使えないため）。" xml:space="preserve">
+    <value>The sampled quantity is removed from stock (it moves to the retention shelf and cannot be shipped or consumed).</value>
+  </data>
+  <data name="保管期限を空欄にすると期限の判定を行わない。" xml:space="preserve">
+    <value>Leave the retention date blank to skip the expiry check.</value>
+  </data>
+  <data name="採取元ロット番号（スキャン可）" xml:space="preserve">
+    <value>Source lot number (scannable)</value>
+  </data>
+  <data name="採取元ロット" xml:space="preserve">
+    <value>Source lot</value>
+  </data>
+  <data name="未選択" xml:space="preserve">
+    <value>Not selected</value>
+  </data>
+  <data name="{0}（{1} {2}・在庫 {3:0.##}）" xml:space="preserve">
+    <value>{0} ({1} {2}, stock {3:0.##})</value>
+  </data>
+  <data name="保管場所" xml:space="preserve">
+    <value>Storage location</value>
+  </data>
+  <data name="保管期限" xml:space="preserve">
+    <value>Retain until</value>
+  </data>
+  <data name="採取を登録" xml:space="preserve">
+    <value>Register sample</value>
+  </data>
+  <data name="保管中のサンプル" xml:space="preserve">
+    <value>Retained samples</value>
+  </data>
+  <data name="保管期限を過ぎたものだけ" xml:space="preserve">
+    <value>Past retention date only</value>
+  </data>
+  <data name="保管を終えたものも表示" xml:space="preserve">
+    <value>Include ended</value>
+  </data>
+  <data name="該当するサンプルはありません。" xml:space="preserve">
+    <value>No matching samples.</value>
+  </data>
+  <data name="サンプル番号" xml:space="preserve">
+    <value>Sample No.</value>
+  </data>
+  <data name="採取日" xml:space="preserve">
+    <value>Sampled on</value>
+  </data>
+  <data name="期限経過" xml:space="preserve">
+    <value>Expired</value>
+  </data>
+  <data name="払出" xml:space="preserve">
+    <value>Issue</value>
+  </data>
+  <data name="ロット {0} の在庫は見つかりませんでした。" xml:space="preserve">
+    <value>No stock was found for lot {0}.</value>
+  </data>
+  <data name="採取元ロット・保管場所・数量（0より大きい値）を指定してください。" xml:space="preserve">
+    <value>Specify the source lot, storage location and quantity (greater than 0).</value>
+  </data>
+  <data name="採取の登録に失敗しました。" xml:space="preserve">
+    <value>Failed to register the sample.</value>
+  </data>
+  <data name="サンプル {0} を登録しました（在庫から {1:0.##} 抜きました）。" xml:space="preserve">
+    <value>Sample {0} registered ({1:0.##} removed from stock).</value>
+  </data>
+  <data name="保管の終了に失敗しました。" xml:space="preserve">
+    <value>Failed to end storage.</value>
+  </data>
+  <data name="サンプル {0} を{1}にしました。" xml:space="preserve">
+    <value>Sample {0} set to {1}.</value>
+  </data>
+  <data name="検査管理 - Parallel Factory MES" xml:space="preserve">
+    <value>Inspections - Parallel Factory MES</value>
+  </data>
+  <data name="受入／工程内／完成品／サンプル／再検査の進捗一覧・検査指示発行（C-20）。" xml:space="preserve">
+    <value>Progress of receiving / in-process / final / sample / re-inspections and issuing inspection orders (C-20).</value>
+  </data>
+  <data name="検査指示の発行（C-20-10-02）" xml:space="preserve">
+    <value>Issue inspection order (C-20-10-02)</value>
+  </data>
+  <data name="ロット選択" xml:space="preserve">
+    <value>Select lot</value>
+  </data>
+  <data name="（スキャン入力または選択）" xml:space="preserve">
+    <value>(scan or select)</value>
+  </data>
+  <data name="検査項目は種別・対象品目/工程に合致する検査基準から自動選択されます（C-10-10）。" xml:space="preserve">
+    <value>Inspection items are selected automatically from the standards matching the type and the item / process (C-10-10).</value>
+  </data>
+  <data name="検査指示を発行" xml:space="preserve">
+    <value>Issue inspection order</value>
+  </data>
+  <data name="検査進捗一覧（C-20-10-01）" xml:space="preserve">
+    <value>Inspection progress (C-20-10-01)</value>
+  </data>
+  <data name="実施中" xml:space="preserve">
+    <value>In progress</value>
+  </data>
+  <data name="判定済" xml:space="preserve">
+    <value>Judged</value>
+  </data>
+  <data name="検査指示はありません。" xml:space="preserve">
+    <value>No inspection orders.</value>
+  </data>
+  <data name="検査指示番号" xml:space="preserve">
+    <value>Inspection order No.</value>
+  </data>
+  <data name="発行日" xml:space="preserve">
+    <value>Issued</value>
+  </data>
+  <data name="詳細・実績入力" xml:space="preserve">
+    <value>Details / results</value>
+  </data>
+  <data name="ロット '{0}' が見つかりません。" xml:space="preserve">
+    <value>Lot '{0}' was not found.</value>
+  </data>
+  <data name="発行に失敗しました。" xml:space="preserve">
+    <value>Issue failed.</value>
+  </data>
+  <data name="検査指示 {0} を発行しました（対象ロットは検査待ちになります）。" xml:space="preserve">
+    <value>Inspection order {0} issued (the lot is now awaiting inspection).</value>
+  </data>
+  <data name="検査詳細 - Parallel Factory MES" xml:space="preserve">
+    <value>Inspection Details - Parallel Factory MES</value>
+  </data>
+  <data name="検査指示 {0}" xml:space="preserve">
+    <value>Inspection Order {0}</value>
+  </data>
+  <data name="{0} ／ 対象：{1} ／ 状態：{2}" xml:space="preserve">
+    <value>{0} / Target: {1} / Status: {2}</value>
+  </data>
+  <data name="検査成績書" xml:space="preserve">
+    <value>Inspection certificate</value>
+  </data>
+  <data name="検査実績の入力（C-20-10-03。規格値から自動判定）" xml:space="preserve">
+    <value>Enter results (C-20-10-03, judged automatically from the spec)</value>
+  </data>
+  <data name="検査項目" xml:space="preserve">
+    <value>Inspection item</value>
+  </data>
+  <data name="測定値" xml:space="preserve">
+    <value>Measured</value>
+  </data>
+  <data name="定性記録" xml:space="preserve">
+    <value>Qualitative record</value>
+  </data>
+  <data name="判定（手動）" xml:space="preserve">
+    <value>Judgment (manual)</value>
+  </data>
+  <data name="（基準 {0}）" xml:space="preserve">
+    <value>(nominal {0})</value>
+  </data>
+  <data name="自動判定" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="合格" xml:space="preserve">
+    <value>Pass</value>
+  </data>
+  <data name="不合格" xml:space="preserve">
+    <value>Fail</value>
+  </data>
+  <data name="使用した検査機（任意）" xml:space="preserve">
+    <value>Inspection device used (optional)</value>
+  </data>
+  <data name="選択しない" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="校正期限切れのため選べない検査機：{0}。" xml:space="preserve">
+    <value>Devices unavailable due to expired calibration: {0}.</value>
+  </data>
+  <data name="マスタ管理の検査機・測定器で校正を記録してください。" xml:space="preserve">
+    <value>Record the calibration under Masters &gt; Inspection Devices.</value>
+  </data>
+  <data name="検査実績を登録" xml:space="preserve">
+    <value>Save results</value>
+  </data>
+  <data name="総合判定（C-20-10-04）" xml:space="preserve">
+    <value>Overall judgment (C-20-10-04)</value>
+  </data>
+  <data name="グレード（任意。C-60-10-01）" xml:space="preserve">
+    <value>Grade (optional, C-60-10-01)</value>
+  </data>
+  <data name="例：A" xml:space="preserve">
+    <value>e.g. A</value>
+  </data>
+  <data name="全検査項目の実績が合格なら合格。判定結果は対象ロットの在庫ステータスへ反映され、不合格時は不適合が自動起票されます。" xml:space="preserve">
+    <value>Pass if all inspection items pass. The judgment is applied to the lot's stock status, and a nonconformance is raised automatically on failure.</value>
+  </data>
+  <data name="判定する" xml:space="preserve">
+    <value>Judge</value>
+  </data>
+  <data name="検査承認（C-20-10-06）" xml:space="preserve">
+    <value>Approve inspection (C-20-10-06)</value>
+  </data>
+  <data name="検査指示を取消（対象ロットの検査待ちを解除）" xml:space="preserve">
+    <value>Cancel inspection order (release the lot from awaiting inspection)</value>
+  </data>
+  <data name="検査実績" xml:space="preserve">
+    <value>Results</value>
+  </data>
+  <data name="サンプルNo" xml:space="preserve">
+    <value>Sample No.</value>
+  </data>
+  <data name="検査機" xml:space="preserve">
+    <value>Device</value>
+  </data>
+  <data name="検査者" xml:space="preserve">
+    <value>Inspector</value>
+  </data>
+  <data name="検査日時" xml:space="preserve">
+    <value>Inspected at</value>
+  </data>
+  <data name="訂正履歴" xml:space="preserve">
+    <value>Correction history</value>
+  </data>
+  <data name="訂正前" xml:space="preserve">
+    <value>Before</value>
+  </data>
+  <data name="訂正後" xml:space="preserve">
+    <value>After</value>
+  </data>
+  <data name="理由" xml:space="preserve">
+    <value>Reason</value>
+  </data>
+  <data name="訂正者" xml:space="preserve">
+    <value>Corrected by</value>
+  </data>
+  <data name="検査実績の訂正（C-20-50-07。理由必須・監査ログ記録）" xml:space="preserve">
+    <value>Correct result (C-20-50-07, reason required, audit logged)</value>
+  </data>
+  <data name="検査結果を入力してください。" xml:space="preserve">
+    <value>Enter the inspection results.</value>
+  </data>
+  <data name="検査実績を登録しました。" xml:space="preserve">
+    <value>Results saved.</value>
+  </data>
+  <data name="判定に失敗しました。" xml:space="preserve">
+    <value>Judgment failed.</value>
+  </data>
+  <data name="不合格と判定しました。ロットは不良となり、不適合が自動起票されました。" xml:space="preserve">
+    <value>Judged as fail. The lot is now defective and a nonconformance was raised automatically.</value>
+  </data>
+  <data name="合格と判定しました。ロットは正常になりました。" xml:space="preserve">
+    <value>Judged as pass. The lot is now normal.</value>
+  </data>
+  <data name="検査指示を取消しました。" xml:space="preserve">
+    <value>Inspection order canceled.</value>
+  </data>
+  <data name="検査を承認しました。" xml:space="preserve">
+    <value>Inspection approved.</value>
+  </data>
+  <data name="検査実績を訂正しました（判定済みの場合は再判定が必要です）。" xml:space="preserve">
+    <value>Result corrected (re-judge if already judged).</value>
+  </data>
+  <data name="不適合管理 - Parallel Factory MES" xml:space="preserve">
+    <value>Nonconformances - Parallel Factory MES</value>
+  </data>
+  <data name="不適合・逸脱管理" xml:space="preserve">
+    <value>Nonconformances and Deviations</value>
+  </data>
+  <data name="逸脱/不具合の一覧（C-30-10-01）、対応指示（C-30-20-01）、対応実行記録（-02）、逸脱承認・特別採用（-03）。" xml:space="preserve">
+    <value>Deviations / defects (C-30-10-01), action instructions (C-30-20-01), action records (-02), deviation approval and special acceptance (-03).</value>
+  </data>
+  <data name="逸脱・品質不具合の記録（B-40-30）" xml:space="preserve">
+    <value>Record deviation / quality issue (B-40-30)</value>
+  </data>
+  <data name="発生元" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="対象ロット" xml:space="preserve">
+    <value>Lot</value>
+  </data>
+  <data name="原因区分（B-40-30-02）" xml:space="preserve">
+    <value>Cause category (B-40-30-02)</value>
+  </data>
+  <data name="例：設備不調／作業ミス／部材不良" xml:space="preserve">
+    <value>e.g. equipment fault / human error / material defect</value>
+  </data>
+  <data name="原因詳細" xml:space="preserve">
+    <value>Cause details</value>
+  </data>
+  <data name="不適合を起票" xml:space="preserve">
+    <value>Raise nonconformance</value>
+  </data>
+  <data name="不適合一覧" xml:space="preserve">
+    <value>Nonconformances</value>
+  </data>
+  <data name="対応指示済" xml:space="preserve">
+    <value>Action instructed</value>
+  </data>
+  <data name="対応完了" xml:space="preserve">
+    <value>Action completed</value>
+  </data>
+  <data name="承認済（クローズ）" xml:space="preserve">
+    <value>Approved (closed)</value>
+  </data>
+  <data name="不適合はありません。" xml:space="preserve">
+    <value>No nonconformances.</value>
+  </data>
+  <data name="ロット：{0}" xml:space="preserve">
+    <value>Lot: {0}</value>
+  </data>
+  <data name="リワーク指図 {0}" xml:space="preserve">
+    <value>Rework order {0}</value>
+  </data>
+  <data name="原因" xml:space="preserve">
+    <value>Cause</value>
+  </data>
+  <data name="対応指示" xml:space="preserve">
+    <value>Action</value>
+  </data>
+  <data name="対応実績" xml:space="preserve">
+    <value>Action record</value>
+  </data>
+  <data name="指示内容" xml:space="preserve">
+    <value>Instruction</value>
+  </data>
+  <data name="承認（特採時はロット解放）" xml:space="preserve">
+    <value>Approve (releases the lot for special acceptance)</value>
+  </data>
+  <data name="起票に失敗しました。" xml:space="preserve">
+    <value>Failed to raise.</value>
+  </data>
+  <data name="不適合を起票しました。" xml:space="preserve">
+    <value>Nonconformance raised.</value>
+  </data>
+  <data name="対応区分を選択してください。" xml:space="preserve">
+    <value>Select an action.</value>
+  </data>
+  <data name="対応を指示しました（保留・廃棄はロットへ、リワークは指図へ連動）。" xml:space="preserve">
+    <value>Action instructed (hold / scrap applies to the lot, rework creates an order).</value>
+  </data>
+  <data name="対応実績を入力してください。" xml:space="preserve">
+    <value>Enter the action record.</value>
+  </data>
+  <data name="対応実績を記録しました。" xml:space="preserve">
+    <value>Action recorded.</value>
+  </data>
+  <data name="承認しました（クローズ）。" xml:space="preserve">
+    <value>Approved (closed).</value>
+  </data>
+  <data name="品質分析 - Parallel Factory MES" xml:space="preserve">
+    <value>Quality Analysis - Parallel Factory MES</value>
+  </data>
+  <data name="不良項目別・工程別・直別・期間別の集計（C-40-10-03）、不適合・逸脱発生状況のモニタリング（C-40-10-05）。期間は製造日（業務日付）基準。" xml:space="preserve">
+    <value>Defects by item, process, shift and period (C-40-10-03) and monitoring of nonconformances and deviations (C-40-10-05). Periods are based on the production (business) date.</value>
+  </data>
+  <data name="サマリ" xml:space="preserve">
+    <value>Summary</value>
+  </data>
+  <data name="検査 合格 / 不合格" xml:space="preserve">
+    <value>Inspections pass / fail</value>
+  </data>
+  <data name="{0} 件 / {1} 件" xml:space="preserve">
+    <value>{0} / {1}</value>
+  </data>
+  <data name="未クローズの不適合" xml:space="preserve">
+    <value>Open nonconformances</value>
+  </data>
+  <data name="要対応" xml:space="preserve">
+    <value>Action needed</value>
+  </data>
+  <data name="品目別の不良集計" xml:space="preserve">
+    <value>Defects by item</value>
+  </data>
+  <data name="うち廃棄" xml:space="preserve">
+    <value>Scrapped</value>
+  </data>
+  <data name="うち再作業待ち" xml:space="preserve">
+    <value>Awaiting rework</value>
+  </data>
+  <data name="不良率" xml:space="preserve">
+    <value>Defect rate</value>
+  </data>
+  <data name="構成" xml:space="preserve">
+    <value>Share</value>
+  </data>
+  <data name="工程別の不良集計" xml:space="preserve">
+    <value>Defects by process</value>
+  </data>
+  <data name="直別の不良集計" xml:space="preserve">
+    <value>Defects by shift</value>
+  </data>
+  <data name="実績に直が付いていません。マスタ管理の勤務シフトで直を定義すると、以降の実績が直別に分かれて比べられます（直は実績の記録時に固定するため、それ以前の実績は「{0}」のままです）。" xml:space="preserve">
+    <value>Production records have no shift. Define shifts under Masters &gt; Shifts to compare later records by shift (the shift is fixed when a record is saved, so earlier records remain "{0}").</value>
+  </data>
+  <data name="（直なし）" xml:space="preserve">
+    <value>(No shift)</value>
+  </data>
+  <data name="不良理由別の不良数（パレート）" xml:space="preserve">
+    <value>Defects by reason (Pareto)</value>
+  </data>
+  <data name="不良数の多い順に並べ、累積構成比を添える。上位いくつで全体の何割を占めるかが分かると、改善の対象を選べる。" xml:space="preserve">
+    <value>Sorted by defect count with the cumulative share. Seeing how much of the total the top reasons account for helps choose what to improve.</value>
+  </data>
+  <data name="対象期間の不良理由内訳はありません（実績入力で不良理由別の内訳を登録すると集計されます）。" xml:space="preserve">
+    <value>No defect reason breakdown in this period (it is aggregated when defects are recorded by reason in production records).</value>
+  </data>
+  <data name="構成比" xml:space="preserve">
+    <value>Share</value>
+  </data>
+  <data name="累積構成比" xml:space="preserve">
+    <value>Cumulative share</value>
+  </data>
+  <data name="不適合の原因区分別 発生件数" xml:space="preserve">
+    <value>Nonconformances by cause category</value>
+  </data>
+  <data name="対象期間の不適合はありません。" xml:space="preserve">
+    <value>No nonconformances in this period.</value>
+  </data>
+  <data name="原因区分" xml:space="preserve">
+    <value>Cause category</value>
+  </data>
+  <data name="件数" xml:space="preserve">
+    <value>Count</value>
+  </data>
+  <data name="出荷判定 - Parallel Factory MES" xml:space="preserve">
+    <value>Shipment Judgments - Parallel Factory MES</value>
+  </data>
+  <data name="出荷判定一覧・検査結果の確認（H-10-10-01）、判定（可／保留／特採。-02）、判定承認（-03）、判定書発行（-04）。" xml:space="preserve">
+    <value>Shipment judgments and inspection results (H-10-10-01), judgment (approved / on hold / special acceptance, -02), approval (-03), judgment documents (-04).</value>
+  </data>
+  <data name="出荷判定の登録" xml:space="preserve">
+    <value>Register shipment judgment</value>
+  </data>
+  <data name="対象出荷指示" xml:space="preserve">
+    <value>Shipping order</value>
+  </data>
+  <data name="出荷実行には、対象出荷指示に対する承認済みの「可」または「特採」判定が必要です。" xml:space="preserve">
+    <value>Shipping requires an approved "approved" or "special acceptance" judgment for the shipping order.</value>
+  </data>
+  <data name="判定を登録" xml:space="preserve">
+    <value>Register judgment</value>
+  </data>
+  <data name="判定一覧" xml:space="preserve">
+    <value>Judgments</value>
+  </data>
+  <data name="出荷判定はありません。" xml:space="preserve">
+    <value>No shipment judgments.</value>
+  </data>
+  <data name="判定書番号" xml:space="preserve">
+    <value>Judgment No.</value>
+  </data>
+  <data name="対象出荷" xml:space="preserve">
+    <value>Shipping order</value>
+  </data>
+  <data name="判定者" xml:space="preserve">
+    <value>Judged by</value>
+  </data>
+  <data name="判定日" xml:space="preserve">
+    <value>Judged on</value>
+  </data>
+  <data name="判定書" xml:space="preserve">
+    <value>Judgment doc</value>
+  </data>
+  <data name="対象出荷指示またはロットを選択してください。" xml:space="preserve">
+    <value>Select a shipping order or lot.</value>
+  </data>
+  <data name="出荷判定を登録しました。承認すると出荷実行が可能になります。" xml:space="preserve">
+    <value>Shipment judgment registered. Shipping becomes possible once it is approved.</value>
+  </data>
+  <data name="判定を承認しました。" xml:space="preserve">
+    <value>Judgment approved.</value>
+  </data>
+  <data name="トレーサビリティ - Parallel Factory MES" xml:space="preserve">
+    <value>Traceability - Parallel Factory MES</value>
+  </data>
+  <data name="ロットトレーサビリティ" xml:space="preserve">
+    <value>Lot Traceability</value>
+  </data>
+  <data name="ロット番号によるトレースバック（製造元特定。H-30-10-01）／トレースフォワード（使用先特定。-02）、製造・検査・在庫履歴の閲覧（-03〜05）。" xml:space="preserve">
+    <value>Trace back by lot number (origin, H-30-10-01) / trace forward (where used, -02), and production, inspection and stock history (-03 to 05).</value>
+  </data>
+  <data name="ロット番号（バーコード/QRスキャン可）" xml:space="preserve">
+    <value>Lot number (barcode / QR scannable)</value>
+  </data>
+  <data name="由来" xml:space="preserve">
+    <value>Origin</value>
+  </data>
+  <data name="発行" xml:space="preserve">
+    <value>Print</value>
+  </data>
+  <data name="トレースバック" xml:space="preserve">
+    <value>Trace back</value>
+  </data>
+  <data name="トレースフォワード" xml:space="preserve">
+    <value>Trace forward</value>
+  </data>
+  <data name="履歴" xml:space="preserve">
+    <value>History</value>
+  </data>
+  <data name="トレースバック（この製品に使われた部材ロット）" xml:space="preserve">
+    <value>Trace back (material lots used in this product)</value>
+  </data>
+  <data name="投入部材の記録はありません。" xml:space="preserve">
+    <value>No material consumption records.</value>
+  </data>
+  <data name="トレースフォワード（このロットの使用先）" xml:space="preserve">
+    <value>Trace forward (where this lot was used)</value>
+  </data>
+  <data name="使用先の記録はありません。" xml:space="preserve">
+    <value>No usage records.</value>
+  </data>
+  <data name="製造履歴（H-30-10-03）" xml:space="preserve">
+    <value>Production history (H-30-10-03)</value>
+  </data>
+  <data name="記録はありません。" xml:space="preserve">
+    <value>No records.</value>
+  </data>
+  <data name="検査履歴（H-30-10-05）" xml:space="preserve">
+    <value>Inspection history (H-30-10-05)</value>
+  </data>
+  <data name="製造条件の逸脱（B-30-30-04）" xml:space="preserve">
+    <value>Process condition deviations (B-30-30-04)</value>
+  </data>
+  <data name="逸脱はありません。" xml:space="preserve">
+    <value>No deviations.</value>
+  </data>
+  <data name="設備稼働履歴（H-30-10-04）" xml:space="preserve">
+    <value>Equipment operation history (H-30-10-04)</value>
+  </data>
+  <data name="記録はありません（稼働実績が作業指示に紐付いていません）。" xml:space="preserve">
+    <value>No records (no operation records are linked to the work order).</value>
+  </data>
+  <data name="在庫履歴" xml:space="preserve">
+    <value>Stock history</value>
+  </data>
+  <data name="状態履歴（H-30-10-04）" xml:space="preserve">
+    <value>Status history (H-30-10-04)</value>
+  </data>
+  <data name="遷移" xml:space="preserve">
+    <value>Transition</value>
+  </data>
+  <data name="実績訂正履歴（B-70-30-01）" xml:space="preserve">
+    <value>Production record corrections (B-70-30-01)</value>
+  </data>
+  <data name="訂正前（良品/不良/廃棄/再作業）" xml:space="preserve">
+    <value>Before (good / defect / scrap / rework)</value>
+  </data>
+  <data name="訂正後（良品/不良/廃棄/再作業）" xml:space="preserve">
+    <value>After (good / defect / scrap / rework)</value>
+  </data>
+  <data name="出荷伝票 - Parallel Factory MES" xml:space="preserve">
+    <value>Shipping Slip - Parallel Factory MES</value>
+  </data>
+  <data name="出荷伝票を印刷 / PDF出力" xml:space="preserve">
+    <value>Print shipping slip / save as PDF</value>
+  </data>
+  <data name="出 荷 伝 票" xml:space="preserve">
+    <value>SHIPPING SLIP</value>
+  </data>
+  <data name="出荷番号" xml:space="preserve">
+    <value>Shipping No.</value>
+  </data>
+  <data name="出荷完了日" xml:space="preserve">
+    <value>Shipped on</value>
+  </data>
+  <data name="出荷明細" xml:space="preserve">
+    <value>Shipping lines</value>
+  </data>
+  <data name="指示数量" xml:space="preserve">
+    <value>Ordered qty</value>
+  </data>
+  <data name="出荷数量" xml:space="preserve">
+    <value>Shipped qty</value>
+  </data>
+  <data name="受領確認欄" xml:space="preserve">
+    <value>Acknowledgment of receipt</value>
+  </data>
+  <data name="受領日" xml:space="preserve">
+    <value>Received on</value>
+  </data>
+  <data name="受領者署名" xml:space="preserve">
+    <value>Recipient signature</value>
+  </data>
+  <data name="棚卸表 - Parallel Factory MES" xml:space="preserve">
+    <value>Count Sheet - Parallel Factory MES</value>
+  </data>
+  <data name="棚卸表を印刷 / PDF出力" xml:space="preserve">
+    <value>Print count sheet / save as PDF</value>
+  </data>
+  <data name="棚 卸 表" xml:space="preserve">
+    <value>STOCKTAKE COUNT SHEET</value>
+  </data>
+  <data name="検査成績書 - Parallel Factory MES" xml:space="preserve">
+    <value>Inspection Certificate - Parallel Factory MES</value>
+  </data>
+  <data name="検査成績書を印刷 / PDF出力" xml:space="preserve">
+    <value>Print inspection certificate / save as PDF</value>
+  </data>
+  <data name="検 査 成 績 書" xml:space="preserve">
+    <value>INSPECTION CERTIFICATE</value>
+  </data>
+  <data name="総合判定" xml:space="preserve">
+    <value>Overall judgment</value>
+  </data>
+  <data name="未判定" xml:space="preserve">
+    <value>Not judged</value>
+  </data>
+  <data name="承認済（{0:yyyy-MM-dd}）" xml:space="preserve">
+    <value>Approved ({0:yyyy-MM-dd})</value>
+  </data>
+  <data name="検査結果" xml:space="preserve">
+    <value>Inspection results</value>
+  </data>
+  <data name="規格値（版）" xml:space="preserve">
+    <value>Spec (version)</value>
+  </data>
+  <data name="（第{0}版）" xml:space="preserve">
+    <value>(v{0})</value>
+  </data>
+  <data name="訂正日時" xml:space="preserve">
+    <value>Corrected at</value>
+  </data>
+  <data name="出荷判定書 - Parallel Factory MES" xml:space="preserve">
+    <value>Shipment Judgment - Parallel Factory MES</value>
+  </data>
+  <data name="出荷判定書を印刷 / PDF出力" xml:space="preserve">
+    <value>Print shipment judgment / save as PDF</value>
+  </data>
+  <data name="出 荷 判 定 書" xml:space="preserve">
+    <value>SHIPMENT JUDGMENT</value>
+  </data>
+  <data name="製造・検査履歴（H-10-10-01）" xml:space="preserve">
+    <value>Production and inspection history (H-10-10-01)</value>
+  </data>
+  <data name="製造履歴" xml:space="preserve">
+    <value>Production history</value>
+  </data>
+  <data name="検査履歴" xml:space="preserve">
+    <value>Inspection history</value>
   </data>
 </root>

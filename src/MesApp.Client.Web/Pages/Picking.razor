@@ -2,19 +2,19 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>出庫・払出 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["出庫・払出 - Parallel Factory MES"]</PageTitle>
 
-<h1>出庫・工程払出</h1>
-<p class="text-muted">出庫指示・ピッキング指示（D-20-10。ロットは先入れ先出し（有効期限優先）で自動引当）、ピッキング実行・払出（D-20-20）。</p>
+<h1>@L["出庫・工程払出"]</h1>
+<p class="text-muted">@L["出庫指示・ピッキング指示（D-20-10。ロットは先入れ先出し（有効期限優先）で自動引当）、ピッキング実行・払出（D-20-20）。"]</p>
 
 <Notice Error="@_error" Message="@_message" />
 
 <AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
-    <h2 style="margin-top:0;">ピッキング指示の作成</h2>
+    <h2 style="margin-top:0;">@L["ピッキング指示の作成"]</h2>
     <div class="form-grid">
         <div class="form-field">
-            <label>区分</label>
+            <label>@L["区分"]</label>
             <select @bind="_type">
                 <option value="@PickingOrderType.ProcessIssue">@EnumLabels.Of(PickingOrderType.ProcessIssue)</option>
                 <option value="@PickingOrderType.Shipping">@EnumLabels.Of(PickingOrderType.Shipping)</option>
@@ -23,26 +23,26 @@
         @if (_type == PickingOrderType.ProcessIssue)
         {
             <div class="form-field">
-                <label>払出先 作業指示</label>
+                <label>@L["払出先 作業指示"]</label>
                 <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
                               @bind-Value="_workOrderId"
                               ValueOf="w => w.Id"
-                              LabelOf='@(w => $"{w.WorkOrderNo}（{w.ProductCode} / {w.ProcessCode}）")' />
+                              LabelOf='@(w => L["{0}（{1} / {2}）", w.WorkOrderNo, w.ProductCode, w.ProcessCode])' />
             </div>
         }
         else
         {
             <div class="form-field">
-                <label>払出先 出荷指示</label>
+                <label>@L["払出先 出荷指示"]</label>
                 <OptionSelect TItem="ShippingOrderResponse"
                               Endpoint="api/shipping-orders/options?status=Instructed"
                               @bind-Value="_shippingOrderId"
                               ValueOf="s => s.Id"
-                              LabelOf='@(s => $"{s.ShippingNo}（{s.Destination}）")' />
+                              LabelOf='@(s => L["{0}（{1}）", s.ShippingNo, s.Destination])' />
             </div>
         }
         <div class="form-field">
-            <label>品目</label>
+            <label>@L["品目"]</label>
             <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
                           @bind-Value="_lineProductId"
                           SelectedItemChanged="RememberProduct"
@@ -50,26 +50,26 @@
                           LabelOf='@(p => $"{p.Code} {p.Name}")' />
         </div>
         <div class="form-field">
-            <label>数量</label>
+            <label>@L["数量"]</label>
             <input type="number" @bind="_lineQuantity" />
         </div>
     </div>
     <div class="actions">
-        <button class="btn btn-secondary" @onclick="AddLine">明細に追加</button>
-        <button class="btn" disabled="@_busy" @onclick="CreateAsync">ピッキング指示を作成</button>
+        <button class="btn btn-secondary" @onclick="AddLine">@L["明細に追加"]</button>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">@L["ピッキング指示を作成"]</button>
     </div>
 
     @if (_lines.Count > 0)
     {
         <table class="table mt-2">
-            <thead><tr><th>品目</th><th>数量</th><th></th></tr></thead>
+            <thead><tr><th>@L["品目"]</th><th>@L["数量"]</th><th></th></tr></thead>
             <tbody>
                 @foreach (var line in _lines)
                 {
                     <tr>
                         <td>@_productCodes.GetValueOrDefault(line.ProductId, "-")</td>
                         <td>@line.Quantity</td>
-                        <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">削除</button></td>
+                        <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">@L["削除"]</button></td>
                     </tr>
                 }
             </tbody>
@@ -79,14 +79,14 @@
 </AuthorizeView>
 
 <div class="card">
-    <h2 style="margin-top:0;">ピッキング指示一覧</h2>
+    <h2 style="margin-top:0;">@L["ピッキング指示一覧"]</h2>
     @if (_orders is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_orders.Total == 0)
     {
-        <p class="text-muted">ピッキング指示はありません。</p>
+        <p class="text-muted">@L["ピッキング指示はありません。"]</p>
     }
     else
     {
@@ -98,21 +98,21 @@
                         <strong>@order.OrderNo</strong>
                         <span class="badge">@EnumLabels.Of(order.Type)</span>
                         <span class="badge @StatusClass(order.Status)">@EnumLabels.Of(order.Status)</span>
-                        <span class="text-muted">払出先：@(order.WorkOrderNo ?? order.ShippingNo ?? "-")</span>
+                        <span class="text-muted">@L["払出先：{0}", order.WorkOrderNo ?? order.ShippingNo ?? "-"]</span>
                     </div>
                     @if (order.Status == PickingOrderStatus.Instructed)
                     {
                         <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="inventoryWrite">
                             <div class="actions">
-                                <button class="btn btn-sm" disabled="@_busy" @onclick="() => ExecuteAsync(order.Id)">ピッキング実行</button>
-                                <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
+                                <button class="btn btn-sm" disabled="@_busy" @onclick="() => ExecuteAsync(order.Id)">@L["ピッキング実行"]</button>
+                                <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">@L["取消"]</button>
                             </div>
                         </AuthorizeView>
                     }
                 </div>
                 <table class="table mt-2">
                     <thead>
-                        <tr><th>品目</th><th>引当ロット</th><th>ロケーション</th><th>数量</th><th>照合</th></tr>
+                        <tr><th>@L["品目"]</th><th>@L["引当ロット"]</th><th>@L["ロケーション"]</th><th>@L["数量"]</th><th>@L["照合"]</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var line in order.Lines)
@@ -127,17 +127,17 @@
                                     {
                                         @* バーコード照合（D-20-20-01）：スキャン値と引当ロットの一致を確認 *@
                                         <ScanInput Value="@GetScan(line.Id)" ShowSubmit="false"
-                                                   Placeholder="ロットをスキャン"
+                                                   Placeholder="@L["ロットをスキャン"]"
                                                    ValueChanged="v => SetScan(line.Id, v)" />
                                         @if (GetScan(line.Id) is { Length: > 0 } scanned)
                                         {
                                             @if (string.Equals(scanned.Trim(), line.LotNumber, StringComparison.OrdinalIgnoreCase))
                                             {
-                                                <span class="badge badge-success">一致</span>
+                                                <span class="badge badge-success">@L["一致"]</span>
                                             }
                                             else
                                             {
-                                                <span class="badge badge-danger">不一致</span>
+                                                <span class="badge badge-danger">@L["不一致"]</span>
                                             }
                                         }
                                     }
@@ -192,7 +192,7 @@
     {
         if (_lineProductId == 0 || _lineQuantity <= 0)
         {
-            _error = "品目と数量を指定してください。";
+            _error = L["品目と数量を指定してください。"];
             return;
         }
         _error = null;
@@ -204,7 +204,7 @@
     {
         if (_lines.Count == 0)
         {
-            _error = "明細を追加してください。";
+            _error = L["明細を追加してください。"];
             return;
         }
         _busy = true;
@@ -218,12 +218,12 @@
                     _shippingOrderId == 0 ? null : _shippingOrderId,
                     [.. _lines]));
             // 在庫不足もここで通知される
-            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["作成に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "ピッキング指示を作成しました（先入れ先出しで引当）。";
+            _message = L["ピッキング指示を作成しました（先入れ先出しで引当）。"];
             _lines.Clear();
             await LoadAsync();
         }
@@ -234,10 +234,10 @@
     }
 
     private async Task ExecuteAsync(int id) =>
-        await PostAsync($"api/picking-orders/{id}/execute", "ピッキングを実行しました（在庫引落し済み）。");
+        await PostAsync($"api/picking-orders/{id}/execute", L["ピッキングを実行しました（在庫引落し済み）。"]);
 
     private async Task CancelAsync(int id) =>
-        await PostAsync($"api/picking-orders/{id}/cancel", "ピッキング指示を取消しました。");
+        await PostAsync($"api/picking-orders/{id}/cancel", L["ピッキング指示を取消しました。"]);
 
     private async Task PostAsync(string url, string successMessage)
     {
@@ -247,7 +247,7 @@
         try
         {
             var response = await Http.PostAsync(url, null);
-            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["操作に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;

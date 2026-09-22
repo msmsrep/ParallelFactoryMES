@@ -2,33 +2,33 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>出荷判定 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["出荷判定 - Parallel Factory MES"]</PageTitle>
 
-<h1>出荷判定</h1>
-<p class="text-muted">出荷判定一覧・検査結果の確認（H-10-10-01）、判定（可／保留／特採。-02）、判定承認（-03）、判定書発行（-04）。</p>
+<h1>@L["出荷判定"]</h1>
+<p class="text-muted">@L["出荷判定一覧・検査結果の確認（H-10-10-01）、判定（可／保留／特採。-02）、判定承認（-03）、判定書発行（-04）。"]</p>
 
 <Notice Error="@_error" Message="@_message" />
 
 <AuthorizeView Roles="@MesRoleGroups.QaManage">
     <div class="card">
-        <h2 style="margin-top:0;">出荷判定の登録</h2>
+        <h2 style="margin-top:0;">@L["出荷判定の登録"]</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>対象出荷指示</label>
+                <label>@L["対象出荷指示"]</label>
                 <OptionSelect TItem="ShippingOrderResponse" Endpoint="api/shipping-orders/options"
-                              @bind-Value="_shippingOrderId" EmptyLabel="なし"
+                              @bind-Value="_shippingOrderId" EmptyLabel="@L["なし"]"
                               ValueOf="s => s.Id"
-                              LabelOf='@(s => $"{s.ShippingNo}（{s.Destination}）")' />
+                              LabelOf='@(s => L["{0}（{1}）", s.ShippingNo, s.Destination])' />
             </div>
             <div class="form-field">
-                <label>対象ロット</label>
+                <label>@L["対象ロット"]</label>
                 <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
-                              @bind-Value="_lotId" EmptyLabel="なし"
+                              @bind-Value="_lotId" EmptyLabel="@L["なし"]"
                               ValueOf="s => s.LotId"
-                              LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode}）")' />
+                              LabelOf='@(s => L["{0}（{1}）", s.LotNumber, s.ProductCode])' />
             </div>
             <div class="form-field">
-                <label>判定</label>
+                <label>@L["判定"]</label>
                 <select @bind="_result">
                     <option value="@ShipmentJudgmentResult.Approved">@EnumLabels.Of(ShipmentJudgmentResult.Approved)</option>
                     <option value="@ShipmentJudgmentResult.Hold">@EnumLabels.Of(ShipmentJudgmentResult.Hold)</option>
@@ -36,30 +36,30 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>備考</label>
+                <label>@L["備考"]</label>
                 <input @bind="_note" />
             </div>
         </div>
-        <p class="text-muted">出荷実行には、対象出荷指示に対する承認済みの「可」または「特採」判定が必要です。</p>
-        <button class="btn" disabled="@_busy" @onclick="CreateAsync">判定を登録</button>
+        <p class="text-muted">@L["出荷実行には、対象出荷指示に対する承認済みの「可」または「特採」判定が必要です。"]</p>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">@L["判定を登録"]</button>
     </div>
 </AuthorizeView>
 
 <div class="card">
-    <h2 style="margin-top:0;">判定一覧</h2>
+    <h2 style="margin-top:0;">@L["判定一覧"]</h2>
     @if (_judgments is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_judgments.Total == 0)
     {
-        <p class="text-muted">出荷判定はありません。</p>
+        <p class="text-muted">@L["出荷判定はありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>判定書番号</th><th>対象出荷</th><th>対象ロット</th><th>判定</th><th>判定者</th><th>判定日</th><th>承認</th><th></th></tr>
+                <tr><th>@L["判定書番号"]</th><th>@L["対象出荷"]</th><th>@L["対象ロット"]</th><th>@L["判定"]</th><th>@L["判定者"]</th><th>@L["判定日"]</th><th>@L["承認"]</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var judgment in _judgments.Items)
@@ -71,16 +71,16 @@
                         <td><span class="badge @ResultClass(judgment.Result)">@EnumLabels.Of(judgment.Result)</span></td>
                         <td>@judgment.JudgedByName</td>
                         <td>@judgment.JudgedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
-                        <td>@(judgment.ApprovedAt is null ? "未承認" : "承認済")</td>
+                        <td>@(judgment.ApprovedAt is null ? L["未承認"] : L["承認済"])</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.QaManage" Context="qa">
                                 @if (judgment.ApprovedAt is null)
                                 {
                                     <button class="btn btn-sm" disabled="@_busy"
-                                            @onclick="() => ApproveAsync(judgment.Id)">承認</button>
+                                            @onclick="() => ApproveAsync(judgment.Id)">@L["承認"]</button>
                                 }
                             </AuthorizeView>
-                            <a class="btn btn-secondary btn-sm" href="print/shipment-judgment/@judgment.Id" target="_blank">判定書</a>
+                            <a class="btn btn-secondary btn-sm" href="print/shipment-judgment/@judgment.Id" target="_blank">@L["判定書"]</a>
                         </td>
                     </tr>
                 }
@@ -116,7 +116,7 @@
     {
         if (_shippingOrderId == 0 && _lotId == 0)
         {
-            _error = "対象出荷指示またはロットを選択してください。";
+            _error = L["対象出荷指示またはロットを選択してください。"];
             return;
         }
         _busy = true;
@@ -129,12 +129,12 @@
                     _lotId == 0 ? null : _lotId,
                     _shippingOrderId == 0 ? null : _shippingOrderId,
                     _result, _note));
-            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["登録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "出荷判定を登録しました。承認すると出荷実行が可能になります。";
+            _message = L["出荷判定を登録しました。承認すると出荷実行が可能になります。"];
             _note = null;
             await LoadAsync();
         }
@@ -152,12 +152,12 @@
         try
         {
             var response = await Http.PostAsync($"api/shipment-judgments/{id}/approve", null);
-            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["承認に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "判定を承認しました。";
+            _message = L["判定を承認しました。"];
             await LoadAsync();
         }
         finally

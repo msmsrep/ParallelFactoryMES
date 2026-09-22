@@ -3,51 +3,51 @@
 @inject HttpClient Http
 
 @* 出荷判定書（H-10-10-04） *@
-<PageTitle>出荷判定書 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["出荷判定書 - Parallel Factory MES"]</PageTitle>
 
 @if (_judgment is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
-    <PrintButton Label="出荷判定書を印刷 / PDF出力" />
+    <PrintButton Label="@L["出荷判定書を印刷 / PDF出力"]" />
 
     <div class="print-sheet">
-        <h1>出 荷 判 定 書</h1>
+        <h1>@L["出 荷 判 定 書"]</h1>
         <table class="table">
             <tbody>
                 <tr>
-                    <th>判定書番号</th><td>@_judgment.JudgmentNo</td>
-                    <th>判定日</th><td>@_judgment.JudgedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                    <th>@L["判定書番号"]</th><td>@_judgment.JudgmentNo</td>
+                    <th>@L["判定日"]</th><td>@_judgment.JudgedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
                 </tr>
                 <tr>
-                    <th>対象出荷指示</th><td>@(_judgment.ShippingNo ?? "-")</td>
-                    <th>対象ロット</th><td>@(_judgment.LotNumber ?? "-")</td>
+                    <th>@L["対象出荷指示"]</th><td>@(_judgment.ShippingNo ?? "-")</td>
+                    <th>@L["対象ロット"]</th><td>@(_judgment.LotNumber ?? "-")</td>
                 </tr>
                 <tr>
-                    <th>判定</th><td><strong>@EnumLabels.Of(_judgment.Result)</strong></td>
-                    <th>判定者</th><td>@_judgment.JudgedByName</td>
+                    <th>@L["判定"]</th><td><strong>@EnumLabels.Of(_judgment.Result)</strong></td>
+                    <th>@L["判定者"]</th><td>@_judgment.JudgedByName</td>
                 </tr>
                 <tr>
-                    <th>承認</th>
+                    <th>@L["承認"]</th>
                     <td colspan="3">
                         @(_judgment.ApprovedAt is null
-                            ? "未承認"
-                            : $"承認済（{_judgment.ApprovedAt:yyyy-MM-dd}）")
+                            ? L["未承認"]
+                            : L["承認済（{0:yyyy-MM-dd}）", _judgment.ApprovedAt])
                     </td>
                 </tr>
-                <tr><th>備考</th><td colspan="3">@(_judgment.Note ?? "-")</td></tr>
+                <tr><th>@L["備考"]</th><td colspan="3">@(_judgment.Note ?? "-")</td></tr>
             </tbody>
         </table>
 
         @if (_history is not null)
         {
-            <h2>製造・検査履歴（H-10-10-01）</h2>
+            <h2>@L["製造・検査履歴（H-10-10-01）"]</h2>
             <table class="table">
                 <tbody>
                     <tr>
-                        <th style="width:120px;">製造履歴</th>
+                        <th style="width:120px;">@L["製造履歴"]</th>
                         <td>
                             @if (_history.ProductionHistory.Count == 0)
                             {
@@ -63,7 +63,7 @@ else
                         </td>
                     </tr>
                     <tr>
-                        <th>検査履歴</th>
+                        <th>@L["検査履歴"]</th>
                         <td>
                             @if (_history.InspectionHistory.Count == 0)
                             {

@@ -2,82 +2,82 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>検査管理 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["検査管理 - Parallel Factory MES"]</PageTitle>
 
-<h1>検査管理</h1>
-<p class="text-muted">受入／工程内／完成品／サンプル／再検査の進捗一覧・検査指示発行（C-20）。</p>
+<h1>@L["検査管理"]</h1>
+<p class="text-muted">@L["受入／工程内／完成品／サンプル／再検査の進捗一覧・検査指示発行（C-20）。"]</p>
 
 <Notice Error="@_error" Message="@_message" />
 
 <AuthorizeView Roles="@MesRoleGroups.QualityManage">
     <div class="card">
-        <h2 style="margin-top:0;">検査指示の発行（C-20-10-02）</h2>
+        <h2 style="margin-top:0;">@L["検査指示の発行（C-20-10-02）"]</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>検査種別</label>
+                <label>@L["検査種別"]</label>
                 <select @bind="_type">
-                    <option value="@InspectionOrderType.Receiving">受入検査</option>
-                    <option value="@InspectionOrderType.InProcess">工程内検査</option>
-                    <option value="@InspectionOrderType.FinalProduct">完成品検査</option>
-                    <option value="@InspectionOrderType.Sample">サンプル検査</option>
+                    <option value="@InspectionOrderType.Receiving">@L["受入検査"]</option>
+                    <option value="@InspectionOrderType.InProcess">@L["工程内検査"]</option>
+                    <option value="@InspectionOrderType.FinalProduct">@L["完成品検査"]</option>
+                    <option value="@InspectionOrderType.Sample">@L["サンプル検査"]</option>
                     <option value="@InspectionOrderType.Reinspection">@EnumLabels.Of(InspectionOrderType.Reinspection)</option>
                 </select>
             </div>
             @if (_type == InspectionOrderType.InProcess)
             {
                 <div class="form-field">
-                    <label>対象作業指示</label>
+                    <label>@L["対象作業指示"]</label>
                     <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
                                   @bind-Value="_workOrderId"
                                   ValueOf="w => w.Id"
-                                  LabelOf='@(w => $"{w.WorkOrderNo}（{w.ProductCode}）")' />
+                                  LabelOf='@(w => L["{0}（{1}）", w.WorkOrderNo, w.ProductCode])' />
                 </div>
             }
             <div class="form-field">
-                <label>対象ロット（スキャン可）</label>
-                <ScanInput @bind-Value="_lotNumber" ShowSubmit="false" Placeholder="ロットをスキャン" />
+                <label>@L["対象ロット（スキャン可）"]</label>
+                <ScanInput @bind-Value="_lotNumber" ShowSubmit="false" Placeholder="@L["ロットをスキャン"]" />
             </div>
             <div class="form-field">
-                <label>ロット選択</label>
+                <label>@L["ロット選択"]</label>
                 <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
-                              @bind-Value="_lotId" EmptyLabel="（スキャン入力または選択）"
+                              @bind-Value="_lotId" EmptyLabel="@L["（スキャン入力または選択）"]"
                               ValueOf="s => s.LotId"
-                              LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode}）")' />
+                              LabelOf='@(s => L["{0}（{1}）", s.LotNumber, s.ProductCode])' />
             </div>
             <div class="form-field">
-                <label>備考</label>
+                <label>@L["備考"]</label>
                 <input @bind="_note" />
             </div>
         </div>
-        <p class="text-muted">検査項目は種別・対象品目/工程に合致する検査基準から自動選択されます（C-10-10）。</p>
-        <button class="btn" disabled="@_busy" @onclick="CreateAsync">検査指示を発行</button>
+        <p class="text-muted">@L["検査項目は種別・対象品目/工程に合致する検査基準から自動選択されます（C-10-10）。"]</p>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">@L["検査指示を発行"]</button>
     </div>
 </AuthorizeView>
 
 <div class="card">
-    <h2 style="margin-top:0;">検査進捗一覧（C-20-10-01）</h2>
+    <h2 style="margin-top:0;">@L["検査進捗一覧（C-20-10-01）"]</h2>
     <select @bind="_statusFilter" @bind:after="LoadAsync" style="margin-bottom:8px;">
-        <option value="">全状態</option>
-        <option value="Instructed">指示</option>
-        <option value="InProgress">実施中</option>
-        <option value="Judged">判定済</option>
-        <option value="Approved">承認済</option>
-        <option value="Canceled">取消</option>
+        <option value="">@L["全状態"]</option>
+        <option value="Instructed">@L["指示"]</option>
+        <option value="InProgress">@L["実施中"]</option>
+        <option value="Judged">@L["判定済"]</option>
+        <option value="Approved">@L["承認済"]</option>
+        <option value="Canceled">@EnumLabels.Of(InspectionOrderStatus.Canceled)</option>
     </select>
 
     @if (_orders is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_orders.Total == 0)
     {
-        <p class="text-muted">検査指示はありません。</p>
+        <p class="text-muted">@L["検査指示はありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>検査指示番号</th><th>種別</th><th>対象</th><th>状態</th><th>判定</th><th>発行日</th><th></th></tr>
+                <tr><th>@L["検査指示番号"]</th><th>@L["種別"]</th><th>@L["対象"]</th><th>@L["状態"]</th><th>@L["判定"]</th><th>@L["発行日"]</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var order in _orders.Items)
@@ -100,7 +100,7 @@
                             }
                         </td>
                         <td>@order.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
-                        <td><a class="btn btn-secondary btn-sm" href="inspections/@order.Id">詳細・実績入力</a></td>
+                        <td><a class="btn btn-secondary btn-sm" href="inspections/@order.Id">@L["詳細・実績入力"]</a></td>
                     </tr>
                 }
             </tbody>
@@ -163,7 +163,7 @@
                 lotId = await ResolveLotIdAsync(_lotNumber.Trim());
                 if (lotId == 0)
                 {
-                    _error = $"ロット '{_lotNumber}' が見つかりません。";
+                    _error = L["ロット '{0}' が見つかりません。", _lotNumber];
                     return;
                 }
             }
@@ -173,13 +173,13 @@
                     lotId == 0 ? null : lotId,
                     _workOrderId == 0 ? null : _workOrderId,
                     null, _note));
-            if (await response.ReadErrorAsync("発行に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["発行に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
             var created = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
-            _message = $"検査指示 {created?.OrderNo} を発行しました（対象ロットは検査待ちになります）。";
+            _message = L["検査指示 {0} を発行しました（対象ロットは検査待ちになります）。", created?.OrderNo ?? ""];
             _lotNumber = null;
             _note = null;
             await LoadAsync();
