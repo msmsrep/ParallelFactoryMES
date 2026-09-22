@@ -1,7 +1,12 @@
+using System.Collections;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Resources;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using MesApp.Api.Localization;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Auth;
@@ -68,6 +73,25 @@ public class AuthTests
         var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
         Assert.Equal(expected, problem?.Title);
     }
+
+    [Fact]
+    public void APIの英訳は原文と同じ埋め込み位置を持つ()
+    {
+        // 訳で {0} を落としたり {2} を足したりすると、その文言を返すAPIで FormatException になる
+        var resources = new ResourceManager(typeof(ApiText))
+            .GetResourceSet(new CultureInfo("en"), createIfNotExists: true, tryParents: false);
+        Assert.NotNull(resources);
+
+        var mismatched = resources.Cast<DictionaryEntry>()
+            .Where(e => !Placeholders((string)e.Key).SetEquals(Placeholders((string)e.Value!)))
+            .Select(e => (string)e.Key)
+            .ToList();
+
+        Assert.Empty(mismatched);
+    }
+
+    private static HashSet<string> Placeholders(string text) =>
+        [.. Regex.Matches(text, @"\{(\d+)(?:[:,][^}]*)?\}").Select(m => m.Groups[1].Value)];
 
     [Fact]
     public async Task 存在しないAPIの文言も英語で返る()

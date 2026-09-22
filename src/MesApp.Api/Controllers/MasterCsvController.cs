@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Api.Services;
 using MesApp.Core.Contracts.Masters;
 using Microsoft.AspNetCore.Authorization;
@@ -16,7 +17,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
 {
     /// <summary>CSV入出力に対応するマスタ種別と列定義</summary>
     [HttpGet("kinds")]
-    public ActionResult<List<CsvKindInfo>> Kinds() => MasterCsvKinds.All;
+    public ActionResult<List<CsvKindInfo>> Kinds() => MasterCsvKinds.All.Select(CsvImport.Localize).ToList();
 
     /// <summary>登録済みマスタのCSV出力</summary>
     [HttpGet("{kind}")]
@@ -26,7 +27,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var info = MasterCsvKinds.Find(kind);
         if (info is null)
         {
-            return this.NotFoundProblem($"CSV出力に対応していないマスタです：{kind}");
+            return this.NotFoundProblem(ApiText.T("CSV出力に対応していないマスタです：{0}", kind));
         }
         if (info.UserAdminOnly && !MesRoleGroups.IsInGroup(User, MesRoleGroups.UserAdmin))
         {
@@ -44,7 +45,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var info = MasterCsvKinds.Find(kind);
         if (info is null)
         {
-            return this.NotFoundProblem($"CSV出力に対応していないマスタです：{kind}");
+            return this.NotFoundProblem(ApiText.T("CSV出力に対応していないマスタです：{0}", kind));
         }
         return CsvFileResult(MasterCsvService.Template(info), $"{info.Kind}_template.csv");
     }
@@ -61,7 +62,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var info = MasterCsvKinds.Find(kind);
         if (info is null)
         {
-            return this.NotFoundProblem($"CSV取込に対応していないマスタです：{kind}");
+            return this.NotFoundProblem(ApiText.T("CSV取込に対応していないマスタです：{0}", kind));
         }
         if (!CanWrite(info))
         {
@@ -71,7 +72,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var csv = await CsvImport.ReadUploadAsync(Request, ct);
         if (csv is null)
         {
-            return this.BadRequestProblem("CSVファイルが選択されていないか、内容が空です。");
+            return this.BadRequestProblem(ApiText.T("CSVファイルが選択されていないか、内容が空です。"));
         }
         return await service.ImportAsync(info, csv, dryRun, ct);
     }
@@ -93,7 +94,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         var bytes = await CsvImport.ReadUploadBytesAsync(Request, ct);
         if (bytes is null)
         {
-            return this.BadRequestProblem("ZIPファイルが選択されていないか、内容が空です。");
+            return this.BadRequestProblem(ApiText.T("ZIPファイルが選択されていないか、内容が空です。"));
         }
         if (CsvBundle.ReadZip(bytes, out var zipError) is not { } entries)
         {
@@ -106,9 +107,10 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
             var actual = unknown.Where(e => ActualCsvKinds.Find(e.Kind) is not null).ToList();
             return this.BadRequestProblem(
                 actual.Count > 0
-                    ? $"実績のCSVが含まれています：{string.Join("、", actual.Select(e => e.FileName))}。実績は実績CSV取込で別のZIPとして取り込んでください。"
-                    : $"取込に対応していないマスタのCSVが含まれています：{string.Join("、", unknown.Select(e => e.FileName))}" +
-                      "（ファイル名は「番号_種別.csv」。例 01_work-centers.csv）。");
+                    ? ApiText.T("実績のCSVが含まれています：{0}。実績は実績CSV取込で別のZIPとして取り込んでください。",
+                        string.Join(ApiText.T("、"), actual.Select(e => e.FileName)))
+                    : ApiText.T("取込に対応していないマスタのCSVが含まれています：{0}（ファイル名は「番号_種別.csv」。例 01_work-centers.csv）。",
+                        string.Join(ApiText.T("、"), unknown.Select(e => e.FileName))));
         }
         var files = entries
             .Select(e => new CsvBundleFile<CsvKindInfo>(e.FileName, MasterCsvKinds.Find(e.Kind)!, e.Text))

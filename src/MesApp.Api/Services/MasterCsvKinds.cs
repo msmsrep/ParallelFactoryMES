@@ -5,7 +5,8 @@ namespace MesApp.Api.Services;
 
 /// <summary>
 /// CSV入出力に対応するマスタ種別の定義（列名・必須列・権限）。
-/// 列名は英語固定で、画面・ドキュメントでは Label（日本語）を案内する。
+/// 列名は英語固定で、画面・ドキュメントでは Label を案内する。Label・Note は日本語の原文で持ち、
+/// 画面へ返すときに <see cref="CsvImport.Localize"/> で表示言語へ訳す（Spec.md 7.9）。
 /// </summary>
 public static class MasterCsvKinds
 {

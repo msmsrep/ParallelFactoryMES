@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using System.Globalization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
@@ -104,7 +105,7 @@ public sealed class ActualCsvService(
             var note = reader.Text("Note", null, 500);
             if (quantity is null && !reader.Failed)
             {
-                reader.Fail("Quantity（受入数量）は必須です。");
+                reader.Fail(ApiText.T("Quantity（受入数量）は必須です。"));
             }
             if (reader.Failed)
             {
@@ -152,15 +153,15 @@ public sealed class ActualCsvService(
             var outputLotNumber = reader.Text("OutputLotNumber", null, 60);
             if (quantity is null && !reader.Failed)
             {
-                reader.Fail("Quantity（指図数量）は必須です。");
+                reader.Fail(ApiText.T("Quantity（指図数量）は必須です。"));
             }
             if (expand && !approve)
             {
-                reader.Fail("工程展開は承認済みの指図だけに行えます。Expand を true にするときは Approve も true にしてください。");
+                reader.Fail(ApiText.T("工程展開は承認済みの指図だけに行えます。Expand を true にするときは Approve も true にしてください。"));
             }
             if (outputLotNumber is not null && !expand)
             {
-                reader.Fail("OutputLotNumber（産出ロット番号）は工程展開するとき（Expand=true）だけ指定できます。");
+                reader.Fail(ApiText.T("OutputLotNumber（産出ロット番号）は工程展開するとき（Expand=true）だけ指定できます。"));
             }
 
             int? sourceOrderId = null;
@@ -171,7 +172,7 @@ public sealed class ActualCsvService(
                     .Select(o => (int?)o.Id).FirstOrDefaultAsync(ct);
                 if (sourceOrderId is null)
                 {
-                    reader.Fail($"元指図 '{sourceOrderNo}' は登録されていません（SourceOrderNo）。");
+                    reader.Fail(ApiText.T("元指図 '{0}' は登録されていません（SourceOrderNo）。", sourceOrderNo));
                 }
             }
             if (reader.Failed)
@@ -262,7 +263,7 @@ public sealed class ActualCsvService(
             }
             if (!checklists.TryGetValue(code, out var checklist))
             {
-                head.Fail($"チェックリスト '{code}' は登録されていません（ChecklistCode）。");
+                head.Fail(ApiText.T("チェックリスト '{0}' は登録されていません（ChecklistCode）。", code));
                 continue;
             }
 
@@ -276,16 +277,16 @@ public sealed class ActualCsvService(
                 var note = reader.Text("Note", null, 500);
                 if (itemSequence is null && !reader.Failed)
                 {
-                    reader.Fail("ItemSequence（項目の表示順）は必須です。");
+                    reader.Fail(ApiText.T("ItemSequence（項目の表示順）は必須です。"));
                 }
                 var item = checklist.Items.FirstOrDefault(i => i.Sequence == itemSequence);
                 if (itemSequence is not null && item is null)
                 {
-                    reader.Fail($"チェックリスト '{code}' に表示順 {itemSequence} の項目はありません。");
+                    reader.Fail(ApiText.T("チェックリスト '{0}' に表示順 {1} の項目はありません。", code, itemSequence));
                 }
                 else if (item is not null && results.Any(r => r.ChecklistItemId == item.Id))
                 {
-                    reader.Fail($"チェックリスト '{code}' の表示順 {itemSequence} が重複しています。");
+                    reader.Fail(ApiText.T("チェックリスト '{0}' の表示順 {1} が重複しています。", code, itemSequence));
                 }
                 if (reader.Failed)
                 {
@@ -331,7 +332,7 @@ public sealed class ActualCsvService(
             var substituteReason = reader.Text("SubstituteReason", null, 500);
             if (quantity is null && !reader.Failed)
             {
-                reader.Fail("Quantity（投入数量）は必須です。");
+                reader.Fail(ApiText.T("Quantity（投入数量）は必須です。"));
             }
             // 前のファイル（受入・工程展開）や前の行で作られたロットも指せるよう、行ごとにDBを引く
             int? lotId = null;
@@ -341,7 +342,7 @@ public sealed class ActualCsvService(
                     .Select(l => (int?)l.Id).FirstOrDefaultAsync(ct);
                 if (lotId is null)
                 {
-                    reader.Fail($"ロット '{lotNumber}' は登録されていません（LotNumber）。");
+                    reader.Fail(ApiText.T("ロット '{0}' は登録されていません（LotNumber）。", lotNumber));
                 }
             }
             if (reader.Failed)
@@ -432,12 +433,12 @@ public sealed class ActualCsvService(
                     .FirstOrDefaultAsync(i => i.WorkOrderId == workOrderId && i.ItemCode == controlItemCode, ct);
                 if (instruction is null)
                 {
-                    reader.Fail($"工程管理項目 '{controlItemCode}' はこの作業指示に展開されていません（ControlItemCode）。");
+                    reader.Fail(ApiText.T("工程管理項目 '{0}' はこの作業指示に展開されていません（ControlItemCode）。", controlItemCode));
                     continue;
                 }
                 if (numericValue is null)
                 {
-                    reader.Fail("ControlItemCode を指定した行には NumericValue（数値）が必要です。");
+                    reader.Fail(ApiText.T("ControlItemCode を指定した行には NumericValue（数値）が必要です。"));
                     continue;
                 }
                 instructionId = instruction.Id;
@@ -446,7 +447,7 @@ public sealed class ActualCsvService(
             }
             if (item is null || value is null)
             {
-                reader.Fail("ControlItemCode を省略した行には Item（項目）と Value（値）が必要です。");
+                reader.Fail(ApiText.T("ControlItemCode を省略した行には Item（項目）と Value（値）が必要です。"));
                 continue;
             }
 
@@ -491,14 +492,14 @@ public sealed class ActualCsvService(
             var note = head.Text("Note", null, 1000);
             if (type == InspectionOrderType.InProcess && workOrderId is null && !head.Failed)
             {
-                head.Fail("工程内検査には OrderNo（指図番号）と Sequence（工程順序）が必要です。");
+                head.Fail(ApiText.T("工程内検査には OrderNo（指図番号）と Sequence（工程順序）が必要です。"));
             }
             int? lotId = null;
             if (type != InspectionOrderType.InProcess)
             {
                 if (lotNumber is null)
                 {
-                    head.Fail("工程内検査以外は LotNumber（対象ロット番号）が必要です。");
+                    head.Fail(ApiText.T("工程内検査以外は LotNumber（対象ロット番号）が必要です。"));
                 }
                 else
                 {
@@ -507,7 +508,7 @@ public sealed class ActualCsvService(
                         .Select(l => (int?)l.Id).FirstOrDefaultAsync(ct);
                     if (lotId is null)
                     {
-                        head.Fail($"ロット '{lotNumber}' は登録されていません（LotNumber）。");
+                        head.Fail(ApiText.T("ロット '{0}' は登録されていません（LotNumber）。", lotNumber));
                     }
                 }
             }
@@ -698,7 +699,7 @@ public sealed class ActualCsvService(
         var sequence = reader.IntOrNull("Sequence", null, 1);
         if (sequence is null && !reader.Failed)
         {
-            reader.Fail("Sequence（工程順序）は必須です。");
+            reader.Fail(ApiText.T("Sequence（工程順序）は必須です。"));
         }
         if (reader.Failed)
         {
@@ -708,7 +709,7 @@ public sealed class ActualCsvService(
         {
             return id;
         }
-        reader.Fail($"指図 '{orderNo}' の工程順序 {sequence} の作業指示はありません（展開済みか、工程順序を確認してください）。");
+        reader.Fail(ApiText.T("指図 '{0}' の工程順序 {1} の作業指示はありません（展開済みか、工程順序を確認してください）。", orderNo, sequence));
         return null;
     }
 
@@ -734,12 +735,12 @@ public sealed class ActualCsvService(
                 || !decimal.TryParse(pair[1], NumberStyles.Number, CultureInfo.InvariantCulture, out var quantity)
                 || quantity < 0)
             {
-                reader.Fail($"Defects は 不良理由コード=数量 をセミコロンで区切って指定してください（'{part}'）。");
+                reader.Fail(ApiText.T("Defects は 不良理由コード=数量 をセミコロンで区切って指定してください（'{0}'）。", part));
                 continue;
             }
             if (!reasonIds.TryGetValue(pair[0], out var reasonId))
             {
-                reader.Fail($"不良理由 '{pair[0]}' は登録されていません（Defects）。");
+                reader.Fail(ApiText.T("不良理由 '{0}' は登録されていません（Defects）。", pair[0]));
                 continue;
             }
             result.Add(new ProductionDefectRequest(reasonId, quantity));

@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Contracts.Masters;
@@ -19,7 +20,7 @@ public class ActualCsvController(ActualCsvService service) : ControllerBase
     /// <summary>CSV取込に対応する実績種別と列定義</summary>
     [HttpGet("kinds")]
     public ActionResult<List<CsvKindInfo>> Kinds() =>
-        ActualCsvKinds.All.Select(k => k.Info with { WriteRoles = k.WriteRoles }).ToList();
+        ActualCsvKinds.All.Select(k => CsvImport.Localize(k.Info) with { WriteRoles = k.WriteRoles }).ToList();
 
     /// <summary>ヘッダーのみのテンプレートCSV</summary>
     [HttpGet("{kind}/template")]
@@ -28,7 +29,7 @@ public class ActualCsvController(ActualCsvService service) : ControllerBase
         var info = ActualCsvKinds.Find(kind);
         if (info is null)
         {
-            return this.NotFoundProblem($"CSV取込に対応していない実績です：{kind}");
+            return this.NotFoundProblem(ApiText.T("CSV取込に対応していない実績です：{0}", kind));
         }
         var csv = CsvFile.Format(info.Info.Columns.Select(c => c.Name), []);
         return File(CsvFile.ToUtf8Bom(csv), "text/csv; charset=utf-8", $"{info.Info.Kind}_template.csv");
@@ -46,7 +47,7 @@ public class ActualCsvController(ActualCsvService service) : ControllerBase
         var info = ActualCsvKinds.Find(kind);
         if (info is null)
         {
-            return this.NotFoundProblem($"CSV取込に対応していない実績です：{kind}");
+            return this.NotFoundProblem(ApiText.T("CSV取込に対応していない実績です：{0}", kind));
         }
         if (!MesRoleGroups.IsInGroup(User, info.WriteRoles))
         {
@@ -56,7 +57,7 @@ public class ActualCsvController(ActualCsvService service) : ControllerBase
         var csv = await CsvImport.ReadUploadAsync(Request, ct);
         if (csv is null)
         {
-            return this.BadRequestProblem("CSVファイルが選択されていないか、内容が空です。");
+            return this.BadRequestProblem(ApiText.T("CSVファイルが選択されていないか、内容が空です。"));
         }
         return await service.ImportAsync(info, csv, dryRun, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
     }
@@ -77,7 +78,7 @@ public class ActualCsvController(ActualCsvService service) : ControllerBase
         var bytes = await CsvImport.ReadUploadBytesAsync(Request, ct);
         if (bytes is null)
         {
-            return this.BadRequestProblem("ZIPファイルが選択されていないか、内容が空です。");
+            return this.BadRequestProblem(ApiText.T("ZIPファイルが選択されていないか、内容が空です。"));
         }
         if (CsvBundle.ReadZip(bytes, out var zipError) is not { } entries)
         {
@@ -90,9 +91,10 @@ public class ActualCsvController(ActualCsvService service) : ControllerBase
             var masters = unknown.Where(e => MasterCsvKinds.Find(e.Kind) is not null).ToList();
             return this.BadRequestProblem(
                 masters.Count > 0
-                    ? $"マスタのCSVが含まれています：{string.Join("、", masters.Select(e => e.FileName))}。マスタはマスタ管理で別のZIPとして取り込んでください。"
-                    : $"取込に対応していない実績のCSVが含まれています：{string.Join("、", unknown.Select(e => e.FileName))}" +
-                      "（ファイル名は「番号_種別.csv」。例 01_receiving.csv）。");
+                    ? ApiText.T("マスタのCSVが含まれています：{0}。マスタはマスタ管理で別のZIPとして取り込んでください。",
+                        string.Join(ApiText.T("、"), masters.Select(e => e.FileName)))
+                    : ApiText.T("取込に対応していない実績のCSVが含まれています：{0}（ファイル名は「番号_種別.csv」。例 01_receiving.csv）。",
+                        string.Join(ApiText.T("、"), unknown.Select(e => e.FileName))));
         }
         var files = entries
             .Select(e => new CsvBundleFile<ActualCsvKind>(e.FileName, ActualCsvKinds.Find(e.Kind)!, e.Text))

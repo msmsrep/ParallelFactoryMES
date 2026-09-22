@@ -1,4 +1,5 @@
 ﻿using System.IO.Compression;
+using MesApp.Api.Localization;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -65,12 +66,12 @@ public static class CsvBundle
                 }
                 if (entries.Count >= MaxEntries)
                 {
-                    error = $"ZIPに入れられるCSVは{MaxEntries}ファイルまでです。";
+                    error = ApiText.T("ZIPに入れられるCSVは{0}ファイルまでです。", MaxEntries);
                     return null;
                 }
                 if (entries.Any(e => string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase)))
                 {
-                    error = $"同じ名前のCSV '{fileName}' が複数あります（フォルダが違っても順番を決められないため、名前を変えてください）。";
+                    error = ApiText.T("同じ名前のCSV '{0}' が複数あります（フォルダが違っても順番を決められないため、名前を変えてください）。", fileName);
                     return null;
                 }
 
@@ -83,12 +84,12 @@ public static class CsvBundle
                     total += read;
                     if (buffer.Length + read > CsvImport.MaxUploadBytes)
                     {
-                        error = $"'{fileName}' が大きすぎます（1ファイル {CsvImport.MaxUploadBytes / 1024 / 1024} MB まで）。";
+                        error = ApiText.T("'{0}' が大きすぎます（1ファイル {1} MB まで）。", fileName, CsvImport.MaxUploadBytes / 1024 / 1024);
                         return null;
                     }
                     if (total > MaxTotalUncompressedBytes)
                     {
-                        error = $"ZIPを展開した合計が大きすぎます（{MaxTotalUncompressedBytes / 1024 / 1024} MB まで）。";
+                        error = ApiText.T("ZIPを展開した合計が大きすぎます（{0} MB まで）。", MaxTotalUncompressedBytes / 1024 / 1024);
                         return null;
                     }
                     buffer.Write(chunk, 0, read);
@@ -98,13 +99,13 @@ public static class CsvBundle
         }
         catch (InvalidDataException)
         {
-            error = "ZIPファイルとして読み込めませんでした。";
+            error = ApiText.T("ZIPファイルとして読み込めませんでした。");
             return null;
         }
 
         if (entries.Count == 0)
         {
-            error = "ZIPにCSVファイルが入っていません。";
+            error = ApiText.T("ZIPにCSVファイルが入っていません。");
             return null;
         }
         return [.. entries.OrderBy(e => e.FileName, StringComparer.Ordinal)];
@@ -148,7 +149,7 @@ public static class CsvBundle
                 }
                 catch (DbUpdateException ex)
                 {
-                    errors.Add(new CsvImportError(0, $"DBへの反映に失敗しました：{ex.InnerException?.Message ?? ex.Message}"));
+                    errors.Add(new CsvImportError(0, ApiText.T("DBへの反映に失敗しました：{0}", ex.InnerException?.Message ?? ex.Message)));
                 }
             }
             results.Add(new CsvBundleFileResult(file.FileName,

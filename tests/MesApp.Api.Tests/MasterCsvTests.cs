@@ -136,6 +136,35 @@ public class MasterCsvTests
     }
 
     [Fact]
+    public async Task 英語では列の案内と取込エラーが英語で返り列キーは変わらない()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en");
+
+        var kinds = await client.GetFromJsonAsync<List<CsvKindInfo>>("/api/masters/csv/kinds");
+        var products = kinds!.Single(k => k.Kind == "products");
+        Assert.Equal("Items", products.Label);
+        var code = products.Columns.Single(c => c.Name == "Code");
+        Assert.Equal(("Item code", "Updated if it matches an existing code, otherwise created"), (code.Label, code.Note));
+        var actuals = await client.GetFromJsonAsync<List<CsvKindInfo>>("/api/actuals/csv/kinds");
+        Assert.Equal("Receiving", actuals!.Single(k => k.Kind == "receiving").Label);
+
+        var result = await ImportAsync(client, "products", """
+            Code,Name,Unit,Type,StandardDefectRate
+            P-001,,個,Product,0
+            P-002,範囲外,個,Product,200
+            P-003,正しい行,個,Product,0
+            P-003,コード重複,個,Product,0
+            """);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, e => e.Line == 2 && e.Message == "Name is required.");
+        Assert.Contains(result.Errors, e => e.Line == 3 && e.Message == "StandardDefectRate must be 100 or less ('200').");
+        Assert.Contains(result.Errors, e => e.Line == 5 && e.Message == "Item code 'P-003' appears on multiple rows.");
+    }
+
+    [Fact]
     public async Task ShiftJISのCSVと日本語ラベルを取り込める()
     {
         using var factory = new ApiFactory();
