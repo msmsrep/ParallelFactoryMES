@@ -7,13 +7,13 @@
                 <NotAuthorized Context="authState">
                     @if (authState.User.Identity?.IsAuthenticated == true)
                     {
-                        <PageTitle>権限がありません - Parallel Factory MES</PageTitle>
-                        <h1>権限がありません</h1>
+                        <PageTitle>@L["権限がありません - Parallel Factory MES"]</PageTitle>
+                        <h1>@L["権限がありません"]</h1>
                         <p class="text-muted">
-                            この画面は、いまのユーザーに割り当てられたロールでは開けません。
-                            必要な権限はシステム管理者に確認してください。
+                            @L["この画面は、いまのユーザーに割り当てられたロールでは開けません。"]
+                            @L["必要な権限はシステム管理者に確認してください。"]
                         </p>
-                        <a class="btn btn-secondary" href="">ダッシュボードへ戻る</a>
+                        <a class="btn btn-secondary" href="">@L["ダッシュボードへ戻る"]</a>
                     }
                     else
                     {
@@ -24,9 +24,9 @@
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
         </Found>
         <NotFound>
-            <PageTitle>ページが見つかりません</PageTitle>
+            <PageTitle>@L["ページが見つかりません"]</PageTitle>
             <LayoutView Layout="@typeof(MainLayout)">
-                <p>ページが見つかりません。</p>
+                <p>@L["ページが見つかりません。"]</p>
             </LayoutView>
         </NotFound>
     </Router>

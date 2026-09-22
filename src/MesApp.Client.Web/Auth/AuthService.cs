@@ -20,11 +20,12 @@ public class AuthService(HttpClient bareClient, TokenStore tokenStore, ApiAuthen
         }
     }
 
-    /// <summary>ログイン。失敗時はエラーメッセージを返す（成功時はnull）</summary>
-    public async Task<string?> LoginAsync(string userName, string password)
+    /// <summary>ログイン。失敗時はエラーメッセージを返す（成功時はnull）。
+    /// <paramref name="fallbackError"/> は API が理由を返さなかったときの文言（表示言語に訳して呼び出し側が渡す。Spec.md 7.9）</summary>
+    public async Task<string?> LoginAsync(string userName, string password, string fallbackError)
     {
         var response = await bareClient.PostAsJsonAsync("api/auth/login", new LoginRequest(userName, password));
-        if (await response.ReadErrorAsync("ログインに失敗しました。") is { } error)
+        if (await response.ReadErrorAsync(fallbackError) is { } error)
         {
             return error;
         }
@@ -82,8 +83,9 @@ public class AuthService(HttpClient bareClient, TokenStore tokenStore, ApiAuthen
         }
     }
 
-    /// <summary>パスワード変更（変更後は再ログインが必要：サーバー側で全リフレッシュトークンが失効する）</summary>
-    public async Task<string?> ChangePasswordAsync(string currentPassword, string newPassword)
+    /// <summary>パスワード変更（変更後は再ログインが必要：サーバー側で全リフレッシュトークンが失効する）。
+    /// <paramref name="fallbackError"/> は <see cref="LoginAsync"/> と同じ</summary>
+    public async Task<string?> ChangePasswordAsync(string currentPassword, string newPassword, string fallbackError)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "api/auth/change-password")
         {
@@ -92,7 +94,7 @@ public class AuthService(HttpClient bareClient, TokenStore tokenStore, ApiAuthen
         request.Headers.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenStore.AccessToken);
         var response = await bareClient.SendAsync(request);
-        if (await response.ReadErrorAsync("パスワード変更に失敗しました。") is { } error)
+        if (await response.ReadErrorAsync(fallbackError) is { } error)
         {
             return error;
         }

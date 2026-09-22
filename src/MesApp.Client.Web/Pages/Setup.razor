@@ -3,12 +3,12 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
-<PageTitle>初期セットアップ - Parallel Factory MES</PageTitle>
+<PageTitle>@L["初期セットアップ - Parallel Factory MES"]</PageTitle>
 
 <div class="login-page">
     <div class="login-box">
-        <h1>初期セットアップ</h1>
-        <p class="text-muted">初期管理者アカウントを作成します（初回起動時のみ有効。Spec 2.2 E）。</p>
+        <h1>@L["初期セットアップ"]</h1>
+        <p class="text-muted">@L["初期管理者アカウントを作成します（初回起動時のみ有効。Spec 2.2 E）。"]</p>
 
         @if (_error is not null)
         {
@@ -16,18 +16,18 @@
         }
 
         <div class="form-field">
-            <label>ユーザー名</label>
+            <label>@L["ユーザー名"]</label>
             <input @bind="_userName" />
         </div>
         <div class="form-field">
-            <label>氏名（表示名）</label>
+            <label>@L["氏名（表示名）"]</label>
             <input @bind="_displayName" />
         </div>
         <div class="form-field">
-            <label>パスワード</label>
+            <label>@L["パスワード"]</label>
             <input type="password" @bind="_password" autocomplete="new-password" />
         </div>
-        <button class="btn" disabled="@_busy" @onclick="SubmitAsync">作成してログイン画面へ</button>
+        <button class="btn" disabled="@_busy" @onclick="SubmitAsync">@L["作成してログイン画面へ"]</button>
     </div>
 </div>
 
@@ -55,7 +55,7 @@
                 Navigation.NavigateTo("login");
                 return;
             }
-            _error = await response.ReadErrorAsync("セットアップに失敗しました。パスワード要件（8文字以上・英小文字・数字）を確認してください。");
+            _error = await response.ReadErrorAsync(L["セットアップに失敗しました。パスワード要件（8文字以上・英小文字・数字）を確認してください。"]);
         }
         finally
         {

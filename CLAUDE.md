@@ -32,6 +32,11 @@ $env:MESAPP_TEST_PROVIDER=$null; $env:MESAPP_TEST_CONNECTION=$null
 dotnet test tests/MesApp.Api.Tests --filter FullyQualifiedName~MasterCsvTests -v n
 ```
 
+多言語対応の取りこぼし（画面・APIの文言を足したり書き換えたりしたとき。`en.resx` に訳の無いキーと、`L[...]` を通っていない画面の日本語を一覧にする。あれば終了コード 1）:
+```powershell
+./scripts/I18nCheck.ps1
+```
+
 マイグレーション（EF ツールは `dotnet-tools.json` で固定）。**スキーマを変えたら3プロバイダーすべてで同じ名前で追加する**ので、手で3回打たずスクリプトを使う（最後に `DatabaseProviderTests` で同期を確認する。DBには接続しない）。**マイグレーションに生SQLを書かない**（3方言になる。データの手当ては C# の起動時処理かサービス側で行う）:
 ```powershell
 ./scripts/Migrations.ps1 -Add <Name>      # 3プロバイダーに追加して検査（/add-migration でも可）
@@ -85,6 +90,7 @@ DB は既定 SQLite（`mesapp.db`）、`Database:Provider` で PostgreSQL / SQL 
 ## クライアント側の規約
 
 - `@inject HttpClient Http`。認証ヘッダは `Auth/AuthMessageHandler` が付与する
+- **画面の文言は `L["原文"]` で包む**（Spec.md 7.9。`L` は `_Imports.razor` で注入済み）。英訳は `Shared/UiText.en.resx` に原文をキーにして足す。値は補間せず `L["{0} 件", n]`、区分値は `EnumLabels.Of(x)`。三項演算子で `null` と並べるときは `.Value` を付ける。文を太字やタグで区切らない（語順が変わると訳せない。1文にまとめる）。共通部品に渡す文言は呼び出し側で訳す。**保存される値（単位の既定値「個」など）や言語名は訳さず、その行に「訳さない」と書く**（`scripts/I18nCheck.ps1` が飛ばす）
 - 冒頭に根拠コメント：`@* ロケーションマスタ（Spec.md 5.1 Location。D-50-20-01） *@`
 - API の失敗応答は `Shared/ApiErrors.ReadErrorAsync` で読む（`IsSuccessStatusCode` と ProblemDetails の読み取りを各画面に書かない）：`if (await response.ReadErrorAsync("登録に失敗しました。") is { } error) { _error = error; return; }`
 - メッセージ表示は `<Notice Error="@_error" Message="@_message" />`、権限制御は `<AuthorizeView Roles="@MesRoleGroups.Xxx">`（APIと同じ定数を使う。書き込みの操作要素だけを隠し、画面自体は開けたままにする）

@@ -3,38 +3,39 @@
 @inject HttpClient Http
 
 @* 実績のCSV一括取込（Spec.md 3.8 実績のCSV一括取込。受入 D-10-10-02 ほか） *@
-<PageTitle>実績CSV取込 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["実績CSV取込 - Parallel Factory MES"]</PageTitle>
 
-<h1>実績CSV取込</h1>
+<h1>@L["実績CSV取込"]</h1>
 <p class="text-muted">
-    試験・移行・教育用に、実績をCSVでまとめて登録します。1件ずつ画面から登録したときと同じチェックを通り、
-    在庫・ロットの状態・監査ログも同じように記録されます。記録者は取り込んだユーザーです。
+    @L["試験・移行・教育用に、実績をCSVでまとめて登録します。"]
+    @L["1件ずつ画面から登録したときと同じチェックを通り、在庫・ロットの状態・監査ログも同じように記録されます。"]
+    @L["記録者は取り込んだユーザーです。"]
 </p>
 
 <Notice Error="@_error" />
 
 <div class="card">
-    <h2 style="margin-top:0;">取り込む順番</h2>
+    <h2 style="margin-top:0;">@L["取り込む順番"]</h2>
     <p class="text-muted">
-        後の実績が前の実績を参照するため、<strong>上から順に</strong>取り込んでください。
-        作業指示は「指図番号＋工程順序」で、投入・検査するロットはロット番号で指します。
-        製造指図の指図番号と、後で投入するロットのロット番号は、CSVで指定しておいてください（自動採番の番号は取り込むまで分かりません）。
+        @L["後の実績が前の実績を参照するため、上から順に取り込んでください。"]
+        @L["作業指示は「指図番号＋工程順序」で、投入・検査するロットはロット番号で指します。"]
+        @L["製造指図の指図番号と、後で投入するロットのロット番号は、CSVで指定しておいてください（自動採番の番号は取り込むまで分かりません）。"]
     </p>
     <p class="text-muted">
-        <strong>1行でもエラーがあると、そのファイル（ZIPの一括取込ではZIPの全ファイル）が取り消されます。</strong>
-        最初は「検証のみ」で確認してから取り込むと安全です。
-        書き方の見本は、リポジトリの <code>samples/actual-csv</code> にあります（<code>samples/master-csv</code> のマスタを取り込んだ後に使えます）。
+        <strong>@L["1行でもエラーがあると、そのファイル（ZIPの一括取込ではZIPの全ファイル）が取り消されます。"]</strong>
+        @L["最初は「検証のみ」で確認してから取り込むと安全です。"]
+        @L["書き方の見本は、リポジトリの {0} にあります（{1} のマスタを取り込んだ後に使えます）。", "samples/actual-csv", "samples/master-csv"]
     </p>
 </div>
 
 @if (_kinds is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
     @* 取込欄はどれか1種別でも取り込めるロールに出す。ZIP内の全種別の可否はAPIが判定する *@
-    <CsvBundlePanel BaseUrl="api/actuals/csv" Label="実績" Example="01_receiving.csv"
+    <CsvBundlePanel BaseUrl="api/actuals/csv" Label="@L["実績"]" Example="01_receiving.csv"
                     Roles="@string.Join(",", _kinds.Select(k => k.WriteRoles).OfType<string>().Distinct())" />
 
     @foreach (var kind in _kinds)
@@ -58,7 +59,7 @@ else
         }
         catch (HttpRequestException)
         {
-            _error = "取込に対応する実績の種別を取得できませんでした。";
+            _error = L["取込に対応する実績の種別を取得できませんでした。"];
             _kinds = [];
         }
     }

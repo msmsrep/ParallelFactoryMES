@@ -3810,4 +3810,256 @@
   <data name="利用実績を記録しました。" xml:space="preserve">
     <value>Usage recorded.</value>
   </data>
+  <data name="権限がありません - Parallel Factory MES" xml:space="preserve">
+    <value>Access Denied - Parallel Factory MES</value>
+  </data>
+  <data name="権限がありません" xml:space="preserve">
+    <value>Access Denied</value>
+  </data>
+  <data name="この画面は、いまのユーザーに割り当てられたロールでは開けません。" xml:space="preserve">
+    <value>Your current roles do not allow you to open this page.</value>
+  </data>
+  <data name="必要な権限はシステム管理者に確認してください。" xml:space="preserve">
+    <value>Ask your system administrator for the required permissions.</value>
+  </data>
+  <data name="ダッシュボードへ戻る" xml:space="preserve">
+    <value>Back to dashboard</value>
+  </data>
+  <data name="ページが見つかりません" xml:space="preserve">
+    <value>Page Not Found</value>
+  </data>
+  <data name="ページが見つかりません。" xml:space="preserve">
+    <value>Page not found.</value>
+  </data>
+  <data name="このアプリについて - Parallel Factory MES" xml:space="preserve">
+    <value>About - Parallel Factory MES</value>
+  </data>
+  <data name="製造実績管理システム（MES）です。マスタ管理・生産管理・製造実行・物流／在庫管理・品質管理・品質保証・設備保全までを1つのアプリでカバーします。" xml:space="preserve">
+    <value>A manufacturing execution system (MES) covering master data, production management, manufacturing execution, logistics/inventory, quality control, quality assurance and equipment maintenance in a single application.</value>
+  </data>
+  <data name="バージョン {0}" xml:space="preserve">
+    <value>Version {0}</value>
+  </data>
+  <data name="リンク" xml:space="preserve">
+    <value>Links</value>
+  </data>
+  <data name="ユーザーガイド（操作マニュアル）" xml:space="preserve">
+    <value>User guide (operating manual)</value>
+  </data>
+  <data name="GitHub リポジトリ（ソースコード）" xml:space="preserve">
+    <value>GitHub repository (source code)</value>
+  </data>
+  <data name="ライセンス全文（LICENSE）" xml:space="preserve">
+    <value>Full license text (LICENSE)</value>
+  </data>
+  <data name="開発のサポート" xml:space="preserve">
+    <value>Support development</value>
+  </data>
+  <data name="開発を続けるための寄付を受け付けています。寄付による機能の追加や制限の解除はなく、すべての機能はこれまでどおり無償で使えます。" xml:space="preserve">
+    <value>Donations to keep development going are welcome. Donating does not unlock features or remove limits; every feature remains free to use.</value>
+  </data>
+  <data name="ライセンス" xml:space="preserve">
+    <value>License</value>
+  </data>
+  <data name="本ソフトウェアは" xml:space="preserve">
+    <value>This software is provided under the</value>
+  </data>
+  <data name="（AGPL-3.0）で提供されます。" xml:space="preserve">
+    <value> (AGPL-3.0).</value>
+  </data>
+  <data name="このプログラムはフリーソフトウェアです。" xml:space="preserve">
+    <value>This program is free software.</value>
+  </data>
+  <data name="フリーソフトウェア財団が公開する GNU Affero General Public License バージョン3、または（任意で）それ以降のバージョンの条件に従って、再頒布および改変ができます。" xml:space="preserve">
+    <value>You can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.</value>
+  </data>
+  <data name="このプログラムは有用であることを願って頒布されますが、一切の保証はありません。" xml:space="preserve">
+    <value>This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;</value>
+  </data>
+  <data name="商品性や特定目的への適合性の黙示的保証もありません。" xml:space="preserve">
+    <value>without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</value>
+  </data>
+  <data name="詳細は LICENSE を参照してください。" xml:space="preserve">
+    <value>See LICENSE for details.</value>
+  </data>
+  <data name="AGPL-3.0 では、改変版をネットワーク経由で第三者に利用させる場合、その利用者に対して改変版のソースコードを提供する義務があります（第13条）。" xml:space="preserve">
+    <value>Under the AGPL-3.0, if you let third parties use a modified version over a network, you must offer those users the source code of the modified version (Section 13).</value>
+  </data>
+  <data name="本システムはWebアプリケーションのため、この条項が適用されます。" xml:space="preserve">
+    <value>As this system is a web application, this section applies.</value>
+  </data>
+  <data name="第三者の著作物について" xml:space="preserve">
+    <value>Third-party works</value>
+  </data>
+  <data name="本システムは、機能要件の定義にあたり一般財団法人エンジニアリング協会（ENAA）の『MES/MOM導入のための標準業務一覧』（2025年10月）を参照しています。" xml:space="preserve">
+    <value>In defining its functional requirements, this system refers to the "Standard Business Process List for MES/MOM Implementation" (October 2025) by the Engineering Advancement Association of Japan (ENAA).</value>
+  </data>
+  <data name="同一覧の著作権はENAAに帰属するため、一覧そのものは本システムおよびリポジトリに含めていません。" xml:space="preserve">
+    <value>As the copyright of the list belongs to ENAA, the list itself is not included in this system or its repository.</value>
+  </data>
+  <data name="画面や仕様書に記載の業務プロセスNo（{0} 等）は、同一覧の項目を参照するための識別子です。" xml:space="preserve">
+    <value>Business process numbers shown in screens and specifications (such as {0}) are identifiers referring to items in that list.</value>
+  </data>
+  <data name="実績CSV取込 - Parallel Factory MES" xml:space="preserve">
+    <value>Actuals CSV Import - Parallel Factory MES</value>
+  </data>
+  <data name="試験・移行・教育用に、実績をCSVでまとめて登録します。" xml:space="preserve">
+    <value>Registers actuals in bulk from CSV, for testing, migration and training.</value>
+  </data>
+  <data name="1件ずつ画面から登録したときと同じチェックを通り、在庫・ロットの状態・監査ログも同じように記録されます。" xml:space="preserve">
+    <value>The same checks apply as when registering one record at a time on screen, and inventory, lot status and audit logs are recorded the same way.</value>
+  </data>
+  <data name="記録者は取り込んだユーザーです。" xml:space="preserve">
+    <value>The importing user is recorded as the recorder.</value>
+  </data>
+  <data name="取り込む順番" xml:space="preserve">
+    <value>Import order</value>
+  </data>
+  <data name="後の実績が前の実績を参照するため、上から順に取り込んでください。" xml:space="preserve">
+    <value>Later actuals refer to earlier ones, so import them from top to bottom.</value>
+  </data>
+  <data name="作業指示は「指図番号＋工程順序」で、投入・検査するロットはロット番号で指します。" xml:space="preserve">
+    <value>Work orders are identified by "order number + operation sequence", and lots to consume or inspect by lot number.</value>
+  </data>
+  <data name="製造指図の指図番号と、後で投入するロットのロット番号は、CSVで指定しておいてください（自動採番の番号は取り込むまで分かりません）。" xml:space="preserve">
+    <value>Specify in the CSV the manufacturing order numbers and the lot numbers of lots consumed later (auto-assigned numbers are not known until import).</value>
+  </data>
+  <data name="1行でもエラーがあると、そのファイル（ZIPの一括取込ではZIPの全ファイル）が取り消されます。" xml:space="preserve">
+    <value>If even one row has an error, the whole file (all files in the ZIP for a ZIP bulk import) is rolled back.</value>
+  </data>
+  <data name="最初は「検証のみ」で確認してから取り込むと安全です。" xml:space="preserve">
+    <value>It is safest to check with "Validate only" first, then import.</value>
+  </data>
+  <data name="書き方の見本は、リポジトリの {0} にあります（{1} のマスタを取り込んだ後に使えます）。" xml:space="preserve">
+    <value>Samples are in {0} in the repository (usable after importing the master data in {1}).</value>
+  </data>
+  <data name="実績" xml:space="preserve">
+    <value>Actuals</value>
+  </data>
+  <data name="取込に対応する実績の種別を取得できませんでした。" xml:space="preserve">
+    <value>Could not load the importable actual types.</value>
+  </data>
+  <data name="監査ログ - Parallel Factory MES" xml:space="preserve">
+    <value>Audit Log - Parallel Factory MES</value>
+  </data>
+  <data name="誰が・いつ・何を変更したかの記録（Spec.md 7.6）。個々の記録は書き換えも削除もできません。" xml:space="preserve">
+    <value>A record of who changed what and when (Spec.md 7.6). Individual records cannot be edited or deleted.</value>
+  </data>
+  <data name="整理できるのは保持期間を過ぎた分だけで、それも削除したこと自体が記録に残ります。" xml:space="preserve">
+    <value>Only records past the retention period can be purged, and the purge itself is recorded.</value>
+  </data>
+  <data name="期間（開始）" xml:space="preserve">
+    <value>Period (from)</value>
+  </data>
+  <data name="期間（終了）" xml:space="preserve">
+    <value>Period (to)</value>
+  </data>
+  <data name="分類・操作" xml:space="preserve">
+    <value>Category / action</value>
+  </data>
+  <data name="すべて" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="（{0} 件）" xml:space="preserve">
+    <value> ({0})</value>
+  </data>
+  <data name="対象の種別" xml:space="preserve">
+    <value>Target type</value>
+  </data>
+  <data name="WorkOrder / Lot など" xml:space="preserve">
+    <value>WorkOrder, Lot, etc.</value>
+  </data>
+  <data name="対象のID" xml:space="preserve">
+    <value>Target ID</value>
+  </data>
+  <data name="対象種別と組で指定" xml:space="preserve">
+    <value>Specify together with the target type</value>
+  </data>
+  <data name="条件をクリア" xml:space="preserve">
+    <value>Clear filters</value>
+  </data>
+  <data name="該当する記録はありません。" xml:space="preserve">
+    <value>No matching records.</value>
+  </data>
+  <data name="分類" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="古い記録の一括削除" xml:space="preserve">
+    <value>Purge old records</value>
+  </data>
+  <data name="保持期間を過ぎた記録だけを整理できます。保持期間の内側は削除できません。" xml:space="preserve">
+    <value>Only records past the retention period can be purged. Records within the retention period cannot be deleted.</value>
+  </data>
+  <data name="削除したこと自体（期間・件数・理由・実行者）が監査ログに残ります。" xml:space="preserve">
+    <value>The purge itself (period, count, reason and user) is recorded in the audit log.</value>
+  </data>
+  <data name="先にバックアップを取得してください。" xml:space="preserve">
+    <value>Take a backup first.</value>
+  </data>
+  <data name="この日まで削除（指定日を含む）" xml:space="preserve">
+    <value>Delete up to this date (inclusive)</value>
+  </data>
+  <data name="理由（必須）" xml:space="preserve">
+    <value>Reason (required)</value>
+  </data>
+  <data name="例：容量削減のため" xml:space="preserve">
+    <value>e.g. To reduce storage</value>
+  </data>
+  <data name="削除件数を確認" xml:space="preserve">
+    <value>Check count to delete</value>
+  </data>
+  <data name="{0} 件を削除する" xml:space="preserve">
+    <value>Delete {0} records</value>
+  </data>
+  <data name="{0} 以前の {1} 件が対象です（削除できるのは {2} 以前）。" xml:space="preserve">
+    <value>{1} records on or before {0} are targeted (deletable up to {2}).</value>
+  </data>
+  <data name="内容を変えると、もう一度件数の確認が必要になります。" xml:space="preserve">
+    <value>If you change the conditions, you need to check the count again.</value>
+  </data>
+  <data name="削除する期間と理由を指定してください。" xml:space="preserve">
+    <value>Specify the period and reason for deletion.</value>
+  </data>
+  <data name="一括削除に失敗しました。" xml:space="preserve">
+    <value>Purge failed.</value>
+  </data>
+  <data name="{0} 件を削除しました。" xml:space="preserve">
+    <value>Deleted {0} records.</value>
+  </data>
+  <data name="パスワード変更 - Parallel Factory MES" xml:space="preserve">
+    <value>Change Password - Parallel Factory MES</value>
+  </data>
+  <data name="パスワード変更" xml:space="preserve">
+    <value>Change password</value>
+  </data>
+  <data name="現在のパスワード" xml:space="preserve">
+    <value>Current password</value>
+  </data>
+  <data name="新しいパスワード（8文字以上・英小文字・数字を含む）" xml:space="preserve">
+    <value>New password (8+ characters, including lowercase letters and digits)</value>
+  </data>
+  <data name="変更（変更後は再ログイン）" xml:space="preserve">
+    <value>Change (sign in again afterwards)</value>
+  </data>
+  <data name="パスワード変更に失敗しました。" xml:space="preserve">
+    <value>Failed to change the password.</value>
+  </data>
+  <data name="ログインに失敗しました。" xml:space="preserve">
+    <value>Sign-in failed.</value>
+  </data>
+  <data name="初期セットアップ - Parallel Factory MES" xml:space="preserve">
+    <value>Initial Setup - Parallel Factory MES</value>
+  </data>
+  <data name="初期セットアップ" xml:space="preserve">
+    <value>Initial Setup</value>
+  </data>
+  <data name="初期管理者アカウントを作成します（初回起動時のみ有効。Spec 2.2 E）。" xml:space="preserve">
+    <value>Creates the initial administrator account (available on first launch only. Spec 2.2 E).</value>
+  </data>
+  <data name="作成してログイン画面へ" xml:space="preserve">
+    <value>Create and go to sign-in</value>
+  </data>
+  <data name="セットアップに失敗しました。パスワード要件（8文字以上・英小文字・数字）を確認してください。" xml:space="preserve">
+    <value>Setup failed. Check the password requirements (8+ characters, lowercase letters and digits).</value>
+  </data>
 </root>

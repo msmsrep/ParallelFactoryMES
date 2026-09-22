@@ -4,12 +4,12 @@
 
 @* 監査ログ（Spec.md 7.6）。記録するだけでは追跡できないため、アプリから引けるようにする *@
 
-<PageTitle>監査ログ - Parallel Factory MES</PageTitle>
+<PageTitle>@L["監査ログ - Parallel Factory MES"]</PageTitle>
 
-<h1>監査ログ</h1>
+<h1>@L["監査ログ"]</h1>
 <p class="text-muted">
-    誰が・いつ・何を変更したかの記録（Spec.md 7.6）。個々の記録は書き換えも削除もできません。
-    整理できるのは保持期間を過ぎた分だけで、それも削除したこと自体が記録に残ります。
+    @L["誰が・いつ・何を変更したかの記録（Spec.md 7.6）。個々の記録は書き換えも削除もできません。"]
+    @L["整理できるのは保持期間を過ぎた分だけで、それも削除したこと自体が記録に残ります。"]
 </p>
 
 <Notice Error="@_error" Message="@_message" />
@@ -17,54 +17,54 @@
 <div class="card">
     <div class="form-grid">
         <div class="form-field">
-            <label>期間（開始）</label>
+            <label>@L["期間（開始）"]</label>
             <input type="date" @bind="_from" />
         </div>
         <div class="form-field">
-            <label>期間（終了）</label>
+            <label>@L["期間（終了）"]</label>
             <input type="date" @bind="_to" />
         </div>
         <div class="form-field">
-            <label>分類・操作</label>
+            <label>@L["分類・操作"]</label>
             <select @bind="_categoryAction">
-                <option value="">すべて</option>
+                <option value="">@L["すべて"]</option>
                 @foreach (var option in _options)
                 {
                     <option value="@($"{option.Category}/{option.Action}")">
-                        @option.Category / @option.Action（@option.Count 件）
+                        @option.Category / @option.Action@L["（{0} 件）", option.Count]
                     </option>
                 }
             </select>
         </div>
         <div class="form-field">
-            <label>対象の種別</label>
-            <input @bind="_targetType" placeholder="WorkOrder / Lot など" />
+            <label>@L["対象の種別"]</label>
+            <input @bind="_targetType" placeholder="@L["WorkOrder / Lot など"]" />
         </div>
         <div class="form-field">
-            <label>対象のID</label>
-            <input @bind="_targetId" placeholder="対象種別と組で指定" />
+            <label>@L["対象のID"]</label>
+            <input @bind="_targetId" placeholder="@L["対象種別と組で指定"]" />
         </div>
     </div>
     <div class="actions">
-        <button class="btn" disabled="@_busy" @onclick="SearchAsync">検索</button>
-        <button class="btn btn-secondary" disabled="@_busy" @onclick="ResetAsync">条件をクリア</button>
+        <button class="btn" disabled="@_busy" @onclick="SearchAsync">@L["検索"]</button>
+        <button class="btn btn-secondary" disabled="@_busy" @onclick="ResetAsync">@L["条件をクリア"]</button>
     </div>
 </div>
 
 <div class="card">
     @if (_logs is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_logs.Total == 0)
     {
-        <p class="text-muted">該当する記録はありません。</p>
+        <p class="text-muted">@L["該当する記録はありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>日時</th><th>ユーザー</th><th>分類</th><th>操作</th><th>対象</th><th>詳細</th><th>IP</th></tr>
+                <tr><th>@L["日時"]</th><th>@L["ユーザー"]</th><th>@L["分類"]</th><th>@L["操作"]</th><th>@L["対象"]</th><th>@L["詳細"]</th><th>IP</th></tr>
             </thead>
             <tbody>
                 @foreach (var log in _logs.Items)
@@ -88,39 +88,38 @@
 
 @* 保持期間を過ぎた記録の整理（Spec.md 7.6）。消す前に必ず件数を確認させる二段階にする *@
 <div class="card">
-    <h2 style="margin-top:0;">古い記録の一括削除</h2>
+    <h2 style="margin-top:0;">@L["古い記録の一括削除"]</h2>
     <p class="text-muted">
-        保持期間を過ぎた記録だけを整理できます。保持期間の内側は削除できません。
-        削除したこと自体（期間・件数・理由・実行者）が監査ログに残ります。
-        <strong>先にバックアップを取得してください。</strong>
+        @L["保持期間を過ぎた記録だけを整理できます。保持期間の内側は削除できません。"]
+        @L["削除したこと自体（期間・件数・理由・実行者）が監査ログに残ります。"]
+        <strong>@L["先にバックアップを取得してください。"]</strong>
     </p>
     <div class="form-grid">
         <div class="form-field">
-            <label>この日まで削除（指定日を含む）</label>
+            <label>@L["この日まで削除（指定日を含む）"]</label>
             <input type="date" value="@_purgeTo?.ToString("yyyy-MM-dd")"
                    @onchange="e => SetPurgeTo(e.Value?.ToString())" />
         </div>
         <div class="form-field">
-            <label>理由（必須）</label>
+            <label>@L["理由（必須）"]</label>
             <input value="@_purgeReason" @onchange="e => SetPurgeReason(e.Value?.ToString())"
-                   placeholder="例：容量削減のため" />
+                   placeholder="@L["例：容量削減のため"]" />
         </div>
     </div>
     <div class="actions">
-        <button class="btn btn-secondary" disabled="@_purgeBusy" @onclick="PreviewPurgeAsync">削除件数を確認</button>
+        <button class="btn btn-secondary" disabled="@_purgeBusy" @onclick="PreviewPurgeAsync">@L["削除件数を確認"]</button>
         @if (_preview is not null)
         {
             <button class="btn btn-danger" disabled="@_purgeBusy" @onclick="ExecutePurgeAsync">
-                @_preview.DeletedCount 件を削除する
+                @L["{0} 件を削除する", _preview.DeletedCount]
             </button>
         }
     </div>
     @if (_preview is not null)
     {
         <p class="text-muted">
-            @_preview.To.ToString("yyyy-MM-dd") 以前の <strong>@_preview.DeletedCount 件</strong>が対象です
-            （削除できるのは @_preview.RetentionCutoff.ToString("yyyy-MM-dd") 以前）。
-            内容を変えると、もう一度件数の確認が必要になります。
+            @L["{0} 以前の {1} 件が対象です（削除できるのは {2} 以前）。", _preview.To.ToString("yyyy-MM-dd"), _preview.DeletedCount, _preview.RetentionCutoff.ToString("yyyy-MM-dd")]
+            @L["内容を変えると、もう一度件数の確認が必要になります。"]
         </p>
     }
 </div>
@@ -173,7 +172,7 @@
         try
         {
             _logs = await Http.GetFromJsonAsync<PagedResult<AuditLogResponse>>(BuildUrl(page));
-            _message = _logs is null ? null : $"{_logs.Total} 件";
+            _message = _logs is null ? null : L["{0} 件", _logs.Total].Value;
         }
         finally
         {
@@ -229,7 +228,7 @@
     {
         if (_purgeTo is not DateTime to || string.IsNullOrWhiteSpace(_purgeReason))
         {
-            _error = "削除する期間と理由を指定してください。";
+            _error = L["削除する期間と理由を指定してください。"];
             return;
         }
         _purgeBusy = true;
@@ -241,7 +240,7 @@
             var response = await Http.PostAsJsonAsync(
                 $"api/audit-logs/purge{(dryRun ? "?dryRun=true" : string.Empty)}", request);
             // 保持期間の内側を指定した場合もここに出る
-            if (await response.ReadErrorAsync("一括削除に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["一括削除に失敗しました。"]) is { } error)
             {
                 _error = error;
                 _preview = null;
@@ -259,7 +258,7 @@
             _options = await Http.GetFromJsonAsync<List<AuditCategoryOption>>("api/audit-logs/categories") ?? [];
             await LoadPageAsync(1);
             // 再読込は件数を表示するので、削除の結果はそのあとに出す
-            _message = $"{result!.DeletedCount} 件を削除しました。";
+            _message = L["{0} 件を削除しました。", result!.DeletedCount];
         }
         finally
         {

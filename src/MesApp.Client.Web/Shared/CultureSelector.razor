@@ -5,7 +5,7 @@
 
 <select aria-label="@L["表示言語"]" title="@L["表示言語"]" value="@_current" @onchange="OnChangedAsync">
     @* 言語名は訳さず、その言語自身の表記で出す（読めない言語に切り替えても戻せるように） *@
-    <option value="@MesCultures.Japanese">日本語</option>
+    <option value="@MesCultures.Japanese">日本語</option> @* 訳さない *@
     <option value="@MesCultures.English">English</option>
 </select>
 

@@ -74,7 +74,7 @@
         _error = null;
         try
         {
-            _error = await Auth.LoginAsync(_userName, _password);
+            _error = await Auth.LoginAsync(_userName, _password, L["ログインに失敗しました。"]);
             if (_error is null)
             {
                 Navigation.NavigateTo("");
