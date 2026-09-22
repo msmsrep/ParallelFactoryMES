@@ -62,7 +62,12 @@ public class ExecutionTests
     [Fact]
     public async Task 実行記録をCSVで取り込むと単票APIと同じ判定と在庫計上を通る()
     {
-        using var factory = new ApiFactory();
+        // オフセットの無い日時は工場のタイムゾーンで読む。+09:00 付きの値と混ぜて検証するので日本に固定する
+        // （固定しないとサーバーのローカル時刻になり、UTC の CI では9時間ずれる）
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["BusinessDay:TimeZone"] = "Asia/Tokyo",
+        });
         using var admin = await TestAuth.CreateAdminClientAsync(factory);
         var ctx = await Phase3TestData.SetupAsync(admin);
         async Task ImportAsync(string path, string csv)
