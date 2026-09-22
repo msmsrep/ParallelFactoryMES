@@ -77,3 +77,9 @@ next_title: 導入と初期設定
 <p><strong>用語やステータスの意味を調べたいとき</strong>は<a href="reference.html">リファレンス</a>を、
 <strong>エラーが出て先に進めないとき</strong>は<a href="troubleshooting.html">困ったときは</a>をご覧ください。</p>
 </div>
+
+## 開発のサポート
+
+Parallel Factory MES は個人で開発しています。開発を続けるための寄付を
+[GitHub Sponsors](https://github.com/sponsors/msmsrep) と [Ko-fi](https://ko-fi.com/msmsrep) で受け付けています。
+寄付による機能の追加や制限の解除はなく、すべての機能はこれまでどおり無償で使えます。
