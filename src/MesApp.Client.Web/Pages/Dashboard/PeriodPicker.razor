@@ -1,0 +1,95 @@
+@* ダッシュボードの期間選択（Spec.md 3.8・3.9）。日次・週次・月次の切替と前後への移動。
+   「今日」は製造日で、境界時刻を知っているサーバー（api/business-date）から受け取る。
+   区切り方（週は月曜始まり）は API と同じ DashboardPeriods を使う *@
+@inject HttpClient Http
+
+<Notice Error="@_error" />
+<div class="actions">
+    <select value="@_unit" @onchange="OnUnitChangedAsync" aria-label="集計単位">
+        @foreach (var unit in Enum.GetValues<DashboardPeriodUnit>())
+        {
+            <option value="@unit">@DashboardPeriods.UnitLabel(unit)</option>
+        }
+    </select>
+    <button class="btn btn-secondary btn-sm" @onclick="() => MoveAsync(-1)">◀ 前へ</button>
+    <input type="date" value="@_anchor.ToString("yyyy-MM-dd")" @onchange="OnAnchorChangedAsync" aria-label="基準日" />
+    <button class="btn btn-secondary btn-sm" @onclick="() => MoveAsync(1)">次へ ▶</button>
+    <button class="btn btn-secondary btn-sm" @onclick="TodayAsync">今日</button>
+    <span><strong>@From.ToString("yyyy-MM-dd")〜@To.ToString("yyyy-MM-dd")</strong></span>
+</div>
+@if (_businessDate is not null)
+{
+    <p class="text-muted">
+        今日＝製造日 @_businessDate.Today.ToString("yyyy-MM-dd")（@(_businessDate.BoundaryHour)時境界。夜勤の日跨ぎ実績も開始した製造日に集計する。週は月曜始まり）
+    </p>
+}
+
+@code {
+    /// <summary>選ばれた期間</summary>
+    public record Range(DateOnly From, DateOnly To, DashboardPeriodUnit Unit);
+
+    /// <summary>true なら推移用に複数の区切り（日次14日・週次12週・月次12か月）を選ぶ。false なら基準日を含む1区切り</summary>
+    [Parameter] public bool Trend { get; set; }
+
+    [Parameter] public EventCallback<Range> OnChanged { get; set; }
+
+    private BusinessDateResponse? _businessDate;
+    private DashboardPeriodUnit _unit = DashboardPeriodUnit.Day;
+    private DateOnly _anchor = DateOnly.FromDateTime(DateTime.Today);
+    private string? _error;
+
+    private int Count => !Trend ? 1 : _unit == DashboardPeriodUnit.Day ? 14 : 12;
+
+    private DateOnly To => DashboardPeriods.End(_anchor, _unit);
+
+    private DateOnly From => DashboardPeriods.Shift(DashboardPeriods.Start(_anchor, _unit), _unit, -(Count - 1));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Trend)
+        {
+            _unit = DashboardPeriodUnit.Week;
+        }
+        try
+        {
+            // 「今日」は暦日ではなく製造日（Spec.md 3.9）。境界時刻の判断はサーバーが持つ
+            _businessDate = await Http.GetFromJsonAsync<BusinessDateResponse>("api/business-date");
+            _anchor = _businessDate!.Today;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "製造日を取得できなかったため、端末の日付で表示しています。";
+        }
+        await NotifyAsync();
+    }
+
+    private Task NotifyAsync() => OnChanged.InvokeAsync(new Range(From, To, _unit));
+
+    private Task OnUnitChangedAsync(ChangeEventArgs e)
+    {
+        _unit = Enum.Parse<DashboardPeriodUnit>(e.Value?.ToString() ?? nameof(DashboardPeriodUnit.Day));
+        return NotifyAsync();
+    }
+
+    private Task OnAnchorChangedAsync(ChangeEventArgs e)
+    {
+        if (!DateOnly.TryParse(e.Value?.ToString(), out var date))
+        {
+            return Task.CompletedTask;
+        }
+        _anchor = date;
+        return NotifyAsync();
+    }
+
+    private Task MoveAsync(int direction)
+    {
+        _anchor = DashboardPeriods.Shift(_anchor, _unit, direction * Count);
+        return NotifyAsync();
+    }
+
+    private Task TodayAsync()
+    {
+        _anchor = _businessDate?.Today ?? DateOnly.FromDateTime(DateTime.Today);
+        return NotifyAsync();
+    }
+}

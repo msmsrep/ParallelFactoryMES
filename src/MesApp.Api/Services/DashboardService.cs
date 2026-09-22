@@ -40,26 +40,11 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
         DateOnly Date, int EquipmentId, string AssetNo, string EquipmentName, int? WorkCenterId,
         EquipmentLogStatus Status, decimal Hours);
 
-    /// <summary>区切りの開始日（週は月曜、月は1日）</summary>
-    public static DateOnly PeriodStart(DateOnly date, DashboardPeriodUnit unit) => unit switch
-    {
-        DashboardPeriodUnit.Week => date.AddDays(-(((int)date.DayOfWeek + 6) % 7)),
-        DashboardPeriodUnit.Month => new DateOnly(date.Year, date.Month, 1),
-        _ => date,
-    };
-
-    private static DateOnly NextPeriodStart(DateOnly start, DashboardPeriodUnit unit) => unit switch
-    {
-        DashboardPeriodUnit.Week => start.AddDays(7),
-        DashboardPeriodUnit.Month => start.AddMonths(1),
-        _ => start.AddDays(1),
-    };
-
     /// <summary>期間内の区切りの数（上限の判定用）</summary>
     public static int CountPeriods(DateOnly from, DateOnly to, DashboardPeriodUnit unit)
     {
         var count = 0;
-        for (var s = PeriodStart(from, unit); s <= to && count <= MaxPeriods; s = NextPeriodStart(s, unit))
+        for (var s = DashboardPeriods.Start(from, unit); s <= to && count <= MaxPeriods; s = DashboardPeriods.Shift(s, unit, 1))
         {
             count++;
         }
@@ -72,10 +57,10 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
         var (production, logs, productionAvailable, utilizationAvailable) = await LoadAsync(filter, ct);
 
         var rows = new List<DashboardMetricsRow>();
-        for (var start = PeriodStart(filter.From, unit); start <= filter.To; start = NextPeriodStart(start, unit))
+        for (var start = DashboardPeriods.Start(filter.From, unit); start <= filter.To; start = DashboardPeriods.Shift(start, unit, 1))
         {
             var from = start < filter.From ? filter.From : start;
-            var end = NextPeriodStart(start, unit).AddDays(-1);
+            var end = DashboardPeriods.End(start, unit);
             var to = end > filter.To ? filter.To : end;
             var label = unit switch
             {

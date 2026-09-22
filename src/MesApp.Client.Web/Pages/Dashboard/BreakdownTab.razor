@@ -1,0 +1,166 @@
+@* ダッシュボードの内訳（Spec.md 3.8。期間の実績を工程・品目・直・ライン・作業区・設備の軸で分ける。
+   B-60-10-05 生産性モニタリング／C-40-10-05 不適合モニタリング／E-20-10-03 稼働モニタリング）。
+   集計は api/dashboard/breakdown が行い、画面では数えない（Spec.md 7.5） *@
+@inject HttpClient Http
+
+<PeriodPicker OnChanged="OnRangeChangedAsync" />
+
+<div class="form-grid">
+    <div class="form-field">
+        <label>内訳の軸</label>
+        <select @bind="_axis" @bind:after="LoadAsync">
+            @foreach (var axis in Enum.GetValues<DashboardAxis>())
+            {
+                <option value="@axis">@(DashboardPeriods.AxisLabel(axis))別</option>
+            }
+        </select>
+    </div>
+    <div class="form-field">
+        <label>作業区で絞り込む</label>
+        <select @bind="_workCenterId" @bind:after="LoadAsync">
+            <option value="0">全作業区</option>
+            @foreach (var wc in _workCenters)
+            {
+                <option value="@wc.Id">@wc.Code @wc.Name</option>
+            }
+        </select>
+        <span class="text-muted">上位（工場・ライン・エリア）を選ぶと配下をまとめて集計する</span>
+    </div>
+</div>
+
+<Notice Error="@_error" />
+
+@if (_data is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    @if (!_data.ProductionAvailable)
+    {
+        <p class="text-muted">設備別では生産数・不良率を出していません（設備は差立で決まり作業指示に固定されないため、生産実績を設備へ分けられない）。</p>
+    }
+    @if (!_data.UtilizationAvailable)
+    {
+        <p class="text-muted">@(DashboardPeriods.AxisLabel(_dataAxis))別では稼働率を出していません（稼働記録は設備単位で、作業指示との紐付けが任意のため）。稼働率はライン・作業区・設備別で見る。</p>
+    }
+    @if (_data.Rows.Count == 0)
+    {
+        <p class="text-muted">この期間の実績はありません。</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>@DashboardPeriods.AxisLabel(_dataAxis)</th>
+                    @if (_data.ProductionAvailable)
+                    {
+                        <th>良品数</th>
+                        <th>不良数</th>
+                        <th>不良率</th>
+                    }
+                    @if (_data.UtilizationAvailable)
+                    {
+                        <th>稼働時間 / 記録時間</th>
+                        <th>設備稼働率</th>
+                        <th>故障件数</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _data.Rows.Append(_data.Total))
+                {
+                    <tr style="@(row == _data.Total ? "font-weight:600;" : null)">
+                        <td>@row.Label</td>
+                        @if (_data.ProductionAvailable)
+                        {
+                            <td>@row.GoodQuantity?.ToString("0.##")</td>
+                            <td>@row.DefectQuantity?.ToString("0.##")</td>
+                            <td>
+                                @if (row.DefectRate is { } rate)
+                                {
+                                    <span>@rate.ToString("0.##") %</span>
+                                    <BarMeter Value="rate" />
+                                }
+                                else
+                                {
+                                    <span class="text-muted">実績なし</span>
+                                }
+                            </td>
+                        }
+                        @if (_data.UtilizationAvailable)
+                        {
+                            <td>@row.RunningHours?.ToString("0.##") / @row.RecordedHours?.ToString("0.##") h</td>
+                            <td>
+                                @if (row.UtilizationRate is { } utilization)
+                                {
+                                    <span>@utilization.ToString("0.##") %</span>
+                                    <BarMeter Value="utilization" HighIsBad="false" />
+                                }
+                                else
+                                {
+                                    <span class="text-muted">記録なし</span>
+                                }
+                            </td>
+                            <td>@row.FailureCount</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private PeriodPicker.Range? _range;
+    private DashboardSummaryResponse? _data;
+    private List<WorkCenterResponse> _workCenters = [];
+    private DashboardAxis _axis = DashboardAxis.Process;
+    /// <summary>表示中のデータの軸（選択を変えた直後は読み込み中で、選択と表示がずれる）</summary>
+    private DashboardAxis _dataAxis = DashboardAxis.Process;
+    private int _workCenterId;
+    private string? _error;
+    private int _requestNo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers") ?? [];
+    }
+
+    private Task OnRangeChangedAsync(PeriodPicker.Range range)
+    {
+        _range = range;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_range is null)
+        {
+            return;
+        }
+        _error = null;
+        var axis = _axis;
+        var url = $"api/dashboard/breakdown?from={_range.From:yyyy-MM-dd}&to={_range.To:yyyy-MM-dd}&axis={axis}";
+        if (_workCenterId != 0) url += $"&workCenterId={_workCenterId}";
+        // 期間・軸を続けて変えると応答の順が入れ替わることがある。最後に出した要求の結果だけを使う
+        var requestNo = ++_requestNo;
+        var response = await Http.GetAsync(url);
+        if (requestNo != _requestNo)
+        {
+            return;
+        }
+        if (await response.ReadErrorAsync("内訳の集計を取得できませんでした。") is { } error)
+        {
+            _error = error;
+            return;
+        }
+        var data = await response.Content.ReadFromJsonAsync<DashboardSummaryResponse>();
+        if (requestNo == _requestNo)
+        {
+            _data = data;
+            _dataAxis = axis;
+        }
+    }
+}
