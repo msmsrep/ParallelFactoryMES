@@ -1998,4 +1998,7 @@
   <data name="0〜99.99。指図の予定材料をこの率ぶん割り増す" xml:space="preserve">
     <value>0 to 99.99. Planned materials of an order are increased by this rate</value>
   </data>
+  <data name="MBOMが循環します（{0}）。" xml:space="preserve">
+    <value>The MBOM is circular ({0}).</value>
+  </data>
 </root>

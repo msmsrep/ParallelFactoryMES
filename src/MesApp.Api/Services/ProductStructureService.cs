@@ -35,6 +35,18 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
             return ApiText.T("存在しない子品目IDが含まれています。");
         }
 
+        var edges = (await db.BomItems.AsNoTracking()
+                .Select(b => new { b.ParentProductId, b.ChildProductId })
+                .ToListAsync(ct))
+            .GroupBy(b => b.ParentProductId)
+            .ToDictionary(g => g.Key, g => g.Select(b => b.ChildProductId).ToList());
+        if (ProductStructurePolicy.FindBomCycle(edges, productId, childIds) is { } cycle)
+        {
+            var codes = await db.Products.AsNoTracking()
+                .Where(p => cycle.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Code, ct);
+            return ApiText.T("MBOMが循環します（{0}）。", string.Join(" → ", cycle.Select(id => codes[id])));
+        }
+
         var existing = await db.BomItems.Where(b => b.ParentProductId == productId).ToListAsync(ct);
         db.BomItems.RemoveRange(existing);
         db.BomItems.AddRange(items.Select(i => new BomItem

@@ -76,6 +76,31 @@ public class MasterTests
     }
 
     [Fact]
+    public async Task 循環するMBOMは登録できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var fg = await CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var sf = await CreateProductAsync(admin, "SF-01", "半製品", ProductType.SemiFinished);
+        var rm = await CreateProductAsync(admin, "RM-01", "部材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{fg.Id}/bom",
+            new List<BomItemRequest> { new(sf.Id, 1m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+        (await admin.PutAsJsonAsync($"/api/products/{sf.Id}/bom",
+            new List<BomItemRequest> { new(rm.Id, 1m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+
+        // RM-01 → FG-01 を足すと FG-01 → SF-01 → RM-01 → FG-01 と一周する。経路をそのまま示す
+        var cyclic = await admin.PutAsJsonAsync($"/api/products/{rm.Id}/bom",
+            new List<BomItemRequest> { new(fg.Id, 1m, MakeOrBuy.InHouse, null) });
+        Assert.Equal(HttpStatusCode.BadRequest, cyclic.StatusCode);
+        var problem = await cyclic.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Contains("RM-01 → FG-01 → SF-01 → RM-01", problem!.Title);
+
+        // 親品目自身の既存明細は置き換えられるので、循環の判定に入れない（SF-01 の子を差し替えるのは循環ではない）
+        (await admin.PutAsJsonAsync($"/api/products/{sf.Id}/bom",
+            new List<BomItemRequest> { new(rm.Id, 2m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
     public async Task MBOMと工順を一括登録できる()
     {
         using var factory = new ApiFactory();

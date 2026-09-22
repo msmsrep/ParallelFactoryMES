@@ -905,6 +905,10 @@ public sealed partial class MasterCsvService
     {
         var productIds = await ProductIdsAsync(ct);
         var existing = await db.BomItems.ToListAsync(ct);
+        // 循環の判定に使う明細。取り込んだ親品目の分はその都度置き換え、後の行が前の行と循環するのも捕まえる
+        var edges = existing.GroupBy(b => b.ParentProductId)
+            .ToDictionary(g => g.Key, g => g.Select(b => b.ChildProductId).ToList());
+        var codeById = productIds.ToDictionary(p => p.Value, p => p.Key);
 
         foreach (var group in GroupRows(table, "ParentProductCode", errors))
         {
@@ -961,6 +965,12 @@ public sealed partial class MasterCsvService
             {
                 continue;
             }
+            if (ProductStructurePolicy.FindBomCycle(edges, parentId, lines.Select(l => l.ChildProductId)) is { } cycle)
+            {
+                parentReader.Fail(ApiText.T("MBOMが循環します（{0}）。", string.Join(" → ", cycle.Select(id => codeById[id]))));
+                continue;
+            }
+            edges[parentId] = [.. lines.Select(l => l.ChildProductId)];
 
             var current = existing.Where(b => b.ParentProductId == parentId).ToList();
             db.BomItems.RemoveRange(current);

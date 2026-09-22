@@ -35,4 +35,59 @@ public static class ProductStructurePolicy
         (candidates ?? [])
             .Concat(representative is { } id ? [id] : [])
             .Distinct();
+
+    /// <summary>
+    /// MBOMの循環（A→B→…→A）を探す（A-40-10-01）。親品目の明細を <paramref name="childIds"/> に置き換えたとき、
+    /// 子品目から既存の明細をたどって親品目へ戻れるなら、その経路（親品目で始まり親品目で終わる品目IDの並び）を返す。
+    /// 循環がなければ null。
+    /// <para>
+    /// 今の展開は1段だけなので循環があっても止まらないが、構成として作れない品目になる。
+    /// 多段の所要量展開や逆展開を足したときに無限ループになるため、登録の時点で止める。
+    /// <paramref name="childrenByParent"/> の親品目自身の明細は、置き換えられるので見ない
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<int>? FindBomCycle(
+        IReadOnlyDictionary<int, List<int>> childrenByParent, int parentId, IEnumerable<int> childIds)
+    {
+        // 幅優先でたどり、見つけた品目の手前を覚えておいて経路を組み立てる
+        var previous = new Dictionary<int, int>();
+        var queue = new Queue<int>();
+        foreach (var child in childIds.Distinct())
+        {
+            if (child == parentId)
+            {
+                return [parentId, parentId];
+            }
+            previous[child] = parentId;
+            queue.Enqueue(child);
+        }
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (current == parentId || !childrenByParent.TryGetValue(current, out var next))
+            {
+                continue;
+            }
+            foreach (var child in next)
+            {
+                if (child == parentId)
+                {
+                    var path = new List<int> { parentId, current };
+                    for (var at = current; previous[at] != parentId; at = previous[at])
+                    {
+                        path.Add(previous[at]);
+                    }
+                    path.Add(parentId);
+                    // 末尾から組んだので、親品目→子品目→…→親品目の順に並べ直す
+                    path.Reverse(1, path.Count - 2);
+                    return path;
+                }
+                if (previous.TryAdd(child, current))
+                {
+                    queue.Enqueue(child);
+                }
+            }
+        }
+        return null;
+    }
 }

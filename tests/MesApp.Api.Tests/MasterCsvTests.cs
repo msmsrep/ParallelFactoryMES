@@ -187,6 +187,27 @@ public class MasterCsvTests
     }
 
     [Fact]
+    public async Task 循環するMBOMはCSVでも取り込めない()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(client, "products", """
+            Code,Name,Unit,Type
+            FG-01,完成品,個,Product
+            SF-01,半製品,個,SemiFinished
+            """)).Succeeded);
+
+        // 同じファイルの後の行が前の行と循環するのも捕まえる（単票APIと同じ判定。Spec.md 7.4）
+        var result = await ImportAsync(client, "bom", """
+            ParentProductCode,ChildProductCode,QuantityPer
+            FG-01,SF-01,1
+            SF-01,FG-01,1
+            """);
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, e => e.Line == 3 && e.Message.Contains("SF-01 → FG-01 → SF-01"));
+    }
+
+    [Fact]
     public async Task MBOMと工順をコード指定のCSVで一括登録できる()
     {
         using var factory = new ApiFactory();
