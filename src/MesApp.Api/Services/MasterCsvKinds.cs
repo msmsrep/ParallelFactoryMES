@@ -307,6 +307,10 @@ public static class CsvEnumLabels
         ("段取り", EquipmentLogStatus.Setup), ("故障", EquipmentLogStatus.Failure),
         ("アイドル", EquipmentLogStatus.Idle), ("待機", EquipmentLogStatus.Idle));
 
+    public static readonly IReadOnlyDictionary<string, ShipmentJudgmentResult> ShipmentJudgmentResults = Build(
+        ("可", ShipmentJudgmentResult.Approved), ("保留", ShipmentJudgmentResult.Hold),
+        ("特採", ShipmentJudgmentResult.SpecialAcceptance), ("特別採用", ShipmentJudgmentResult.SpecialAcceptance));
+
     public static readonly IReadOnlyDictionary<string, MakeOrBuy> MakeOrBuys = Build(
         ("内製", MakeOrBuy.InHouse), ("外注", MakeOrBuy.Outsourced));
 

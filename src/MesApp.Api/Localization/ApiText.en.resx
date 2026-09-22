@@ -1905,4 +1905,82 @@
   <data name="出荷番号 '{0}' は既に存在します。" xml:space="preserve">
     <value>Shipping number '{0}' already exists.</value>
   </data>
+  <data name="Quantity（指示数量）は必須です。" xml:space="preserve">
+    <value>Quantity (instructed quantity) is required.</value>
+  </data>
+  <data name="出荷番号 '{0}' に品目 '{1}' の行が重複しています。" xml:space="preserve">
+    <value>Shipping number '{0}' has duplicate rows for product '{1}'.</value>
+  </data>
+  <data name="ShippingNo（出荷番号）と LotNumber（対象ロット番号）のどちらかは必須です。" xml:space="preserve">
+    <value>Either ShippingNo (shipping number) or LotNumber (target lot number) is required.</value>
+  </data>
+  <data name="Quantity（出荷数量）は必須です。" xml:space="preserve">
+    <value>Quantity (shipping quantity) is required.</value>
+  </data>
+  <data name="出荷指示 '{0}' は登録されていません（ShippingNo）。" xml:space="preserve">
+    <value>Shipping order '{0}' is not registered (ShippingNo).</value>
+  </data>
+  <data name="出荷指示" xml:space="preserve">
+    <value>Shipping orders</value>
+  </data>
+  <data name="出荷判定" xml:space="preserve">
+    <value>Shipment judgments</value>
+  </data>
+  <data name="出荷実行" xml:space="preserve">
+    <value>Shipments</value>
+  </data>
+  <data name="出荷番号" xml:space="preserve">
+    <value>Shipping number</value>
+  </data>
+  <data name="出荷先" xml:space="preserve">
+    <value>Destination</value>
+  </data>
+  <data name="出荷予定日" xml:space="preserve">
+    <value>Planned shipping date</value>
+  </data>
+  <data name="指示数量" xml:space="preserve">
+    <value>Instructed quantity</value>
+  </data>
+  <data name="出荷ロット番号" xml:space="preserve">
+    <value>Shipping lot number</value>
+  </data>
+  <data name="出荷元ロケーションコード" xml:space="preserve">
+    <value>Source location code</value>
+  </data>
+  <data name="出荷数量" xml:space="preserve">
+    <value>Shipping quantity</value>
+  </data>
+  <data name="同じ番号の行を1件の出荷指示にまとめる。後続の出荷判定・出荷実行CSVから指示を指す。SHで始まる番号は自動採番用のため使えない" xml:space="preserve">
+    <value>Rows with the same number are grouped into one shipping order. Later shipment judgment and shipment CSVs refer to the order by this number. Numbers starting with SH are reserved for auto-numbering.</value>
+  </data>
+  <data name="まとまりの最初の行の値を使う" xml:space="preserve">
+    <value>The value of the first row in the group is used.</value>
+  </data>
+  <data name="yyyy-MM-dd。まとまりの最初の行の値を使う" xml:space="preserve">
+    <value>yyyy-MM-dd. The value of the first row in the group is used.</value>
+  </data>
+  <data name="登録済みで有効な品目コード。1件の指示に同じ品目を2行書けない" xml:space="preserve">
+    <value>A registered, active product code. The same product cannot appear on two rows of one order.</value>
+  </data>
+  <data name="登録済みの出荷番号（出荷指示CSVの ShippingNo）。出荷実行には出荷指示を対象にした承認済みの判定が必要" xml:space="preserve">
+    <value>A registered shipping number (ShippingNo in the shipping order CSV). Shipping requires an approved judgment on the shipping order.</value>
+  </data>
+  <data name="登録済みのロット番号。ShippingNo と少なくともどちらかは必須" xml:space="preserve">
+    <value>A registered lot number. At least one of this and ShippingNo is required.</value>
+  </data>
+  <data name="Approved（可）/ Hold（保留）/ SpecialAcceptance（特採）" xml:space="preserve">
+    <value>Approved / Hold / SpecialAcceptance</value>
+  </data>
+  <data name="true で判定の登録に続けて承認する" xml:space="preserve">
+    <value>true approves the judgment right after registering it.</value>
+  </data>
+  <data name="登録済みの出荷番号（出荷指示CSVの ShippingNo）。同じ番号の行を1回の出荷にまとめる" xml:space="preserve">
+    <value>A registered shipping number (ShippingNo in the shipping order CSV). Rows with the same number are shipped together.</value>
+  </data>
+  <data name="登録済みのロット番号。出荷指示に含まれる品目で、使える状態（正常・期限内）であること" xml:space="preserve">
+    <value>A registered lot number of a product in the shipping order, in a usable state (normal and not expired).</value>
+  </data>
+  <data name="0より大きい数値。出荷済みと合わせて指示数量を超えられない" xml:space="preserve">
+    <value>A number greater than 0. Together with the quantity already shipped, it cannot exceed the instructed quantity.</value>
+  </data>
 </root>

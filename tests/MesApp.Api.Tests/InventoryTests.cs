@@ -235,6 +235,71 @@ public class InventoryTests
     }
 
     [Fact]
+    public async Task 出荷指示と出荷判定と出荷実行をCSVで取り込め_判定の無い出荷は全件取り消される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        await Phase3TestData.SetupAsync(admin);
+        Assert.True((await Phase3TestData.ImportActualCsvAsync(admin, "receiving",
+            "ProductCode,Quantity,LocationCode,LotNumber\nFG-01,100,LOC-P,FG-LOT-1\n")).Succeeded);
+        const string orderHeader = "ShippingNo,Destination,PlannedDate,ProductCode,Quantity\n";
+        const string shipHeader = "ShippingNo,LotNumber,LocationCode,Quantity\n";
+
+        // 自動採番の形式（SH〜）の番号と、1件の指示に同じ品目を2行書いたものは拒否し、正しい行も登録しない
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "shipping-orders",
+            orderHeader
+            + "CSV-SH-1,出荷先A,2026-10-16,FG-01,60\n"
+            + "SH20260101-0001,出荷先B,,FG-01,10\n"
+            + "CSV-SH-3,出荷先C,,FG-01,5\n"
+            + "CSV-SH-3,出荷先C,,FG-01,5\n");
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("SH20260101-0001"));
+        Assert.Contains(invalid.Errors, e => e.Line == 5 && e.Message.Contains("FG-01"));
+
+        // 出荷番号が同じ行は1件の指示にまとまる（ここでは1行ずつ2件）
+        var orders = await Phase3TestData.ImportActualCsvAsync(admin, "shipping-orders",
+            orderHeader + "CSV-SH-1,出荷先A,2026-10-16,FG-01,60\nCSV-SH-2,出荷先B,,FG-01,10\n");
+        Assert.True(orders.Succeeded);
+        Assert.Equal(2, orders.Created);
+
+        // 判定の無い指示は出荷できず、在庫も動かない（単票APIと同じゲート）
+        var blocked = await Phase3TestData.ImportActualCsvAsync(admin, "shipments", shipHeader + "CSV-SH-1,FG-LOT-1,LOC-P,20\n");
+        Assert.False(blocked.Succeeded);
+        Assert.Contains("H-10-10", Assert.Single(blocked.Errors).Message);
+        Assert.Equal(100m, await StockOfProductAsync(admin, "FG-01"));
+
+        // 出荷判定の取込は単票の判定APIと同じ権限（品質保証）。物流は取り込めない
+        var kinds = await admin.GetFromJsonAsync<List<CsvKindInfo>>("/api/actuals/csv/kinds");
+        Assert.Equal(MesRoleGroups.QaManage, kinds!.Single(k => k.Kind == "shipment-judgments").WriteRoles);
+        Assert.Equal(MesRoleGroups.InventoryManage, kinds!.Single(k => k.Kind == "shipments").WriteRoles);
+        const string judgmentCsv = "ShippingNo,LotNumber,Result,Approve,Note\nCSV-SH-1,FG-LOT-1,可,true,\nCSV-SH-2,,Hold,false,保留\n";
+        using var logistics = await TestAuth.CreateUserClientAsync(
+            factory, admin, "logistics1", "Passw0rd123", MesRoles.Logistics);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await Phase3TestData.PostActualCsvAsync(logistics, "shipment-judgments", judgmentCsv)).StatusCode);
+        var judged = await Phase3TestData.ImportActualCsvAsync(admin, "shipment-judgments", judgmentCsv);
+        Assert.True(judged.Succeeded);
+        Assert.Equal(2, judged.Created);
+
+        // 保留の判定しか無い指示は出荷できない
+        var held = await Phase3TestData.ImportActualCsvAsync(logistics, "shipments", shipHeader + "CSV-SH-2,FG-LOT-1,LOC-P,10\n");
+        Assert.False(held.Succeeded);
+
+        // 出荷番号が同じ行は1回の出荷にまとまり、指示数量に達すると完了になる
+        var shipped = await Phase3TestData.ImportActualCsvAsync(logistics, "shipments",
+            shipHeader + "CSV-SH-1,FG-LOT-1,LOC-P,20\nCSV-SH-1,FG-LOT-1,LOC-P,40\n");
+        Assert.True(shipped.Succeeded, string.Join(" / ", shipped.Errors.Select(e => e.Message)));
+        Assert.Equal(1, shipped.Created);
+        Assert.Equal(40m, await StockOfProductAsync(admin, "FG-01"));
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MesApp.Infrastructure.MesAppDbContext>();
+        var order = await db.ShippingOrders.Include(s => s.Lines).SingleAsync(s => s.ShippingNo == "CSV-SH-1");
+        Assert.Equal(ShippingOrderStatus.Completed, order.Status);
+        Assert.Equal(new DateOnly(2026, 10, 16), order.PlannedDate);
+        Assert.Equal(60m, Assert.Single(order.Lines).ShippedQuantity);
+    }
+
+    [Fact]
     public async Task 出荷指示から出荷実行で在庫が引き落とされ完了になる()
     {
         using var factory = new ApiFactory();

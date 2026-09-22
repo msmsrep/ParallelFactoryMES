@@ -60,7 +60,7 @@
 | 受入・受入ロット採番 | D-10-10 | `ReceivingController.cs` `api/receiving` | `Core/Entities/Inventory.cs`: InventoryStock / InventoryTransaction<br>Production.cs: Lot | `/receiving` `Receiving.razor` | `Tests/InventoryTests.cs` |
 | 在庫オペレーション（照会・移動・調整・分割/統合・廃棄・期限） | D-10-30 / D-30-10 / D-40-40 | `InventoryController.cs` `api/inventory`<br>更新系（移動・調整・ステータス変更・分割・統合・振替・廃棄・返品・払出戻し）は `Api/Services/LotOperationService.cs`<br>在庫数量の増減そのものは `Api/Services/InventoryService.cs` | Inventory.cs: InventoryStock / InventoryTransaction | `/inventory` `Inventory.razor` | `Tests/InventoryTests.cs` |
 | 出庫・ピッキング・工程払出（FEFO自動引当） | D-20-10 / D-20-20 | `PickingOrdersController.cs` `api/picking-orders`<br>作成・実行・取消は `Api/Services/PickingService.cs` | Inventory.cs: PickingOrder / PickingLine | `/picking` `Picking.razor` | `Tests/InventoryTests.cs` |
-| 出荷（出荷判定ゲート付き） | D-40 / H-10-10 | `ShippingOrdersController.cs` `api/shipping-orders`<br>作成・出荷実行・取消は `Api/Services/ShippingService.cs` | Inventory.cs: ShippingOrder / ShippingLine | `/shipping` `Shipping.razor`<br>`/print/shipping/{id}` `Print/ShippingSlip.razor` | `Tests/InventoryTests.cs` |
+| 出荷（出荷判定ゲート付き） | D-40 / H-10-10 | `ShippingOrdersController.cs` `api/shipping-orders`<br>作成・出荷実行・取消は `Api/Services/ShippingService.cs`<br>CSV：実績CSVの種別 `shipping-orders`・`shipments`（`ActualCsvService.Shipping.cs`。出荷番号は手入力必須、`SH〜` は拒否）。サンプルは `samples/actual-csv/13`〜`15` | Inventory.cs: ShippingOrder / ShippingLine | `/shipping` `Shipping.razor`<br>`/print/shipping/{id}` `Print/ShippingSlip.razor` | `Tests/InventoryTests.cs` |
 | 棚卸（スナップショット→実棚→差異→確定） | D-50-10 | `StocktakesController.cs` `api/stocktakes`<br>作成・実棚登録・確定・取消は `Api/Services/StocktakeService.cs` | Inventory.cs: Stocktake / StocktakeLine | `/stocktakes` `Stocktakes.razor`<br>`/print/stocktake/{id}` `Print/StocktakeSheet.razor` | `Tests/InventoryTests.cs` |
 | ロケーション・棚番管理 | D-50-20-01 | `LocationsController.cs` `api/locations` | Masters.cs: Location（`WorkCenterId`＝所属する資源。**段は問わない**） | `/masters` `Masters/LocationsTab.razor` | `Tests/MasterTests.cs` |
 | 倉庫業務進捗管理（**受入は対象外**。指示を持たないため） | D-50-30-07 | `InventoryController.cs` `api/inventory/warehouse-progress?from=&to=`（出庫ピッキング・出荷・在庫移動・棚卸。取消は数えない。期間は**製造日の半開区間**） | 新規エンティティなし（既存の指示を数え直す） | `/warehouse-operations` `Web/Pages/WarehouseOperations.razor` | `Tests/InventoryTests.cs` |
@@ -93,7 +93,7 @@
 
 | 業務 | MES No | API | エンティティ | 画面 | テスト |
 |:--|:--|:--|:--|:--|:--|
-| 出荷判定（可／保留／特採・単段階承認） | H-10-10 | `ShipmentJudgmentsController.cs` `api/shipment-judgments` | Quality.cs: ShipmentJudgment | `/shipment-judgments` `ShipmentJudgments.razor`<br>`/print/shipment-judgment/{id}` `Print/ShipmentJudgmentDoc.razor` | `Tests/QualityTests.cs`<br>出荷ゲートは `InventoryTests.cs` |
+| 出荷判定（可／保留／特採・単段階承認） | H-10-10 | `ShipmentJudgmentsController.cs` `api/shipment-judgments`<br>登録・承認は `Api/Services/ShipmentJudgmentService.cs`（単票APIと実績CSVの種別 `shipment-judgments` で共通） | Quality.cs: ShipmentJudgment | `/shipment-judgments` `ShipmentJudgments.razor`<br>`/print/shipment-judgment/{id}` `Print/ShipmentJudgmentDoc.razor` | `Tests/QualityTests.cs`<br>出荷ゲートは `InventoryTests.cs` |
 | ロットトレーサビリティ（前方・後方追跡） | H-30-10 | `TraceabilityController.cs` `api/traceability`（`/history` は製造・検査・在庫・状態・訂正・**設備稼働**の履歴を返す。製造行には作業者と**直**を並べる。文字列の組み立てはSQLに載せず取り出してから行う） | Production.cs: Lot<br>Execution.cs: MaterialConsumption<br>Maintenance.cs: EquipmentLog | `/traceability` `Traceability.razor`<br>`Web/Shared/TraceTree.razor` | `Tests/QualityTests.cs` |
 
 ---

@@ -1,0 +1,3 @@
+﻿ShippingNo,LotNumber,Result,Approve,Note
+SMP-SH-001,FG1000-S001,Approved,true,完成品検査合格（グレードA）を確認
+SMP-SH-002,,Hold,false,納期調整中のため保留（出荷実行はできない）

@@ -27,13 +27,15 @@ namespace MesApp.Api.Services;
 /// 前の行を登録しないと判定できない条件があるため。
 /// </para>
 /// </summary>
-public sealed class ActualCsvService(
+public sealed partial class ActualCsvService(
     MesAppDbContext db,
     ReceivingService receiving,
     ManufacturingOrderService orders,
     WorkOrderExecutionService execution,
     InspectionService inspections,
     ShopFloorReportService reports,
+    ShippingService shipping,
+    ShipmentJudgmentService judgments,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
@@ -71,6 +73,9 @@ public sealed class ActualCsvService(
             ActualCsvKinds.WorkTimeRecords => await ImportWorkTimeRecordsAsync(table, errors, userId!, ct),
             ActualCsvKinds.TroubleReports => await ImportTroubleReportsAsync(table, errors, userId!, ct),
             ActualCsvKinds.EquipmentLogs => await ImportEquipmentLogsAsync(table, errors, userId, ct),
+            ActualCsvKinds.ShippingOrders => await ImportShippingOrdersAsync(table, errors, userId, ct),
+            ActualCsvKinds.ShipmentJudgments => await ImportShipmentJudgmentsAsync(table, errors, userId!, ct),
+            ActualCsvKinds.Shipments => await ImportShipmentsAsync(table, errors, userId, ct),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
         if (errors.Count == 0)
