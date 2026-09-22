@@ -311,7 +311,7 @@ public class ExecutionTests
             new List<MesApp.Core.Contracts.Masters.BomItemRequest>
             {
                 new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
-                new(other.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
+                new(other.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1", IsAlternative: true),
             })).EnsureSuccessStatusCode();
         var stillRejected = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
             new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m));
@@ -321,7 +321,7 @@ public class ExecutionTests
         var newOrder = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
         var accepted2 = await admin.PostAsJsonAsync(
             $"/api/work-orders/{newOrder.WorkOrders[0].Id}/consumptions",
-            new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m));
+            new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m, "主材料の欠品"));
         Assert.Equal(HttpStatusCode.OK, accepted2.StatusCode);
         Assert.Equal(95m, await Phase3TestData.GetStockQuantityAsync(admin, otherLot.Id));
     }

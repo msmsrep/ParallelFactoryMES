@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Policies;
@@ -35,6 +36,42 @@ public static class ProductStructurePolicy
         (candidates ?? [])
             .Concat(representative is { } id ? [id] : [])
             .Distinct();
+
+    /// <summary>
+    /// MBOMの代替部品グループの整合（A-40-10-04）。問題があれば日本語の理由を返す。
+    /// <list type="bullet">
+    /// <item>代替部品の行は代替部品グループを持つ（どの主材料の代わりかが決まらないと、投入の照合で意味を持たない）</item>
+    /// <item>グループの主材料（代替部品でない行）はちょうど1つ。無いとバックフラッシュがそのグループの部材を何も引かず、
+    /// 2つ以上だと代わりになるはずの部材を両方とも原単位ぶん引く（Spec.md 3.9）</item>
+    /// </list>
+    /// グループ名は前後の空白を除いて比べる（<see cref="NormalizeAlternativeGroup"/>）
+    /// </summary>
+    public static string? CheckAlternativeGroups(IEnumerable<(string ChildCode, string? Group, bool IsAlternative)> lines)
+    {
+        var normalized = lines.Select(l => (l.ChildCode, Group: NormalizeAlternativeGroup(l.Group), l.IsAlternative)).ToList();
+        if (normalized.FirstOrDefault(l => l.IsAlternative && l.Group is null) is { ChildCode: { } orphan })
+        {
+            return ApiText.T("代替部品の行には代替部品グループが必要です（子品目 '{0}'）。", orphan);
+        }
+        foreach (var group in normalized.Where(l => l.Group is not null).GroupBy(l => l.Group!, StringComparer.Ordinal))
+        {
+            var primaries = group.Where(l => !l.IsAlternative).Select(l => l.ChildCode).ToList();
+            if (primaries.Count == 0)
+            {
+                return ApiText.T("代替部品グループ '{0}' に主材料（代替部品でない行）がありません。", group.Key);
+            }
+            if (primaries.Count > 1)
+            {
+                return ApiText.T("代替部品グループ '{0}' に主材料が複数あります（{1}）。主材料は1つにし、他は代替部品にしてください。",
+                    group.Key, string.Join(", ", primaries));
+            }
+        }
+        return null;
+    }
+
+    /// <summary>代替部品グループ名の正規化（前後の空白を除き、空なら未指定）。保存とグループの比較で同じ形にする</summary>
+    public static string? NormalizeAlternativeGroup(string? group) =>
+        string.IsNullOrWhiteSpace(group) ? null : group.Trim();
 
     /// <summary>
     /// MBOMの循環（A→B→…→A）を探す（A-40-10-01）。親品目の明細を <paramref name="childIds"/> に置き換えたとき、

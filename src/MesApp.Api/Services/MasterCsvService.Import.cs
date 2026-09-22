@@ -956,13 +956,19 @@ public sealed partial class MasterCsvService
                     ChildProductId = childId!.Value,
                     QuantityPer = quantity!.Value,
                     MakeOrBuy = makeOrBuy,
-                    AlternativeGroup = alternativeGroup,
+                    AlternativeGroup = ProductStructurePolicy.NormalizeAlternativeGroup(alternativeGroup),
                     IsAlternative = isAlternative,
                     RoutingSequence = routingSequence,
                 });
             }
             if (failed)
             {
+                continue;
+            }
+            if (ProductStructurePolicy.CheckAlternativeGroups(
+                    lines.Select(l => (codeById[l.ChildProductId], l.AlternativeGroup, l.IsAlternative))) is { } alternativeError)
+            {
+                parentReader.Fail(ApiText.T("親品目 '{0}'：{1}", parentCode, alternativeError));
                 continue;
             }
             if (ProductStructurePolicy.FindBomCycle(edges, parentId, lines.Select(l => l.ChildProductId)) is { } cycle)

@@ -2001,4 +2001,16 @@
   <data name="MBOMが循環します（{0}）。" xml:space="preserve">
     <value>The MBOM is circular ({0}).</value>
   </data>
+  <data name="代替部品の行には代替部品グループが必要です（子品目 '{0}'）。" xml:space="preserve">
+    <value>A substitute row needs a substitute group (child item '{0}').</value>
+  </data>
+  <data name="代替部品グループ '{0}' に主材料（代替部品でない行）がありません。" xml:space="preserve">
+    <value>Substitute group '{0}' has no primary material (a row that is not a substitute).</value>
+  </data>
+  <data name="代替部品グループ '{0}' に主材料が複数あります（{1}）。主材料は1つにし、他は代替部品にしてください。" xml:space="preserve">
+    <value>Substitute group '{0}' has more than one primary material ({1}). Keep one primary and mark the others as substitutes.</value>
+  </data>
+  <data name="親品目 '{0}'：{1}" xml:space="preserve">
+    <value>Parent item '{0}': {1}</value>
+  </data>
 </root>

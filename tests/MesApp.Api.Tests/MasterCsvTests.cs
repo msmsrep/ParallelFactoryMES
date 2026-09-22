@@ -208,6 +208,28 @@ public class MasterCsvTests
     }
 
     [Fact]
+    public async Task 代替部品グループの整合はCSVでも確かめる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(client, "products", """
+            Code,Name,Unit,Type
+            FG-01,完成品,個,Product
+            RM-01,主材料,個,Material
+            RM-02,代替部材,個,Material
+            """)).Succeeded);
+
+        // 単票APIと同じ判定（ProductStructurePolicy）。主材料の無いグループは取り込めない
+        var result = await ImportAsync(client, "bom", """
+            ParentProductCode,ChildProductCode,QuantityPer,AlternativeGroup,IsAlternative
+            FG-01,RM-01,1,GRP-1,true
+            FG-01,RM-02,1,GRP-1,true
+            """);
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, e => e.Line == 2 && e.Message.Contains("GRP-1") && e.Message.Contains("FG-01"));
+    }
+
+    [Fact]
     public async Task MBOMと工順をコード指定のCSVで一括登録できる()
     {
         using var factory = new ApiFactory();

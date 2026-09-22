@@ -28,11 +28,16 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
         }
 
         var childIds = items.Select(i => i.ChildProductId).ToList();
-        var validChildIds = await db.Products
-            .Where(p => childIds.Contains(p.Id)).Select(p => p.Id).ToListAsync(ct);
-        if (childIds.Except(validChildIds).Any())
+        var childCodes = await db.Products
+            .Where(p => childIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Code, ct);
+        if (childIds.Except(childCodes.Keys).Any())
         {
             return ApiText.T("存在しない子品目IDが含まれています。");
+        }
+        if (ProductStructurePolicy.CheckAlternativeGroups(
+                items.Select(i => (childCodes[i.ChildProductId], i.AlternativeGroup, i.IsAlternative))) is { } alternativeError)
+        {
+            return alternativeError;
         }
 
         var edges = (await db.BomItems.AsNoTracking()
@@ -55,7 +60,7 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
             ChildProductId = i.ChildProductId,
             QuantityPer = i.QuantityPer,
             MakeOrBuy = i.MakeOrBuy,
-            AlternativeGroup = i.AlternativeGroup,
+            AlternativeGroup = ProductStructurePolicy.NormalizeAlternativeGroup(i.AlternativeGroup),
             IsAlternative = i.IsAlternative,
             RoutingSequence = i.RoutingSequence,
         }));
