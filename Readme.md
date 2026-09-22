@@ -96,7 +96,8 @@ DBファイル（`mesapp.db`）とJWT署名鍵（`jwt-signing.key`）は**デー
 
 書き方の見本として、そのまま取り込めるサンプルデータ一式を [`samples/master-csv/`](samples/master-csv/) に置いています
 （ファイル名の番号順に取り込むと、製造指図から出荷まで試せる状態になります）。
-ZIPにしたものを Releases に添付しています（[マスタ](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)・[実績](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip)・[ダッシュボード確認用の3か月分の実績](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv-bulk.zip)）。
+3か月分の実績サンプルと同じ期間の生産計画は [`samples/production-plans/`](samples/production-plans/) にあり、生産計画・予実画面の計画登録タブから取り込みます。
+ZIPにしたものを Releases に添付しています（[マスタ](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)・[実績](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip)・[ダッシュボード確認用の3か月分の実績](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv-bulk.zip)・[同じ期間の生産計画](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-production-plans.csv)）。
 
 ## 配布・本番相当の実行
 
@@ -201,4 +202,6 @@ tests/
 samples/
   master-csv             マスタ一括登録用のサンプルCSV（取込順にファイル名を採番）
   actual-csv             実績一括登録用のサンプルCSV（master-csv の取込後に番号順で取り込む）
+  actual-csv-bulk        ダッシュボード・予実確認用の約3か月分の実績（scripts/New-SampleBulkActuals.ps1 で生成）
+  production-plans       actual-csv-bulk と同じ期間の生産計画（生産計画・予実画面の計画登録タブから取り込む）
 ```

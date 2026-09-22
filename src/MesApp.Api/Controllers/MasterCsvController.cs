@@ -84,6 +84,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
     /// <para>
     /// ZIPに含まれる<b>全種別の取込権限</b>が要る（1種別でも権限が無ければ何も取り込まず403）。
     /// 実績CSVが混ざったZIPは受け付けない（実績は <c>api/actuals/csv/bundle</c> で別に取り込む）。
+    /// 生産計画もマスタでないので受け付けない（<see cref="MasterCsvKinds.Standalone"/>。計画登録タブから1ファイルで取り込む）。
     /// </para>
     /// </summary>
     [HttpPost("bundle")]
@@ -101,6 +102,15 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
             return this.BadRequestProblem(zipError);
         }
 
+        // 生産計画などマスタでない種別は、種別として取り込めてもマスタのZIPには入れさせない（それぞれの画面から取り込む）
+        var standalone = entries
+            .Where(e => MasterCsvKinds.Standalone.Contains(e.Kind, StringComparer.OrdinalIgnoreCase)).ToList();
+        if (standalone.Count > 0)
+        {
+            return this.BadRequestProblem(ApiText.T(
+                "マスタでないCSVが含まれています：{0}。生産計画は生産計画・予実画面の計画登録タブから取り込んでください。",
+                string.Join(ApiText.T("、"), standalone.Select(e => e.FileName))));
+        }
         var unknown = entries.Where(e => MasterCsvKinds.Find(e.Kind) is null).ToList();
         if (unknown.Count > 0)
         {

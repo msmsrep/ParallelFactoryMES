@@ -228,8 +228,9 @@ public static class MasterCsvKinds
             new("AcquiredOn", "取得日", false, "yyyy-MM-dd"),
             new("ExpiresOn", "有効期限", false, "yyyy-MM-dd"),
         ]),
-        // 生産計画は業務データだが、改訂のたびに同じキーを上書きしたいので実績CSV（常に新規登録）でなく
-        // マスタCSV（キーでupsert）に乗せる（Spec.md 3.8・5.2 ProductionPlan。A-30-10-01）
+        // 生産計画はマスタではなく業務データだが、改訂のたびに同じキーを上書きしたいので、実績CSV（常に新規登録）でなく
+        // マスタCSVの取込の仕組み（キーでupsert）だけを借りる。マスタの一括ZIPには入れない（ImportOrder・Standalone。
+        // Spec.md 3.8・5.2 ProductionPlan。A-30-10-01）
         new(ProductionPlans, "生産計画", false,
         [
             new("BusinessDate", "製造日", true, "yyyy-MM-dd。製造日・品目・工程・作業区が同じなら計画数量を上書き、無ければ新規登録"),
@@ -248,14 +249,20 @@ public static class MasterCsvKinds
     /// <summary>
     /// 一括出力で付ける番号の順（＝取り込む順）。後の種別が前の種別のコードを参照する
     /// （ロケーション→品目の既定ロケーション、作業区→設備・工順、手順書→工順、直→ユーザー など）。
-    /// 種別を追加したら、参照先より後ろに置く
+    /// 種別を追加したら、参照先より後ろに置く。マスタの一括ZIPに入るのはここに並べた種別だけ
     /// </summary>
     public static readonly IReadOnlyList<string> ImportOrder =
     [
         WorkCenters, Processes, Locations, Products, Skills, Shifts, Equipments, EquipmentParts, Tools,
         Checklists, DefectReasons, InspectionItems, ControlItems, InspectionDevices, Bom, WorkProcedures,
-        Routing, Users, UserSkills, ProductionPlans,
+        Routing, Users, UserSkills,
     ];
+
+    /// <summary>
+    /// 取込の仕組みだけを借りている、マスタでない種別（生産計画）。マスタの一括ZIPの取込・出力には入れず、
+    /// それぞれの画面から1ファイルずつ扱う（日々増える業務データを、マスタの移行や全件出力に巻き込まないため。Spec.md 3.8）
+    /// </summary>
+    public static readonly IReadOnlyList<string> Standalone = [ProductionPlans];
 
     public static CsvKindInfo? Find(string kind) =>
         All.FirstOrDefault(k => string.Equals(k.Kind, kind, StringComparison.OrdinalIgnoreCase));

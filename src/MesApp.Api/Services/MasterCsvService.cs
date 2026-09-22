@@ -312,17 +312,27 @@ public sealed partial class MasterCsvService(
         var plans = await db.ProductionPlans.AsNoTracking()
             .Include(p => p.Product).Include(p => p.Process).Include(p => p.WorkCenter)
             .ToListAsync(ct);
-        return [.. plans
+        return ProductionPlanRows(plans
             .OrderBy(p => p.BusinessDate)
             .ThenBy(p => p.Product!.Code, StringComparer.Ordinal)
             .ThenBy(p => p.Process!.Code, StringComparer.Ordinal)
-            .ThenBy(p => p.WorkCenter?.Code, StringComparer.Ordinal)
-            .Select(p => new string?[]
-            {
-                Date(p.BusinessDate), p.Product!.Code, p.Process!.Code, p.WorkCenter?.Code,
-                Num(p.PlannedQuantity), p.Note,
-            })];
+            .ThenBy(p => p.WorkCenter?.Code, StringComparer.Ordinal));
     }
+
+    /// <summary>
+    /// 絞り込んだ計画をCSVにする（生産計画画面の出力 <c>api/production-plans/csv</c>。Spec.md 3.8）。
+    /// 品目・工程・作業区を Include 済みで、並べ替え済みの計画を渡す
+    /// </summary>
+    public static string FormatProductionPlans(IEnumerable<ProductionPlan> plans) =>
+        CsvFile.Format(MasterCsvKinds.ColumnNames(MasterCsvKinds.Find(MasterCsvKinds.ProductionPlans)!),
+            ProductionPlanRows(plans));
+
+    private static List<string?[]> ProductionPlanRows(IEnumerable<ProductionPlan> plans) =>
+        [.. plans.Select(p => new string?[]
+        {
+            Date(p.BusinessDate), p.Product!.Code, p.Process!.Code, p.WorkCenter?.Code,
+            Num(p.PlannedQuantity), p.Note,
+        })];
 
     private async Task<Dictionary<string, List<string>>> RoleNamesByUserAsync(CancellationToken ct)
     {

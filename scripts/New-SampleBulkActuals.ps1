@@ -17,12 +17,17 @@
 
     部材の受入・投入は含めない（バックフラッシュしない）。在庫の動きを見るサンプルは samples/actual-csv/ を使う。
 
+    あわせて、同じ期間の生産計画（製造日×品目×工程の計画数量）を samples/production-plans/production-plans.csv に書く
+    （生産計画はマスタでも実績でもないので、どちらのZIPにも入れない。生産計画画面の計画登録タブから取り込み、予実タブで突き合わせを見る）。
+    計画は乱数を使わず、実績の出来高とほぼ釣り合う一定の数量にしている（工具摩耗の週は達成率が下がり、お盆休みは計画0＝計画上の休止）。
+
 .EXAMPLE
     ./scripts/New-SampleBulkActuals.ps1
 #>
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot '../samples/actual-csv-bulk')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot '../samples/actual-csv-bulk'),
+    [string]$PlanOutputDirectory = (Join-Path $PSScriptRoot '../samples/production-plans')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -184,9 +189,50 @@ for ($w = 0; $w -lt $weeks; $w++) {
     $production.Add("$sfOrder,20,$($sfWeekGood - $defect),$defect,,,$(Fmt $returnDay.AddHours(10)),$(Fmt $returnDay.AddHours(11)),WIP-02,false,$(SplitDefects $defect @{ 'DR-03' = 1 })")
 }
 
+# ---- 生産計画（製造日×品目×工程。作業区は工順と同じ最下段）。乱数を使わない（上の実績の内容を変えないため） ----
+$plans = [System.Collections.Generic.List[string]]::new()
+$plans.Add('BusinessDate,ProductCode,ProcessCode,WorkCenterCode,PlannedQuantity,Note')
+for ($w = 0; $w -lt $weeks; $w++) {
+    $monday = $firstMonday.AddDays(7 * $w)
+    $sfWeekPlan = 0
+    $lastWeekday = $null
+    foreach ($day in (0..5 | ForEach-Object { $monday.AddDays($_) })) {
+        $key = Key $day
+        if ($obonDays -contains $key) {
+            # 計画数量0は計画上の休止（予実では達成率を出さない）
+            $plans.Add("$key,SF-2000,PR-10,WC-MC1,0,お盆休み")
+            $plans.Add("$key,FG-1000,PR-30,WC-AS1,0,お盆休み")
+            $plans.Add("$key,FG-1000,PR-40,WC-QC1,0,お盆休み")
+            $plans.Add("$key,FG-1000,PR-50,WC-PK1,0,お盆休み")
+            continue
+        }
+        if ($day.DayOfWeek -eq 'Saturday') {
+            if ($saturdayShifts -contains $key) {
+                $plans.Add("$key,SF-2000,PR-10,WC-MC1,40,休日出勤（昼勤のみ）")
+                $sfWeekPlan += 40
+            }
+            continue
+        }
+        # 加工は昼勤40＋夜勤36、組立→最終検査→梱包は昼勤で30
+        $plans.Add("$key,SF-2000,PR-10,WC-MC1,76,")
+        $plans.Add("$key,FG-1000,PR-30,WC-AS1,30,")
+        $plans.Add("$key,FG-1000,PR-40,WC-QC1,30,")
+        $plans.Add("$key,FG-1000,PR-50,WC-PK1,30,")
+        $sfWeekPlan += 76
+        $lastWeekday = $key
+    }
+    # 外注の表面処理は週の最終稼働日にまとめて戻る（作業区なし）
+    if ($lastWeekday) {
+        $plans.Add("$lastWeekday,SF-2000,PR-20,,$sfWeekPlan,外注戻り（週まとめ）")
+    }
+}
+
 New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
 $bom = [System.Text.UTF8Encoding]::new($true)
 [IO.File]::WriteAllLines((Join-Path $OutputDirectory '01_manufacturing-orders.csv'), $orders, $bom)
 [IO.File]::WriteAllLines((Join-Path $OutputDirectory '02_production-records.csv'), $production, $bom)
 [IO.File]::WriteAllLines((Join-Path $OutputDirectory '03_equipment-logs.csv'), $logs, $bom)
+New-Item -ItemType Directory -Force $PlanOutputDirectory | Out-Null
+[IO.File]::WriteAllLines((Join-Path $PlanOutputDirectory 'production-plans.csv'), $plans, $bom)
 Write-Host "作成: $OutputDirectory（指図 $($orders.Count - 1) 行・生産実績 $($production.Count - 1) 行・設備稼働 $($logs.Count - 1) 行）"
+Write-Host "作成: $PlanOutputDirectory（生産計画 $($plans.Count - 1) 行）"

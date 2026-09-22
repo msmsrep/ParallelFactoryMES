@@ -266,6 +266,7 @@ MBOMは、実績入力の**バックフラッシュ**（部材の自動消費）
 - **1ファイルでもエラーがあると、ZIPの全ファイルが取り消されます。** 結果にはファイルごとのエラーと、処理しなかったファイルが出ます。
 - ZIPに入っている**全部の種別を取り込める権限**が必要です（例：ユーザーのCSVが入っていると、システム管理者以外は取り込めません）。
 - 実績のCSVは入れられません。実績は **実績CSV取込** 画面でZIPにして取り込みます。
+- 生産計画もマスタではないので入れられません。生産計画は **生産計画・予実** 画面の計画登録タブから取り込みます（[生産管理](production.html#plan)）。
 - **全マスタをZIPで出力** すると、取り込む順の番号付きのCSVがまとめて出力されます。そのまま別の環境へ一括取込できます
   （ユーザーはパスワードを出力しないので、新しい環境で使うときはユーザーのCSVに `InitialPassword` を書き足してください）。
 
@@ -326,6 +327,7 @@ CSVに登場しなかった親品目のMBOM・工順は変更されません。
 **[samples-actual-csv-bulk.zip](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv-bulk.zip)** にあります
 （中身と見どころは [samples/actual-csv-bulk](https://github.com/msmsrep/ParallelFactoryMES/tree/main/samples/actual-csv-bulk)）。
 期間は 2026-06-29〜2026-09-20 なので、ダッシュボードでは基準日をその期間に合わせて見てください。
+同じ期間の生産計画のサンプル（[samples-production-plans.csv](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-production-plans.csv)）もあります（[生産管理](production.html#plan)を参照）。
 
 ### ユーザーのCSV（システム管理者のみ）
 

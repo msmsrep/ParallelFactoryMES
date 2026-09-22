@@ -5,7 +5,8 @@
 .DESCRIPTION
     自己完結版なので配布先に .NET / ASP.NET Core Runtime は要らない。
     ZIP には起動スクリプト（start.cmd / start.sh）・LICENSE・ソースの所在（AGPL-3.0 の対応ソース）を同梱する。
-    あわせて、取込画面に渡せるサンプルCSVのZIP（samples-master-csv.zip / samples-actual-csv.zip / samples-actual-csv-bulk.zip）を作る。
+    あわせて、取込画面に渡せるサンプルCSVのZIP（samples-master-csv.zip / samples-actual-csv.zip / samples-actual-csv-bulk.zip）と、
+    生産計画のサンプル（samples-production-plans.csv。計画登録タブのCSV取込は1ファイルずつなのでZIPにしない）を作る。
 
     ZIP は Unix の実行権限を保持しないため、start.sh が起動前に MesApp.Api へ実行権限を付ける
     （利用者は `sh start.sh` で起動する）。
@@ -132,3 +133,7 @@ foreach ($kind in 'master-csv', 'actual-csv', 'actual-csv-bulk') {
     [IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $repoRoot "samples/$kind"), $zip)
     Write-Host "作成: $zip"
 }
+# 生産計画はマスタでも実績でもなく、計画登録タブから1ファイルで取り込むので、CSVのまま添付する
+$planCsv = Join-Path $OutputDirectory 'samples-production-plans.csv'
+Copy-Item (Join-Path $repoRoot 'samples/production-plans/production-plans.csv') $planCsv -Force
+Write-Host "作成: $planCsv"

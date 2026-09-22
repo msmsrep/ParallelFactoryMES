@@ -33,47 +33,31 @@ public class ProductionPlansController(
         [FromQuery] int? productId = null, [FromQuery] int? processId = null,
         [FromQuery] int? workCenterId = null, CancellationToken ct = default)
     {
-        if (from > to)
+        var (plans, error) = await SearchAsync(from, to, productId, processId, workCenterId, ct);
+        if (error is not null)
         {
-            return this.BadRequestProblem(ApiText.T("期間の開始日が終了日より後になっています。"));
+            return error;
         }
+        return plans!.Select(ToResponse).ToList();
+    }
 
-        var query = BaseQuery();
-        if (from is { } f)
+    /// <summary>
+    /// 一覧と同じ条件で絞った計画のCSV出力（Spec.md 3.8）。列はCSV取込（<c>api/masters/csv/production-plans</c>）と同じで、
+    /// そのまま直して取り込み直せる。計画は日々増えるので、マスタのように全件を出さず画面の絞り込みに合わせる
+    /// </summary>
+    [HttpGet("csv")]
+    public async Task<IActionResult> ExportCsv(
+        [FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null,
+        [FromQuery] int? productId = null, [FromQuery] int? processId = null,
+        [FromQuery] int? workCenterId = null, CancellationToken ct = default)
+    {
+        var (plans, error) = await SearchAsync(from, to, productId, processId, workCenterId, ct);
+        if (error is not null)
         {
-            query = query.Where(p => p.BusinessDate >= f);
+            return error;
         }
-        if (to is { } t)
-        {
-            query = query.Where(p => p.BusinessDate <= t);
-        }
-        if (productId is { } pid)
-        {
-            query = query.Where(p => p.ProductId == pid);
-        }
-        if (processId is { } prid)
-        {
-            query = query.Where(p => p.ProcessId == prid);
-        }
-        if (workCenterId is { } rootId)
-        {
-            var all = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
-            if (all.All(x => x.Id != rootId))
-            {
-                return this.BadRequestProblem(ApiText.T("作業区（ID {0}）が見つかりません。", rootId));
-            }
-            var targets = WorkCenterHierarchyPolicy.SelfAndDescendantIds(rootId, all);
-            query = query.Where(p => p.WorkCenterId != null && targets.Contains(p.WorkCenterId.Value));
-        }
-
-        var plans = await query.ToListAsync(ct);
-        return plans
-            .OrderBy(p => p.BusinessDate)
-            .ThenBy(p => p.Product!.Code, StringComparer.Ordinal)
-            .ThenBy(p => p.Process!.Code, StringComparer.Ordinal)
-            .ThenBy(p => p.WorkCenter?.Code, StringComparer.Ordinal)
-            .Select(ToResponse)
-            .ToList();
+        var csv = MasterCsvService.FormatProductionPlans(plans!);
+        return File(CsvFile.ToUtf8Bom(csv), "text/csv; charset=utf-8", $"production-plans_{DateTime.Now:yyyyMMdd}.csv");
     }
 
     /// <summary>
@@ -191,6 +175,51 @@ public class ProductionPlansController(
             { Conflict: true } v => this.ConflictProblem(v.Message),
             var v => this.BadRequestProblem(v.Message),
         };
+    }
+
+    /// <summary>一覧・CSV出力の共通の絞り込み（製造日・品目・工程・作業区の配下）。並びは製造日・品目・工程・作業区のコード順</summary>
+    private async Task<(List<ProductionPlan>? Plans, ActionResult? Error)> SearchAsync(
+        DateOnly? from, DateOnly? to, int? productId, int? processId, int? workCenterId, CancellationToken ct)
+    {
+        if (from > to)
+        {
+            return (null, this.BadRequestProblem(ApiText.T("期間の開始日が終了日より後になっています。")));
+        }
+
+        var query = BaseQuery();
+        if (from is { } f)
+        {
+            query = query.Where(p => p.BusinessDate >= f);
+        }
+        if (to is { } t)
+        {
+            query = query.Where(p => p.BusinessDate <= t);
+        }
+        if (productId is { } pid)
+        {
+            query = query.Where(p => p.ProductId == pid);
+        }
+        if (processId is { } prid)
+        {
+            query = query.Where(p => p.ProcessId == prid);
+        }
+        if (workCenterId is { } rootId)
+        {
+            var all = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
+            if (all.All(x => x.Id != rootId))
+            {
+                return (null, this.BadRequestProblem(ApiText.T("作業区（ID {0}）が見つかりません。", rootId)));
+            }
+            var targets = WorkCenterHierarchyPolicy.SelfAndDescendantIds(rootId, all);
+            query = query.Where(p => p.WorkCenterId != null && targets.Contains(p.WorkCenterId.Value));
+        }
+
+        var plans = await query.ToListAsync(ct);
+        return ([.. plans
+            .OrderBy(p => p.BusinessDate)
+            .ThenBy(p => p.Product!.Code, StringComparer.Ordinal)
+            .ThenBy(p => p.Process!.Code, StringComparer.Ordinal)
+            .ThenBy(p => p.WorkCenter?.Code, StringComparer.Ordinal)], null);
     }
 
     private IQueryable<ProductionPlan> BaseQuery() =>

@@ -24,6 +24,12 @@
 
 部材の受入・投入は含めません（バックフラッシュしない）。在庫の動きを見るときは `samples/actual-csv/` を使ってください。
 
+## 生産計画（予実）
+
+同じ期間の生産計画は [`samples/production-plans/`](../production-plans/) にあります
+（生産計画は実績でもマスタでもないので、このZIPには入れていません）。
+**生産・製造実行 → 生産計画・予実** の計画登録タブから取り込むと、予実タブで計画と出来高の突き合わせを見られます。
+
 ## 取り込み方
 
 **管理 → 実績CSV取込** の **ZIPで一括取込** に、このフォルダのCSVをまとめたZIP（リリースの `samples-actual-csv-bulk.zip`）を渡します。
@@ -32,6 +38,7 @@
 ## 作り直し方
 
 内容は [`scripts/New-SampleBulkActuals.ps1`](../../scripts/New-SampleBulkActuals.ps1) が生成しています（乱数の種を固定しているので、何度作っても同じ内容になります）。
+生産計画（`samples/production-plans/production-plans.csv`）も同じスクリプトが書き出します。
 手で編集せず、スクリプトを直して作り直してください。
 
 ```powershell

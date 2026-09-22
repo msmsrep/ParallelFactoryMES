@@ -1086,6 +1086,9 @@
   <data name="実績のCSVが含まれています：{0}。実績は実績CSV取込で別のZIPとして取り込んでください。" xml:space="preserve">
     <value>The ZIP contains actuals CSV files: {0}. Import actuals as a separate ZIP in Actuals CSV Import.</value>
   </data>
+  <data name="マスタでないCSVが含まれています：{0}。生産計画は生産計画・予実画面の計画登録タブから取り込んでください。" xml:space="preserve">
+    <value>The ZIP contains CSV files that are not master data: {0}. Import production plans from the Plan entry tab of Production Plan vs. Actual.</value>
+  </data>
   <data name="取込に対応していないマスタのCSVが含まれています：{0}（ファイル名は「番号_種別.csv」。例 01_work-centers.csv）。" xml:space="preserve">
     <value>The ZIP contains CSV files for masters that cannot be imported: {0} (file names must be "number_kind.csv", e.g. 01_work-centers.csv).</value>
   </data>
