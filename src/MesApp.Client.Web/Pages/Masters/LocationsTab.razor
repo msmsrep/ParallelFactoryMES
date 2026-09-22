@@ -5,14 +5,14 @@
 
 <AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
-        <h2 style="margin-top:0;">@(_editingId is null ? "ロケーションの登録" : $"ロケーションの編集（{_code}）")</h2>
+        <h2 style="margin-top:0;">@(_editingId is null ? L["ロケーションの登録"] : L["ロケーションの編集（{0}）", _code])</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>ロケーションコード</label>
+                <label>@L["ロケーションコード"]</label>
                 <input @bind="_code" />
             </div>
             <div class="form-field">
-                <label>倉庫/エリア区分</label>
+                <label>@L["倉庫/エリア区分"]</label>
                 <select @bind="_areaType">
                     <option value="@LocationAreaType.MaterialWarehouse">@EnumLabels.Of(LocationAreaType.MaterialWarehouse)</option>
                     <option value="@LocationAreaType.InProcess">@EnumLabels.Of(LocationAreaType.InProcess)</option>
@@ -21,9 +21,9 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>所属する作業区</label>
+                <label>@L["所属する作業区"]</label>
                 <select @bind="_workCenterId">
-                    <option value="0">なし</option>
+                    <option value="0">@L["なし"]</option>
                     @foreach (var wc in _workCenters ?? [])
                     {
                         <option value="@wc.Id">@wc.Code @wc.Name</option>
@@ -31,31 +31,31 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>棚番</label>
+                <label>@L["棚番"]</label>
                 <input @bind="_shelfNo" />
             </div>
         </div>
         <div class="actions">
-            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
             @if (_editingId is not null)
             {
-                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+                <button class="btn btn-secondary" @onclick="ResetForm">@L["キャンセル"]</button>
             }
         </div>
     </div>
 </AuthorizeView>
 
-<CsvIoPanel Kind="locations" Label="ロケーション" KeyLabel="ロケーションコード" OnImported="LoadAsync" />
+<CsvIoPanel Kind="locations" Label="@L["ロケーション"]" KeyLabel="@L["ロケーションコード"]" OnImported="LoadAsync" />
 
 <div class="card">
     @if (_items is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else
     {
         <table class="table">
-            <thead><tr><th>コード</th><th>区分</th><th>作業区</th><th>棚番</th><th>状態</th><th></th></tr></thead>
+            <thead><tr><th>@L["コード"]</th><th>@L["区分"]</th><th>@L["作業区"]</th><th>@L["棚番"]</th><th>@L["状態"]</th><th></th></tr></thead>
             <tbody>
                 @foreach (var item in _items)
                 {
@@ -64,14 +64,14 @@
                         <td>@EnumLabels.Of(item.AreaType)</td>
                         <td>@(item.WorkCenterCode is null ? "-" : $"{item.WorkCenterCode} {item.WorkCenterName}")</td>
                         <td>@(item.ShelfNo ?? "-")</td>
-                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td>@(item.IsActive ? L["有効"] : L["無効"])</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
-                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">@L["編集"]</button>
                                 @if (item.IsActive)
                                 {
                                     <button class="btn btn-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                            @onclick="() => DeactivateAsync(item.Id)">@L["無効化"]</button>
                                 }
                             </AuthorizeView>
                         </td>
@@ -125,7 +125,7 @@
     {
         if (string.IsNullOrWhiteSpace(_code))
         {
-            _error = "ロケーションコードを入力してください。";
+            _error = L["ロケーションコードを入力してください。"];
             return;
         }
         _busy = true;
@@ -137,12 +137,12 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/locations", request)
                 : await Http.PutAsJsonAsync($"api/locations/{_editingId}", request);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保存しました。";
+            _message = L["保存しました。"];
             ResetForm();
             await LoadAsync();
         }
@@ -159,12 +159,12 @@
         try
         {
             var response = await Http.DeleteAsync($"api/locations/{id}");
-            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["無効化に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "無効化しました。";
+            _message = L["無効化しました。"];
             await LoadAsync();
         }
         finally

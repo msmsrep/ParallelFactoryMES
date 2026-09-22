@@ -387,4 +387,961 @@
   <data name="（{0}）" xml:space="preserve">
     <value>({0})</value>
   </data>
+  <data name="マスタ管理 - Parallel Factory MES" xml:space="preserve">
+    <value>Master Data - Parallel Factory MES</value>
+  </data>
+  <data name="品目／MBOM／工順（BOP）／工程／作業区／設備（BOE）／治工具／ロケーション／検査項目・基準／検査機・測定器／工程管理項目／作業手順書（SOP）／チェックリスト／勤務シフト／ユーザー・スキル資格。" xml:space="preserve">
+    <value>Products / MBOM / Routings (BOP) / Processes / Work centers / Equipment (BOE) / Tools / Locations / Inspection items &amp; criteria / Inspection devices / Process control items / Work procedures (SOP) / Checklists / Shifts / Users &amp; skills.</value>
+  </data>
+  <data name="マスタ" xml:space="preserve">
+    <value>Master data</value>
+  </data>
+  <data name="品目・MBOM・工順" xml:space="preserve">
+    <value>Products, MBOM &amp; Routings</value>
+  </data>
+  <data name="工程" xml:space="preserve">
+    <value>Process</value>
+  </data>
+  <data name="作業区" xml:space="preserve">
+    <value>Work center</value>
+  </data>
+  <data name="設備（BOE）" xml:space="preserve">
+    <value>Equipment (BOE)</value>
+  </data>
+  <data name="治工具" xml:space="preserve">
+    <value>Tools</value>
+  </data>
+  <data name="ロケーション" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="検査項目・基準" xml:space="preserve">
+    <value>Inspection Items</value>
+  </data>
+  <data name="工程管理項目" xml:space="preserve">
+    <value>Process Control Items</value>
+  </data>
+  <data name="検査機・測定器" xml:space="preserve">
+    <value>Inspection Devices</value>
+  </data>
+  <data name="作業手順書" xml:space="preserve">
+    <value>Work Procedures</value>
+  </data>
+  <data name="チェックリスト" xml:space="preserve">
+    <value>Checklists</value>
+  </data>
+  <data name="不良理由" xml:space="preserve">
+    <value>Defect Reasons</value>
+  </data>
+  <data name="スキル・資格" xml:space="preserve">
+    <value>Skills &amp; Qualifications</value>
+  </data>
+  <data name="勤務シフト" xml:space="preserve">
+    <value>Shifts</value>
+  </data>
+  <data name="ユーザー" xml:space="preserve">
+    <value>Users</value>
+  </data>
+  <data name="チェックリストの登録" xml:space="preserve">
+    <value>Register checklist</value>
+  </data>
+  <data name="編集（{0}）" xml:space="preserve">
+    <value>Edit ({0})</value>
+  </data>
+  <data name="名称" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="適用区分" xml:space="preserve">
+    <value>Applies to</value>
+  </data>
+  <data name="HSE（健康衛生・安全）" xml:space="preserve">
+    <value>HSE (health, safety &amp; environment)</value>
+  </data>
+  <data name="順序" xml:space="preserve">
+    <value>Order</value>
+  </data>
+  <data name="チェック内容" xml:space="preserve">
+    <value>Check item</value>
+  </data>
+  <data name="削除" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="必須項目（未チェックでは実施記録できない）" xml:space="preserve">
+    <value>Required (cannot be recorded unchecked)</value>
+  </data>
+  <data name="項目を追加" xml:space="preserve">
+    <value>Add item</value>
+  </data>
+  <data name="登録" xml:space="preserve">
+    <value>Register</value>
+  </data>
+  <data name="更新" xml:space="preserve">
+    <value>Update</value>
+  </data>
+  <data name="キャンセル" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="チェックリストコード" xml:space="preserve">
+    <value>Checklist code</value>
+  </data>
+  <data name="読み込み中..." xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="項目数" xml:space="preserve">
+    <value>Items</value>
+  </data>
+  <data name="状態" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="有効" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="無効" xml:space="preserve">
+    <value>Inactive</value>
+  </data>
+  <data name="編集" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="無効化" xml:space="preserve">
+    <value>Deactivate</value>
+  </data>
+  <data name="チェック内容を入力してください。" xml:space="preserve">
+    <value>Enter the check item.</value>
+  </data>
+  <data name="順序が重複しています。" xml:space="preserve">
+    <value>The order numbers are duplicated.</value>
+  </data>
+  <data name="コード・名称・項目（1件以上）を入力してください。" xml:space="preserve">
+    <value>Enter the code, name and at least one item.</value>
+  </data>
+  <data name="保存に失敗しました。" xml:space="preserve">
+    <value>Failed to save.</value>
+  </data>
+  <data name="保存しました。" xml:space="preserve">
+    <value>Saved.</value>
+  </data>
+  <data name="無効化に失敗しました。" xml:space="preserve">
+    <value>Failed to deactivate.</value>
+  </data>
+  <data name="無効化しました。" xml:space="preserve">
+    <value>Deactivated.</value>
+  </data>
+  <data name="工程管理項目の登録" xml:space="preserve">
+    <value>Register process control item</value>
+  </data>
+  <data name="温度・回転数など、製造時に記録すべき条件の定義と指示値・上下限。実績はこの範囲と照合する。" xml:space="preserve">
+    <value>Conditions to record during production (temperature, speed, etc.) with their set values and limits. Actual values are checked against this range.</value>
+  </data>
+  <data name="工程管理項目コード" xml:space="preserve">
+    <value>Control item code</value>
+  </data>
+  <data name="単位" xml:space="preserve">
+    <value>Unit</value>
+  </data>
+  <data name="℃ / rpm など" xml:space="preserve">
+    <value>e.g. °C / rpm</value>
+  </data>
+  <data name="対象品目" xml:space="preserve">
+    <value>Product</value>
+  </data>
+  <data name="指定なし" xml:space="preserve">
+    <value>Not specified</value>
+  </data>
+  <data name="対象工程" xml:space="preserve">
+    <value>Process</value>
+  </data>
+  <data name="指示値" xml:space="preserve">
+    <value>Set value</value>
+  </data>
+  <data name="許容下限" xml:space="preserve">
+    <value>Lower limit</value>
+  </data>
+  <data name="許容上限" xml:space="preserve">
+    <value>Upper limit</value>
+  </data>
+  <data name="更新（版数+1）" xml:space="preserve">
+    <value>Update (revision +1)</value>
+  </data>
+  <data name="対象" xml:space="preserve">
+    <value>Target</value>
+  </data>
+  <data name="許容範囲" xml:space="preserve">
+    <value>Allowed range</value>
+  </data>
+  <data name="版数" xml:space="preserve">
+    <value>Revision</value>
+  </data>
+  <data name="工程管理項目コードと名称を入力してください。" xml:space="preserve">
+    <value>Enter the control item code and name.</value>
+  </data>
+  <data name="不良理由の登録" xml:space="preserve">
+    <value>Register defect reason</value>
+  </data>
+  <data name="不良理由の編集（{0}）" xml:space="preserve">
+    <value>Edit defect reason ({0})</value>
+  </data>
+  <data name="粒度は「現場が迷わず選べて、集計にも使える」範囲で定義する（細かすぎると選べず、粗すぎると改善に使えない）。" xml:space="preserve">
+    <value>Define reasons at a granularity the shop floor can pick without hesitation and that is still useful for analysis (too fine and nobody can choose; too coarse and it is useless for improvement).</value>
+  </data>
+  <data name="不良理由コード" xml:space="preserve">
+    <value>Defect reason code</value>
+  </data>
+  <data name="不良理由名" xml:space="preserve">
+    <value>Defect reason</value>
+  </data>
+  <data name="区分" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="不良理由コードと不良理由名を入力してください。" xml:space="preserve">
+    <value>Enter the defect reason code and name.</value>
+  </data>
+  <data name="設備の登録" xml:space="preserve">
+    <value>Register equipment</value>
+  </data>
+  <data name="設備の編集（{0}）" xml:space="preserve">
+    <value>Edit equipment ({0})</value>
+  </data>
+  <data name="資産番号" xml:space="preserve">
+    <value>Asset no.</value>
+  </data>
+  <data name="設備名" xml:space="preserve">
+    <value>Equipment name</value>
+  </data>
+  <data name="設置場所（作業区）" xml:space="preserve">
+    <value>Location (work center)</value>
+  </data>
+  <data name="なし" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="設置場所（旧項目）" xml:space="preserve">
+    <value>Location (legacy field)</value>
+  </data>
+  <data name="保全タイプ" xml:space="preserve">
+    <value>Maintenance type</value>
+  </data>
+  <data name="カレンダ（日数）" xml:space="preserve">
+    <value>Calendar (days)</value>
+  </data>
+  <data name="保全閾値" xml:space="preserve">
+    <value>Maintenance threshold</value>
+  </data>
+  <data name="保全部品" xml:space="preserve">
+    <value>Maintenance parts</value>
+  </data>
+  <data name="保全部品（{0} {1}）" xml:space="preserve">
+    <value>Maintenance parts ({0} {1})</value>
+  </data>
+  <data name="品目" xml:space="preserve">
+    <value>Product</value>
+  </data>
+  <data name="1回あたり数量" xml:space="preserve">
+    <value>Qty per job</value>
+  </data>
+  <data name="部品の品目" xml:space="preserve">
+    <value>Part product</value>
+  </data>
+  <data name="管理区分" xml:space="preserve">
+    <value>Management type</value>
+  </data>
+  <data name="行を追加" xml:space="preserve">
+    <value>Add row</value>
+  </data>
+  <data name="保全部品を保存" xml:space="preserve">
+    <value>Save maintenance parts</value>
+  </data>
+  <data name="閉じる" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="設備の保全部品" xml:space="preserve">
+    <value>Equipment maintenance parts</value>
+  </data>
+  <data name="設備の資産番号＋品目コード" xml:space="preserve">
+    <value>Equipment asset no. + product code</value>
+  </data>
+  <data name="設置場所（旧）" xml:space="preserve">
+    <value>Location (legacy)</value>
+  </data>
+  <data name="閾値" xml:space="preserve">
+    <value>Threshold</value>
+  </data>
+  <data name="資産番号と設備名を入力してください。" xml:space="preserve">
+    <value>Enter the asset no. and equipment name.</value>
+  </data>
+  <data name="部品の品目を選んでください。" xml:space="preserve">
+    <value>Select the part product.</value>
+  </data>
+  <data name="同じ品目は1行だけ登録できます。" xml:space="preserve">
+    <value>Each product can be registered only once.</value>
+  </data>
+  <data name="保全部品の保存に失敗しました。" xml:space="preserve">
+    <value>Failed to save the maintenance parts.</value>
+  </data>
+  <data name="保全部品を保存しました。" xml:space="preserve">
+    <value>Maintenance parts saved.</value>
+  </data>
+  <data name="検査機の登録" xml:space="preserve">
+    <value>Register inspection device</value>
+  </data>
+  <data name="校正期限を過ぎた検査機で測った結果は品質保証の根拠にならないため、期限切れの機器は検査実績に使えない。" xml:space="preserve">
+    <value>Measurements from a device past its calibration due date cannot support quality assurance, so overdue devices cannot be used for inspection results.</value>
+  </data>
+  <data name="校正周期を入れておくと、校正の記録時に次回期限を自動で置く。期限を空にすると期限の判定を行わない。" xml:space="preserve">
+    <value>If a calibration interval is set, the next due date is filled in automatically when calibration is recorded. Leave the due date blank to skip the due-date check.</value>
+  </data>
+  <data name="検査機コード" xml:space="preserve">
+    <value>Device code</value>
+  </data>
+  <data name="MD-01 など" xml:space="preserve">
+    <value>e.g. MD-01</value>
+  </data>
+  <data name="ノギス / 三次元測定機" xml:space="preserve">
+    <value>Caliper / CMM</value>
+  </data>
+  <data name="製造番号・管理番号" xml:space="preserve">
+    <value>Serial / control no.</value>
+  </data>
+  <data name="設置場所" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="最終校正日" xml:space="preserve">
+    <value>Last calibrated</value>
+  </data>
+  <data name="次回校正期限" xml:space="preserve">
+    <value>Next calibration due</value>
+  </data>
+  <data name="校正周期（日）" xml:space="preserve">
+    <value>Calibration interval (days)</value>
+  </data>
+  <data name="製造番号" xml:space="preserve">
+    <value>Serial no.</value>
+  </data>
+  <data name="次回期限" xml:space="preserve">
+    <value>Next due</value>
+  </data>
+  <data name="校正期限切れ" xml:space="preserve">
+    <value>Calibration overdue</value>
+  </data>
+  <data name="あと{0}日" xml:space="preserve">
+    <value>{0} days left</value>
+  </data>
+  <data name="校正を記録" xml:space="preserve">
+    <value>Record calibration</value>
+  </data>
+  <data name="校正の記録（{0} {1}）" xml:space="preserve">
+    <value>Calibration records ({0} {1})</value>
+  </data>
+  <data name="校正日" xml:space="preserve">
+    <value>Calibration date</value>
+  </data>
+  <data name="次回校正期限（空欄なら校正周期から自動）" xml:space="preserve">
+    <value>Next calibration due (blank = from interval)</value>
+  </data>
+  <data name="結果・所見" xml:space="preserve">
+    <value>Result / findings</value>
+  </data>
+  <data name="合格 / 調整実施 / 外部委託先 など" xml:space="preserve">
+    <value>Pass / adjusted / external vendor, etc.</value>
+  </data>
+  <data name="記録" xml:space="preserve">
+    <value>Record</value>
+  </data>
+  <data name="実施者" xml:space="preserve">
+    <value>Performed by</value>
+  </data>
+  <data name="校正の記録はまだありません。" xml:space="preserve">
+    <value>No calibration records yet.</value>
+  </data>
+  <data name="検査機コードと名称を入力してください。" xml:space="preserve">
+    <value>Enter the device code and name.</value>
+  </data>
+  <data name="校正日を入力してください。" xml:space="preserve">
+    <value>Enter the calibration date.</value>
+  </data>
+  <data name="記録に失敗しました。" xml:space="preserve">
+    <value>Failed to record.</value>
+  </data>
+  <data name="校正を記録しました。" xml:space="preserve">
+    <value>Calibration recorded.</value>
+  </data>
+  <data name="検査項目・基準の登録" xml:space="preserve">
+    <value>Register inspection item</value>
+  </data>
+  <data name="検査項目コード" xml:space="preserve">
+    <value>Inspection item code</value>
+  </data>
+  <data name="検査種別" xml:space="preserve">
+    <value>Inspection type</value>
+  </data>
+  <data name="受入検査" xml:space="preserve">
+    <value>Receiving inspection</value>
+  </data>
+  <data name="工程内検査" xml:space="preserve">
+    <value>In-process inspection</value>
+  </data>
+  <data name="完成品検査" xml:space="preserve">
+    <value>Final inspection</value>
+  </data>
+  <data name="サンプル検査" xml:space="preserve">
+    <value>Sample inspection</value>
+  </data>
+  <data name="規格値 下限" xml:space="preserve">
+    <value>Spec lower limit</value>
+  </data>
+  <data name="規格値 上限" xml:space="preserve">
+    <value>Spec upper limit</value>
+  </data>
+  <data name="基準値" xml:space="preserve">
+    <value>Nominal value</value>
+  </data>
+  <data name="検査方法" xml:space="preserve">
+    <value>Method</value>
+  </data>
+  <data name="サンプリング数" xml:space="preserve">
+    <value>Sample size</value>
+  </data>
+  <data name="種別" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="規格値" xml:space="preserve">
+    <value>Spec</value>
+  </data>
+  <data name="方法" xml:space="preserve">
+    <value>Method</value>
+  </data>
+  <data name="ｻﾝﾌﾟﾘﾝｸﾞ" xml:space="preserve">
+    <value>Sampling</value>
+  </data>
+  <data name="検査項目コードと名称を入力してください。" xml:space="preserve">
+    <value>Enter the inspection item code and name.</value>
+  </data>
+  <data name="ロケーションの登録" xml:space="preserve">
+    <value>Register location</value>
+  </data>
+  <data name="ロケーションの編集（{0}）" xml:space="preserve">
+    <value>Edit location ({0})</value>
+  </data>
+  <data name="ロケーションコード" xml:space="preserve">
+    <value>Location code</value>
+  </data>
+  <data name="倉庫/エリア区分" xml:space="preserve">
+    <value>Warehouse / area type</value>
+  </data>
+  <data name="所属する作業区" xml:space="preserve">
+    <value>Work center</value>
+  </data>
+  <data name="棚番" xml:space="preserve">
+    <value>Shelf no.</value>
+  </data>
+  <data name="ロケーションコードを入力してください。" xml:space="preserve">
+    <value>Enter the location code.</value>
+  </data>
+  <data name="工程の登録" xml:space="preserve">
+    <value>Register process</value>
+  </data>
+  <data name="工程の編集（ID {0}）" xml:space="preserve">
+    <value>Edit process (ID {0})</value>
+  </data>
+  <data name="工程コード" xml:space="preserve">
+    <value>Process code</value>
+  </data>
+  <data name="工程名" xml:space="preserve">
+    <value>Process name</value>
+  </data>
+  <data name="工程区分" xml:space="preserve">
+    <value>Process type</value>
+  </data>
+  <data name="工程コードと工程名を入力してください。" xml:space="preserve">
+    <value>Enter the process code and name.</value>
+  </data>
+  <data name="{0} の 設計変更の影響（J-40-40-01/03）" xml:space="preserve">
+    <value>Impact of design change on {0} (J-40-40-01/03)</value>
+  </data>
+  <data name="指図は展開した時点のMBOM・工順を写し取って持つため、" xml:space="preserve">
+    <value>Orders keep a copy of the MBOM and routing as of when they were exploded, so </value>
+  </data>
+  <data name="展開済みの指図に上の改訂は届かない" xml:space="preserve">
+    <value>the revision above does not reach orders already exploded</value>
+  </data>
+  <data name="。" xml:space="preserve">
+    <value>.</value>
+  </data>
+  <data name="改訂後の条件で作り直すなら、その指図を取り消して作り直す必要がある。" xml:space="preserve">
+    <value>To build with the revised conditions, cancel and recreate those orders.</value>
+  </data>
+  <data name="進行中の製造指図" xml:space="preserve">
+    <value>Manufacturing orders in progress</value>
+  </data>
+  <data name="進行中の指図はない。改訂の影響を受ける指図はない。" xml:space="preserve">
+    <value>No orders in progress. No order is affected by the revision.</value>
+  </data>
+  <data name="指図番号" xml:space="preserve">
+    <value>Order no.</value>
+  </data>
+  <data name="数量" xml:space="preserve">
+    <value>Quantity</value>
+  </data>
+  <data name="納期" xml:space="preserve">
+    <value>Due date</value>
+  </data>
+  <data name="着手済" xml:space="preserve">
+    <value>Started</value>
+  </data>
+  <data name="改訂の反映" xml:space="preserve">
+    <value>Revision applied</value>
+  </data>
+  <data name="届かない（展開済）" xml:space="preserve">
+    <value>Not applied (already exploded)</value>
+  </data>
+  <data name="展開時に反映される" xml:space="preserve">
+    <value>Applied when exploded</value>
+  </data>
+  <data name="部材の在庫と所要" xml:space="preserve">
+    <value>Component stock and requirements</value>
+  </data>
+  <data name="部材がない。" xml:space="preserve">
+    <value>No components.</value>
+  </data>
+  <data name="部材" xml:space="preserve">
+    <value>Component</value>
+  </data>
+  <data name="現行の原単位" xml:space="preserve">
+    <value>Current qty per unit</value>
+  </data>
+  <data name="進行中指図の予定数量" xml:space="preserve">
+    <value>Planned qty in open orders</value>
+  </data>
+  <data name="現在庫" xml:space="preserve">
+    <value>On hand</value>
+  </data>
+  <data name="現行MBOMに無い" xml:space="preserve">
+    <value>Not in current MBOM</value>
+  </data>
+  <data name="「現行MBOMに無い」部材は、改訂で外したが進行中の指図がまだ必要としているもの。" xml:space="preserve">
+    <value>Components marked "Not in current MBOM" were removed by the revision but are still required by open orders.</value>
+  </data>
+  <data name="その在庫を先に使い切るか、指図を作り直すかを判断する材料になる。" xml:space="preserve">
+    <value>Use this to decide whether to use up that stock first or to recreate the orders.</value>
+  </data>
+  <data name="{0} {1} の MBOM（A-40-10）" xml:space="preserve">
+    <value>MBOM of {0} {1} (A-40-10)</value>
+  </data>
+  <data name="子品目" xml:space="preserve">
+    <value>Child product</value>
+  </data>
+  <data name="必要数量（親1単位）" xml:space="preserve">
+    <value>Qty required (per parent unit)</value>
+  </data>
+  <data name="内外製" xml:space="preserve">
+    <value>Make / buy</value>
+  </data>
+  <data name="代替グループ" xml:space="preserve">
+    <value>Alternate group</value>
+  </data>
+  <data name="代替部品" xml:space="preserve">
+    <value>Alternate part</value>
+  </data>
+  <data name="代替" xml:space="preserve">
+    <value>Alternate</value>
+  </data>
+  <data name="主" xml:space="preserve">
+    <value>Primary</value>
+  </data>
+  <data name="必要数量" xml:space="preserve">
+    <value>Qty required</value>
+  </data>
+  <data name="内外製区分" xml:space="preserve">
+    <value>Make / buy type</value>
+  </data>
+  <data name="代替部品グループ" xml:space="preserve">
+    <value>Alternate part group</value>
+  </data>
+  <data name="代替部品（主材料でない）" xml:space="preserve">
+    <value>Alternate part (not the primary material)</value>
+  </data>
+  <data name="明細に追加" xml:space="preserve">
+    <value>Add line</value>
+  </data>
+  <data name="MBOMを保存（一括置換）" xml:space="preserve">
+    <value>Save MBOM (replace all)</value>
+  </data>
+  <data name="子品目と必要数量を指定してください。" xml:space="preserve">
+    <value>Specify the child product and required quantity.</value>
+  </data>
+  <data name="MBOMを保存しました。" xml:space="preserve">
+    <value>MBOM saved.</value>
+  </data>
+  <data name="{0} の 工順（BOP。A-40-20）" xml:space="preserve">
+    <value>Routing of {0} (BOP, A-40-20)</value>
+  </data>
+  <data name="標準作業(分)" xml:space="preserve">
+    <value>Std. work (min)</value>
+  </data>
+  <data name="標準段取(分)" xml:space="preserve">
+    <value>Std. setup (min)</value>
+  </data>
+  <data name="必要スキル" xml:space="preserve">
+    <value>Required skill</value>
+  </data>
+  <data name="候補設備" xml:space="preserve">
+    <value>Candidate equipment</value>
+  </data>
+  <data name="管理項目" xml:space="preserve">
+    <value>Control items</value>
+  </data>
+  <data name="工程順序" xml:space="preserve">
+    <value>Sequence</value>
+  </data>
+  <data name="標準作業時間(分)" xml:space="preserve">
+    <value>Standard work time (min)</value>
+  </data>
+  <data name="標準段取り時間(分)" xml:space="preserve">
+    <value>Standard setup time (min)</value>
+  </data>
+  <data name="必要スキル・資格" xml:space="preserve">
+    <value>Required skill / qualification</value>
+  </data>
+  <data name="候補設備（Ctrl/Shiftで複数選択）" xml:space="preserve">
+    <value>Candidate equipment (Ctrl/Shift for multiple)</value>
+  </data>
+  <data name="使用治工具" xml:space="preserve">
+    <value>Tools used</value>
+  </data>
+  <data name="例：温度、回転数" xml:space="preserve">
+    <value>e.g. temperature, speed</value>
+  </data>
+  <data name="作業手順書（SOP）" xml:space="preserve">
+    <value>Work procedure (SOP)</value>
+  </data>
+  <data name="工程を追加" xml:space="preserve">
+    <value>Add process</value>
+  </data>
+  <data name="工順を保存（一括置換）" xml:space="preserve">
+    <value>Save routing (replace all)</value>
+  </data>
+  <data name="工程を選択してください。" xml:space="preserve">
+    <value>Select a process.</value>
+  </data>
+  <data name="工程順序が重複しています。" xml:space="preserve">
+    <value>The sequence numbers are duplicated.</value>
+  </data>
+  <data name="、" xml:space="preserve">
+    <value>, </value>
+  </data>
+  <data name="{0} ほか{1}件" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
+  <data name="工順（BOP）を保存しました。" xml:space="preserve">
+    <value>Routing (BOP) saved.</value>
+  </data>
+  <data name="品目の登録" xml:space="preserve">
+    <value>Register product</value>
+  </data>
+  <data name="品目の編集（{0}）" xml:space="preserve">
+    <value>Edit product ({0})</value>
+  </data>
+  <data name="品目コード" xml:space="preserve">
+    <value>Product code</value>
+  </data>
+  <data name="品目名" xml:space="preserve">
+    <value>Product name</value>
+  </data>
+  <data name="品目区分" xml:space="preserve">
+    <value>Product type</value>
+  </data>
+  <data name="規格" xml:space="preserve">
+    <value>Specification</value>
+  </data>
+  <data name="標準不良率(%)" xml:space="preserve">
+    <value>Standard defect rate (%)</value>
+  </data>
+  <data name="既定ロケーション（入庫先の推奨。D-10-30-03）" xml:space="preserve">
+    <value>Default location (suggested put-away. D-10-30-03)</value>
+  </data>
+  <data name="指定しない" xml:space="preserve">
+    <value>Not specified</value>
+  </data>
+  <data name="既定ロケーションを決めておくと、受入・完成品入庫でそこを第一候補として推奨する。" xml:space="preserve">
+    <value>With a default location, receiving and finished-goods put-away suggest it first.</value>
+  </data>
+  <data name="未指定でも、同じ品目の在庫がある場所と品目区分の既定エリアから推奨を出す。" xml:space="preserve">
+    <value>Without one, suggestions come from places already holding the product and the default area for its product type.</value>
+  </data>
+  <data name="親品目コード＋子品目コード" xml:space="preserve">
+    <value>Parent product code + child product code</value>
+  </data>
+  <data name="工順（BOP）" xml:space="preserve">
+    <value>Routing (BOP)</value>
+  </data>
+  <data name="品目コード＋工程順序" xml:space="preserve">
+    <value>Product code + sequence</value>
+  </data>
+  <data name="標準不良率" xml:space="preserve">
+    <value>Std. defect rate</value>
+  </data>
+  <data name="MBOM・工順" xml:space="preserve">
+    <value>MBOM / Routing</value>
+  </data>
+  <data name="品目コードと品目名を入力してください。" xml:space="preserve">
+    <value>Enter the product code and name.</value>
+  </data>
+  <data name="直の登録" xml:space="preserve">
+    <value>Register shift</value>
+  </data>
+  <data name="昼勤・夜勤などの時間帯を定義する。終了時刻が開始時刻以下なら翌日にまたぐ夜勤として扱う。" xml:space="preserve">
+    <value>Define time bands such as day and night shifts. If the end time is at or before the start time, the shift is treated as crossing into the next day.</value>
+  </data>
+  <data name="時間帯が重なる直は登録できない（重なると実績がどの直か決まらないため）。" xml:space="preserve">
+    <value>Overlapping shifts cannot be registered (results could not be assigned to one shift).</value>
+  </data>
+  <data name="製造日の境界時刻をまたぐ直は登録できるが、実績が2つの製造日へ分かれるため警告を出す。" xml:space="preserve">
+    <value>A shift crossing the production-day boundary can be registered, but a warning is shown because its results split across two production days.</value>
+  </data>
+  <data name="シフトコード" xml:space="preserve">
+    <value>Shift code</value>
+  </data>
+  <data name="D / N など" xml:space="preserve">
+    <value>e.g. D / N</value>
+  </data>
+  <data name="昼勤 / 夜勤" xml:space="preserve">
+    <value>Day / Night</value>
+  </data>
+  <data name="開始時刻" xml:space="preserve">
+    <value>Start time</value>
+  </data>
+  <data name="終了時刻" xml:space="preserve">
+    <value>End time</value>
+  </data>
+  <data name="勤務シフト（直）" xml:space="preserve">
+    <value>Shifts</value>
+  </data>
+  <data name="時間帯" xml:space="preserve">
+    <value>Time band</value>
+  </data>
+  <data name="日跨ぎ" xml:space="preserve">
+    <value>Crosses midnight</value>
+  </data>
+  <data name="製造日境界またぎ" xml:space="preserve">
+    <value>Crosses day boundary</value>
+  </data>
+  <data name="あり（夜勤）" xml:space="preserve">
+    <value>Yes (night)</value>
+  </data>
+  <data name="シフトコードと名称を入力してください。" xml:space="preserve">
+    <value>Enter the shift code and name.</value>
+  </data>
+  <data name="スキル・資格の登録" xml:space="preserve">
+    <value>Register skill / qualification</value>
+  </data>
+  <data name="有効期限管理が必要（期限切れは差立で不合格）" xml:space="preserve">
+    <value>Requires expiry tracking (expired = rejected at dispatch)</value>
+  </data>
+  <data name="スキル・資格コード" xml:space="preserve">
+    <value>Skill code</value>
+  </data>
+  <data name="期限管理" xml:space="preserve">
+    <value>Expiry tracking</value>
+  </data>
+  <data name="要" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="不要" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="コードと名称を入力してください。" xml:space="preserve">
+    <value>Enter the code and name.</value>
+  </data>
+  <data name="治工具の登録" xml:space="preserve">
+    <value>Register tool</value>
+  </data>
+  <data name="治工具の編集（{0}）" xml:space="preserve">
+    <value>Edit tool ({0})</value>
+  </data>
+  <data name="治工具コード" xml:space="preserve">
+    <value>Tool code</value>
+  </data>
+  <data name="型／切削工具／検査工具 など" xml:space="preserve">
+    <value>Die / cutting tool / gauge, etc.</value>
+  </data>
+  <data name="寿命閾値（使用回数）" xml:space="preserve">
+    <value>Life threshold (uses)</value>
+  </data>
+  <data name="寿命閾値（使用時間h）" xml:space="preserve">
+    <value>Life threshold (hours)</value>
+  </data>
+  <data name="使用中（引当で設定）" xml:space="preserve">
+    <value>In use (set by allocation)</value>
+  </data>
+  <data name="寿命(回数)" xml:space="preserve">
+    <value>Life (uses)</value>
+  </data>
+  <data name="寿命(時間)" xml:space="preserve">
+    <value>Life (hours)</value>
+  </data>
+  <data name="治工具コードと名称を入力してください。" xml:space="preserve">
+    <value>Enter the tool code and name.</value>
+  </data>
+  <data name="ユーザー管理はシステム管理者のみ利用できます。" xml:space="preserve">
+    <value>User management is available to system administrators only.</value>
+  </data>
+  <data name="ユーザーの登録" xml:space="preserve">
+    <value>Register user</value>
+  </data>
+  <data name="ユーザーの編集（{0}）" xml:space="preserve">
+    <value>Edit user ({0})</value>
+  </data>
+  <data name="氏名（表示名）" xml:space="preserve">
+    <value>Full name (display name)</value>
+  </data>
+  <data name="初期パスワード（初回ログイン時に変更を強制）" xml:space="preserve">
+    <value>Initial password (must be changed at first sign-in)</value>
+  </data>
+  <data name="在籍（無効化するとログイン不可）" xml:space="preserve">
+    <value>Active (inactive users cannot sign in)</value>
+  </data>
+  <data name="作業場所（作業区）" xml:space="preserve">
+    <value>Workplace (work center)</value>
+  </data>
+  <data name="所属（部署・課）" xml:space="preserve">
+    <value>Department</value>
+  </data>
+  <data name="例：第1製造課" xml:space="preserve">
+    <value>e.g. Production Section 1</value>
+  </data>
+  <data name="所属する直" xml:space="preserve">
+    <value>Shift</value>
+  </data>
+  <data name="ロール" xml:space="preserve">
+    <value>Roles</value>
+  </data>
+  <data name="ユーザーのスキル・資格" xml:space="preserve">
+    <value>User skills &amp; qualifications</value>
+  </data>
+  <data name="ユーザー名＋スキル・資格コード" xml:space="preserve">
+    <value>User name + skill code</value>
+  </data>
+  <data name="氏名" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="所属" xml:space="preserve">
+    <value>Department</value>
+  </data>
+  <data name="作業場所" xml:space="preserve">
+    <value>Workplace</value>
+  </data>
+  <data name="直" xml:space="preserve">
+    <value>Shift</value>
+  </data>
+  <data name="在籍" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="要変更" xml:space="preserve">
+    <value>Must change</value>
+  </data>
+  <data name="{0} のスキル・資格（F-20-10）" xml:space="preserve">
+    <value>Skills &amp; qualifications of {0} (F-20-10)</value>
+  </data>
+  <data name="取得日" xml:space="preserve">
+    <value>Acquired</value>
+  </data>
+  <data name="有効期限" xml:space="preserve">
+    <value>Expires</value>
+  </data>
+  <data name="期限切れ" xml:space="preserve">
+    <value>Expired</value>
+  </data>
+  <data name="期限接近" xml:space="preserve">
+    <value>Expiring soon</value>
+  </data>
+  <data name="追加" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="スキルを保存（一括置換）" xml:space="preserve">
+    <value>Save skills (replace all)</value>
+  </data>
+  <data name="氏名を入力してください。" xml:space="preserve">
+    <value>Enter the name.</value>
+  </data>
+  <data name="ユーザー名と初期パスワードを入力してください。" xml:space="preserve">
+    <value>Enter the user name and initial password.</value>
+  </data>
+  <data name="スキル・資格を選択してください。" xml:space="preserve">
+    <value>Select a skill / qualification.</value>
+  </data>
+  <data name="同一スキルが既に登録されています。" xml:space="preserve">
+    <value>The same skill is already registered.</value>
+  </data>
+  <data name="スキル・資格を保存しました。" xml:space="preserve">
+    <value>Skills &amp; qualifications saved.</value>
+  </data>
+  <data name="作業区の登録" xml:space="preserve">
+    <value>Register work center</value>
+  </data>
+  <data name="作業区の編集（{0}）" xml:space="preserve">
+    <value>Edit work center ({0})</value>
+  </data>
+  <data name="工場 → ライン → エリア → 作業区 の順に登録する。上位には1つ上の段だけを指定できる。" xml:space="preserve">
+    <value>Register in the order plant → line → area → work center. The parent must be exactly one level up.</value>
+  </data>
+  <data name="作業区コード" xml:space="preserve">
+    <value>Work center code</value>
+  </data>
+  <data name="段" xml:space="preserve">
+    <value>Level</value>
+  </data>
+  <data name="上位の資源" xml:space="preserve">
+    <value>Parent resource</value>
+  </data>
+  <data name="工場は上位を持たない" xml:space="preserve">
+    <value>A plant has no parent</value>
+  </data>
+  <data name="（選択してください）" xml:space="preserve">
+    <value>(Please select)</value>
+  </data>
+  <data name="上位" xml:space="preserve">
+    <value>Parent</value>
+  </data>
+  <data name="作業区コードを入力してください。" xml:space="preserve">
+    <value>Enter the work center code.</value>
+  </data>
+  <data name="名称を入力してください。" xml:space="preserve">
+    <value>Enter the name.</value>
+  </data>
+  <data name="作業手順書の登録" xml:space="preserve">
+    <value>Register work procedure</value>
+  </data>
+  <data name="工順（BOP）の工程に紐付けて使う。作業者は作業指示から手順を確認する。" xml:space="preserve">
+    <value>Linked to routing (BOP) steps. Operators view the procedure from the work order.</value>
+  </data>
+  <data name="手順書の作成そのものはMESの対象外のため、本文を置けないときは所在（文書番号・URL）だけでもよい。" xml:space="preserve">
+    <value>Authoring procedures is outside the MES, so if the body cannot be stored, recording only its location (document no. or URL) is fine.</value>
+  </data>
+  <data name="手順書番号" xml:space="preserve">
+    <value>Procedure no.</value>
+  </data>
+  <data name="表題" xml:space="preserve">
+    <value>Title</value>
+  </data>
+  <data name="手順書の所在" xml:space="preserve">
+    <value>Procedure location</value>
+  </data>
+  <data name="文書番号 / URL など" xml:space="preserve">
+    <value>Document no. / URL, etc.</value>
+  </data>
+  <data name="手順ステップ" xml:space="preserve">
+    <value>Steps</value>
+  </data>
+  <data name="1行1ステップで記入" xml:space="preserve">
+    <value>One step per line</value>
+  </data>
+  <data name="番号" xml:space="preserve">
+    <value>No.</value>
+  </data>
+  <data name="手順" xml:space="preserve">
+    <value>Steps</value>
+  </data>
+  <data name="所在" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="手順書番号と表題を入力してください。" xml:space="preserve">
+    <value>Enter the procedure no. and title.</value>
+  </data>
 </root>

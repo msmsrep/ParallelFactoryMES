@@ -5,20 +5,20 @@
 
 <AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
-        <h2 style="margin-top:0;">@(_editingId is null ? "設備の登録" : $"設備の編集（{_assetNo}）")</h2>
+        <h2 style="margin-top:0;">@(_editingId is null ? L["設備の登録"] : L["設備の編集（{0}）", _assetNo])</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>資産番号</label>
+                <label>@L["資産番号"]</label>
                 <input @bind="_assetNo" />
             </div>
             <div class="form-field">
-                <label>設備名</label>
+                <label>@L["設備名"]</label>
                 <input @bind="_name" />
             </div>
             <div class="form-field">
-                <label>設置場所（作業区）</label>
+                <label>@L["設置場所（作業区）"]</label>
                 <select @bind="_workCenterId">
-                    <option value="0">なし</option>
+                    <option value="0">@L["なし"]</option>
                     @foreach (var wc in _workCenters ?? [])
                     {
                         <option value="@wc.Id">@wc.Code @wc.Name</option>
@@ -26,11 +26,11 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>設置場所（旧項目）</label>
+                <label>@L["設置場所（旧項目）"]</label>
                 <input @bind="_site" />
             </div>
             <div class="form-field">
-                <label>状態</label>
+                <label>@L["状態"]</label>
                 <select @bind="_status">
                     <option value="@EquipmentStatus.Available">@EnumLabels.Of(EquipmentStatus.Available)</option>
                     <option value="@EquipmentStatus.Stopped">@EnumLabels.Of(EquipmentStatus.Stopped)</option>
@@ -39,28 +39,28 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>保全タイプ</label>
+                <label>@L["保全タイプ"]</label>
                 <select @bind="_maintenanceType">
                     <option value="@MaintenanceType.None">@EnumLabels.Of(MaintenanceType.None)</option>
-                    <option value="@MaintenanceType.Calendar">カレンダ（日数）</option>
+                    <option value="@MaintenanceType.Calendar">@L["カレンダ（日数）"]</option>
                     <option value="@MaintenanceType.RunTime">@EnumLabels.Of(MaintenanceType.RunTime)</option>
                     <option value="@MaintenanceType.Count">@EnumLabels.Of(MaintenanceType.Count)</option>
                 </select>
             </div>
             <div class="form-field">
-                <label>保全閾値</label>
+                <label>@L["保全閾値"]</label>
                 <input type="number" step="any" @bind="_threshold" />
             </div>
             <div class="form-field">
-                <label>保全部品</label>
+                <label>@L["保全部品"]</label>
                 <input @bind="_parts" />
             </div>
         </div>
         <div class="actions">
-            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
             @if (_editingId is not null)
             {
-                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+                <button class="btn btn-secondary" @onclick="ResetForm">@L["キャンセル"]</button>
             }
         </div>
     </div>
@@ -70,9 +70,9 @@
 @if (_selected is not null)
 {
     <div class="card">
-        <h2 style="margin-top:0;">保全部品（@_selected.AssetNo @_selected.Name）</h2>
+        <h2 style="margin-top:0;">@L["保全部品（{0} {1}）", _selected.AssetNo, _selected.Name]</h2>
         <table class="table">
-            <thead><tr><th>品目</th><th>区分</th><th>1回あたり数量</th><th>備考</th><th></th></tr></thead>
+            <thead><tr><th>@L["品目"]</th><th>@L["区分"]</th><th>@L["1回あたり数量"]</th><th>@L["備考"]</th><th></th></tr></thead>
             <tbody>
                 @foreach (var part in _partLines)
                 {
@@ -83,7 +83,7 @@
                         <td>@(part.Note ?? "-")</td>
                         <td>
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="partWrite">
-                                <button class="btn btn-danger btn-sm" @onclick="() => _partLines.Remove(part)">削除</button>
+                                <button class="btn btn-danger btn-sm" @onclick="() => _partLines.Remove(part)">@L["削除"]</button>
                             </AuthorizeView>
                         </td>
                     </tr>
@@ -93,51 +93,51 @@
         <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="partAdd">
             <div class="form-grid">
                 <div class="form-field">
-                    <label>部品の品目</label>
+                    <label>@L["部品の品目"]</label>
                     <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
                                   @bind-Value="_partProductId"
                                   ValueOf="p => p.Id"
                                   LabelOf='@(p => $"{p.Code} {p.Name}")' />
                 </div>
                 <div class="form-field">
-                    <label>管理区分</label>
+                    <label>@L["管理区分"]</label>
                     <select @bind="_partCategory">
                         <option value="@MaintenancePartCategory.Consumable">@EnumLabels.Of(MaintenancePartCategory.Consumable)</option>
                         <option value="@MaintenancePartCategory.Asset">@EnumLabels.Of(MaintenancePartCategory.Asset)</option>
                     </select>
                 </div>
                 <div class="form-field">
-                    <label>1回あたり数量</label>
+                    <label>@L["1回あたり数量"]</label>
                     <input type="number" step="any" @bind="_partQuantity" />
                 </div>
                 <div class="form-field">
-                    <label>備考</label>
+                    <label>@L["備考"]</label>
                     <input @bind="_partNote" />
                 </div>
             </div>
             <div class="actions">
-                <button class="btn btn-secondary" @onclick="AddPart">行を追加</button>
-                <button class="btn" disabled="@_busy" @onclick="SavePartsAsync">保全部品を保存</button>
-                <button class="btn btn-secondary" @onclick="() => _selected = null">閉じる</button>
+                <button class="btn btn-secondary" @onclick="AddPart">@L["行を追加"]</button>
+                <button class="btn" disabled="@_busy" @onclick="SavePartsAsync">@L["保全部品を保存"]</button>
+                <button class="btn btn-secondary" @onclick="() => _selected = null">@L["閉じる"]</button>
             </div>
         </AuthorizeView>
     </div>
 }
 
-<CsvIoPanel Kind="equipment-parts" Label="設備の保全部品" KeyLabel="設備の資産番号＋品目コード" OnImported="ReloadPartsAsync" />
+<CsvIoPanel Kind="equipment-parts" Label="@L["設備の保全部品"]" KeyLabel="@L["設備の資産番号＋品目コード"]" OnImported="ReloadPartsAsync" />
 
-<CsvIoPanel Kind="equipments" Label="設備（BOE）" KeyLabel="資産番号" OnImported="LoadAsync" />
+<CsvIoPanel Kind="equipments" Label="@L["設備（BOE）"]" KeyLabel="@L["資産番号"]" OnImported="LoadAsync" />
 
 <div class="card">
     @if (_items is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>資産番号</th><th>設備名</th><th>作業区</th><th>設置場所（旧）</th><th>状態</th><th>保全タイプ</th><th>閾値</th><th>保全部品</th><th></th></tr>
+                <tr><th>@L["資産番号"]</th><th>@L["設備名"]</th><th>@L["作業区"]</th><th>@L["設置場所（旧）"]</th><th>@L["状態"]</th><th>@L["保全タイプ"]</th><th>@L["閾値"]</th><th>@L["保全部品"]</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var item in _items)
@@ -153,12 +153,12 @@
                         <td>@(item.MaintenanceParts ?? "-")</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
-                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
-                                <button class="btn btn-secondary btn-sm" @onclick="() => SelectPartsAsync(item)">保全部品</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">@L["編集"]</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => SelectPartsAsync(item)">@L["保全部品"]</button>
                                 @if (item.IsActive)
                                 {
                                     <button class="btn btn-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                            @onclick="() => DeactivateAsync(item.Id)">@L["無効化"]</button>
                                 }
                             </AuthorizeView>
                         </td>
@@ -235,7 +235,7 @@
     {
         if (string.IsNullOrWhiteSpace(_assetNo) || string.IsNullOrWhiteSpace(_name))
         {
-            _error = "資産番号と設備名を入力してください。";
+            _error = L["資産番号と設備名を入力してください。"];
             return;
         }
         _busy = true;
@@ -248,12 +248,12 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/equipments", request)
                 : await Http.PutAsJsonAsync($"api/equipments/{_editingId}", request);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保存しました。";
+            _message = L["保存しました。"];
             ResetForm();
             await LoadAsync();
         }
@@ -270,12 +270,12 @@
         try
         {
             var response = await Http.DeleteAsync($"api/equipments/{id}");
-            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["無効化に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "無効化しました。";
+            _message = L["無効化しました。"];
             await LoadAsync();
         }
         finally
@@ -308,12 +308,12 @@
     {
         if (_partProductId == 0)
         {
-            _error = "部品の品目を選んでください。";
+            _error = L["部品の品目を選んでください。"];
             return;
         }
         if (_partLines.Any(p => p.ProductId == _partProductId))
         {
-            _error = "同じ品目は1行だけ登録できます。";
+            _error = L["同じ品目は1行だけ登録できます。"];
             return;
         }
         _error = null;
@@ -335,12 +335,12 @@
         {
             var response = await Http.PutAsJsonAsync(
                 $"api/equipments/{_selected.Id}/parts", _partLines);
-            if (await response.ReadErrorAsync("保全部品の保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保全部品の保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保全部品を保存しました。";
+            _message = L["保全部品を保存しました。"];
         }
         finally
         {

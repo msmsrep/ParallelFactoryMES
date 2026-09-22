@@ -1,23 +1,23 @@
 @* 設計変更の影響確認（J-40-40-01/03）。改訂を保存する前に、届く指図と届かない指図を見せる *@
 <div class="card">
-    <h2 style="margin-top:0;">@Product.Code の 設計変更の影響（J-40-40-01/03）</h2>
+    <h2 style="margin-top:0;">@L["{0} の 設計変更の影響（J-40-40-01/03）", Product.Code]</h2>
     <p class="text-muted">
-        指図は展開した時点のMBOM・工順を写し取って持つため、<strong>展開済みの指図に上の改訂は届かない</strong>。
-        改訂後の条件で作り直すなら、その指図を取り消して作り直す必要がある。
+        @L["指図は展開した時点のMBOM・工順を写し取って持つため、"]<strong>@L["展開済みの指図に上の改訂は届かない"]</strong>@L["。"]
+        @L["改訂後の条件で作り直すなら、その指図を取り消して作り直す必要がある。"]
     </p>
 
-    <h3>進行中の製造指図</h3>
+    <h3>@L["進行中の製造指図"]</h3>
     @if (Impact.Orders.Count == 0)
     {
-        <p class="text-muted">進行中の指図はない。改訂の影響を受ける指図はない。</p>
+        <p class="text-muted">@L["進行中の指図はない。改訂の影響を受ける指図はない。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
                 <tr>
-                    <th>指図番号</th><th>状態</th><th>数量</th><th>納期</th>
-                    <th>作業指示</th><th>着手済</th><th>改訂の反映</th>
+                    <th>@L["指図番号"]</th><th>@L["状態"]</th><th>@L["数量"]</th><th>@L["納期"]</th>
+                    <th>@L["作業指示"]</th><th>@L["着手済"]</th><th>@L["改訂の反映"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -33,11 +33,11 @@
                         <td>
                             @if (order.IsSnapshotFixed)
                             {
-                                <span class="badge badge-warning">届かない（展開済）</span>
+                                <span class="badge badge-warning">@L["届かない（展開済）"]</span>
                             }
                             else
                             {
-                                <span class="badge badge-info">展開時に反映される</span>
+                                <span class="badge badge-info">@L["展開時に反映される"]</span>
                             }
                         </td>
                     </tr>
@@ -46,18 +46,18 @@
         </table>
     }
 
-    <h3>部材の在庫と所要</h3>
+    <h3>@L["部材の在庫と所要"]</h3>
     @if (Impact.Materials.Count == 0)
     {
-        <p class="text-muted">部材がない。</p>
+        <p class="text-muted">@L["部材がない。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
                 <tr>
-                    <th>部材</th><th>名称</th><th>現行の原単位</th>
-                    <th>進行中指図の予定数量</th><th>現在庫</th>
+                    <th>@L["部材"]</th><th>@L["名称"]</th><th>@L["現行の原単位"]</th>
+                    <th>@L["進行中指図の予定数量"]</th><th>@L["現在庫"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -69,7 +69,7 @@
                             @if (!material.InCurrentBom)
                             {
                                 <span>&nbsp;</span>
-                                <span class="badge badge-warning">現行MBOMに無い</span>
+                                <span class="badge badge-warning">@L["現行MBOMに無い"]</span>
                             }
                         </td>
                         <td>@material.Name</td>
@@ -81,8 +81,8 @@
             </tbody>
         </table>
         <p class="text-muted">
-            「現行MBOMに無い」部材は、改訂で外したが進行中の指図がまだ必要としているもの。
-            その在庫を先に使い切るか、指図を作り直すかを判断する材料になる。
+            @L["「現行MBOMに無い」部材は、改訂で外したが進行中の指図がまだ必要としているもの。"]
+            @L["その在庫を先に使い切るか、指図を作り直すかを判断する材料になる。"]
         </p>
     }
 </div>

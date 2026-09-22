@@ -2,10 +2,10 @@
 
 @* 品目のMBOM（Spec.md 5.1、A-40-10）。品目マスタタブで選んだ品目に対して開く *@
 <div class="card">
-    <h2 style="margin-top:0;">@Product.Code @Product.Name の MBOM（A-40-10）</h2>
+    <h2 style="margin-top:0;">@L["{0} {1} の MBOM（A-40-10）", Product.Code, Product.Name]</h2>
     <Notice Error="@_error" Message="@_message" />
     <table class="table">
-        <thead><tr><th>子品目</th><th>必要数量（親1単位）</th><th>内外製</th><th>代替グループ</th><th>代替部品</th><th></th></tr></thead>
+        <thead><tr><th>@L["子品目"]</th><th>@L["必要数量（親1単位）"]</th><th>@L["内外製"]</th><th>@L["代替グループ"]</th><th>@L["代替部品"]</th><th></th></tr></thead>
         <tbody>
             @foreach (var line in _lines)
             {
@@ -14,8 +14,8 @@
                     <td>@line.QuantityPer</td>
                     <td>@EnumLabels.Of(line.MakeOrBuy)</td>
                     <td>@(line.AlternativeGroup ?? "-")</td>
-                    <td>@(line.IsAlternative ? "代替" : "主")</td>
-                    <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">削除</button></td>
+                    <td>@(line.IsAlternative ? L["代替"] : L["主"])</td>
+                    <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">@L["削除"]</button></td>
                 </tr>
             }
         </tbody>
@@ -23,9 +23,9 @@
     <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="bom">
         <div class="form-grid">
             <div class="form-field">
-                <label>子品目</label>
+                <label>@L["子品目"]</label>
                 <select @bind="_childId">
-                    <option value="0">選択してください</option>
+                    <option value="0">@L["選択してください"]</option>
                     @foreach (var product in Products)
                     {
                         <option value="@product.Id">@product.Code @product.Name</option>
@@ -33,31 +33,31 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>必要数量</label>
+                <label>@L["必要数量"]</label>
                 <input type="number" step="any" @bind="_quantity" />
             </div>
             <div class="form-field">
-                <label>内外製区分</label>
+                <label>@L["内外製区分"]</label>
                 <select @bind="_makeOrBuy">
                     <option value="@MakeOrBuy.InHouse">@EnumLabels.Of(MakeOrBuy.InHouse)</option>
                     <option value="@MakeOrBuy.Outsourced">@EnumLabels.Of(MakeOrBuy.Outsourced)</option>
                 </select>
             </div>
             <div class="form-field">
-                <label>代替部品グループ</label>
+                <label>@L["代替部品グループ"]</label>
                 <input @bind="_altGroup" />
             </div>
             @* 代替部品の投入には理由の記録を求める（A-40-10-04） *@
             <div class="form-field">
                 <label>
                     <input type="checkbox" @bind="_isAlternative" style="width:auto;" />
-                    代替部品（主材料でない）
+                    @L["代替部品（主材料でない）"]
                 </label>
             </div>
         </div>
         <div class="actions">
-            <button class="btn btn-secondary" @onclick="AddLine">明細に追加</button>
-            <button class="btn" disabled="@_busy" @onclick="SaveAsync">MBOMを保存（一括置換）</button>
+            <button class="btn btn-secondary" @onclick="AddLine">@L["明細に追加"]</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@L["MBOMを保存（一括置換）"]</button>
         </div>
     </AuthorizeView>
 </div>
@@ -110,7 +110,7 @@
     {
         if (_childId == 0 || _quantity <= 0)
         {
-            _error = "子品目と必要数量を指定してください。";
+            _error = L["子品目と必要数量を指定してください。"];
             return;
         }
         _error = null;
@@ -128,12 +128,12 @@
         try
         {
             var response = await Http.PutAsJsonAsync($"api/products/{Product.Id}/bom", _lines);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "MBOMを保存しました。";
+            _message = L["MBOMを保存しました。"];
             await OnSaved.InvokeAsync();
         }
         finally

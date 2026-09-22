@@ -1,29 +1,29 @@
 ﻿@page "/masters"
 @attribute [Authorize]
 
-<PageTitle>マスタ管理 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["マスタ管理 - Parallel Factory MES"]</PageTitle>
 
-<h1>マスタ管理</h1>
-<p class="text-muted">品目／MBOM／工順（BOP）／工程／作業区／設備（BOE）／治工具／ロケーション／検査項目・基準／検査機・測定器／工程管理項目／作業手順書（SOP）／チェックリスト／勤務シフト／ユーザー・スキル資格。</p>
+<h1>@L["マスタ管理"]</h1>
+<p class="text-muted">@L["品目／MBOM／工順（BOP）／工程／作業区／設備（BOE）／治工具／ロケーション／検査項目・基準／検査機・測定器／工程管理項目／作業手順書（SOP）／チェックリスト／勤務シフト／ユーザー・スキル資格。"]</p>
 
-<CsvBundlePanel BaseUrl="api/masters/csv" Label="マスタ" CanExport="true" OnImported="Reload" />
+<CsvBundlePanel BaseUrl="api/masters/csv" Label="@L["マスタ"]" CanExport="true" OnImported="Reload" />
 
 <div class="tabs">
-    <button class="@TabClass("products")" @onclick='() => _tab = "products"'>品目・MBOM・工順</button>
-    <button class="@TabClass("processes")" @onclick='() => _tab = "processes"'>工程</button>
-    <button class="@TabClass("work-centers")" @onclick='() => _tab = "work-centers"'>作業区</button>
-    <button class="@TabClass("equipments")" @onclick='() => _tab = "equipments"'>設備（BOE）</button>
-    <button class="@TabClass("tools")" @onclick='() => _tab = "tools"'>治工具</button>
-    <button class="@TabClass("locations")" @onclick='() => _tab = "locations"'>ロケーション</button>
-    <button class="@TabClass("inspection")" @onclick='() => _tab = "inspection"'>検査項目・基準</button>
-    <button class="@TabClass("control-items")" @onclick='() => _tab = "control-items"'>工程管理項目</button>
-    <button class="@TabClass("inspection-devices")" @onclick='() => _tab = "inspection-devices"'>検査機・測定器</button>
-    <button class="@TabClass("work-procedures")" @onclick='() => _tab = "work-procedures"'>作業手順書</button>
-    <button class="@TabClass("checklists")" @onclick='() => _tab = "checklists"'>チェックリスト</button>
-    <button class="@TabClass("defect-reasons")" @onclick='() => _tab = "defect-reasons"'>不良理由</button>
-    <button class="@TabClass("skills")" @onclick='() => _tab = "skills"'>スキル・資格</button>
-    <button class="@TabClass("shifts")" @onclick='() => _tab = "shifts"'>勤務シフト</button>
-    <button class="@TabClass("users")" @onclick='() => _tab = "users"'>ユーザー</button>
+    <button class="@TabClass("products")" @onclick='() => _tab = "products"'>@L["品目・MBOM・工順"]</button>
+    <button class="@TabClass("processes")" @onclick='() => _tab = "processes"'>@L["工程"]</button>
+    <button class="@TabClass("work-centers")" @onclick='() => _tab = "work-centers"'>@L["作業区"]</button>
+    <button class="@TabClass("equipments")" @onclick='() => _tab = "equipments"'>@L["設備（BOE）"]</button>
+    <button class="@TabClass("tools")" @onclick='() => _tab = "tools"'>@L["治工具"]</button>
+    <button class="@TabClass("locations")" @onclick='() => _tab = "locations"'>@L["ロケーション"]</button>
+    <button class="@TabClass("inspection")" @onclick='() => _tab = "inspection"'>@L["検査項目・基準"]</button>
+    <button class="@TabClass("control-items")" @onclick='() => _tab = "control-items"'>@L["工程管理項目"]</button>
+    <button class="@TabClass("inspection-devices")" @onclick='() => _tab = "inspection-devices"'>@L["検査機・測定器"]</button>
+    <button class="@TabClass("work-procedures")" @onclick='() => _tab = "work-procedures"'>@L["作業手順書"]</button>
+    <button class="@TabClass("checklists")" @onclick='() => _tab = "checklists"'>@L["チェックリスト"]</button>
+    <button class="@TabClass("defect-reasons")" @onclick='() => _tab = "defect-reasons"'>@L["不良理由"]</button>
+    <button class="@TabClass("skills")" @onclick='() => _tab = "skills"'>@L["スキル・資格"]</button>
+    <button class="@TabClass("shifts")" @onclick='() => _tab = "shifts"'>@L["勤務シフト"]</button>
+    <button class="@TabClass("users")" @onclick='() => _tab = "users"'>@L["ユーザー"]</button>
 </div>
 
 @* 一括取込の後は、開いているタブを作り直して一覧を読み直す *@

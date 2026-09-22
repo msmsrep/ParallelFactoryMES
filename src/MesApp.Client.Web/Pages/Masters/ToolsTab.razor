@@ -5,61 +5,61 @@
 
 <AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
-        <h2 style="margin-top:0;">@(_editingId is null ? "治工具の登録" : $"治工具の編集（{_code}）")</h2>
+        <h2 style="margin-top:0;">@(_editingId is null ? L["治工具の登録"] : L["治工具の編集（{0}）", _code])</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>治工具コード</label>
+                <label>@L["治工具コード"]</label>
                 <input @bind="_code" />
             </div>
             <div class="form-field">
-                <label>名称</label>
+                <label>@L["名称"]</label>
                 <input @bind="_name" />
             </div>
             <div class="form-field">
-                <label>種別</label>
-                <input @bind="_toolType" placeholder="型／切削工具／検査工具 など" />
+                <label>@L["種別"]</label>
+                <input @bind="_toolType" placeholder="@L["型／切削工具／検査工具 など"]" />
             </div>
             <div class="form-field">
-                <label>寿命閾値（使用回数）</label>
+                <label>@L["寿命閾値（使用回数）"]</label>
                 <input type="number" @bind="_lifeCount" />
             </div>
             <div class="form-field">
-                <label>寿命閾値（使用時間h）</label>
+                <label>@L["寿命閾値（使用時間h）"]</label>
                 <input type="number" step="any" @bind="_lifeHours" />
             </div>
             <div class="form-field">
-                <label>状態</label>
+                <label>@L["状態"]</label>
                 <select @bind="_status">
                     <option value="@ToolStatus.Available">@EnumLabels.Of(ToolStatus.Available)</option>
                     @* 使用中は作業指示への引当で決まるため、手では選ばせない（既に使用中のものは表示のため残す） *@
-                    <option value="@ToolStatus.InUse" disabled="@(_originalStatus != ToolStatus.InUse)">使用中（引当で設定）</option>
+                    <option value="@ToolStatus.InUse" disabled="@(_originalStatus != ToolStatus.InUse)">@L["使用中（引当で設定）"]</option>
                     <option value="@ToolStatus.UnderMaintenance">@EnumLabels.Of(ToolStatus.UnderMaintenance)</option>
                     <option value="@ToolStatus.Retired">@EnumLabels.Of(ToolStatus.Retired)</option>
                 </select>
             </div>
         </div>
         <div class="actions">
-            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
             @if (_editingId is not null)
             {
-                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+                <button class="btn btn-secondary" @onclick="ResetForm">@L["キャンセル"]</button>
             }
         </div>
     </div>
 </AuthorizeView>
 
-<CsvIoPanel Kind="tools" Label="治工具" KeyLabel="治工具コード" OnImported="LoadAsync" />
+<CsvIoPanel Kind="tools" Label="@L["治工具"]" KeyLabel="@L["治工具コード"]" OnImported="LoadAsync" />
 
 <div class="card">
     @if (_items is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>コード</th><th>名称</th><th>種別</th><th>寿命(回数)</th><th>寿命(時間)</th><th>状態</th><th></th></tr>
+                <tr><th>@L["コード"]</th><th>@L["名称"]</th><th>@L["種別"]</th><th>@L["寿命(回数)"]</th><th>@L["寿命(時間)"]</th><th>@L["状態"]</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var item in _items)
@@ -73,11 +73,11 @@
                         <td>@EnumLabels.Of(item.Status)</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
-                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">@L["編集"]</button>
                                 @if (item.IsActive)
                                 {
                                     <button class="btn btn-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                            @onclick="() => DeactivateAsync(item.Id)">@L["無効化"]</button>
                                 }
                             </AuthorizeView>
                         </td>
@@ -135,7 +135,7 @@
     {
         if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
         {
-            _error = "治工具コードと名称を入力してください。";
+            _error = L["治工具コードと名称を入力してください。"];
             return;
         }
         _busy = true;
@@ -147,12 +147,12 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/tools", request)
                 : await Http.PutAsJsonAsync($"api/tools/{_editingId}", request);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保存しました。";
+            _message = L["保存しました。"];
             ResetForm();
             await LoadAsync();
         }
@@ -169,12 +169,12 @@
         try
         {
             var response = await Http.DeleteAsync($"api/tools/{id}");
-            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["無効化に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "無効化しました。";
+            _message = L["無効化しました。"];
             await LoadAsync();
         }
         finally

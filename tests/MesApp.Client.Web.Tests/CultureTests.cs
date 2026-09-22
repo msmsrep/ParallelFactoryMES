@@ -1,4 +1,7 @@
+using System.Collections;
 using System.Globalization;
+using System.Resources;
+using System.Text.RegularExpressions;
 using Bunit;
 using Bunit.TestDoubles;
 using MesApp.Client.Web.Auth;
@@ -135,6 +138,26 @@ public class CultureTests : BunitContext
         // 訳さない用途向けの原文は言語に左右されない
         Assert.Equal("保留", InCulture("en", () => EnumLabels.OriginalOf(LotStockStatus.OnHold)));
     }
+
+    [Fact]
+    public void 画面の英訳は原文と同じ埋め込み位置を持つ()
+    {
+        // 訳で {0} を落としたり {2} を足したりすると、その文言を出した画面で FormatException になる
+        var resources = new ResourceManager(typeof(UiText))
+            .GetResourceSet(new CultureInfo("en"), createIfNotExists: true, tryParents: false);
+        Assert.NotNull(resources);
+        Assert.Equal("Log out", resources.GetString("ログアウト"));
+
+        var mismatched = resources.Cast<DictionaryEntry>()
+            .Where(e => !Placeholders((string)e.Key).SetEquals(Placeholders((string)e.Value!)))
+            .Select(e => (string)e.Key)
+            .ToList();
+
+        Assert.Empty(mismatched);
+    }
+
+    private static HashSet<string> Placeholders(string text) =>
+        [.. Regex.Matches(text, @"\{(\d+)(?:[:,][^}]*)?\}").Select(m => m.Groups[1].Value)];
 
     private const string Japanese = @"[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}]";
 

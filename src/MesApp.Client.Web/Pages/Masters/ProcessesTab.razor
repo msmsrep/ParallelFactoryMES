@@ -5,18 +5,18 @@
 
 <AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
-        <h2 style="margin-top:0;">@(_editingId is null ? "工程の登録" : $"工程の編集（ID {_editingId}）")</h2>
+        <h2 style="margin-top:0;">@(_editingId is null ? L["工程の登録"] : L["工程の編集（ID {0}）", _editingId])</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>工程コード</label>
+                <label>@L["工程コード"]</label>
                 <input @bind="_code" />
             </div>
             <div class="form-field">
-                <label>工程名</label>
+                <label>@L["工程名"]</label>
                 <input @bind="_name" />
             </div>
             <div class="form-field">
-                <label>工程区分</label>
+                <label>@L["工程区分"]</label>
                 <select @bind="_category">
                     <option value="@MakeOrBuy.InHouse">@EnumLabels.Of(MakeOrBuy.InHouse)</option>
                     <option value="@MakeOrBuy.Outsourced">@EnumLabels.Of(MakeOrBuy.Outsourced)</option>
@@ -24,26 +24,26 @@
             </div>
         </div>
         <div class="actions">
-            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
             @if (_editingId is not null)
             {
-                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+                <button class="btn btn-secondary" @onclick="ResetForm">@L["キャンセル"]</button>
             }
         </div>
     </div>
 </AuthorizeView>
 
-<CsvIoPanel Kind="processes" Label="工程" KeyLabel="工程コード" OnImported="LoadAsync" />
+<CsvIoPanel Kind="processes" Label="@L["工程"]" KeyLabel="@L["工程コード"]" OnImported="LoadAsync" />
 
 <div class="card">
     @if (_items is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else
     {
         <table class="table">
-            <thead><tr><th>コード</th><th>工程名</th><th>区分</th><th>状態</th><th></th></tr></thead>
+            <thead><tr><th>@L["コード"]</th><th>@L["工程名"]</th><th>@L["区分"]</th><th>@L["状態"]</th><th></th></tr></thead>
             <tbody>
                 @foreach (var item in _items)
                 {
@@ -51,14 +51,14 @@
                         <td>@item.Code</td>
                         <td>@item.Name</td>
                         <td>@EnumLabels.Of(item.Category)</td>
-                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td>@(item.IsActive ? L["有効"] : L["無効"])</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
-                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">@L["編集"]</button>
                                 @if (item.IsActive)
                                 {
                                     <button class="btn btn-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                            @onclick="() => DeactivateAsync(item.Id)">@L["無効化"]</button>
                                 }
                             </AuthorizeView>
                         </td>
@@ -104,7 +104,7 @@
     {
         if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
         {
-            _error = "工程コードと工程名を入力してください。";
+            _error = L["工程コードと工程名を入力してください。"];
             return;
         }
         _busy = true;
@@ -116,12 +116,12 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/processes", request)
                 : await Http.PutAsJsonAsync($"api/processes/{_editingId}", request);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保存しました。";
+            _message = L["保存しました。"];
             ResetForm();
             await LoadAsync();
         }
@@ -138,12 +138,12 @@
         try
         {
             var response = await Http.DeleteAsync($"api/processes/{id}");
-            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["無効化に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "無効化しました。";
+            _message = L["無効化しました。"];
             await LoadAsync();
         }
         finally

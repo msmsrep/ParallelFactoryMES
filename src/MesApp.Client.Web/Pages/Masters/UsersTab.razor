@@ -4,27 +4,27 @@
 <AuthorizeView Roles="@MesRoleGroups.UserAdmin">
     <NotAuthorized>
         <div class="card">
-            <p class="text-muted">ユーザー管理はシステム管理者のみ利用できます。</p>
+            <p class="text-muted">@L["ユーザー管理はシステム管理者のみ利用できます。"]</p>
         </div>
     </NotAuthorized>
     <Authorized>
         <Notice Error="@_error" Message="@_message" />
 
         <div class="card">
-            <h2 style="margin-top:0;">@(_editingId is null ? "ユーザーの登録" : $"ユーザーの編集（{_userName}）")</h2>
+            <h2 style="margin-top:0;">@(_editingId is null ? L["ユーザーの登録"] : L["ユーザーの編集（{0}）", _userName])</h2>
             <div class="form-grid">
                 <div class="form-field">
-                    <label>ユーザー名</label>
+                    <label>@L["ユーザー名"]</label>
                     <input @bind="_userName" disabled="@(_editingId is not null)" />
                 </div>
                 <div class="form-field">
-                    <label>氏名（表示名）</label>
+                    <label>@L["氏名（表示名）"]</label>
                     <input @bind="_displayName" />
                 </div>
                 @if (_editingId is null)
                 {
                     <div class="form-field">
-                        <label>初期パスワード（初回ログイン時に変更を強制）</label>
+                        <label>@L["初期パスワード（初回ログイン時に変更を強制）"]</label>
                         <input type="password" @bind="_password" autocomplete="new-password" />
                     </div>
                 }
@@ -33,7 +33,7 @@
                     <div class="form-field">
                         <label>
                             <input type="checkbox" style="width:auto;" @bind="_isActive" />
-                            在籍（無効化するとログイン不可）
+                            @L["在籍（無効化するとログイン不可）"]
                         </label>
                     </div>
                 }
@@ -41,9 +41,9 @@
 
             <div class="form-grid">
                 <div class="form-field">
-                    <label>作業場所（作業区）</label>
+                    <label>@L["作業場所（作業区）"]</label>
                     <select @bind="_workCenterId">
-                        <option value="0">なし</option>
+                        <option value="0">@L["なし"]</option>
                         @foreach (var wc in _workCenters)
                         {
                             <option value="@wc.Id">@wc.Code @wc.Name</option>
@@ -51,23 +51,23 @@
                     </select>
                 </div>
                 <div class="form-field">
-                    <label>所属（部署・課）</label>
-                    <input @bind="_department" placeholder="例：第1製造課" />
+                    <label>@L["所属（部署・課）"]</label>
+                    <input @bind="_department" placeholder="@L["例：第1製造課"]" />
                 </div>
                 <div class="form-field">
                     @* 所属する直（F-10-10-01）。実績の直は記録時刻から引くので、ここは既定の所属 *@
-                    <label>所属する直</label>
+                    <label>@L["所属する直"]</label>
                     <select @bind="_shiftId">
-                        <option value="0">なし</option>
+                        <option value="0">@L["なし"]</option>
                         @foreach (var shift in _shifts)
                         {
-                            <option value="@shift.Id">@shift.Code @shift.Name（@shift.ScheduleLabel）</option>
+                            <option value="@shift.Id">@shift.Code @shift.Name (@shift.ScheduleLabel)</option>
                         }
                     </select>
                 </div>
             </div>
 
-            <h2>ロール</h2>
+            <h2>@L["ロール"]</h2>
             <div class="form-grid">
                 @foreach (var role in MesRoles.All)
                 {
@@ -82,29 +82,29 @@
             </div>
 
             <div class="actions mt-2">
-                <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+                <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
                 @if (_editingId is not null)
                 {
-                    <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+                    <button class="btn btn-secondary" @onclick="ResetForm">@L["キャンセル"]</button>
                 }
             </div>
         </div>
 
-        <CsvIoPanel Kind="users" Label="ユーザー" KeyLabel="ユーザー名"
+        <CsvIoPanel Kind="users" Label="@L["ユーザー"]" KeyLabel="@L["ユーザー名"]"
                     Roles="@MesRoleGroups.UserAdmin" OnImported="LoadAsync" />
-        <CsvIoPanel Kind="user-skills" Label="ユーザーのスキル・資格" KeyLabel="ユーザー名＋スキル・資格コード"
+        <CsvIoPanel Kind="user-skills" Label="@L["ユーザーのスキル・資格"]" KeyLabel="@L["ユーザー名＋スキル・資格コード"]"
                     Roles="@MesRoleGroups.UserAdmin" OnImported="ReloadSkillsAsync" />
 
         <div class="card">
             @if (_users is null)
             {
-                <p class="text-muted">読み込み中...</p>
+                <p class="text-muted">@L["読み込み中..."]</p>
             }
             else
             {
                 <table class="table">
                     <thead>
-                        <tr><th>ユーザー名</th><th>氏名</th><th>所属</th><th>作業場所</th><th>直</th><th>ロール</th><th>在籍</th><th>パスワード</th><th></th></tr>
+                        <tr><th>@L["ユーザー名"]</th><th>@L["氏名"]</th><th>@L["所属"]</th><th>@L["作業場所"]</th><th>@L["直"]</th><th>@L["ロール"]</th><th>@L["在籍"]</th><th>@L["パスワード"]</th><th></th></tr>
                     </thead>
                     <tbody>
                         @foreach (var user in _users)
@@ -115,12 +115,12 @@
                                 <td>@(user.Department ?? "-")</td>
                                 <td>@(user.WorkCenterCode is null ? "-" : $"{user.WorkCenterCode} {user.WorkCenterName}")</td>
                                 <td>@(user.ShiftCode is null ? "-" : $"{user.ShiftCode} {user.ShiftName}")</td>
-                                <td>@string.Join("、", user.Roles.Select(EnumLabels.Role))</td>
-                                <td>@(user.IsActive ? "在籍" : "無効")</td>
-                                <td>@(user.MustChangePassword ? "要変更" : "-")</td>
+                                <td>@string.Join(L["、"], user.Roles.Select(EnumLabels.Role))</td>
+                                <td>@(user.IsActive ? L["在籍"] : L["無効"])</td>
+                                <td>@(user.MustChangePassword ? L["要変更"] : "-")</td>
                                 <td class="actions">
-                                    <button class="btn btn-secondary btn-sm" @onclick="() => Edit(user)">編集</button>
-                                    <button class="btn btn-secondary btn-sm" @onclick="() => SelectSkillsAsync(user)">スキル・資格</button>
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => Edit(user)">@L["編集"]</button>
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => SelectSkillsAsync(user)">@L["スキル・資格"]</button>
                                 </td>
                             </tr>
                         }
@@ -132,9 +132,9 @@
         @if (_skillTarget is not null)
         {
             <div class="card">
-                <h2 style="margin-top:0;">@_skillTarget.DisplayName のスキル・資格（F-20-10）</h2>
+                <h2 style="margin-top:0;">@L["{0} のスキル・資格（F-20-10）", _skillTarget.DisplayName]</h2>
                 <table class="table">
-                    <thead><tr><th>スキル・資格</th><th>取得日</th><th>有効期限</th><th>状態</th><th></th></tr></thead>
+                    <thead><tr><th>@L["スキル・資格"]</th><th>@L["取得日"]</th><th>@L["有効期限"]</th><th>@L["状態"]</th><th></th></tr></thead>
                     <tbody>
                         @foreach (var line in _userSkills)
                         {
@@ -146,28 +146,28 @@
                                 <td>
                                     @if (line.ExpiresOn is not null && line.ExpiresOn < DateOnly.FromDateTime(DateTime.Today))
                                     {
-                                        <span class="badge badge-danger">期限切れ</span>
+                                        <span class="badge badge-danger">@L["期限切れ"]</span>
                                     }
                                     else if (line.ExpiresOn is not null
                                              && line.ExpiresOn < DateOnly.FromDateTime(DateTime.Today.AddDays(30)))
                                     {
-                                        <span class="badge badge-warning">期限接近</span>
+                                        <span class="badge badge-warning">@L["期限接近"]</span>
                                     }
                                     else
                                     {
-                                        <text>有効</text>
+                                        <text>@L["有効"]</text>
                                     }
                                 </td>
-                                <td><button class="btn btn-danger btn-sm" @onclick="() => _userSkills.Remove(line)">削除</button></td>
+                                <td><button class="btn btn-danger btn-sm" @onclick="() => _userSkills.Remove(line)">@L["削除"]</button></td>
                             </tr>
                         }
                     </tbody>
                 </table>
                 <div class="form-grid">
                     <div class="form-field">
-                        <label>スキル・資格</label>
+                        <label>@L["スキル・資格"]</label>
                         <select @bind="_newSkillId">
-                            <option value="0">選択してください</option>
+                            <option value="0">@L["選択してください"]</option>
                             @foreach (var skill in _skills)
                             {
                                 <option value="@skill.Id">@skill.Code @skill.Name</option>
@@ -175,17 +175,17 @@
                         </select>
                     </div>
                     <div class="form-field">
-                        <label>取得日</label>
+                        <label>@L["取得日"]</label>
                         <input type="date" @bind="_newAcquiredOn" />
                     </div>
                     <div class="form-field">
-                        <label>有効期限</label>
+                        <label>@L["有効期限"]</label>
                         <input type="date" @bind="_newExpiresOn" />
                     </div>
                 </div>
                 <div class="actions">
-                    <button class="btn btn-secondary" @onclick="AddSkill">追加</button>
-                    <button class="btn" disabled="@_busy" @onclick="SaveSkillsAsync">スキルを保存（一括置換）</button>
+                    <button class="btn btn-secondary" @onclick="AddSkill">@L["追加"]</button>
+                    <button class="btn" disabled="@_busy" @onclick="SaveSkillsAsync">@L["スキルを保存（一括置換）"]</button>
                 </div>
             </div>
         }
@@ -284,7 +284,7 @@
     {
         if (string.IsNullOrWhiteSpace(_displayName))
         {
-            _error = "氏名を入力してください。";
+            _error = L["氏名を入力してください。"];
             return;
         }
         _busy = true;
@@ -297,7 +297,7 @@
             {
                 if (string.IsNullOrWhiteSpace(_userName) || string.IsNullOrEmpty(_password))
                 {
-                    _error = "ユーザー名と初期パスワードを入力してください。";
+                    _error = L["ユーザー名と初期パスワードを入力してください。"];
                     return;
                 }
                 response = await Http.PostAsJsonAsync("api/users",
@@ -315,12 +315,12 @@
                         _shiftId == 0 ? null : _shiftId));
             }
 
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保存しました。";
+            _message = L["保存しました。"];
             ResetForm();
             await LoadAsync();
         }
@@ -351,12 +351,12 @@
     {
         if (_newSkillId == 0)
         {
-            _error = "スキル・資格を選択してください。";
+            _error = L["スキル・資格を選択してください。"];
             return;
         }
         if (_userSkills.Any(s => s.SkillId == _newSkillId))
         {
-            _error = "同一スキルが既に登録されています。";
+            _error = L["同一スキルが既に登録されています。"];
             return;
         }
         _error = null;
@@ -378,12 +378,12 @@
         try
         {
             var response = await Http.PutAsJsonAsync($"api/users/{_skillTarget.Id}/skills", _userSkills);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "スキル・資格を保存しました。";
+            _message = L["スキル・資格を保存しました。"];
         }
         finally
         {
