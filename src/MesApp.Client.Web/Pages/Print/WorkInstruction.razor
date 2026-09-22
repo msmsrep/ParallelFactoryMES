@@ -52,7 +52,7 @@ else
                         <tr>
                             <td>@line.ProductCode</td>
                             <td>@line.ProductName</td>
-                            <td>@(line.QuantityPer * _workOrder.PlannedQuantity)</td>
+                            <td>@RequiredQuantity(line)</td>
                             <td>@(line.AlternativeGroup ?? "-")</td>
                         </tr>
                     }
@@ -78,6 +78,7 @@ else
 
     private WorkOrderResponse? _workOrder;
     private List<OrderMaterialResponse> _materials = [];
+    private decimal _orderQuantity;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -90,9 +91,18 @@ else
             var finalSequence = order?.WorkOrders
                 .Where(w => w.Status != WorkOrderStatus.Canceled)
                 .Max(w => (int?)w.RoutingSequence);
+            _orderQuantity = order?.Order.Quantity ?? 0;
             var sequence = _workOrder.RoutingSequence;
             _materials = [.. (order?.Materials ?? [])
                 .Where(m => m.RoutingSequence == sequence || (m.RoutingSequence is null && sequence == finalSequence))];
         }
     }
+
+    /// <summary>
+    /// 計画数分の必要数量。予定材料の予定数量（標準不良率で割り増し済み。Spec.md 5.2）を、
+    /// 指図数量に対するこの作業指示の計画数の割合で按分する。原単位×計画数で出すと割り増しが抜け、指図の予定材料と食い違う
+    /// </summary>
+    private decimal RequiredQuantity(OrderMaterialResponse line) =>
+        _orderQuantity == 0 ? line.QuantityPer * _workOrder!.PlannedQuantity
+            : line.PlannedQuantity * _workOrder!.PlannedQuantity / _orderQuantity;
 }

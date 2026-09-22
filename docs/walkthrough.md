@@ -270,7 +270,7 @@ MBOMと工順の登録方法は、[マスタ管理の品目・MBOM・工順](mas
 </figure>
 
 <figure class="shot">
-<img src="assets/walkthrough/order-detail.webp" width="1440" height="934" alt="製造指図 SMP-FG-001 の詳細画面。予定材料7品目と、工程展開でできた作業指示3件が表示されている" loading="lazy">
+<img src="assets/walkthrough/order-detail.webp" width="1440" height="947" alt="製造指図 SMP-FG-001 の詳細画面。予定材料7品目（予定数量は標準不良率ぶん割り増し、消費工程はすべて10）と、工程展開でできた作業指示3件が表示されている" loading="lazy">
 <figcaption>製造指図の詳細。予定材料と、工程展開でできた作業指示が並ぶ。予定数量はギアポンプの標準不良率 1.5% ぶん割り増され、部材はどれも組立（工程10）で使う。各行から段取り・実績入力・指示書の印刷へ進める</figcaption>
 </figure>
 
