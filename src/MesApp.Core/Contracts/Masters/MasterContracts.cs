@@ -28,12 +28,14 @@ public record BomItemRequest(
     MakeOrBuy MakeOrBuy,
     string? AlternativeGroup,
     /// <summary>代替部品か（同一グループ内の主材料でない行。投入時に理由の記録を求める）</summary>
-    bool IsAlternative = false);
+    bool IsAlternative = false,
+    /// <summary>消費する工程の工程順序（未指定なら最終工程。バックフラッシュはこの工程で引く）</summary>
+    [Range(1, int.MaxValue)] int? RoutingSequence = null);
 
 public record BomItemResponse(
     int Id, int ChildProductId, string ChildProductCode, string ChildProductName,
     decimal QuantityPer, MakeOrBuy MakeOrBuy, string? AlternativeGroup,
-    bool IsAlternative = false);
+    bool IsAlternative = false, int? RoutingSequence = null);
 
 // ---- 工程（Process）----
 

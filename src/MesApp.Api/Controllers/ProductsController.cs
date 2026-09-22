@@ -147,7 +147,7 @@ public class ProductsController(
             .OrderBy(b => b.ChildProduct!.Code)
             .Select(b => new BomItemResponse(
                 b.Id, b.ChildProductId, b.ChildProduct!.Code, b.ChildProduct!.Name,
-                b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup, b.IsAlternative))
+                b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup, b.IsAlternative, b.RoutingSequence))
             .ToListAsync(ct);
     }
 

@@ -86,7 +86,7 @@ public class ManufacturingOrdersController(
             order.Materials.OrderBy(m => m.ChildProduct!.Code)
                 .Select(m => new OrderMaterialResponse(
                     m.ChildProductId, m.ChildProduct!.Code, m.ChildProduct!.Name,
-                    m.QuantityPer, m.PlannedQuantity, m.AlternativeGroup)).ToList());
+                    m.QuantityPer, m.PlannedQuantity, m.AlternativeGroup, m.RoutingSequence)).ToList());
     }
 
     /// <summary>指図登録（A-20-10-01 手動登録、B-10-10-04 突発、B-70-10-01 リワーク）</summary>

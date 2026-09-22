@@ -163,6 +163,7 @@ public static class MasterCsvKinds
             new("MakeOrBuy", "内外製区分", false, "InHouse（内製）/ Outsourced（外注）"),
             new("AlternativeGroup", "代替部品グループ", false, null),
             new("IsAlternative", "代替部品", false, "true / false。trueの行を投入するには理由の記録が必要"),
+            new("RoutingSequence", "消費工程（工程順序）", false, "親品目の工順の工程順序。空なら最終工程。バックフラッシュはこの工程で部材を引く"),
         ]),
         new(Routing, "工順（BOP）", false,
         [

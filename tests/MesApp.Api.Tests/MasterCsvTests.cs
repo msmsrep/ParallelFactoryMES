@@ -206,9 +206,9 @@ public class MasterCsvTests
             """)).Succeeded);
 
         var bom = await ImportAsync(client, "bom", """
-            ParentProductCode,ChildProductCode,QuantityPer,MakeOrBuy,AlternativeGroup
-            FG-01,RM-01,2,InHouse,
-            FG-01,RM-02,1.5,Outsourced,ALT-1
+            ParentProductCode,ChildProductCode,QuantityPer,MakeOrBuy,AlternativeGroup,RoutingSequence
+            FG-01,RM-01,2,InHouse,,1
+            FG-01,RM-02,1.5,Outsourced,ALT-1,
             """);
         Assert.True(bom.Succeeded, string.Join(" / ", bom.Errors.Select(e => e.Message)));
         Assert.Equal(1, bom.Created);
@@ -218,6 +218,9 @@ public class MasterCsvTests
         var bomLines = await client.GetFromJsonAsync<List<BomItemResponse>>($"/api/products/{parentId}/bom");
         Assert.Equal(2, bomLines!.Count);
         Assert.Equal(1.5m, bomLines.Single(b => b.ChildProductCode == "RM-02").QuantityPer);
+        // 消費工程は空なら未指定（最終工程で消費）
+        Assert.Equal(1, bomLines.Single(b => b.ChildProductCode == "RM-01").RoutingSequence);
+        Assert.Null(bomLines.Single(b => b.ChildProductCode == "RM-02").RoutingSequence);
 
         var routing = await ImportAsync(client, "routing", """
             ProductCode,Sequence,ProcessCode,StandardWorkMinutes,StandardSetupMinutes,ControlItems

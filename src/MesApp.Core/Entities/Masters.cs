@@ -61,6 +61,13 @@ public class BomItem
     /// 代替部品の投入には理由の記録を求める（Spec.md 3.9 部材投入の照合）
     /// </summary>
     public bool IsAlternative { get; set; }
+
+    /// <summary>
+    /// この部材を消費する工程（親品目の工順の工程順序 <see cref="Routing.Sequence"/>。B-40-10-09）。
+    /// 未設定なら最終工程で消費する。工順は一括置換で行が作り直されるため、IDではなく工程順序で指す。
+    /// 工順に無い工程順序は指図の展開時に拒否する（MBOMと工順はどちらを先に登録してもよいため、登録時には照合しない）
+    /// </summary>
+    public int? RoutingSequence { get; set; }
 }
 
 /// <summary>工程マスタ（Spec.md 5.1 Process）</summary>

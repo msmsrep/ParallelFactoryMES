@@ -4155,4 +4155,16 @@
   <data name="製造日＋品目コード＋工程コード＋作業区コード" xml:space="preserve">
     <value>production date + product code + process code + work center code</value>
   </data>
+  <data name="消費工程" xml:space="preserve">
+    <value>Consuming step</value>
+  </data>
+  <data name="最終工程" xml:space="preserve">
+    <value>Final step</value>
+  </data>
+  <data name="最終工程（未指定）" xml:space="preserve">
+    <value>Final step (not specified)</value>
+  </data>
+  <data name="{0}（工順に無し）" xml:space="preserve">
+    <value>{0} (not in routing)</value>
+  </data>
 </root>

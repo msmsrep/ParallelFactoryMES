@@ -203,6 +203,9 @@ namespace MesApp.Migrations.SqlServer.Migrations
                         .HasPrecision(18, 6)
                         .HasColumnType("decimal(18,6)");
 
+                    b.Property<int?>("RoutingSequence")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ChildProductId");
@@ -1619,6 +1622,9 @@ namespace MesApp.Migrations.SqlServer.Migrations
                     b.Property<decimal>("QuantityPer")
                         .HasPrecision(18, 6)
                         .HasColumnType("decimal(18,6)");
+
+                    b.Property<int?>("RoutingSequence")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 

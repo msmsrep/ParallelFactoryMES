@@ -28,7 +28,8 @@ public record ManufacturingOrderResponse(
 /// <summary>指図の予定材料（展開時にMBOMから固定。Spec.md 5.7）</summary>
 public record OrderMaterialResponse(
     int ChildProductId, string ProductCode, string ProductName,
-    decimal QuantityPer, decimal PlannedQuantity, string? AlternativeGroup);
+    decimal QuantityPer, decimal PlannedQuantity, string? AlternativeGroup,
+    int? RoutingSequence = null);
 
 public record ManufacturingOrderDetailResponse(
     ManufacturingOrderResponse Order,

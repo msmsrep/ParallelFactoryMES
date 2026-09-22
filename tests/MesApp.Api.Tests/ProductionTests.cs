@@ -414,6 +414,26 @@ public class ProductionTests
     }
 
     [Fact]
+    public async Task MBOMの消費工程が工順に無い品目の指図は展開できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        // 工順は工程順序 1・2。MBOMと工順は別々に改訂できるため、ずれは展開時に止める
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom", new List<BomItemRequest>
+        {
+            new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, null, RoutingSequence: 3),
+        })).EnsureSuccessStatusCode();
+        var order = await CreateOrderAsync(admin, ctx.ProductId);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        Assert.Equal(HttpStatusCode.BadRequest, expanded.StatusCode);
+        Assert.Contains("RM-01", await expanded.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task 承認済みの指図を変更すると未承認に戻る()
     {
         using var factory = new ApiFactory();

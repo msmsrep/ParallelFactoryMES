@@ -213,6 +213,21 @@ public sealed class ManufacturingOrderService(
             return OrderOutcome.Invalid(ApiText.T("品目 '{0}' に工順（BOP）が登録されていません。", order.Product!.Code));
         }
 
+        // MBOMの消費工程は工順の工程順序で指す。MBOMと工順は別々に改訂できるため、ずれはここで止める
+        // （見過ごすと、どの作業指示のバックフラッシュでも引かれない部材ができる）
+        var bom = await db.BomItems
+            .Include(b => b.ChildProduct)
+            .Where(b => b.ParentProductId == order.ProductId)
+            .ToListAsync(ct);
+        var sequences = routing.Select(r => r.Sequence).ToHashSet();
+        if (bom.FirstOrDefault(b => b.RoutingSequence is { } s && !sequences.Contains(s)) is { } orphan)
+        {
+            return OrderOutcome.Invalid(ApiText.T(
+                "MBOMの部材 '{0}' の消費工程（工程順序 {1}）が品目 '{2}' の工順にありません。MBOMか工順を直してください。",
+                orphan.ChildProduct!.Code, orphan.RoutingSequence!.Value, order.Product!.Code));
+        }
+        var finalSequence = routing[^1].Sequence;
+
         // 産出ロット採番（手入力があれば一意性を確認して使用）
         if (string.IsNullOrWhiteSpace(lotNumber))
         {
@@ -289,10 +304,8 @@ public sealed class ManufacturingOrderService(
         }
 
         // MBOMも展開時点で予定材料として固定する。以降の投入照合（B-30-20-01）と
-        // バックフラッシュ（B-40-10-09）はこの予定材料を基準にする
-        var bom = await db.BomItems
-            .Where(b => b.ParentProductId == order.ProductId)
-            .ToListAsync(ct);
+        // バックフラッシュ（B-40-10-09）はこの予定材料を基準にする。
+        // 消費工程が未指定の行は最終工程に解決して入れ、以降は工順の改訂に左右されないようにする
         foreach (var item in bom)
         {
             db.ManufacturingOrderMaterials.Add(new ManufacturingOrderMaterial
@@ -303,6 +316,7 @@ public sealed class ManufacturingOrderService(
                 PlannedQuantity = item.QuantityPer * order.Quantity,
                 AlternativeGroup = item.AlternativeGroup,
                 IsAlternative = item.IsAlternative,
+                RoutingSequence = item.RoutingSequence ?? finalSequence,
             });
         }
 

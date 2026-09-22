@@ -45,6 +45,7 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
             MakeOrBuy = i.MakeOrBuy,
             AlternativeGroup = i.AlternativeGroup,
             IsAlternative = i.IsAlternative,
+            RoutingSequence = i.RoutingSequence,
         }));
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Master", "Update", "Bom", productId.ToString(),
