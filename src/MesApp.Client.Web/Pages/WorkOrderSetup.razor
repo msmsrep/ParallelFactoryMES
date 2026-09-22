@@ -24,8 +24,8 @@ else
             <div class="form-field">
                 <label>区分</label>
                 <select @bind="_setupType">
-                    <option value="@SetupType.Pre">前段取り</option>
-                    <option value="@SetupType.Post">後段取り</option>
+                    <option value="@SetupType.Pre">@EnumLabels.Of(SetupType.Pre)</option>
+                    <option value="@SetupType.Post">@EnumLabels.Of(SetupType.Post)</option>
                 </select>
             </div>
             <div class="form-field">
@@ -55,7 +55,7 @@ else
                     @foreach (var record in _setupRecords)
                     {
                         <tr>
-                            <td>@(record.Type == SetupType.Pre ? "前段取り" : "後段取り")</td>
+                            <td>@EnumLabels.Of(record.Type)</td>
                             <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                             <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
                             <td>@record.PerformedByName</td>
@@ -148,7 +148,7 @@ else
                 <option value="0">選択してください</option>
                 @foreach (var checklist in _checklists)
                 {
-                    <option value="@checklist.Id">@checklist.Code @checklist.Name（@ChecklistCategoryLabel(checklist.Category)）</option>
+                    <option value="@checklist.Id">@checklist.Code @checklist.Name（@EnumLabels.Of(checklist.Category)）</option>
                 }
             </select>
         </div>
@@ -320,16 +320,6 @@ else
         }
     }
 
-    private static string ChecklistCategoryLabel(ChecklistCategory category) => category switch
-    {
-        ChecklistCategory.Common => "共通",
-        ChecklistCategory.Process => "工程",
-        ChecklistCategory.Product => "品目",
-        ChecklistCategory.Setup => "段取り",
-        ChecklistCategory.Maintenance => "保全",
-        ChecklistCategory.Hse => "HSE",
-        _ => category.ToString(),
-    };
 
     private async Task AllocateToolAsync()
     {

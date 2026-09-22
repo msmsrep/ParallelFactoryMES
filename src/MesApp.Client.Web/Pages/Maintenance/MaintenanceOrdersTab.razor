@@ -29,8 +29,8 @@
         <div class="form-field">
             <label>依頼区分</label>
             <select @bind="_order.RequestType">
-                <option value="@MaintenanceRequestType.Spot">突発依頼</option>
-                <option value="@MaintenanceRequestType.Planned">計画</option>
+                <option value="@MaintenanceRequestType.Spot">@EnumLabels.Of(MaintenanceRequestType.Spot)</option>
+                <option value="@MaintenanceRequestType.Planned">@EnumLabels.Of(MaintenanceRequestType.Planned)</option>
             </select>
         </div>
         <div class="form-field">
@@ -72,8 +72,8 @@
             <div class="card">
                 <div>
                     <strong>@order.OrderNo</strong>
-                    <span class="badge">@(order.RequestType == MaintenanceRequestType.Planned ? "計画" : "突発依頼")</span>
-                    <span class="badge @OrderStatusClass(order.Status)">@OrderStatusLabel(order.Status)</span>
+                    <span class="badge">@EnumLabels.Of(order.RequestType)</span>
+                    <span class="badge @OrderStatusClass(order.Status)">@EnumLabels.Of(order.Status)</span>
                     <span class="text-muted">対象：@(order.EquipmentName ?? order.ToolName ?? "-")</span>
                     @if (order.ProcedureNo is not null)
                     {
@@ -355,13 +355,6 @@
         }
     }
 
-    private static string OrderStatusLabel(MaintenanceOrderStatus status) => status switch
-    {
-        MaintenanceOrderStatus.Instructed => "指示",
-        MaintenanceOrderStatus.Completed => "完了",
-        MaintenanceOrderStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 
     private static string OrderStatusClass(MaintenanceOrderStatus status) => status switch
     {

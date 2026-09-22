@@ -6,6 +6,8 @@ using MesApp.Client.Web.Layout;
 using MesApp.Client.Web.Shared;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Auth;
+using MesApp.Core.Entities;
+using MesApp.Core.Localization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -73,6 +75,54 @@ public class CultureTests : BunitContext
         Assert.Equal(MesCultures.English, JSInterop.VerifyInvoke("mesApp.culture.set").Arguments.Single());
         // 訳のサテライトアセンブリは起動時に読まれるため、同じ画面を強制再読込して反映する
         Assert.True(navigation.History.Single().Options.ForceLoad);
+    }
+
+    /// <summary>Core に定義された全区分値（新しい区分・値を足したときに表示名の書き忘れを検出する）</summary>
+    public static TheoryData<Enum> AllEnumValues()
+    {
+        var data = new TheoryData<Enum>();
+        foreach (var type in typeof(LotStockStatus).Assembly.GetTypes().Where(t => t.IsEnum && t.IsPublic))
+        {
+            foreach (Enum value in Enum.GetValues(type))
+            {
+                data.Add(value);
+            }
+        }
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(AllEnumValues))]
+    public void 全区分値に日本語の表示名と英語の訳がある(Enum value)
+    {
+        Assert.NotEqual(value.ToString(), EnumLabels.OriginalOf(value));
+
+        var english = InCulture("en", () => EnumLabels.Of(value));
+        Assert.DoesNotMatch(@"[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}]", english);
+    }
+
+    [Fact]
+    public void 区分値とロールの表示名は表示言語に従う()
+    {
+        Assert.Equal("保留", InCulture("ja", () => EnumLabels.Of(LotStockStatus.OnHold)));
+        Assert.Equal("On hold", InCulture("en", () => EnumLabels.Of(LotStockStatus.OnHold)));
+        Assert.Equal("Quality assurance", InCulture("en", () => EnumLabels.Role(MesRoles.QualityAssurance)));
+        // 訳さない用途向けの原文は言語に左右されない
+        Assert.Equal("保留", InCulture("en", () => EnumLabels.OriginalOf(LotStockStatus.OnHold)));
+    }
+
+    private static T InCulture<T>(string culture, Func<T> action)
+    {
+        var original = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentUICulture = new CultureInfo(culture);
+        try
+        {
+            return action();
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
     }
 
     private IRenderedComponent<MainLayout> RenderLayoutIn(string culture)

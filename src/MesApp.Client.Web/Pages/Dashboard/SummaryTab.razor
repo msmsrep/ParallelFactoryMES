@@ -42,7 +42,7 @@ else if (_current is { } now)
         </KpiTile>
     </div>
     <p class="text-muted">
-        @DeltaLabel は直前の@(DashboardPeriods.UnitLabel(_range!.Unit).TrimEnd('次'))との差（率は%ポイント）。未クローズの不適合は期間中に起票されて未クローズのもの。
+        @DeltaLabel は直前の@(EnumLabels.Of(_range!.Unit).TrimEnd('次'))との差（率は%ポイント）。未クローズの不適合は期間中に起票されて未クローズのもの。
         日・週・月の推移は「推移」タブ、工程・品目・直・ライン・設備ごとの内訳は「内訳」タブで見る。不良理由・停止原因は<a href="quality-analysis">品質分析</a>・<a href="maintenance">設備保全</a>で確認する。
     </p>
 }

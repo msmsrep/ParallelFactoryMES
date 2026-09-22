@@ -83,7 +83,7 @@
                 {
                     <tr>
                         <td>@(record.UserName ?? "-")</td>
-                        <td>@(record.Type == WorkTimeType.Direct ? "直接" : "間接")</td>
+                        <td>@EnumLabels.Of(record.Type)</td>
                         <td>@(record.WorkOrderNo ?? record.IndirectCategory ?? "-")</td>
                         <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "作業中")</td>

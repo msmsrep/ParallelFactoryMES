@@ -23,9 +23,9 @@
             <div class="form-field">
                 <label>品目区分</label>
                 <select @bind="_type">
-                    <option value="@ProductType.Product">製品</option>
-                    <option value="@ProductType.SemiFinished">半製品・中間品</option>
-                    <option value="@ProductType.Material">部材</option>
+                    <option value="@ProductType.Product">@EnumLabels.Of(ProductType.Product)</option>
+                    <option value="@ProductType.SemiFinished">@EnumLabels.Of(ProductType.SemiFinished)</option>
+                    <option value="@ProductType.Material">@EnumLabels.Of(ProductType.Material)</option>
                 </select>
             </div>
             <div class="form-field">
@@ -80,7 +80,7 @@
                     <tr>
                         <td>@product.Code</td>
                         <td>@product.Name</td>
-                        <td>@TypeLabel(product.Type)</td>
+                        <td>@EnumLabels.Of(product.Type)</td>
                         <td>@product.Unit</td>
                         <td>@product.StandardDefectRate %</td>
                         <td>@(product.IsActive ? "有効" : "無効")</td>
@@ -261,11 +261,4 @@
             $"api/products/{_selected.Id}/change-impact");
     }
 
-    private static string TypeLabel(ProductType type) => type switch
-    {
-        ProductType.Product => "製品",
-        ProductType.SemiFinished => "半製品",
-        ProductType.Material => "部材",
-        _ => type.ToString(),
-    };
 }

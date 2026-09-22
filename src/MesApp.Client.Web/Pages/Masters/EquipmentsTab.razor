@@ -32,19 +32,19 @@
             <div class="form-field">
                 <label>状態</label>
                 <select @bind="_status">
-                    <option value="@EquipmentStatus.Available">稼働可能</option>
-                    <option value="@EquipmentStatus.Stopped">停止中</option>
-                    <option value="@EquipmentStatus.UnderMaintenance">保全中</option>
-                    <option value="@EquipmentStatus.Retired">廃棄・除却</option>
+                    <option value="@EquipmentStatus.Available">@EnumLabels.Of(EquipmentStatus.Available)</option>
+                    <option value="@EquipmentStatus.Stopped">@EnumLabels.Of(EquipmentStatus.Stopped)</option>
+                    <option value="@EquipmentStatus.UnderMaintenance">@EnumLabels.Of(EquipmentStatus.UnderMaintenance)</option>
+                    <option value="@EquipmentStatus.Retired">@EnumLabels.Of(EquipmentStatus.Retired)</option>
                 </select>
             </div>
             <div class="form-field">
                 <label>保全タイプ</label>
                 <select @bind="_maintenanceType">
-                    <option value="@MaintenanceType.None">対象外</option>
+                    <option value="@MaintenanceType.None">@EnumLabels.Of(MaintenanceType.None)</option>
                     <option value="@MaintenanceType.Calendar">カレンダ（日数）</option>
-                    <option value="@MaintenanceType.RunTime">稼働時間</option>
-                    <option value="@MaintenanceType.Count">使用回数</option>
+                    <option value="@MaintenanceType.RunTime">@EnumLabels.Of(MaintenanceType.RunTime)</option>
+                    <option value="@MaintenanceType.Count">@EnumLabels.Of(MaintenanceType.Count)</option>
                 </select>
             </div>
             <div class="form-field">
@@ -78,7 +78,7 @@
                 {
                     <tr>
                         <td>@(_products.FirstOrDefault(p => p.Id == part.ProductId)?.Code ?? part.ProductId.ToString())</td>
-                        <td>@CategoryLabel(part.Category)</td>
+                        <td>@EnumLabels.Of(part.Category)</td>
                         <td>@part.QuantityPer</td>
                         <td>@(part.Note ?? "-")</td>
                         <td>
@@ -102,8 +102,8 @@
                 <div class="form-field">
                     <label>管理区分</label>
                     <select @bind="_partCategory">
-                        <option value="@MaintenancePartCategory.Consumable">消耗品</option>
-                        <option value="@MaintenancePartCategory.Asset">資産管理部品</option>
+                        <option value="@MaintenancePartCategory.Consumable">@EnumLabels.Of(MaintenancePartCategory.Consumable)</option>
+                        <option value="@MaintenancePartCategory.Asset">@EnumLabels.Of(MaintenancePartCategory.Asset)</option>
                     </select>
                 </div>
                 <div class="form-field">
@@ -147,8 +147,8 @@
                         <td>@item.Name</td>
                         <td>@(item.WorkCenterCode is null ? "-" : $"{item.WorkCenterCode} {item.WorkCenterName}")</td>
                         <td>@(item.Site ?? "-")</td>
-                        <td>@StatusLabel(item.Status)</td>
-                        <td>@MaintenanceTypeLabel(item.MaintenanceType)</td>
+                        <td>@EnumLabels.Of(item.Status)</td>
+                        <td>@EnumLabels.Of(item.MaintenanceType)</td>
                         <td>@(item.MaintenanceThreshold?.ToString() ?? "-")</td>
                         <td>@(item.MaintenanceParts ?? "-")</td>
                         <td class="actions">
@@ -348,28 +348,6 @@
         }
     }
 
-    private static string CategoryLabel(MaintenancePartCategory category) => category switch
-    {
-        MaintenancePartCategory.Asset => "資産管理部品",
-        MaintenancePartCategory.Consumable => "消耗品",
-        _ => category.ToString(),
-    };
 
-    private static string StatusLabel(EquipmentStatus status) => status switch
-    {
-        EquipmentStatus.Available => "稼働可能",
-        EquipmentStatus.Stopped => "停止中",
-        EquipmentStatus.UnderMaintenance => "保全中",
-        EquipmentStatus.Retired => "廃棄・除却",
-        _ => status.ToString(),
-    };
 
-    private static string MaintenanceTypeLabel(MaintenanceType type) => type switch
-    {
-        MaintenanceType.None => "対象外",
-        MaintenanceType.Calendar => "カレンダ",
-        MaintenanceType.RunTime => "稼働時間",
-        MaintenanceType.Count => "使用回数",
-        _ => type.ToString(),
-    };
 }

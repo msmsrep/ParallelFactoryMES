@@ -15,9 +15,9 @@
         <div class="form-field">
             <label>発生元</label>
             <select @bind="_form.Source">
-                <option value="@NonconformanceSource.Production">生産実績</option>
-                <option value="@NonconformanceSource.Inspection">検査</option>
-                <option value="@NonconformanceSource.Receiving">受入</option>
+                <option value="@NonconformanceSource.Production">@EnumLabels.Of(NonconformanceSource.Production)</option>
+                <option value="@NonconformanceSource.Inspection">@EnumLabels.Of(NonconformanceSource.Inspection)</option>
+                <option value="@NonconformanceSource.Receiving">@EnumLabels.Of(NonconformanceSource.Receiving)</option>
             </select>
         </div>
         <div class="form-field">
@@ -74,8 +74,8 @@
             <div class="card">
                 <div>
                     <strong>@report.ReportNo</strong>
-                    <span class="badge">@SourceLabel(report.Source)</span>
-                    <span class="badge @StatusClass(report.Status)">@StatusLabel(report.Status)</span>
+                    <span class="badge">@EnumLabels.Of(report.Source)</span>
+                    <span class="badge @StatusClass(report.Status)">@EnumLabels.Of(report.Status)</span>
                     @if (report.LotNumber is not null)
                     {
                         <span class="text-muted">ロット：@report.LotNumber</span>
@@ -91,7 +91,7 @@
                         <tr><th>原因</th><td>@(report.CauseCategory ?? "-") @(report.CauseDetail)</td></tr>
                         <tr>
                             <th>対応指示</th>
-                            <td>@(report.Action is null ? "-" : $"{ActionLabel(report.Action.Value)}：{report.ActionInstruction}")</td>
+                            <td>@(report.Action is null ? "-" : $"{EnumLabels.Of(report.Action.Value)}：{report.ActionInstruction}")</td>
                         </tr>
                         <tr><th>対応実績</th><td style="white-space:normal;">@(report.ActionRecord ?? "-")</td></tr>
                     </tbody>
@@ -104,10 +104,10 @@
                         {
                             <select value="@GetForm(report.Id).Action"
                                     @onchange="e => GetForm(report.Id).Action = e.Value?.ToString()">
-                                <option value="@NonconformanceAction.Rework">リワーク</option>
-                                <option value="@NonconformanceAction.Hold">保留</option>
-                                <option value="@NonconformanceAction.Discard">廃棄</option>
-                                <option value="@NonconformanceAction.SpecialAcceptance">特別採用</option>
+                                <option value="@NonconformanceAction.Rework">@EnumLabels.Of(NonconformanceAction.Rework)</option>
+                                <option value="@NonconformanceAction.Hold">@EnumLabels.Of(NonconformanceAction.Hold)</option>
+                                <option value="@NonconformanceAction.Discard">@EnumLabels.Of(NonconformanceAction.Discard)</option>
+                                <option value="@NonconformanceAction.SpecialAcceptance">@EnumLabels.Of(NonconformanceAction.SpecialAcceptance)</option>
                             </select>
                             <input placeholder="指示内容" value="@GetForm(report.Id).Instruction"
                                    @onchange="e => GetForm(report.Id).Instruction = e.Value?.ToString()" />
@@ -292,31 +292,8 @@
         }
     }
 
-    private static string SourceLabel(NonconformanceSource source) => source switch
-    {
-        NonconformanceSource.Production => "生産実績",
-        NonconformanceSource.Inspection => "検査",
-        NonconformanceSource.Receiving => "受入",
-        _ => source.ToString(),
-    };
 
-    private static string ActionLabel(NonconformanceAction action) => action switch
-    {
-        NonconformanceAction.Rework => "リワーク",
-        NonconformanceAction.Hold => "保留",
-        NonconformanceAction.Discard => "廃棄",
-        NonconformanceAction.SpecialAcceptance => "特別採用",
-        _ => action.ToString(),
-    };
 
-    private static string StatusLabel(NonconformanceStatus status) => status switch
-    {
-        NonconformanceStatus.Open => "発生",
-        NonconformanceStatus.ActionInstructed => "対応指示済",
-        NonconformanceStatus.ActionCompleted => "対応完了",
-        NonconformanceStatus.Closed => "クローズ",
-        _ => status.ToString(),
-    };
 
     private static string StatusClass(NonconformanceStatus status) => status switch
     {

@@ -17,7 +17,7 @@ else
                     <td>@history.ChangedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                     <td><StatusBadge Status="@history.FromStatus.ToString()" /></td>
                     <td><StatusBadge Status="@history.ToStatus.ToString()" /></td>
-                    <td>@Labels.WorkOrderStatusSource(history.Source)</td>
+                    <td>@EnumLabels.Of(history.Source)</td>
                     <td>@(history.Note ?? "-")</td>
                     <td>@(history.ChangedByName ?? "-")</td>
                 </tr>

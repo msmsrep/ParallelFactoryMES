@@ -162,7 +162,7 @@
                                 <span class="badge badge-warning">あと@(days)日</span>
                             }
                         </td>
-                        <td>@StatusLabel(sample.Status)</td>
+                        <td>@EnumLabels.Of(sample.Status)</td>
                         <td class="actions">
                             @if (sample.Status == SampleStorageStatus.Stored)
                             {
@@ -315,7 +315,7 @@
                 _error = error;
                 return;
             }
-            _message = $"サンプル {sample.SampleNo} を{StatusLabel(status)}にしました。";
+            _message = $"サンプル {sample.SampleNo} を{EnumLabels.Of(status)}にしました。";
             await LoadSamplesAsync();
         }
         finally
@@ -324,10 +324,4 @@
         }
     }
 
-    private static string StatusLabel(SampleStorageStatus status) => status switch
-    {
-        SampleStorageStatus.Stored => "保管中",
-        SampleStorageStatus.Consumed => "払出済",
-        _ => "廃棄済",
-    };
 }

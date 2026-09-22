@@ -21,11 +21,11 @@
             <div class="form-field">
                 <label>区分</label>
                 <select @bind="_category">
-                    <option value="@DefectReasonCategory.Material">材質・部材</option>
-                    <option value="@DefectReasonCategory.Process">加工・作業</option>
-                    <option value="@DefectReasonCategory.Equipment">設備</option>
-                    <option value="@DefectReasonCategory.Human">人的要因</option>
-                    <option value="@DefectReasonCategory.Other">その他</option>
+                    <option value="@DefectReasonCategory.Material">@EnumLabels.Of(DefectReasonCategory.Material)</option>
+                    <option value="@DefectReasonCategory.Process">@EnumLabels.Of(DefectReasonCategory.Process)</option>
+                    <option value="@DefectReasonCategory.Equipment">@EnumLabels.Of(DefectReasonCategory.Equipment)</option>
+                    <option value="@DefectReasonCategory.Human">@EnumLabels.Of(DefectReasonCategory.Human)</option>
+                    <option value="@DefectReasonCategory.Other">@EnumLabels.Of(DefectReasonCategory.Other)</option>
                 </select>
             </div>
         </div>
@@ -56,7 +56,7 @@
                     <tr>
                         <td>@item.Code</td>
                         <td>@item.Name</td>
-                        <td>@Labels.DefectCategory(item.Category)</td>
+                        <td>@EnumLabels.Of(item.Category)</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">

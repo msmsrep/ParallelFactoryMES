@@ -76,7 +76,7 @@
                     <div>
                         <strong>@order.ShippingNo</strong>
                         <span class="text-muted">@order.Destination</span>
-                        <span class="badge @StatusClass(order.Status)">@ShippingStatusLabel(order.Status)</span>
+                        <span class="badge @StatusClass(order.Status)">@EnumLabels.Of(order.Status)</span>
                         <span class="text-muted">予定日 @(order.PlannedDate?.ToString("yyyy-MM-dd") ?? "-")</span>
                     </div>
                     <div class="actions">
@@ -292,13 +292,6 @@
         }
     }
 
-    private static string ShippingStatusLabel(ShippingOrderStatus status) => status switch
-    {
-        ShippingOrderStatus.Instructed => "指示",
-        ShippingOrderStatus.Completed => "完了",
-        ShippingOrderStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 
     private static string StatusClass(ShippingOrderStatus status) => status switch
     {

@@ -1,3 +1,4 @@
+using MesApp.Core.Localization;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Policies;
@@ -48,13 +49,13 @@ public static class WorkCenterHierarchyPolicy
 
         if (parent is null)
         {
-            return $"'{code}' には上位の資源（{LevelName(required.Value)}）の指定が必要です。";
+            return $"'{code}' には上位の資源（{EnumLabels.Of(required.Value)}）の指定が必要です。";
         }
 
         if (parent.Level != required.Value)
         {
-            return $"'{code}'（{LevelName(level)}）の上位には{LevelName(required.Value)}を指定してください" +
-                   $"（'{parent.Code}' は{LevelName(parent.Level)}です）。";
+            return $"'{code}'（{EnumLabels.Of(level)}）の上位には{EnumLabels.Of(required.Value)}を指定してください" +
+                   $"（'{parent.Code}' は{EnumLabels.Of(parent.Level)}です）。";
         }
 
         // 循環：自分自身、または自分の配下を親にすると木が閉じる
@@ -89,7 +90,7 @@ public static class WorkCenterHierarchyPolicy
         }
         if (workCenter.Level != WorkCenterLevel.WorkCenter)
         {
-            return $"設備の設置場所には作業区を指定してください（'{workCenter.Code}' は{LevelName(workCenter.Level)}です）。";
+            return $"設備の設置場所には作業区を指定してください（'{workCenter.Code}' は{EnumLabels.Of(workCenter.Level)}です）。";
         }
         return workCenter.IsActive
             ? null
@@ -169,11 +170,4 @@ public static class WorkCenterHierarchyPolicy
     }
 
     /// <summary>エラーメッセージ用の段の日本語名</summary>
-    public static string LevelName(WorkCenterLevel level) => level switch
-    {
-        WorkCenterLevel.Plant => "工場",
-        WorkCenterLevel.Line => "ライン",
-        WorkCenterLevel.Area => "エリア",
-        _ => "作業区",
-    };
 }

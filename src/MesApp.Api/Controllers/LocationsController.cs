@@ -1,4 +1,5 @@
-﻿using MesApp.Api.Policies;
+﻿using MesApp.Core.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -174,19 +175,13 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
         }
         foreach (var location in locations.Where(l => l.AreaType == defaultArea))
         {
-            Add(location, $"品目区分「{ProductTypeLabel(product.Type)}」の既定エリア");
+            Add(location, $"品目区分「{EnumLabels.Of(product.Type)}」の既定エリア");
         }
 
         return result.Take(Math.Clamp(limit, 1, 20)).ToList();
     }
 
     /// <summary>推奨理由に出す品目区分の日本語（画面と同じ語を使う）</summary>
-    private static string ProductTypeLabel(ProductType type) => type switch
-    {
-        ProductType.Product => "製品",
-        ProductType.SemiFinished => "半製品・中間品",
-        _ => "部材",
-    };
 
     /// <summary>作業区は未設定でもよいため、コード・名称はnull許容のまま返す</summary>
     private static LocationResponse ToResponse(Location l, WorkCenter? workCenter = null)

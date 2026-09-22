@@ -33,8 +33,8 @@
             <div class="form-field">
                 <label>指図区分</label>
                 <select @bind="_form.OrderType">
-                    <option value="@ManufacturingOrderType.Normal">通常</option>
-                    <option value="@ManufacturingOrderType.Spot">突発</option>
+                    <option value="@ManufacturingOrderType.Normal">@EnumLabels.Of(ManufacturingOrderType.Normal)</option>
+                    <option value="@ManufacturingOrderType.Spot">@EnumLabels.Of(ManufacturingOrderType.Spot)</option>
                 </select>
             </div>
             <div class="form-field">
@@ -85,7 +85,7 @@
                         <td>@order.ProductCode @order.ProductName</td>
                         <td>@order.Quantity</td>
                         <td>@(order.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
-                        <td>@OrderTypeLabel(order.OrderType)</td>
+                        <td>@EnumLabels.Of(order.OrderType)</td>
                         <td><StatusBadge Status="@order.Status.ToString()" /></td>
                         <td>@(order.OutputLotNumber ?? "-")</td>
                         <td><a class="btn btn-secondary btn-sm" href="manufacturing-orders/@order.Id">詳細</a></td>
@@ -167,11 +167,4 @@
         }
     }
 
-    private static string OrderTypeLabel(ManufacturingOrderType type) => type switch
-    {
-        ManufacturingOrderType.Normal => "通常",
-        ManufacturingOrderType.Rework => "リワーク",
-        ManufacturingOrderType.Spot => "突発",
-        _ => type.ToString(),
-    };
 }

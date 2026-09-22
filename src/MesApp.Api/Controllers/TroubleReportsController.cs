@@ -1,3 +1,4 @@
+using MesApp.Core.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -85,7 +86,7 @@ public class TroubleReportsController(MesAppDbContext db, ShopFloorReportService
         {
             // 「発生」へ戻すと対応を始めた事実が消えるため、戻しは完了からの再オープンだけに限る
             return this.ConflictProblem(
-                $"トラブル報告の状態を「{StatusLabel(before)}」から「{StatusLabel(request.Status)}」へは変更できません。");
+                $"トラブル報告の状態を「{EnumLabels.Of(before)}」から「{EnumLabels.Of(request.Status)}」へは変更できません。");
         }
         if (reopen && string.IsNullOrWhiteSpace(request.ResponseNote))
         {
@@ -107,13 +108,6 @@ public class TroubleReportsController(MesAppDbContext db, ShopFloorReportService
         return await GetResponseAsync(id, ct);
     }
 
-    private static string StatusLabel(TroubleStatus status) => status switch
-    {
-        TroubleStatus.Open => "発生",
-        TroubleStatus.InProgress => "対応中",
-        TroubleStatus.Closed => "完了",
-        _ => status.ToString(),
-    };
 
     private async Task<TroubleReportResponse> GetResponseAsync(int id, CancellationToken ct) =>
         await db.TroubleReports.AsNoTracking()

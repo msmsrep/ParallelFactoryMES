@@ -18,11 +18,11 @@
             <div class="form-field">
                 <label>適用区分</label>
                 <select @bind="_category">
-                    <option value="@ChecklistCategory.Common">共通</option>
-                    <option value="@ChecklistCategory.Process">工程</option>
-                    <option value="@ChecklistCategory.Product">品目</option>
-                    <option value="@ChecklistCategory.Setup">段取り</option>
-                    <option value="@ChecklistCategory.Maintenance">保全</option>
+                    <option value="@ChecklistCategory.Common">@EnumLabels.Of(ChecklistCategory.Common)</option>
+                    <option value="@ChecklistCategory.Process">@EnumLabels.Of(ChecklistCategory.Process)</option>
+                    <option value="@ChecklistCategory.Product">@EnumLabels.Of(ChecklistCategory.Product)</option>
+                    <option value="@ChecklistCategory.Setup">@EnumLabels.Of(ChecklistCategory.Setup)</option>
+                    <option value="@ChecklistCategory.Maintenance">@EnumLabels.Of(ChecklistCategory.Maintenance)</option>
                     <option value="@ChecklistCategory.Hse">HSE（健康衛生・安全）</option>
                 </select>
             </div>
@@ -87,7 +87,7 @@
                     <tr>
                         <td>@checklist.Code</td>
                         <td>@checklist.Name</td>
-                        <td>@CategoryLabel(checklist.Category)</td>
+                        <td>@EnumLabels.Of(checklist.Category)</td>
                         <td>@checklist.Items.Count</td>
                         <td>@(checklist.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
@@ -220,14 +220,4 @@
         }
     }
 
-    private static string CategoryLabel(ChecklistCategory category) => category switch
-    {
-        ChecklistCategory.Common => "共通",
-        ChecklistCategory.Process => "工程",
-        ChecklistCategory.Product => "品目",
-        ChecklistCategory.Setup => "段取り",
-        ChecklistCategory.Maintenance => "保全",
-        ChecklistCategory.Hse => "HSE",
-        _ => category.ToString(),
-    };
 }

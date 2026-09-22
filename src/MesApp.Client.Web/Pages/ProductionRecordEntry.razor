@@ -111,7 +111,7 @@ else
                         {
                             <tr>
                                 <td>@reason.Code @reason.Name</td>
-                                <td>@Labels.DefectCategory(reason.Category)</td>
+                                <td>@EnumLabels.Of(reason.Category)</td>
                                 <td>
                                     <input type="number" min="0" style="width:6rem;"
                                            value="@GetDefectQuantity(reason.Id)"

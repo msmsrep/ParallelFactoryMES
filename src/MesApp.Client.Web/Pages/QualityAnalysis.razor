@@ -160,7 +160,7 @@ else
                     {
                         <tr>
                             <td>@row.Code @row.Name</td>
-                            <td>@Labels.DefectCategory(row.Category)</td>
+                            <td>@EnumLabels.Of(row.Category)</td>
                             <td>@row.Quantity</td>
                             <td>@row.Share %</td>
                             <td>@row.CumulativeShare %</td>

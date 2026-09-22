@@ -26,7 +26,7 @@ else
                     <th>対象ロット</th><td>@(_judgment.LotNumber ?? "-")</td>
                 </tr>
                 <tr>
-                    <th>判定</th><td><strong>@ShipmentJudgments.ResultLabel(_judgment.Result)</strong></td>
+                    <th>判定</th><td><strong>@EnumLabels.Of(_judgment.Result)</strong></td>
                     <th>判定者</th><td>@_judgment.JudgedByName</td>
                 </tr>
                 <tr>

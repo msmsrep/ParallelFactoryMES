@@ -120,10 +120,10 @@
         <div class="form-field">
             <label>区分（QCDS）</label>
             <select @bind="_form.Category">
-                <option value="@TroubleCategory.Quality">品質</option>
-                <option value="@TroubleCategory.Cost">コスト</option>
-                <option value="@TroubleCategory.Delivery">納期</option>
-                <option value="@TroubleCategory.Safety">安全</option>
+                <option value="@TroubleCategory.Quality">@EnumLabels.Of(TroubleCategory.Quality)</option>
+                <option value="@TroubleCategory.Cost">@EnumLabels.Of(TroubleCategory.Cost)</option>
+                <option value="@TroubleCategory.Delivery">@EnumLabels.Of(TroubleCategory.Delivery)</option>
+                <option value="@TroubleCategory.Safety">@EnumLabels.Of(TroubleCategory.Safety)</option>
             </select>
         </div>
         <div class="form-field">
@@ -182,10 +182,10 @@
                 {
                     <tr>
                         <td>@trouble.OccurredAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                        <td>@CategoryLabel(trouble.Category)</td>
+                        <td>@EnumLabels.Of(trouble.Category)</td>
                         <td>@(trouble.WorkOrderNo ?? trouble.EquipmentName ?? "-")</td>
                         <td style="white-space:normal;max-width:260px;">@trouble.Content</td>
-                        <td>@TroubleStatusLabel(trouble.Status)</td>
+                        <td>@EnumLabels.Of(trouble.Status)</td>
                         <td style="white-space:pre-wrap;max-width:280px;">@(trouble.ResponseHistory ?? "-")</td>
                         <td>
                             @if (trouble.Status != TroubleStatus.Closed)
@@ -338,20 +338,5 @@
         }
     }
 
-    private static string CategoryLabel(TroubleCategory category) => category switch
-    {
-        TroubleCategory.Quality => "品質",
-        TroubleCategory.Cost => "コスト",
-        TroubleCategory.Delivery => "納期",
-        TroubleCategory.Safety => "安全",
-        _ => category.ToString(),
-    };
 
-    private static string TroubleStatusLabel(TroubleStatus status) => status switch
-    {
-        TroubleStatus.Open => "発生",
-        TroubleStatus.InProgress => "対応中",
-        TroubleStatus.Closed => "完了",
-        _ => status.ToString(),
-    };
 }

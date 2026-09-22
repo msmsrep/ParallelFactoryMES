@@ -14,10 +14,10 @@
             <div class="form-field">
                 <label>倉庫/エリア区分</label>
                 <select @bind="_areaType">
-                    <option value="@LocationAreaType.MaterialWarehouse">部材倉庫</option>
-                    <option value="@LocationAreaType.InProcess">工程内</option>
-                    <option value="@LocationAreaType.ProductWarehouse">製品倉庫</option>
-                    <option value="@LocationAreaType.ShippingArea">出荷場</option>
+                    <option value="@LocationAreaType.MaterialWarehouse">@EnumLabels.Of(LocationAreaType.MaterialWarehouse)</option>
+                    <option value="@LocationAreaType.InProcess">@EnumLabels.Of(LocationAreaType.InProcess)</option>
+                    <option value="@LocationAreaType.ProductWarehouse">@EnumLabels.Of(LocationAreaType.ProductWarehouse)</option>
+                    <option value="@LocationAreaType.ShippingArea">@EnumLabels.Of(LocationAreaType.ShippingArea)</option>
                 </select>
             </div>
             <div class="form-field">
@@ -61,7 +61,7 @@
                 {
                     <tr>
                         <td>@item.Code</td>
-                        <td>@AreaLabel(item.AreaType)</td>
+                        <td>@EnumLabels.Of(item.AreaType)</td>
                         <td>@(item.WorkCenterCode is null ? "-" : $"{item.WorkCenterCode} {item.WorkCenterName}")</td>
                         <td>@(item.ShelfNo ?? "-")</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
@@ -173,12 +173,4 @@
         }
     }
 
-    private static string AreaLabel(LocationAreaType areaType) => areaType switch
-    {
-        LocationAreaType.MaterialWarehouse => "部材倉庫",
-        LocationAreaType.InProcess => "工程内",
-        LocationAreaType.ProductWarehouse => "製品倉庫",
-        LocationAreaType.ShippingArea => "出荷場",
-        _ => areaType.ToString(),
-    };
 }

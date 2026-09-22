@@ -19,7 +19,7 @@ else
             <tbody>
                 <tr>
                     <th>検査指示番号</th><td>@_order.OrderNo</td>
-                    <th>検査種別</th><td>@Inspections.TypeLabel(_order.Type)</td>
+                    <th>検査種別</th><td>@EnumLabels.Of(_order.Type)</td>
                 </tr>
                 <tr>
                     <th>対象</th><td>@(_order.TargetLotNumber ?? _order.TargetWorkOrderNo ?? "-")</td>
@@ -30,7 +30,7 @@ else
                     <td>
                         @if (_order.OverallJudgment is InspectionJudgment judgment)
                         {
-                            <strong>@(judgment == InspectionJudgment.Pass ? "合格" : "不合格")</strong>
+                            <strong>@EnumLabels.Of(judgment)</strong>
                         }
                         else
                         {
@@ -67,7 +67,7 @@ else
                         </td>
                         <td>@(item?.Method ?? "-")</td>
                         <td>@(result.MeasuredValue?.ToString() ?? result.TextValue ?? "-")</td>
-                        <td>@(result.Judgment == InspectionJudgment.Pass ? "合格" : "不合格")</td>
+                        <td>@EnumLabels.Of(result.Judgment)</td>
                         @* 使用した検査機（C-20-50-03）。校正済みの機器で測ったことを成績書で示す *@
                         <td>@(result.InspectionDeviceCode ?? "-")</td>
                         <td>@result.InspectedByName</td>

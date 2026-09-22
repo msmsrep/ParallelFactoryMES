@@ -26,20 +26,5 @@ public static class DashboardPeriods
     public static DateOnly End(DateOnly date, DashboardPeriodUnit unit) =>
         Shift(Start(date, unit), unit, 1).AddDays(-1);
 
-    public static string UnitLabel(DashboardPeriodUnit unit) => unit switch
-    {
-        DashboardPeriodUnit.Week => "週次",
-        DashboardPeriodUnit.Month => "月次",
-        _ => "日次",
-    };
 
-    public static string AxisLabel(DashboardAxis axis) => axis switch
-    {
-        DashboardAxis.Process => "工程",
-        DashboardAxis.Product => "品目",
-        DashboardAxis.Shift => "直",
-        DashboardAxis.Line => "ライン",
-        DashboardAxis.WorkCenter => "作業区",
-        _ => "設備",
-    };
 }

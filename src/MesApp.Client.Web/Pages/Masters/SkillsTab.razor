@@ -18,8 +18,8 @@
             <div class="form-field">
                 <label>種別</label>
                 <select @bind="_type">
-                    <option value="@SkillType.Skill">スキル</option>
-                    <option value="@SkillType.Certification">資格</option>
+                    <option value="@SkillType.Skill">@EnumLabels.Of(SkillType.Skill)</option>
+                    <option value="@SkillType.Certification">@EnumLabels.Of(SkillType.Certification)</option>
                 </select>
             </div>
             <div class="form-field">
@@ -58,7 +58,7 @@
                     <tr>
                         <td>@item.Code</td>
                         <td>@item.Name</td>
-                        <td>@(item.Type == SkillType.Skill ? "スキル" : "資格")</td>
+                        <td>@EnumLabels.Of(item.Type)</td>
                         <td>@(item.RequiresExpiry ? "要" : "不要")</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">

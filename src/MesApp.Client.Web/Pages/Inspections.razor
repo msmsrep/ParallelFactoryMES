@@ -20,7 +20,7 @@
                     <option value="@InspectionOrderType.InProcess">工程内検査</option>
                     <option value="@InspectionOrderType.FinalProduct">完成品検査</option>
                     <option value="@InspectionOrderType.Sample">サンプル検査</option>
-                    <option value="@InspectionOrderType.Reinspection">再検査</option>
+                    <option value="@InspectionOrderType.Reinspection">@EnumLabels.Of(InspectionOrderType.Reinspection)</option>
                 </select>
             </div>
             @if (_type == InspectionOrderType.InProcess)
@@ -84,14 +84,14 @@
                 {
                     <tr>
                         <td>@order.OrderNo</td>
-                        <td>@TypeLabel(order.Type)</td>
+                        <td>@EnumLabels.Of(order.Type)</td>
                         <td>@(order.TargetLotNumber ?? order.TargetWorkOrderNo ?? "-")</td>
-                        <td><span class="badge @StatusClass(order.Status)">@StatusLabel(order.Status)</span></td>
+                        <td><span class="badge @StatusClass(order.Status)">@EnumLabels.Of(order.Status)</span></td>
                         <td>
                             @if (order.OverallJudgment is InspectionJudgment judgment)
                             {
                                 <span class="badge @(judgment == InspectionJudgment.Pass ? "badge-success" : "badge-danger")">
-                                    @(judgment == InspectionJudgment.Pass ? "合格" : "不合格")
+                                    @EnumLabels.Of(judgment)
                                 </span>
                             }
                             else
@@ -190,25 +190,7 @@
         }
     }
 
-    internal static string TypeLabel(InspectionOrderType type) => type switch
-    {
-        InspectionOrderType.Receiving => "受入",
-        InspectionOrderType.InProcess => "工程内",
-        InspectionOrderType.FinalProduct => "完成品",
-        InspectionOrderType.Sample => "サンプル",
-        InspectionOrderType.Reinspection => "再検査",
-        _ => type.ToString(),
-    };
 
-    internal static string StatusLabel(InspectionOrderStatus status) => status switch
-    {
-        InspectionOrderStatus.Instructed => "指示",
-        InspectionOrderStatus.InProgress => "実施中",
-        InspectionOrderStatus.Judged => "判定済",
-        InspectionOrderStatus.Approved => "承認済",
-        InspectionOrderStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 
     private static string StatusClass(InspectionOrderStatus status) => status switch
     {

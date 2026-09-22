@@ -90,7 +90,7 @@
                         <td>@order.Quantity</td>
                         <td>@order.FromLocationCode</td>
                         <td>@order.ToLocationCode</td>
-                        <td>@StatusLabel(order.Status)</td>
+                        <td>@EnumLabels.Of(order.Status)</td>
                         <td>@order.CreatedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(order.ExecutedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
                         <td>
@@ -126,13 +126,6 @@
     private string? _message;
     private bool _busy;
 
-    private static string StatusLabel(TransferOrderStatus status) => status switch
-    {
-        TransferOrderStatus.Instructed => "指示中",
-        TransferOrderStatus.Completed => "完了",
-        TransferOrderStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 
     protected override async Task OnInitializedAsync()
     {

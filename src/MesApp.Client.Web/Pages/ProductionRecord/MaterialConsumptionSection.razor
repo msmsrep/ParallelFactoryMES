@@ -24,7 +24,7 @@ else
                     <td>@consumption.LotNumber</td>
                     <td>@consumption.Quantity</td>
                     <td>@consumption.ConsumedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                    <td>@(consumption.Method == ConsumptionMethod.Backflush ? "バックフラッシュ" : "手動")</td>
+                    <td>@EnumLabels.Of(consumption.Method)</td>
                     <td>@(consumption.IsSubstitute ? consumption.SubstituteReason ?? "（代替）" : "-")</td>
                 </tr>
             }

@@ -56,7 +56,7 @@
                             <td>@stock.ProductCode @stock.ProductName</td>
                             <td>@stock.LocationCode</td>
                             <td>@stock.Quantity</td>
-                            <td>@Labels.LotStatus(stock.LotStatus)</td>
+                            <td>@EnumLabels.Of(stock.LotStatus)</td>
                             <td>@(stock.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
                             <td class="actions">
                                 <button class="btn btn-secondary btn-sm"
@@ -170,11 +170,11 @@ else if (_tab == "ops")
             <div class="form-field">
                 <label>在庫ステータス</label>
                 <select @bind="_op.Status">
-                    <option value="@LotStockStatus.Normal">正常</option>
-                    <option value="@LotStockStatus.OnHold">保留</option>
-                    <option value="@LotStockStatus.AwaitingInspection">検査待ち</option>
-                    <option value="@LotStockStatus.Defective">不良</option>
-                    <option value="@LotStockStatus.ToBeDiscarded">廃棄予定</option>
+                    <option value="@LotStockStatus.Normal">@EnumLabels.Of(LotStockStatus.Normal)</option>
+                    <option value="@LotStockStatus.OnHold">@EnumLabels.Of(LotStockStatus.OnHold)</option>
+                    <option value="@LotStockStatus.AwaitingInspection">@EnumLabels.Of(LotStockStatus.AwaitingInspection)</option>
+                    <option value="@LotStockStatus.Defective">@EnumLabels.Of(LotStockStatus.Defective)</option>
+                    <option value="@LotStockStatus.ToBeDiscarded">@EnumLabels.Of(LotStockStatus.ToBeDiscarded)</option>
                 </select>
             </div>
         </div>
@@ -255,7 +255,7 @@ else
                     {
                         <tr>
                             <td>@transaction.Timestamp.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                            <td>@TransactionTypeLabel(transaction.Type)</td>
+                            <td>@EnumLabels.Of(transaction.Type)</td>
                             <td>@transaction.LotNumber</td>
                             <td>@transaction.ProductCode</td>
                             <td>@transaction.Quantity</td>
@@ -440,23 +440,4 @@ else
         }
     }
 
-    private static string TransactionTypeLabel(InventoryTransactionType type) => type switch
-    {
-        InventoryTransactionType.Receipt => "受入",
-        InventoryTransactionType.PutAway => "入庫",
-        InventoryTransactionType.Issue => "出庫",
-        InventoryTransactionType.ProcessIssue => "工程払出",
-        InventoryTransactionType.IssueReturn => "払出戻し",
-        InventoryTransactionType.Move => "移動",
-        InventoryTransactionType.Adjust => "調整",
-        InventoryTransactionType.Discard => "廃棄",
-        InventoryTransactionType.Return => "返品",
-        InventoryTransactionType.Transfer => "振替",
-        InventoryTransactionType.Split => "分割",
-        InventoryTransactionType.Merge => "統合",
-        InventoryTransactionType.StocktakeAdjust => "棚卸調整",
-        InventoryTransactionType.Ship => "出荷",
-        InventoryTransactionType.MaintenanceIssue => "保全消費",
-        _ => type.ToString(),
-    };
 }

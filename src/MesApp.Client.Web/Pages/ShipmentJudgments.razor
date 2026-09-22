@@ -30,9 +30,9 @@
             <div class="form-field">
                 <label>判定</label>
                 <select @bind="_result">
-                    <option value="@ShipmentJudgmentResult.Approved">可</option>
-                    <option value="@ShipmentJudgmentResult.Hold">保留</option>
-                    <option value="@ShipmentJudgmentResult.SpecialAcceptance">特別採用</option>
+                    <option value="@ShipmentJudgmentResult.Approved">@EnumLabels.Of(ShipmentJudgmentResult.Approved)</option>
+                    <option value="@ShipmentJudgmentResult.Hold">@EnumLabels.Of(ShipmentJudgmentResult.Hold)</option>
+                    <option value="@ShipmentJudgmentResult.SpecialAcceptance">@EnumLabels.Of(ShipmentJudgmentResult.SpecialAcceptance)</option>
                 </select>
             </div>
             <div class="form-field">
@@ -68,7 +68,7 @@
                         <td>@judgment.JudgmentNo</td>
                         <td>@(judgment.ShippingNo ?? "-")</td>
                         <td>@(judgment.LotNumber ?? "-")</td>
-                        <td><span class="badge @ResultClass(judgment.Result)">@ResultLabel(judgment.Result)</span></td>
+                        <td><span class="badge @ResultClass(judgment.Result)">@EnumLabels.Of(judgment.Result)</span></td>
                         <td>@judgment.JudgedByName</td>
                         <td>@judgment.JudgedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
                         <td>@(judgment.ApprovedAt is null ? "未承認" : "承認済")</td>
@@ -166,13 +166,6 @@
         }
     }
 
-    internal static string ResultLabel(ShipmentJudgmentResult result) => result switch
-    {
-        ShipmentJudgmentResult.Approved => "可",
-        ShipmentJudgmentResult.Hold => "保留",
-        ShipmentJudgmentResult.SpecialAcceptance => "特別採用",
-        _ => result.ToString(),
-    };
 
     private static string ResultClass(ShipmentJudgmentResult result) => result switch
     {

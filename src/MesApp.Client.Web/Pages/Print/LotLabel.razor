@@ -22,7 +22,7 @@ else
                 <tr><th>数量</th><td>@_lot.InitialQuantity</td></tr>
                 <tr><th>製造日/受入日</th><td>@(_lot.ManufacturedOn?.ToString("yyyy-MM-dd") ?? "-")</td></tr>
                 <tr><th>有効期限</th><td>@(_lot.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td></tr>
-                <tr><th>ステータス</th><td>@Labels.LotStatus(_lot.StockStatus)</td></tr>
+                <tr><th>ステータス</th><td>@EnumLabels.Of(_lot.StockStatus)</td></tr>
                 <tr><th>グレード</th><td>@(_lot.Grade ?? "-")</td></tr>
             </tbody>
         </table>

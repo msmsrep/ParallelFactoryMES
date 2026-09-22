@@ -12,12 +12,12 @@ else
 {
     <h1>検査指示 @_order.OrderNo</h1>
     <p class="text-muted">
-        @Inspections.TypeLabel(_order.Type) ／ 対象：@(_order.TargetLotNumber ?? _order.TargetWorkOrderNo ?? "-")
-        ／ 状態：@Inspections.StatusLabel(_order.Status)
+        @EnumLabels.Of(_order.Type) ／ 対象：@(_order.TargetLotNumber ?? _order.TargetWorkOrderNo ?? "-")
+        ／ 状態：@EnumLabels.Of(_order.Status)
         @if (_order.OverallJudgment is InspectionJudgment judgment)
         {
             <span class="badge @(judgment == InspectionJudgment.Pass ? "badge-success" : "badge-danger")">
-                @(judgment == InspectionJudgment.Pass ? "合格" : "不合格")
+                @EnumLabels.Of(judgment)
             </span>
         }
         <a class="btn btn-secondary btn-sm" href="print/inspection/@Id" target="_blank">検査成績書</a>
@@ -144,7 +144,7 @@ else
                             <td>@(result.TextValue ?? "-")</td>
                             <td>
                                 <span class="badge @(result.Judgment == InspectionJudgment.Pass ? "badge-success" : "badge-danger")">
-                                    @(result.Judgment == InspectionJudgment.Pass ? "合格" : "不合格")
+                                    @EnumLabels.Of(result.Judgment)
                                 </span>
                             </td>
                             <td>@(result.InspectionDeviceCode ?? "-")</td>
@@ -208,8 +208,8 @@ else
                 <div class="form-field">
                     <label>判定</label>
                     <select @bind="_correctJudgment">
-                        <option value="@InspectionJudgment.Pass">合格</option>
-                        <option value="@InspectionJudgment.Fail">不合格</option>
+                        <option value="@InspectionJudgment.Pass">@EnumLabels.Of(InspectionJudgment.Pass)</option>
+                        <option value="@InspectionJudgment.Fail">@EnumLabels.Of(InspectionJudgment.Fail)</option>
                     </select>
                 </div>
                 <div class="form-field">
@@ -230,7 +230,7 @@ else
     private static string FormatValue(decimal? measured, string? text, InspectionJudgment judgment)
     {
         var value = measured?.ToString() ?? text ?? "-";
-        return $"{value}（{(judgment == InspectionJudgment.Pass ? "合格" : "不合格")}）";
+        return $"{value}（{EnumLabels.Of(judgment)}）";
     }
 
     private sealed class ResultEntry

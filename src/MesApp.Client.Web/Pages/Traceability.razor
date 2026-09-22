@@ -27,8 +27,8 @@
                     <th>品目</th><td>@_lot.ProductCode @_lot.ProductName</td>
                 </tr>
                 <tr>
-                    <th>在庫ステータス</th><td>@Labels.LotStatus(_lot.StockStatus)</td>
-                    <th>由来</th><td>@(_lot.OriginType == LotOriginType.Production ? "生産" : "受入")</td>
+                    <th>在庫ステータス</th><td>@EnumLabels.Of(_lot.StockStatus)</td>
+                    <th>由来</th><td>@EnumLabels.Of(_lot.OriginType)</td>
                 </tr>
                 <tr>
                     <th>製造日/受入日</th><td>@(_lot.ManufacturedOn?.ToString("yyyy-MM-dd") ?? "-")</td>
@@ -153,8 +153,8 @@
                         {
                             <tr>
                                 <td>@entry.ChangedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</td>
-                                <td>@Labels.LotStatus(entry.FromStatus) → @Labels.LotStatus(entry.ToStatus)</td>
-                                <td>@Labels.LotStatusSource(entry.Source)</td>
+                                <td>@EnumLabels.Of(entry.FromStatus) → @EnumLabels.Of(entry.ToStatus)</td>
+                                <td>@EnumLabels.Of(entry.Source)</td>
                                 <td>@(entry.Reason ?? "-")</td>
                                 <td>@(entry.ChangedByName ?? "-")</td>
                             </tr>

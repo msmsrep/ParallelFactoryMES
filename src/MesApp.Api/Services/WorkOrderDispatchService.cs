@@ -1,3 +1,4 @@
+using MesApp.Core.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Entities;
@@ -78,7 +79,7 @@ public sealed class WorkOrderDispatchService(
             if (equipmentId != workOrder.AssignedEquipmentId && equipment.Status != EquipmentStatus.Available)
             {
                 return Outcome<WorkOrder>.Conflict(
-                    $"設備 '{equipment.AssetNo}' は{EquipmentStatusLabel(equipment.Status)}のため割り当てられません。");
+                    $"設備 '{equipment.AssetNo}' は{EnumLabels.Of(equipment.Status)}のため割り当てられません。");
             }
 
             // 工順に候補設備が登録されていれば、その中からしか選べない。候補が未登録の工順は従来どおり設備を限定しない
@@ -105,12 +106,4 @@ public sealed class WorkOrderDispatchService(
         return Outcome<WorkOrder>.Ok(workOrder);
     }
 
-    private static string EquipmentStatusLabel(EquipmentStatus status) => status switch
-    {
-        EquipmentStatus.Available => "稼働可能",
-        EquipmentStatus.Stopped => "停止中",
-        EquipmentStatus.UnderMaintenance => "保全中",
-        EquipmentStatus.Retired => "廃棄・除却",
-        _ => status.ToString(),
-    };
 }

@@ -18,8 +18,8 @@
             <div class="form-field">
                 <label>工程区分</label>
                 <select @bind="_category">
-                    <option value="@MakeOrBuy.InHouse">内製</option>
-                    <option value="@MakeOrBuy.Outsourced">外注</option>
+                    <option value="@MakeOrBuy.InHouse">@EnumLabels.Of(MakeOrBuy.InHouse)</option>
+                    <option value="@MakeOrBuy.Outsourced">@EnumLabels.Of(MakeOrBuy.Outsourced)</option>
                 </select>
             </div>
         </div>
@@ -50,7 +50,7 @@
                     <tr>
                         <td>@item.Code</td>
                         <td>@item.Name</td>
-                        <td>@(item.Category == MakeOrBuy.InHouse ? "内製" : "外注")</td>
+                        <td>@EnumLabels.Of(item.Category)</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">

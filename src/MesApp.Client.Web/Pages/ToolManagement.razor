@@ -70,7 +70,7 @@
                 {
                     <tr>
                         <td>@row.ToolCode @row.ToolName</td>
-                        <td>@ToolStatusLabel(row.Status)</td>
+                        <td>@EnumLabels.Of(row.Status)</td>
                         <td>@row.CumulativeCount @(row.LifeThresholdCount is null ? "" : $"/ {row.LifeThresholdCount}")</td>
                         <td>@row.CumulativeHours @(row.LifeThresholdHours is null ? "" : $"/ {row.LifeThresholdHours}")</td>
                         <td>
@@ -300,14 +300,6 @@
         }
     }
 
-    private static string ToolStatusLabel(ToolStatus status) => status switch
-    {
-        ToolStatus.Available => "使用可能",
-        ToolStatus.InUse => "使用中",
-        ToolStatus.UnderMaintenance => "メンテナンス中",
-        ToolStatus.Retired => "廃棄",
-        _ => status.ToString(),
-    };
 
     private async Task LoadAnalysisAsync()
     {

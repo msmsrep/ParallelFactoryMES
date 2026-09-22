@@ -20,8 +20,8 @@
             <div class="form-field">
                 <label>保全種別</label>
                 <select @bind="_plan.Category">
-                    <option value="@MaintenanceCategory.Periodic">定期</option>
-                    <option value="@MaintenanceCategory.Unplanned">計画外</option>
+                    <option value="@MaintenanceCategory.Periodic">@EnumLabels.Of(MaintenanceCategory.Periodic)</option>
+                    <option value="@MaintenanceCategory.Unplanned">@EnumLabels.Of(MaintenanceCategory.Unplanned)</option>
                 </select>
             </div>
             <div class="form-field">
@@ -65,11 +65,11 @@
                 {
                     <tr>
                         <td>@plan.AssetNo @plan.EquipmentName</td>
-                        <td>@(plan.Category == MaintenanceCategory.Periodic ? "定期" : "計画外")</td>
+                        <td>@EnumLabels.Of(plan.Category)</td>
                         <td>@plan.PlanYear</td>
                         <td>@(plan.ScheduledDate?.ToString("yyyy-MM-dd") ?? "-")</td>
                         <td>@(plan.CycleDays is null ? "-" : $"{plan.CycleDays}日")</td>
-                        <td>@PlanStatusLabel(plan.Status)</td>
+                        <td>@EnumLabels.Of(plan.Status)</td>
                         <td>
                             <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage" Context="mt">
                                 @if (plan.Status == MaintenancePlanStatus.Planned)
@@ -170,12 +170,4 @@
         }
     }
 
-    private static string PlanStatusLabel(MaintenancePlanStatus status) => status switch
-    {
-        MaintenancePlanStatus.Planned => "計画",
-        MaintenancePlanStatus.Ordered => "指示発行済",
-        MaintenancePlanStatus.Completed => "完了",
-        MaintenancePlanStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 }

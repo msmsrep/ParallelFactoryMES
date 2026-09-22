@@ -92,7 +92,7 @@
                     <tr>
                         <td>@item.Code</td>
                         <td>@item.Name</td>
-                        <td>@TypeLabel(item.Type)</td>
+                        <td>@EnumLabels.Of(item.Type)</td>
                         <td>
                             @(item.TargetProductCode ?? item.TargetProcessCode ?? "-")
                         </td>
@@ -230,12 +230,4 @@
         }
     }
 
-    private static string TypeLabel(InspectionType type) => type switch
-    {
-        InspectionType.Receiving => "受入",
-        InspectionType.InProcess => "工程内",
-        InspectionType.FinalProduct => "完成品",
-        InspectionType.Sample => "サンプル",
-        _ => type.ToString(),
-    };
 }

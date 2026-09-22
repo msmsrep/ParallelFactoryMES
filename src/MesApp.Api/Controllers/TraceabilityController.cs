@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Core.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -143,7 +144,7 @@ public class TraceabilityController(MesAppDbContext db, IBusinessDateService bus
             })
             .ToListAsync(ct);
         var equipmentHistory = equipmentLogs
-            .Select(l => $"{l.AssetNo} {l.EquipmentName}: [{EquipmentLogStatusLabel(l.Status)}] " +
+            .Select(l => $"{l.AssetNo} {l.EquipmentName}: [{EnumLabels.Of(l.Status)}] " +
                          $"{businessDate.ToFactoryTime(l.StartedAt):yyyy-MM-dd HH:mm}〜" +
                          (l.EndedAt is { } ended
                              ? $"{businessDate.ToFactoryTime(ended):yyyy-MM-dd HH:mm}"
@@ -180,15 +181,6 @@ public class TraceabilityController(MesAppDbContext db, IBusinessDateService bus
     }
 
     /// <summary>稼働状態の日本語名（履歴は人が読む前提のため）</summary>
-    private static string EquipmentLogStatusLabel(EquipmentLogStatus status) => status switch
-    {
-        EquipmentLogStatus.Running => "稼働",
-        EquipmentLogStatus.Stopped => "停止",
-        EquipmentLogStatus.Setup => "段取り",
-        EquipmentLogStatus.Failure => "故障",
-        EquipmentLogStatus.Idle => "アイドル",
-        _ => status.ToString(),
-    };
 
     /// <summary>産出ロット→（生成元作業指示の指図の全作業指示）→投入部材ロットを再帰的に辿る</summary>
     private async Task<List<TraceNode>> BuildBackNodesAsync(

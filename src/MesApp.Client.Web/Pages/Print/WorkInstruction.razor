@@ -52,7 +52,7 @@ else
                             <td>@line.ChildProductCode</td>
                             <td>@line.ChildProductName</td>
                             <td>@(line.QuantityPer * _workOrder.PlannedQuantity)</td>
-                            <td>@(line.MakeOrBuy == MakeOrBuy.InHouse ? "内製" : "外注")</td>
+                            <td>@EnumLabels.Of(line.MakeOrBuy)</td>
                         </tr>
                     }
                 </tbody>

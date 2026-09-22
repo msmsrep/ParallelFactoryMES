@@ -30,11 +30,11 @@
             <div class="form-field">
                 <label>状態</label>
                 <select @bind="_status">
-                    <option value="@ToolStatus.Available">使用可能</option>
+                    <option value="@ToolStatus.Available">@EnumLabels.Of(ToolStatus.Available)</option>
                     @* 使用中は作業指示への引当で決まるため、手では選ばせない（既に使用中のものは表示のため残す） *@
                     <option value="@ToolStatus.InUse" disabled="@(_originalStatus != ToolStatus.InUse)">使用中（引当で設定）</option>
-                    <option value="@ToolStatus.UnderMaintenance">メンテナンス中</option>
-                    <option value="@ToolStatus.Retired">廃棄</option>
+                    <option value="@ToolStatus.UnderMaintenance">@EnumLabels.Of(ToolStatus.UnderMaintenance)</option>
+                    <option value="@ToolStatus.Retired">@EnumLabels.Of(ToolStatus.Retired)</option>
                 </select>
             </div>
         </div>
@@ -70,7 +70,7 @@
                         <td>@(item.ToolType ?? "-")</td>
                         <td>@(item.LifeThresholdCount?.ToString() ?? "-")</td>
                         <td>@(item.LifeThresholdHours?.ToString() ?? "-")</td>
-                        <td>@StatusLabel(item.Status)</td>
+                        <td>@EnumLabels.Of(item.Status)</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
@@ -183,12 +183,4 @@
         }
     }
 
-    private static string StatusLabel(ToolStatus status) => status switch
-    {
-        ToolStatus.Available => "使用可能",
-        ToolStatus.InUse => "使用中",
-        ToolStatus.UnderMaintenance => "メンテナンス中",
-        ToolStatus.Retired => "廃棄",
-        _ => status.ToString(),
-    };
 }

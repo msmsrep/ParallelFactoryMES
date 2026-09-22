@@ -50,7 +50,7 @@
                     <tr>
                         <td>@stocktake.StocktakeNo</td>
                         <td>@(_locations.FirstOrDefault(l => l.Id == stocktake.TargetLocationId)?.Code ?? "全ロケーション")</td>
-                        <td><span class="badge @StatusClass(stocktake.Status)">@StocktakeStatusLabel(stocktake.Status)</span></td>
+                        <td><span class="badge @StatusClass(stocktake.Status)">@EnumLabels.Of(stocktake.Status)</span></td>
                         <td>@stocktake.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
                         <td>@(stocktake.FinalizedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
                         <td>@stocktake.Lines.Count 件</td>
@@ -249,13 +249,6 @@
         }
     }
 
-    private static string StocktakeStatusLabel(StocktakeStatus status) => status switch
-    {
-        StocktakeStatus.Instructed => "指示",
-        StocktakeStatus.Finalized => "確定",
-        StocktakeStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 
     private static string StatusClass(StocktakeStatus status) => status switch
     {

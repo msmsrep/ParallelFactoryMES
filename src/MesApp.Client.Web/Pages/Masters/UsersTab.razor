@@ -75,7 +75,7 @@
                         <label>
                             <input type="checkbox" style="width:auto;" checked="@_roles.Contains(role)"
                                    @onchange="e => ToggleRole(role, (bool)(e.Value ?? false))" />
-                            @RoleLabel(role)
+                            @EnumLabels.Role(role)
                         </label>
                     </div>
                 }
@@ -115,7 +115,7 @@
                                 <td>@(user.Department ?? "-")</td>
                                 <td>@(user.WorkCenterCode is null ? "-" : $"{user.WorkCenterCode} {user.WorkCenterName}")</td>
                                 <td>@(user.ShiftCode is null ? "-" : $"{user.ShiftCode} {user.ShiftName}")</td>
-                                <td>@string.Join("、", user.Roles.Select(RoleLabel))</td>
+                                <td>@string.Join("、", user.Roles.Select(EnumLabels.Role))</td>
                                 <td>@(user.IsActive ? "在籍" : "無効")</td>
                                 <td>@(user.MustChangePassword ? "要変更" : "-")</td>
                                 <td class="actions">
@@ -391,15 +391,4 @@
         }
     }
 
-    private static string RoleLabel(string role) => role switch
-    {
-        MesRoles.SystemAdmin => "システム管理者",
-        MesRoles.ProductionManager => "生産管理",
-        MesRoles.Operator => "現場作業者",
-        MesRoles.Logistics => "物流・倉庫",
-        MesRoles.QualityControl => "品質管理",
-        MesRoles.QualityAssurance => "品質保証",
-        MesRoles.Maintenance => "設備保全",
-        _ => role,
-    };
 }

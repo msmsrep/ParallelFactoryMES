@@ -11,7 +11,7 @@
         <select @bind="_axis" @bind:after="LoadAsync">
             @foreach (var axis in Enum.GetValues<DashboardAxis>())
             {
-                <option value="@axis">@(DashboardPeriods.AxisLabel(axis))別</option>
+                <option value="@axis">@(EnumLabels.Of(axis))別</option>
             }
         </select>
     </div>
@@ -42,7 +42,7 @@ else
     }
     @if (!_data.UtilizationAvailable)
     {
-        <p class="text-muted">@(DashboardPeriods.AxisLabel(_dataAxis))別では稼働率を出していません（稼働記録は設備単位で、作業指示との紐付けが任意のため）。稼働率はライン・作業区・設備別で見る。</p>
+        <p class="text-muted">@(EnumLabels.Of(_dataAxis))別では稼働率を出していません（稼働記録は設備単位で、作業指示との紐付けが任意のため）。稼働率はライン・作業区・設備別で見る。</p>
     }
     @if (_data.Rows.Count == 0)
     {
@@ -50,7 +50,7 @@ else
     }
     else
     {
-        var axisLabel = DashboardPeriods.AxisLabel(_dataAxis);
+        var axisLabel = EnumLabels.Of(_dataAxis);
         @if (_data.ProductionAvailable)
         {
             var production = _data.Rows
@@ -81,7 +81,7 @@ else
         <table class="table">
             <thead>
                 <tr>
-                    <th>@DashboardPeriods.AxisLabel(_dataAxis)</th>
+                    <th>@EnumLabels.Of(_dataAxis)</th>
                     @if (_data.ProductionAvailable)
                     {
                         <th>良品数</th>

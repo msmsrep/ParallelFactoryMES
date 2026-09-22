@@ -15,9 +15,9 @@
             }
             @if (node.Relation is not null)
             {
-                <span class="badge badge-warning">@Labels.LotRelation(node.Relation.Value)</span>
+                <span class="badge badge-warning">@EnumLabels.Of(node.Relation.Value)</span>
             }
-            <span class="badge">@Labels.LotStatus(node.StockStatus)</span>
+            <span class="badge">@EnumLabels.Of(node.StockStatus)</span>
             <a class="btn btn-secondary btn-sm" href="traceability?lot=@node.LotNumber">この Lot を追跡</a>
 
             @if (node.Children.Count > 0)

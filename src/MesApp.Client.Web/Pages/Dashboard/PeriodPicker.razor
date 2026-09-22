@@ -8,7 +8,7 @@
     <select value="@_unit" @onchange="OnUnitChangedAsync" aria-label="集計単位">
         @foreach (var unit in Enum.GetValues<DashboardPeriodUnit>())
         {
-            <option value="@unit">@DashboardPeriods.UnitLabel(unit)</option>
+            <option value="@unit">@EnumLabels.Of(unit)</option>
         }
     </select>
     <button class="btn btn-secondary btn-sm" @onclick="() => MoveAsync(-1)">◀ 前へ</button>

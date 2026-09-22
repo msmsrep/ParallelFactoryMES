@@ -16,8 +16,8 @@
         <div class="form-field">
             <label>区分</label>
             <select @bind="_type">
-                <option value="@PickingOrderType.ProcessIssue">工程払出</option>
-                <option value="@PickingOrderType.Shipping">出荷</option>
+                <option value="@PickingOrderType.ProcessIssue">@EnumLabels.Of(PickingOrderType.ProcessIssue)</option>
+                <option value="@PickingOrderType.Shipping">@EnumLabels.Of(PickingOrderType.Shipping)</option>
             </select>
         </div>
         @if (_type == PickingOrderType.ProcessIssue)
@@ -96,8 +96,8 @@
                 <div class="actions" style="justify-content:space-between;">
                     <div>
                         <strong>@order.OrderNo</strong>
-                        <span class="badge">@(order.Type == PickingOrderType.ProcessIssue ? "工程払出" : "出荷")</span>
-                        <span class="badge @StatusClass(order.Status)">@PickingStatusLabel(order.Status)</span>
+                        <span class="badge">@EnumLabels.Of(order.Type)</span>
+                        <span class="badge @StatusClass(order.Status)">@EnumLabels.Of(order.Status)</span>
                         <span class="text-muted">払出先：@(order.WorkOrderNo ?? order.ShippingNo ?? "-")</span>
                     </div>
                     @if (order.Status == PickingOrderStatus.Instructed)
@@ -261,13 +261,6 @@
         }
     }
 
-    private static string PickingStatusLabel(PickingOrderStatus status) => status switch
-    {
-        PickingOrderStatus.Instructed => "指示",
-        PickingOrderStatus.Completed => "完了",
-        PickingOrderStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 
     private static string StatusClass(PickingOrderStatus status) => status switch
     {

@@ -19,11 +19,11 @@
         <div class="form-field">
             <label>状態</label>
             <select @bind="_log.Status">
-                <option value="@EquipmentLogStatus.Running">稼働</option>
-                <option value="@EquipmentLogStatus.Stopped">停止</option>
-                <option value="@EquipmentLogStatus.Setup">段取り</option>
-                <option value="@EquipmentLogStatus.Failure">故障</option>
-                <option value="@EquipmentLogStatus.Idle">アイドル</option>
+                <option value="@EquipmentLogStatus.Running">@EnumLabels.Of(EquipmentLogStatus.Running)</option>
+                <option value="@EquipmentLogStatus.Stopped">@EnumLabels.Of(EquipmentLogStatus.Stopped)</option>
+                <option value="@EquipmentLogStatus.Setup">@EnumLabels.Of(EquipmentLogStatus.Setup)</option>
+                <option value="@EquipmentLogStatus.Failure">@EnumLabels.Of(EquipmentLogStatus.Failure)</option>
+                <option value="@EquipmentLogStatus.Idle">@EnumLabels.Of(EquipmentLogStatus.Idle)</option>
             </select>
         </div>
         <div class="form-field">
@@ -151,7 +151,7 @@
                 {
                     <tr>
                         <td>@log.EquipmentName</td>
-                        <td>@LogStatusLabel(log.Status)</td>
+                        <td>@EnumLabels.Of(log.Status)</td>
                         <td>@(log.WorkOrderNo ?? "-")</td>
                         <td>@log.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(log.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
@@ -241,13 +241,4 @@
         }
     }
 
-    private static string LogStatusLabel(EquipmentLogStatus status) => status switch
-    {
-        EquipmentLogStatus.Running => "稼働",
-        EquipmentLogStatus.Stopped => "停止",
-        EquipmentLogStatus.Setup => "段取り",
-        EquipmentLogStatus.Failure => "故障",
-        EquipmentLogStatus.Idle => "アイドル",
-        _ => status.ToString(),
-    };
 }

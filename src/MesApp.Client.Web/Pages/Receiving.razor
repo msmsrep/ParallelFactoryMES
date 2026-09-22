@@ -92,7 +92,7 @@
                         <td>@stock.ProductCode @stock.ProductName</td>
                         <td>@stock.LocationCode</td>
                         <td>@stock.Quantity</td>
-                        <td>@Labels.LotStatus(stock.LotStatus)</td>
+                        <td>@EnumLabels.Of(stock.LotStatus)</td>
                         <td>@(stock.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
                         <td class="actions">
                             <a class="btn btn-secondary btn-sm" href="print/lot/@stock.LotId" target="_blank">現品票</a>

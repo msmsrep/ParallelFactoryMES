@@ -21,10 +21,10 @@
             <div class="form-field">
                 <label>段</label>
                 <select @bind="_level">
-                    <option value="@WorkCenterLevel.Plant">工場</option>
-                    <option value="@WorkCenterLevel.Line">ライン</option>
-                    <option value="@WorkCenterLevel.Area">エリア</option>
-                    <option value="@WorkCenterLevel.WorkCenter">作業区</option>
+                    <option value="@WorkCenterLevel.Plant">@EnumLabels.Of(WorkCenterLevel.Plant)</option>
+                    <option value="@WorkCenterLevel.Line">@EnumLabels.Of(WorkCenterLevel.Line)</option>
+                    <option value="@WorkCenterLevel.Area">@EnumLabels.Of(WorkCenterLevel.Area)</option>
+                    <option value="@WorkCenterLevel.WorkCenter">@EnumLabels.Of(WorkCenterLevel.WorkCenter)</option>
                 </select>
             </div>
             <div class="form-field">
@@ -72,7 +72,7 @@
                     <tr>
                         <td>@item.Code</td>
                         <td>@item.Name</td>
-                        <td>@LevelLabel(item.Level)</td>
+                        <td>@EnumLabels.Of(item.Level)</td>
                         <td>@(item.ParentCode is null ? "-" : $"{item.ParentCode} {item.ParentName}")</td>
                         <td>@(item.IsActive ? "有効" : "無効")</td>
                         <td class="actions">
@@ -112,7 +112,7 @@
         _ => WorkCenterLevel.Area,
     };
 
-    private string? RequiredParentLabel => RequiredParent is { } l ? LevelLabel(l) : null;
+    private string? RequiredParentLabel => RequiredParent is { } l ? EnumLabels.Of(l) : null;
 
     /// <summary>上位に選べる候補。段を1つ上のものに絞り、自分自身は除く</summary>
     private IEnumerable<WorkCenterResponse> ParentCandidates =>
@@ -202,12 +202,4 @@
         }
     }
 
-    private static string LevelLabel(WorkCenterLevel level) => level switch
-    {
-        WorkCenterLevel.Plant => "工場",
-        WorkCenterLevel.Line => "ライン",
-        WorkCenterLevel.Area => "エリア",
-        WorkCenterLevel.WorkCenter => "作業区",
-        _ => level.ToString(),
-    };
 }
