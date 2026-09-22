@@ -161,8 +161,16 @@ p{margin:0}
 
 /* 始め方 */
 .start{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-block:clamp(56px,8vw,88px)}
-.start-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,5vw,64px)}
-.start h2,.scope h2{font-size:clamp(22px,2.6vw,28px)}
+.start-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,5vw,64px);margin-top:clamp(48px,7vw,72px)}
+.start h2{font-size:clamp(22px,2.6vw,28px)}
+.start-lead{margin-top:10px;color:var(--muted);font-size:15px}
+.gets{margin-top:24px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.get{border:1px solid var(--line);border-radius:8px;background:var(--ground);padding:20px 22px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.get h3{font-size:19px}
+.get p{font-size:14px;color:var(--muted);flex:1}
+.get pre{margin:0;align-self:stretch;font-size:12px}
+.get small{font-size:12.5px;color:var(--muted)}
+.get .mono{white-space:nowrap}
 .steps{list-style:none;margin:24px 0 0;padding:0;display:grid;gap:20px;counter-reset:st}
 .steps li{counter-increment:st;display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px}
 .steps li::before{content:counter(st);font-family:var(--mono);font-weight:500;font-size:13px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--accent);margin-top:2px}
@@ -177,18 +185,6 @@ dl.req{margin:24px 0 0;display:grid;grid-template-columns:auto minmax(0,1fr);gap
 dl.req dt{color:var(--muted)}
 dl.req dd{margin:0}
 
-/* 範囲 */
-.scope{padding-block:clamp(56px,8vw,88px)}
-.scope-grid{margin-top:24px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px}
-.box{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:20px 22px}
-.box h3{font-size:16px;display:flex;align-items:center;gap:8px}
-.box ul{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:8px;font-size:14.5px}
-.box li{display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:12px;border-top:1px dashed var(--line);padding-top:8px}
-.box li:first-child{border-top:0;padding-top:0}
-.box li b{font-weight:500}
-.box li span{color:var(--muted)}
-.box.not li{grid-template-columns:minmax(0,1fr)}
-
 footer{border-top:1px solid var(--line);padding-block:32px 48px;font-size:13px;color:var(--muted)}
 footer .wrap{display:grid;gap:10px}
 footer p{max-width:62em}
@@ -197,13 +193,12 @@ footer p{max-width:62em}
   .feature,.feature.flip{grid-template-columns:minmax(0,1fr)}
   .feature.flip .copy{order:0}
   .copy{position:static}
-  .start-grid,.scope-grid{grid-template-columns:minmax(0,1fr)}
+  .start-grid,.gets{grid-template-columns:minmax(0,1fr)}
   .pair{grid-template-columns:minmax(0,1fr)}
   .pair .screen:last-child{max-width:320px}
 }
 @media (max-width:520px){
   .top nav a.opt{display:none}
-  .box li{grid-template-columns:minmax(0,1fr);gap:0}
 }
 @media (prefers-reduced-motion:no-preference){
   .hero-shot .screen{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
@@ -233,7 +228,7 @@ footer p{max-width:62em}
     <a class="brand" href="#"><svg class="brand-mark logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg>Parallel Factory MES</a>
     <nav>
       <a class="opt" href="#features">できること</a>
-      <a class="opt" href="#start">始め方</a>
+      <a class="opt" href="#start">入手する</a>
       <a class="opt" href="index.html">ユーザーガイド</a>
       <a class="gh" href="https://github.com/msmsrep/ParallelFactoryMES" aria-label="GitHub リポジトリ"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
     </nav>
@@ -249,7 +244,7 @@ footer p{max-width:62em}
     <p class="lead">Parallel Factory MES は、工場の製造実績をブラウザで記録・追跡するオープンソースのMESです。指図・作業・在庫・検査・出荷を一本の流れとして扱い、どの部材ロットからどの製品ロットができたかを、いつでも両方向にたどれます。</p>
     <div class="cta">
       <a class="btn btn-primary" href="index.html">ユーザーガイドを読む</a>
-      <a class="btn btn-ghost" href="#start">動かしてみる</a>
+      <a class="btn btn-ghost" href="#start">入手する</a>
     </div>
     <div class="hero-shot">
       <figure class="screen">
@@ -430,52 +425,58 @@ footer p{max-width:62em}
 </section>
 
 <section class="start" id="start" aria-labelledby="start-title">
-  <div class="wrap start-grid">
-    <div>
-      <h2 id="start-title">動かしてみる</h2>
-      <ol class="steps">
-        <li><div><b>起動する</b><p>リポジトリのルートで実行します。データベース（SQLite）は自動で作られます。</p><pre>dotnet run --project src/MesApp.Api</pre></div></li>
-        <li><div><b>管理者を作る</b><p>ブラウザで <span class="mono">http://localhost:5288</span> を開くと、初期セットアップの案内が出ます。</p></div></li>
-        <li><div><b>サンプルを入れる</b><p><span class="mono">samples/master-csv</span> と <span class="mono">samples/actual-csv</span> をそれぞれZIPにして取り込むと、製造指図から出荷まで試せる状態になります。</p></div></li>
-      </ol>
-    </div>
-    <div>
-      <h2>使いかた</h2>
-      <div class="forms">
-        <div class="form"><b>社内LANのサーバーで</b><p>1台で起動し、現場のPCやタブレットはブラウザで開くだけ。端末へのインストールもライセンス認証も要りません。</p></div>
-        <div class="form"><b>試すだけなら、1台のPCで</b> <span class="chip c-grey">テスト・検証用</span><p>API・データベース・画面をひとつにまとめたWindowsデスクトップ版もあります。サーバーもネット接続も要らないので、機能を試したり検証したりするのに向いています。現場での本番運用は、上のサーバー構成でお使いください。</p></div>
+  <div class="wrap">
+    <h2 id="start-title">入手する</h2>
+    <p class="start-lead">どれも無償で、ライセンス認証もありません。ZIP・Docker・ストア版は .NET のインストールも不要です。</p>
+    <div class="gets">
+      <div class="get">
+        <span class="chip c-grey">1台で試す</span>
+        <h3>Microsoft Store</h3>
+        <p>API・データベース・画面をひとつにまとめた Windows のデスクトップ版です。サーバーもネット接続も要らないので、機能を試したり検証したりするのに向いています。</p>
+        <a class="btn btn-primary" href="https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=ja-JP&amp;gl=JP">Microsoft Store で入手</a>
+        <small>Windows 10（2004 以降）/ 11</small>
       </div>
-      <dl class="req">
-        <dt>実行環境</dt><dd>.NET 10（実行だけなら ASP.NET Core 10 ランタイム）</dd>
-        <dt>データベース</dt><dd>SQLite（既定・追加インストール不要）／PostgreSQL／SQL Server</dd>
-        <dt>HTTPS</dt><dd>IIS / nginx などのリバースプロキシで終端（社内CA・mkcert の証明書で可）</dd>
-        <dt>端末</dt><dd>Chrome / Edge などのブラウザ</dd>
-        <dt>構成</dt><dd>ASP.NET Core Web API ＋ Blazor WebAssembly</dd>
-      </dl>
+      <div class="get">
+        <span class="chip c-green">社内サーバー</span>
+        <h3>ZIP</h3>
+        <p>展開して <span class="mono">start.cmd</span>（Linux は <span class="mono">sh start.sh</span>）を実行するだけ。ランタイム同梱の自己完結版です。</p>
+        <a class="btn btn-ghost" href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest">Releases からダウンロード</a>
+        <small>Windows / Linux（x64）・ポート 5000</small>
+      </div>
+      <div class="get">
+        <span class="chip c-green">社内サーバー</span>
+        <h3>Docker</h3>
+        <p>データはボリュームに残ります。PostgreSQL と一緒に動かすなら <a href="https://github.com/msmsrep/ParallelFactoryMES/blob/main/compose.postgres.yaml"><span class="mono">compose.postgres.yaml</span></a> を使います。</p>
+        <pre>docker run -d -p 8080:8080 \
+  -v mesapp-data:/data \
+  ghcr.io/msmsrep/parallelfactorymes</pre>
+        <small>amd64 / arm64・ポート 8080</small>
+      </div>
     </div>
-  </div>
-</section>
 
-<section class="scope wrap" aria-labelledby="scope-title">
-  <h2 id="scope-title">いまできること・まだのこと</h2>
-  <div class="scope-grid">
-    <div class="box">
-      <h3><span class="chip c-green">利用できます</span></h3>
-      <ul>
-        <li><b>生産管理</b><span>製造指図・工程展開・進捗・差立</span></li>
-        <li><b>製造実行</b><span>段取り・チェックリスト・実績・作業時間・トラブル報告</span></li>
-        <li><b>物流・在庫</b><span>受入・在庫操作・出庫／払出・出荷・棚卸・搬送指示</span></li>
-        <li><b>品質</b><span>検査指示・実績・判定・不適合・品質分析</span></li>
-        <li><b>品質保証</b><span>出荷判定・トレーサビリティ</span></li>
-        <li><b>設備保全</b><span>稼働記録・保全計画／指示／実績・手順書・治工具寿命</span></li>
-        <li><b>帳票</b><span>指示書・現品票などの印刷、バーコード／QR読み取り</span></li>
-      </ul>
-    </div>
-    <div class="box not">
-      <h3><span class="chip c-grey">まだ使えません</span></h3>
-      <ul>
-        <li>Docker での配布</li>
-      </ul>
+    <div class="start-grid">
+      <div>
+        <h2>動かしてみる</h2>
+        <ol class="steps">
+          <li><div><b>起動する</b><p>上のどれかで起動し、ブラウザで <span class="mono">http://localhost:5000</span>（Docker は <span class="mono">8080</span>）を開きます。ストア版はアプリの画面がそのまま開きます。データベース（SQLite）は自動で作られます。</p></div></li>
+          <li><div><b>管理者を作る</b><p>最初は初期セットアップの案内が出るので、管理者を作ります。ストア版は管理者が自動で作られ、ユーザー名と初期パスワードが画面の上に表示されます。</p></div></li>
+          <li><div><b>サンプルを入れる</b><p><a href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip">マスタ</a>・<a href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip">実績</a>のサンプルZIPをこの順に取り込むと、製造指図から出荷まで試せる状態になります。</p></div></li>
+        </ol>
+      </div>
+      <div>
+        <h2>使いかた</h2>
+        <div class="forms">
+          <div class="form"><b>社内LANのサーバーで</b><p>ZIP か Docker で1台に置き、現場のPCやタブレットはブラウザで開くだけ。端末へのインストールもライセンス認証も要りません。本番運用はこちらの構成でお使いください。</p></div>
+          <div class="form"><b>試すだけなら、1台のPCで</b> <span class="chip c-grey">テスト・検証用</span><p>Microsoft Store のデスクトップ版は、ほかの端末からは接続できません。機能を試したり、手順を検証したりするのに使います。</p></div>
+        </div>
+        <dl class="req">
+          <dt>サーバー</dt><dd>Windows / Linux（x64）、または Docker（amd64 / arm64）</dd>
+          <dt>データベース</dt><dd>SQLite（既定・追加インストール不要）／PostgreSQL／SQL Server</dd>
+          <dt>HTTPS</dt><dd>IIS / nginx などのリバースプロキシで終端（社内CA・mkcert の証明書で可）</dd>
+          <dt>端末</dt><dd>Chrome / Edge などのブラウザ</dd>
+          <dt>構成</dt><dd>ASP.NET Core Web API ＋ Blazor WebAssembly（ソースから動かすなら .NET 10 SDK）</dd>
+        </dl>
+      </div>
     </div>
   </div>
 </section>

@@ -22,11 +22,12 @@ Webクライアント（Blazor WebAssembly）は、APIサーバー（ASP.NET Cor
 
 ## 配布と起動
 
-サーバーに置く方法は3通りあります。1台のPCだけで使う場合は、Microsoft Store のデスクトップ版が手軽です。
+サーバーに置く方法は3通りあります。1台のPCで試すだけなら、[Microsoft Store のデスクトップ版](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=ja-JP&gl=JP)が手軽です
+（ほかの端末からは接続できないため、現場での運用には下のいずれかを使います）。
 
 | 方法 | 向いている場面 | 入手先 |
 |---|---|---|
-| ZIP（自己完結版） | Windows / Linux のサーバーに直接置く。.NET のインストールは不要 | [GitHub Releases](https://github.com/msmsrep/ParallelFactoryMES/releases) の `ParallelFactoryMES-<版>-win-x64.zip` / `-linux-x64.zip` |
+| ZIP（自己完結版） | Windows / Linux のサーバーに直接置く。.NET のインストールは不要 | [GitHub Releases](https://github.com/msmsrep/ParallelFactoryMES/releases/latest) の `ParallelFactoryMES-<版>-win-x64.zip` / `-linux-x64.zip` |
 | Docker | コンテナで動かす（amd64 / arm64） | `ghcr.io/msmsrep/parallelfactorymes` |
 | ソースから発行 | 手元で改造したものを配る | `dotnet publish src/MesApp.Api -c Release -o publish` |
 

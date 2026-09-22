@@ -1,6 +1,6 @@
 # リリース（タグ v1.2.3 の push で起動）
 #   1. ビルドとテスト（ci.yml）
-#   2. 自己完結版 ZIP（win-x64 / linux-x64）を作って GitHub Release に添付する（build/Pack-Zip.ps1）
+#   2. 自己完結版 ZIP（win-x64 / linux-x64）とサンプルCSVの ZIP を作って GitHub Release に添付する（build/Pack-Zip.ps1）
 #   3. コンテナイメージ（linux/amd64・linux/arm64）を GHCR に登録する（Dockerfile）
 # v1.2.3-rc.1 のようなプレリリースのタグは Release をプレリリース扱いにし、イメージに latest を付けない
 # MSIX（Microsoft Store）は署名と提出が手作業なので対象外（docs-dev/MsixRelease.md）

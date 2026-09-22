@@ -250,8 +250,9 @@ MBOMは、実績入力の**バックフラッシュ**（部材の自動消費）
 ギアポンプを生産する小規模な工場を想定した内容で、ファイル名の番号順に取り込むと、
 製造指図から出荷まで一通り試せる状態になります。
 
-**[samples/master-csv](https://github.com/msmsrep/ParallelFactoryMES/tree/main/samples/master-csv)**
-（作業区・工程・ロケーション・品目・スキル・勤務シフト・設備・保全部品・治工具・チェックリスト・不良理由・検査項目・工程管理項目・検査機・MBOM・作業手順書・工順・ユーザー）
+**[samples-master-csv.zip](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)**
+（作業区・工程・ロケーション・品目・スキル・勤務シフト・設備・保全部品・治工具・チェックリスト・不良理由・検査項目・工程管理項目・検査機・MBOM・作業手順書・工順・ユーザー）。
+下の「ZIPでまとめて取り込む」にそのまま渡せます。中身のCSVは [samples/master-csv](https://github.com/msmsrep/ParallelFactoryMES/tree/main/samples/master-csv) でも見られます。
 
 まずはこのサンプルを取り込んで動きを確認し、エクスポートしたCSVを自社の内容に
 書き換えて使うのが分かりやすい進め方です。
@@ -261,7 +262,7 @@ MBOMは、実績入力の**バックフラッシュ**（部材の自動消費）
 マスタ管理画面の上にある **ZIPで一括取込・一括出力** を使うと、複数のCSVを1回で取り込めます。
 
 - CSVをZIPにまとめて選びます。**ファイル名の順に取り込み**、種別はファイル名の「_」より後ろで決まります
-  （`01_work-centers.csv` → 作業区）。サンプルの `samples/master-csv` フォルダをそのままZIPにすれば取り込めます。
+  （`01_work-centers.csv` → 作業区）。サンプルの `samples-master-csv.zip` はそのまま取り込めます。
 - **1ファイルでもエラーがあると、ZIPの全ファイルが取り消されます。** 結果にはファイルごとのエラーと、処理しなかったファイルが出ます。
 - ZIPに入っている**全部の種別を取り込める権限**が必要です（例：ユーザーのCSVが入っていると、システム管理者以外は取り込めません）。
 - 実績のCSVは入れられません。実績は **実績CSV取込** 画面でZIPにして取り込みます。
@@ -314,10 +315,11 @@ CSVに登場しなかった親品目のMBOM・工順は変更されません。
 - **記録者は取り込んだユーザー**です。作業者を指定する列はありません。
 - 取り込める権限は、種別ごとに画面から登録するときと同じです（受入は物流、製造指図は生産管理、検査は品質管理 など）。
 - 「1行でもエラーがあると全件取り消し」「検証のみ」はマスタのCSVと同じです。
-- 画面の上の **ZIPで一括取込** で、`samples/actual-csv` のような複数のCSVを1回で取り込めます（ファイル名の順。1ファイルでもエラーがあればZIPの全ファイルを取り消し）。
+- 画面の上の **ZIPで一括取込** で、複数のCSVを1回で取り込めます（ファイル名の順。1ファイルでもエラーがあればZIPの全ファイルを取り消し）。
 
 受入から検査まで一通りそろった**サンプル**が
-**[samples/actual-csv](https://github.com/msmsrep/ParallelFactoryMES/tree/main/samples/actual-csv)** にあります。
+**[samples-actual-csv.zip](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip)** にあります
+（中身は [samples/actual-csv](https://github.com/msmsrep/ParallelFactoryMES/tree/main/samples/actual-csv)）。
 [サンプルCSV](#サンプルcsv) のマスタを取り込んだ後に、ファイル名の番号順に取り込んでください。
 
 ### ユーザーのCSV（システム管理者のみ）
