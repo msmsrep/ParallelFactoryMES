@@ -1,4 +1,4 @@
-@* ダッシュボードの推移（Spec.md 3.8。日次・週次・月次の生産数・不良率・稼働率。
+﻿@* ダッシュボードの推移（Spec.md 3.8。日次・週次・月次の生産数・不良率・稼働率。
    B-60-10-05 生産性モニタリング／C-40-10-05 不適合モニタリング／E-20-10-03 稼働モニタリング）。
    集計は api/dashboard/trend が行い、画面では数えない（Spec.md 7.5） *@
 @inject HttpClient Http
@@ -50,44 +50,23 @@ else
         <p class="text-muted">工程・品目で絞り込んでいるため稼働率は出していません（稼働記録と作業指示の紐付けは任意のため、工程・品目では稼働を正しく分けられない）。</p>
     }
 
-    @* 生産数（良品＋不良）の棒と不良率の点。色は既存のテーマ変数を使う *@
     @if (_data.Rows.Count > 0)
     {
-        var width = Math.Max(_data.Rows.Count * 40, 320);
-        var slot = (decimal)width / _data.Rows.Count;
-        <div class="card" style="overflow-x:auto;">
-            <svg viewBox="0 0 @width 180" style="width:100%; min-width:@(width)px; height:180px;" role="img"
-                 aria-label="期間ごとの良品数・不良数と不良率">
-                @for (var i = 0; i < _data.Rows.Count; i++)
-                {
-                    var row = _data.Rows[i];
-                    var good = row.GoodQuantity ?? 0;
-                    var defect = row.DefectQuantity ?? 0;
-                    var x = slot * i + slot * 0.2m;
-                    var w = slot * 0.6m;
-                    var goodH = MaxQuantity == 0 ? 0 : good / MaxQuantity * 140m;
-                    var defectH = MaxQuantity == 0 ? 0 : defect / MaxQuantity * 140m;
-                    <rect x="@F(x)" y="@F(150 - goodH)" width="@F(w)" height="@F(goodH)" style="fill:var(--primary);">
-                        <title>@row.Label 良品 @good.ToString("0.##") / 不良 @defect.ToString("0.##")</title>
-                    </rect>
-                    <rect x="@F(x)" y="@F(150 - goodH - defectH)" width="@F(w)" height="@F(defectH)" style="fill:var(--danger);" />
-                    @if (row.DefectRate is { } rate)
-                    {
-                        <circle cx="@F(x + w / 2)" cy="@F(150 - Math.Min(rate, MaxRate) / MaxRate * 140m)" r="3"
-                                style="fill:var(--warning);">
-                            <title>@row.Label 不良率 @rate.ToString("0.##") %</title>
-                        </circle>
-                    }
-                    @* Razor は <text> を特別扱いするため、SVGの text 要素は文字列で出す（中身は日付だけ） *@
-                    @((MarkupString)$"<text x=\"{F(x + w / 2)}\" y=\"168\" text-anchor=\"middle\" style=\"font-size:10px; fill:var(--text-muted);\">{ShortLabel(row)}</text>")
-                }
-                <line x1="0" y1="150" x2="@width" y2="150" style="stroke:var(--border);" />
-            </svg>
-            <p class="text-muted">
-                <span style="color:var(--primary);">■</span> 良品数　<span style="color:var(--danger);">■</span> 不良数（棒の高さは最大 @MaxQuantity.ToString("0.##") を基準）
-                　<span style="color:var(--warning);">●</span> 不良率（上端 @MaxRate.ToString("0.##") %）
-            </p>
-        </div>
+        var labels = _data.Rows.Select(ShortLabel).ToList();
+        <h2>生産数と不良率</h2>
+        <ComboChart Labels="labels" AriaLabel="期間ごとの良品数・不良数と不良率"
+                    Bars="@([new ChartSeries("良品数", "var(--primary)", [.. _data.Rows.Select(r => r.GoodQuantity)]),
+                             new ChartSeries("不良数", "var(--danger)", [.. _data.Rows.Select(r => r.DefectQuantity)])])"
+                    Lines="@([new ChartSeries("不良率", "var(--warning)", [.. _data.Rows.Select(r => r.DefectRate)])])"
+                    LineUnit="%" LineMaxTop="100" />
+        @if (_data.UtilizationAvailable)
+        {
+            <h2>設備稼働率と故障件数</h2>
+            <ComboChart Labels="labels" AriaLabel="期間ごとの設備稼働率と故障件数"
+                        Bars="@([new ChartSeries("故障件数", "var(--danger)", [.. _data.Rows.Select(r => (decimal?)r.FailureCount)])])"
+                        Lines="@([new ChartSeries("設備稼働率", "var(--success)", [.. _data.Rows.Select(r => r.UtilizationRate)])])"
+                        BarUnit="件" BarInteger="true" LineUnit="%" LineMinTop="100" LineMaxTop="100" />
+        }
     }
 
     <table class="table">
@@ -156,11 +135,6 @@ else
     private string? _error;
     private int _requestNo;
 
-    private decimal MaxQuantity => _data?.Rows.Max(r => (r.GoodQuantity ?? 0) + (r.DefectQuantity ?? 0)) ?? 0;
-
-    /// <summary>不良率の目盛りの上端。最大値に合わせる（数%の変化が見えなくならないように）が、0なら1%</summary>
-    private decimal MaxRate => Math.Max(_data?.Rows.Max(r => r.DefectRate ?? 0) ?? 0, 1m);
-
     protected override async Task OnInitializedAsync()
     {
         _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
@@ -215,6 +189,4 @@ else
         DashboardPeriodUnit.Month => $"{row.PeriodStart:yyyy/MM}",
         _ => $"{row.PeriodStart:MM/dd}",
     };
-
-    private static string F(decimal value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 }

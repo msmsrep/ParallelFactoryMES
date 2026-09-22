@@ -1,4 +1,4 @@
-@* 割合表示用の簡易バー（品質分析・稼働率・治工具寿命などのモニタリング表示） *@
+﻿@* 割合表示用の簡易バー（品質分析・稼働率・治工具寿命などのモニタリング表示） *@
 <div class="bar-meter" title="@Value.ToString("0.##") %">
     <div class="bar-meter-fill @FillClass" style="width:@(Math.Clamp(Value, 0, 100).ToString("0.##"))%;"></div>
 </div>
@@ -9,11 +9,6 @@
     /// <summary>値が高いほど危険な指標か（不良率・寿命消化率など）。falseなら高いほど良い指標（稼働率）</summary>
     [Parameter] public bool HighIsBad { get; set; } = true;
 
-    private string FillClass => HighIsBad switch
-    {
-        true when Value >= 100 => "bar-danger",
-        true when Value >= 80 => "bar-warning",
-        false when Value < 50 => "bar-warning",
-        _ => string.Empty,
-    };
+    /// <summary>しきい値はドーナツ（DonutGauge）と共通</summary>
+    private string FillClass => ChartScale.Level(Value, HighIsBad) is { } level ? $"bar-{level}" : string.Empty;
 }

@@ -1,0 +1,175 @@
+@* 棒（積み上げ）と折れ線の複合グラフ（Spec.md 3.8 ダッシュボードの推移）。
+   棒は左軸、折れ線は右軸（%など単位の違う指標）。値の計算はせず、渡された系列を描くだけ *@
+
+<div class="chart">
+    <svg viewBox="0 0 @ChartScale.F(Width) @ChartScale.F(Height)" style="width:100%; min-width:@(ChartScale.F(Width))px;"
+         role="img" aria-label="@AriaLabel">
+        @* 左軸の目盛り線 *@
+        @foreach (var tick in _barTicks)
+        {
+            var y = BarY(tick);
+            <line x1="@ChartScale.F(Left)" y1="@ChartScale.F(y)" x2="@ChartScale.F(Left + PlotWidth)" y2="@ChartScale.F(y)"
+                  style="stroke:var(--border); stroke-dasharray:@(tick == 0 ? "none" : "2 3");" />
+            @ChartScale.Text(Left - 6, y + 3, ChartScale.Number(tick), "end")
+        }
+        @if (BarUnit is not null)
+        {
+            @ChartScale.Text(Left - 6, 10, $"（{BarUnit}）", "end")
+        }
+        @* 右軸の目盛り（折れ線がある場合だけ） *@
+        @if (Lines.Count > 0)
+        {
+            @foreach (var tick in _lineTicks)
+            {
+                @ChartScale.Text(Left + PlotWidth + 6, LineY(tick) + 3, ChartScale.Number(tick), "start")
+            }
+            @if (LineUnit is not null)
+            {
+                @ChartScale.Text(Left + PlotWidth + 6, 10, $"（{LineUnit}）", "start")
+            }
+        }
+
+        @for (var i = 0; i < Labels.Count; i++)
+        {
+            var x = Left + Slot * i + Slot * 0.2m;
+            var w = Slot * 0.6m;
+            var baseY = BarY(0);
+            @foreach (var series in Bars)
+            {
+                if (series.Values[i] is not { } value || value <= 0)
+                {
+                    continue;
+                }
+                var h = baseY - BarY(value);
+                <rect x="@ChartScale.F(x)" y="@ChartScale.F(baseY - h)" width="@ChartScale.F(w)" height="@ChartScale.F(h)"
+                      style="fill:@series.Color;">
+                    <title>@Labels[i] @series.Name @ChartScale.Number(value)@BarUnit</title>
+                </rect>
+                baseY -= h;
+            }
+            @if (i % LabelEvery == 0)
+            {
+                @ChartScale.Text(x + w / 2, Height - 8, Labels[i])
+            }
+        }
+
+        @* 折れ線。null の区切りで線を切る（0 とつながないように） *@
+        @foreach (var series in Lines)
+        {
+            @foreach (var segment in Segments(series))
+            {
+                @if (segment.Count > 1)
+                {
+                    <polyline points="@string.Join(' ', segment.Select(p => $"{ChartScale.F(p.X)},{ChartScale.F(p.Y)}"))"
+                              style="fill:none; stroke:@series.Color; stroke-width:2;" />
+                }
+            }
+            @for (var i = 0; i < Labels.Count; i++)
+            {
+                @if (series.Values[i] is { } value)
+                {
+                    <circle cx="@ChartScale.F(CenterX(i))" cy="@ChartScale.F(LineY(value))" r="3.5"
+                            style="fill:var(--surface); stroke:@series.Color; stroke-width:2;">
+                        <title>@Labels[i] @series.Name @ChartScale.Number(value)@LineUnit</title>
+                    </circle>
+                }
+            }
+        }
+    </svg>
+    <p class="text-muted">
+        @foreach (var series in Bars)
+        {
+            <span style="margin-right:12px;"><span style="color:@series.Color;">■</span> @series.Name</span>
+        }
+        @foreach (var series in Lines)
+        {
+            <span style="margin-right:12px;"><span style="color:@series.Color;">●</span> @series.Name（右軸）</span>
+        }
+        <span>棒・点にカーソルを合わせると値を表示する</span>
+    </p>
+</div>
+
+@code {
+    /// <summary>横軸のラベル（区切りの数だけ）</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> Labels { get; set; } = [];
+
+    /// <summary>積み上げる棒の系列（下から順に積む）</summary>
+    [Parameter] public IReadOnlyList<ChartSeries> Bars { get; set; } = [];
+
+    /// <summary>折れ線の系列（右軸を共有する）</summary>
+    [Parameter] public IReadOnlyList<ChartSeries> Lines { get; set; } = [];
+
+    [Parameter] public string? BarUnit { get; set; }
+    [Parameter] public string? LineUnit { get; set; }
+
+    /// <summary>棒の値が件数なら true（目盛りを整数にする）</summary>
+    [Parameter] public bool BarInteger { get; set; }
+
+    /// <summary>右軸の上限の下限（不良率の数%の変化が潰れないよう最大値に合わせるが、0なら1にする等）</summary>
+    [Parameter] public decimal LineMinTop { get; set; } = 1m;
+
+    /// <summary>右軸の上限の上限（%なら100）</summary>
+    [Parameter] public decimal? LineMaxTop { get; set; }
+
+    [Parameter] public string AriaLabel { get; set; } = "グラフ";
+
+    private const decimal Height = 232m;
+    private const decimal Top = 28m;
+    private const decimal Bottom = 208m;
+    private const decimal Left = 52m;
+    private const decimal Right = 48m;
+
+    private IReadOnlyList<decimal> _barTicks = [0m, 1m];
+    private IReadOnlyList<decimal> _lineTicks = [0m, 1m];
+
+    private decimal PlotWidth => Math.Max(Labels.Count * 40m, 480m);
+    private decimal Width => Left + PlotWidth + Right;
+    private decimal Slot => Labels.Count == 0 ? PlotWidth : PlotWidth / Labels.Count;
+
+    /// <summary>区切りが多いときはラベルを間引く（重なって読めなくなるため）</summary>
+    private int LabelEvery => Math.Max(1, (int)Math.Ceiling(Labels.Count / 16m));
+
+    protected override void OnParametersSet()
+    {
+        var barMax = Enumerable.Range(0, Labels.Count)
+            .Select(i => Bars.Sum(s => Math.Max(s.Values[i] ?? 0, 0)))
+            .DefaultIfEmpty(0).Max();
+        _barTicks = ChartScale.Ticks(barMax, integer: BarInteger);
+
+        var lineMax = Lines.SelectMany(s => s.Values).Select(v => v ?? 0).DefaultIfEmpty(0).Max();
+        lineMax = Math.Max(lineMax, LineMinTop);
+        _lineTicks = ChartScale.Ticks(lineMax);
+        if (LineMaxTop is { } maxTop && _lineTicks[^1] > maxTop && lineMax <= maxTop)
+        {
+            // 100% を超える目盛りは意味が無いので切る
+            _lineTicks = [.. _lineTicks.Where(t => t <= maxTop)];
+        }
+    }
+
+    private decimal BarY(decimal value) => Bottom - value / _barTicks[^1] * (Bottom - Top);
+
+    private decimal LineY(decimal value) => Bottom - Math.Min(value, _lineTicks[^1]) / _lineTicks[^1] * (Bottom - Top);
+
+    private decimal CenterX(int i) => Left + Slot * i + Slot / 2;
+
+    private IEnumerable<List<(decimal X, decimal Y)>> Segments(ChartSeries series)
+    {
+        var segment = new List<(decimal X, decimal Y)>();
+        for (var i = 0; i < Labels.Count; i++)
+        {
+            if (series.Values[i] is { } value)
+            {
+                segment.Add((CenterX(i), LineY(value)));
+            }
+            else if (segment.Count > 0)
+            {
+                yield return segment;
+                segment = [];
+            }
+        }
+        if (segment.Count > 0)
+        {
+            yield return segment;
+        }
+    }
+}
