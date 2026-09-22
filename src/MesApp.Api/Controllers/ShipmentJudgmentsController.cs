@@ -1,7 +1,5 @@
-using MesApp.Api.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
-using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
@@ -21,8 +19,7 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class ShipmentJudgmentsController(
     MesAppDbContext db,
-    NumberingService numbering,
-    IAuditLogger auditLogger) : ControllerBase
+    ShipmentJudgmentService judgments) : ControllerBase
 {
     /// <summary>出荷判定一覧（H-10-10-01）</summary>
     [HttpGet]
@@ -53,35 +50,14 @@ public class ShipmentJudgmentsController(
     public async Task<ActionResult<ShipmentJudgmentResponse>> Create(
         ShipmentJudgmentCreateRequest request, CancellationToken ct)
     {
-        if (request.LotId is null && request.ShippingOrderId is null)
+        var outcome = await judgments.CreateAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!, ct);
+        if (outcome.Failed)
         {
-            return this.BadRequestProblem(ApiText.T("対象ロットIDまたは出荷指示IDを指定してください。"));
+            return ToProblem(outcome);
         }
-        if (request.LotId is int lotId && !await db.Lots.AnyAsync(l => l.Id == lotId, ct))
-        {
-            return this.BadRequestProblem(ApiText.T("存在しないロットIDです。"));
-        }
-        if (request.ShippingOrderId is int shippingOrderId
-            && !await db.ShippingOrders.AnyAsync(s => s.Id == shippingOrderId, ct))
-        {
-            return this.BadRequestProblem(ApiText.T("存在しない出荷指示IDです。"));
-        }
-
-        var judgment = new ShipmentJudgment
-        {
-            JudgmentNo = await numbering.NextJudgmentNoAsync(ct),
-            LotId = request.LotId,
-            ShippingOrderId = request.ShippingOrderId,
-            Result = request.Result,
-            JudgedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-            Note = request.Note,
-        };
-        db.ShipmentJudgments.Add(judgment);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Quality", "ShipmentJudge", nameof(ShipmentJudgment), judgment.Id.ToString(),
-            detail: $"judgmentNo={judgment.JudgmentNo}, result={judgment.Result}", ct: ct);
-        var saved = await BaseQuery().FirstAsync(j => j.Id == judgment.Id, ct);
-        return CreatedAtAction(nameof(Get), new { id = judgment.Id }, ToResponse(saved));
+        var id = outcome.Value!.Id;
+        var saved = await BaseQuery().FirstAsync(j => j.Id == id, ct);
+        return CreatedAtAction(nameof(Get), new { id }, ToResponse(saved));
     }
 
     /// <summary>判定承認（H-10-10-03）</summary>
@@ -89,23 +65,21 @@ public class ShipmentJudgmentsController(
     [Authorize(Roles = MesRoleGroups.QaManage)]
     public async Task<ActionResult<ShipmentJudgmentResponse>> Approve(int id, CancellationToken ct)
     {
-        var judgment = await db.ShipmentJudgments.FirstOrDefaultAsync(j => j.Id == id, ct);
-        if (judgment is null)
+        var outcome = await judgments.ApproveAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        if (outcome.Failed)
         {
-            return NotFound();
+            return ToProblem(outcome);
         }
-        if (judgment.ApprovedAt is not null)
-        {
-            return this.ConflictProblem(ApiText.T("既に承認済みです。"));
-        }
-        judgment.ApprovedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        judgment.ApprovedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Quality", "ShipmentJudgeApprove", nameof(ShipmentJudgment), id.ToString(),
-            detail: $"judgmentNo={judgment.JudgmentNo}", ct: ct);
         var saved = await BaseQuery().FirstAsync(j => j.Id == id, ct);
         return ToResponse(saved);
     }
+
+    private ActionResult ToProblem(Outcome<ShipmentJudgment> outcome) => outcome.Kind switch
+    {
+        OutcomeError.NotFound => NotFound(),
+        OutcomeError.Conflict => this.ConflictProblem(outcome.Error),
+        _ => this.BadRequestProblem(outcome.Error),
+    };
 
     private IQueryable<ShipmentJudgment> BaseQuery() =>
         db.ShipmentJudgments.AsNoTracking()

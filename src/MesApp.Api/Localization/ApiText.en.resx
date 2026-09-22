@@ -1896,4 +1896,13 @@
   <data name="製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}' には作業区 '{3}' の計画があり、作業区 '{4}' の計画と範囲が重なります（作業区なしと作業区あり、上位の段と配下の段の計画は、予実で二重に数えるため同時に登録できません）。" xml:space="preserve">
     <value>Product '{1}', process '{2}' on production date {0:yyyy-MM-dd} already has a plan for work center '{3}', which overlaps with work center '{4}'. Plans with and without a work center, or for a parent and its child work center, cannot coexist because the plan-vs-actual view would count them twice.</value>
   </data>
+  <data name="存在しない出荷判定IDです。" xml:space="preserve">
+    <value>The shipment judgment ID does not exist.</value>
+  </data>
+  <data name="出荷番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Shipping number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="出荷番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Shipping number '{0}' already exists.</value>
+  </data>
 </root>
