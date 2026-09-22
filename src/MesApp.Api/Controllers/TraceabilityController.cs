@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Localization;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
@@ -76,8 +77,8 @@ public class TraceabilityController(MesAppDbContext db, IBusinessDateService bus
                     ShiftName = r.Shift!.Name,
                 })
                 .ToListAsync(ct))
-            .Select(r => $"{r.WorkOrderNo}: 良品{r.GoodQuantity} 不良{r.DefectQuantity} (作業者: {r.Performer}"
-                         + (r.ShiftCode is null ? string.Empty : $" / 直: {r.ShiftCode} {r.ShiftName}")
+            .Select(r => ApiText.T("{0}: 良品{1} 不良{2} (作業者: {3}", r.WorkOrderNo, r.GoodQuantity, r.DefectQuantity, r.Performer)
+                         + (r.ShiftCode is null ? string.Empty : ApiText.T(" / 直: {0} {1}", r.ShiftCode, r.ShiftName))
                          + ")")
             .ToList();
 
@@ -85,13 +86,13 @@ public class TraceabilityController(MesAppDbContext db, IBusinessDateService bus
             .Where(i => i.TargetLotId == lotId)
             .OrderBy(i => i.Id)
             .Select(i => $"{i.OrderNo} [{i.Type}] {i.Status}" +
-                         (i.OverallJudgment != null ? $" 判定: {i.OverallJudgment}" : string.Empty))
+                         (i.OverallJudgment != null ? ApiText.T(" 判定: {0}", EnumLabels.Of(i.OverallJudgment)) : string.Empty))
             .ToListAsync(ct);
 
         var transactions = await db.InventoryTransactions.AsNoTracking()
             .Where(t => t.LotId == lotId)
             .OrderBy(t => t.Id)
-            .Select(t => $"[{t.Type}] 数量{t.Quantity}" +
+            .Select(t => ApiText.T("[{0}] 数量{1}", EnumLabels.Of(t.Type), t.Quantity) +
                          (t.FromLocation != null ? $" from {t.FromLocation.Code}" : string.Empty) +
                          (t.ToLocation != null ? $" to {t.ToLocation.Code}" : string.Empty) +
                          (t.WorkOrder != null ? $" ({t.WorkOrder.WorkOrderNo})" : string.Empty))
@@ -148,9 +149,9 @@ public class TraceabilityController(MesAppDbContext db, IBusinessDateService bus
                          $"{businessDate.ToFactoryTime(l.StartedAt):yyyy-MM-dd HH:mm}〜" +
                          (l.EndedAt is { } ended
                              ? $"{businessDate.ToFactoryTime(ended):yyyy-MM-dd HH:mm}"
-                             : "（継続中）") +
+                             : ApiText.T("（継続中）")) +
                          $" ({l.WorkOrderNo})" +
-                         (l.StopCause is not null ? $" 原因: {l.StopCause}" : string.Empty))
+                         (l.StopCause is not null ? ApiText.T(" 原因: {0}", l.StopCause) : string.Empty))
             .ToList();
 
         // 製造条件の逸脱（B-30-30-04）。不良の原因を「どの条件が外れていたか」から追えるようにする。
@@ -170,9 +171,7 @@ public class TraceabilityController(MesAppDbContext db, IBusinessDateService bus
             })
             .ToListAsync(ct);
         var controlItemDeviations = deviations
-            .Select(d => $"{d.Item}: 実績 {d.Value}（許容 {d.Lower?.ToString() ?? "-"}〜" +
-                         $"{d.Upper?.ToString() ?? "-"}{d.Unit}） " +
-                         $"{businessDate.ToFactoryTime(d.RecordedAt):yyyy-MM-dd HH:mm} ({d.WorkOrderNo})")
+            .Select(d => ApiText.T("{0}: 実績 {1}（許容 {2}〜{3}{4}） {5:yyyy-MM-dd HH:mm} ({6})", d.Item, d.Value, d.Lower?.ToString() ?? "-", d.Upper?.ToString() ?? "-", d.Unit, businessDate.ToFactoryTime(d.RecordedAt), d.WorkOrderNo))
             .ToList();
 
         return new LotHistoryResponse(lot.Id, lot.LotNumber, lot.Product!.Code, lot.Product!.Name,

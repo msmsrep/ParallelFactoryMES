@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using MesApp.Api.Localization;
+using System.Security.Claims;
 using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -104,7 +105,7 @@ public class WorkOrdersController(
             var all = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
             if (all.All(x => x.Id != rootId))
             {
-                return this.BadRequestProblem($"作業区（ID {rootId}）が見つかりません。");
+                return this.BadRequestProblem(ApiText.T("作業区（ID {0}）が見つかりません。", rootId));
             }
             var targets = WorkCenterHierarchyPolicy.SelfAndDescendantIds(rootId, all);
             query = query.Where(w => w.WorkCenterId != null && targets.Contains(w.WorkCenterId.Value));
@@ -279,7 +280,7 @@ public class WorkOrdersController(
         }
         if (workOrder.WorkProcedureId is not int procedureId)
         {
-            return this.NotFoundProblem("この作業指示には作業手順書が紐付いていません。");
+            return this.NotFoundProblem(ApiText.T("この作業指示には作業手順書が紐付いていません。"));
         }
         var procedure = await db.WorkProcedures.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == procedureId, ct);

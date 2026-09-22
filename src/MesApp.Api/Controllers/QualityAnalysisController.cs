@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -111,7 +112,7 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
                         && (toEnd is null || n.CreatedAt < toEnd))
             .ToList();
         var byCause = nonconformances
-            .GroupBy(n => n.CauseCategory ?? "（未分類）")
+            .GroupBy(n => n.CauseCategory ?? ApiText.T("（未分類）"))
             .OrderByDescending(g => g.Count())
             .ToDictionary(g => g.Key, g => g.Count());
 

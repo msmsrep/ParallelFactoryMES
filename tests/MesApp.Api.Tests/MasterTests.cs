@@ -11,6 +11,23 @@ namespace MesApp.Api.Tests;
 public class MasterTests
 {
     [Fact]
+    public async Task 英語を指定すると値を埋め込んだエラーも英語で返る()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        (await client.PostAsJsonAsync("/api/products",
+            new ProductRequest("P-001", "テスト製品", "個", null, ProductType.Product, 0m))).EnsureSuccessStatusCode();
+        client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en");
+
+        var duplicated = await client.PostAsJsonAsync("/api/products",
+            new ProductRequest("P-001", "別製品", "個", null, ProductType.Product, 0m));
+
+        Assert.Equal(HttpStatusCode.Conflict, duplicated.StatusCode);
+        var problem = await duplicated.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Equal("Item code 'P-001' already exists.", problem?.Title);
+    }
+
+    [Fact]
     public async Task 品目マスタのCRUDと論理削除ができる()
     {
         using var factory = new ApiFactory();

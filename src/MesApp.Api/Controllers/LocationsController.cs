@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Localization;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
@@ -44,12 +45,12 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
     {
         if (await db.Locations.AnyAsync(l => l.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"ロケーションコード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("ロケーションコード '{0}' は既に存在します。", request.Code));
         }
         var workCenter = await FindWorkCenterAsync(request.WorkCenterId, ct);
         if (request.WorkCenterId is { } missing && workCenter is null)
         {
-            return this.BadRequestProblem($"作業区（ID {missing}）が見つかりません。");
+            return this.BadRequestProblem(ApiText.T("作業区（ID {0}）が見つかりません。", missing));
         }
         if (WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } reason)
         {
@@ -80,12 +81,12 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
         }
         if (await db.Locations.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return this.ConflictProblem($"ロケーションコード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("ロケーションコード '{0}' は既に存在します。", request.Code));
         }
         var workCenter = await FindWorkCenterAsync(request.WorkCenterId, ct);
         if (request.WorkCenterId is { } missing && workCenter is null)
         {
-            return this.BadRequestProblem($"作業区（ID {missing}）が見つかりません。");
+            return this.BadRequestProblem(ApiText.T("作業区（ID {0}）が見つかりません。", missing));
         }
         if (WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } reason)
         {
@@ -129,7 +130,7 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
             .FirstOrDefaultAsync(p => p.Id == productId, ct);
         if (product is null)
         {
-            return this.NotFoundProblem($"品目ID {productId} は登録されていません。");
+            return this.NotFoundProblem(ApiText.T("品目ID {0} は登録されていません。", productId));
         }
 
         // その品目が今どこにどれだけあるか（②の並び順と、全候補に添える現在庫）
@@ -164,18 +165,18 @@ public class LocationsController(MesAppDbContext db, IAuditLogger auditLogger) :
 
         if (product.DefaultLocationId is { } defaultId && byId.TryGetValue(defaultId, out var defaultLocation))
         {
-            Add(defaultLocation, "品目マスタの既定ロケーション");
+            Add(defaultLocation, ApiText.T("品目マスタの既定ロケーション"));
         }
         foreach (var stock in stocks.OrderByDescending(s => s.Quantity))
         {
             if (byId.TryGetValue(stock.LocationId, out var location))
             {
-                Add(location, $"同じ品目の在庫がある（{stock.Quantity:0.##} {product.Unit}）");
+                Add(location, ApiText.T("同じ品目の在庫がある（{0:0.##} {1}）", stock.Quantity, product.Unit));
             }
         }
         foreach (var location in locations.Where(l => l.AreaType == defaultArea))
         {
-            Add(location, $"品目区分「{EnumLabels.Of(product.Type)}」の既定エリア");
+            Add(location, ApiText.T("品目区分「{0}」の既定エリア", EnumLabels.Of(product.Type)));
         }
 
         return result.Take(Math.Clamp(limit, 1, 20)).ToList();

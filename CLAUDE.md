@@ -76,7 +76,8 @@ DB は既定 SQLite（`mesapp.db`）、`Database:Provider` で PostgreSQL / SQL 
 - 書き込み系アクションに `[Authorize(Roles = MesRoleGroups.Xxx)]`。ロール定数は `MesRoles`、組み合わせは `MesRoleGroups`（新しい組み合わせが要るときだけ `Core/Constants/MesRoleGroups.cs` に追加）。**API と画面で同じ定数を使う**（別々に書くと片方だけ直したときに表示と権限がずれる）
 - 参照系は `AsNoTracking()`、全アクションに `CancellationToken ct`
 - DTO は `MesApp.Core/Contracts/<領域>/` の `record`。エンティティを直接返さない
-- エラーは `ProblemDetails` + **日本語のメッセージ**。`new ProblemDetails` を直接書かず `ProblemResultExtensions` を使う（例: `return this.ConflictProblem($"ロケーションコード '{request.Code}' は既に存在します。");`）。重複は `ConflictProblem`、未存在は `NotFoundProblem`、入力不正は `BadRequestProblem`
+- エラーは `ProblemDetails` + **日本語のメッセージ**。`new ProblemDetails` を直接書かず `ProblemResultExtensions` を使う（例は次項）。重複は `ConflictProblem`、未存在は `NotFoundProblem`、入力不正は `BadRequestProblem`
+- **利用者に返す文言は `ApiText.T("原文", 値…)` で包む**（Spec.md 7.9 多言語対応。英訳は `Api/Localization/ApiText.en.resx` に原文をキーにして足す）。値は補間せず `{0}` で渡す：`this.ConflictProblem(ApiText.T("ロケーションコード '{0}' は既に存在します。", request.Code))`。状態・区分は `EnumLabels.Of(x)` で表示名にして渡す。**保存される文字列（在庫トランザクションの備考・状態履歴の理由・監査ログ）とサーバーのログは包まない**
 - 作成・更新・削除の後に `auditLogger.LogAsync(...)` を呼ぶ。**変更前後を追跡する操作（訂正・調整・ステータス変更）は `detail:` に匿名オブジェクト `new { before, after, reason }` を渡す**（JSONで保存される）。要約で足りる操作は文字列でよい
 - **複数の経路で必要になる業務判定は Controller に書かない**。`Api/Policies/` に置き、Controller はそれを呼んで結果を `ProblemDetails` に変換するだけにする（`LotUsabilityPolicy` / `MaterialIssuePolicy` / `ShipmentGatePolicy`）
 - **ロット・作業指示のステータスを直接代入しない**。`LotStatusService` / `WorkOrderStatusService` 経由で変更し、遷移を状態履歴に残す（Spec.md 5.2・5.3）。製造指図・検査指示の状態も Controller で代入せず、`ManufacturingOrderService` / `InspectionService` に集める（状態履歴は持たず監査ログで追う）

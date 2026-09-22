@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Entities;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Entities;
 
 namespace MesApp.Api.Policies;
 
@@ -41,14 +42,14 @@ public static class ShiftSchedulePolicy
     {
         if (start == end)
         {
-            return "開始時刻と終了時刻が同じです。24時間の直は表せないため、時間帯を分けて登録してください。";
+            return ApiText.T("開始時刻と終了時刻が同じです。24時間の直は表せないため、時間帯を分けて登録してください。");
         }
         // 重なりを許すと、ある時刻がどの直かを一意に決められず実績の直が定まらない
         foreach (var other in others)
         {
             if (Overlaps(start, end, other.StartTime, other.EndTime))
             {
-                return $"直 '{other.Code}'（{Format(other.StartTime, other.EndTime)}）と時間帯が重なっています。";
+                return ApiText.T("直 '{0}'（{1}）と時間帯が重なっています。", other.Code, Format(other.StartTime, other.EndTime));
             }
         }
         return null;
@@ -72,14 +73,13 @@ public static class ShiftSchedulePolicy
         {
             return null;
         }
-        return $"この直は製造日の境界時刻（{boundary:HH:mm}）をまたぎます。" +
-               "同じ直の実績が2つの製造日へ分かれるため、日次集計と直別集計で母数が食い違います。";
+        return ApiText.T("この直は製造日の境界時刻（{0:HH:mm}）をまたぎます。同じ直の実績が2つの製造日へ分かれるため、日次集計と直別集計で母数が食い違います。", boundary);
     }
 
     /// <summary>時間帯の表示（夜勤は翌日であることが分かるようにする）</summary>
     public static string Format(TimeOnly start, TimeOnly end) =>
         CrossesMidnight(start, end)
-            ? $"{start:HH:mm}〜翌{end:HH:mm}"
+            ? ApiText.T("{0:HH:mm}〜翌{1:HH:mm}", start, end)
             : $"{start:HH:mm}〜{end:HH:mm}";
 
     /// <summary>

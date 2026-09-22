@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using MesApp.Api.Localization;
+using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
@@ -41,8 +42,7 @@ public class ProductionRecordsController(
         if (request.ScrapQuantity + request.ReworkQuantity > request.DefectQuantity)
         {
             return this.BadRequestProblem(
-                $"廃棄数と再作業待ち数の合計（{request.ScrapQuantity + request.ReworkQuantity}）が" +
-                $"不良数（{request.DefectQuantity}）を超えています。");
+                ApiText.T("廃棄数と再作業待ち数の合計（{0}）が不良数（{1}）を超えています。", request.ScrapQuantity + request.ReworkQuantity, request.DefectQuantity));
         }
 
         var before = new

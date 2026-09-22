@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Maintenance;
@@ -22,13 +24,13 @@ public sealed class ToolIssueService(MesAppDbContext db, IAuditLogger auditLogge
         var tool = await db.Tools.FindAsync([request.ToolId], ct);
         if (tool is null)
         {
-            return Outcome<ToolIssue>.NotFound($"治工具ID {request.ToolId} は登録されていません。");
+            return Outcome<ToolIssue>.NotFound(ApiText.T("治工具ID {0} は登録されていません。", request.ToolId));
         }
         var workOrder = await db.WorkOrders.AsNoTracking()
             .FirstOrDefaultAsync(w => w.Id == request.WorkOrderId, ct);
         if (workOrder is null)
         {
-            return Outcome<ToolIssue>.NotFound($"作業指示ID {request.WorkOrderId} は登録されていません。");
+            return Outcome<ToolIssue>.NotFound(ApiText.T("作業指示ID {0} は登録されていません。", request.WorkOrderId));
         }
 
         if (await CheckIssuableAsync(tool, ct) is { } reason)
@@ -61,11 +63,11 @@ public sealed class ToolIssueService(MesAppDbContext db, IAuditLogger auditLogge
         var issue = await db.ToolIssues.Include(i => i.Tool).FirstOrDefaultAsync(i => i.Id == id, ct);
         if (issue is null)
         {
-            return Outcome<ToolIssue>.NotFound($"引当ID {id} は登録されていません。");
+            return Outcome<ToolIssue>.NotFound(ApiText.T("引当ID {0} は登録されていません。", id));
         }
         if (issue.Status != ToolIssueStatus.Allocated)
         {
-            return Outcome<ToolIssue>.Conflict($"状態 '{issue.Status}' の引当は払い出せません。");
+            return Outcome<ToolIssue>.Conflict(ApiText.T("状態 '{0}' の引当は払い出せません。", EnumLabels.Of(issue.Status)));
         }
 
         // 引当てから払出までの間に寿命へ達している／メンテへ入っていることがある
@@ -77,7 +79,7 @@ public sealed class ToolIssueService(MesAppDbContext db, IAuditLogger auditLogge
         var receivedBy = request.IssuedToUserId ?? userId;
         if (receivedBy is not null && !await db.Users.AnyAsync(u => u.Id == receivedBy, ct))
         {
-            return Outcome<ToolIssue>.Invalid("受領者が登録されていません。");
+            return Outcome<ToolIssue>.Invalid(ApiText.T("受領者が登録されていません。"));
         }
 
         issue.Status = ToolIssueStatus.Issued;
@@ -97,11 +99,11 @@ public sealed class ToolIssueService(MesAppDbContext db, IAuditLogger auditLogge
         var issue = await db.ToolIssues.Include(i => i.Tool).FirstOrDefaultAsync(i => i.Id == id, ct);
         if (issue is null)
         {
-            return Outcome<ToolIssue>.NotFound($"引当ID {id} は登録されていません。");
+            return Outcome<ToolIssue>.NotFound(ApiText.T("引当ID {0} は登録されていません。", id));
         }
         if (issue.Status is not (ToolIssueStatus.Allocated or ToolIssueStatus.Issued))
         {
-            return Outcome<ToolIssue>.Conflict($"状態 '{issue.Status}' の引当は返却できません。");
+            return Outcome<ToolIssue>.Conflict(ApiText.T("状態 '{0}' の引当は返却できません。", EnumLabels.Of(issue.Status)));
         }
 
         issue.Status = ToolIssueStatus.Returned;
@@ -123,11 +125,11 @@ public sealed class ToolIssueService(MesAppDbContext db, IAuditLogger auditLogge
         var issue = await db.ToolIssues.Include(i => i.Tool).FirstOrDefaultAsync(i => i.Id == id, ct);
         if (issue is null)
         {
-            return Outcome<ToolIssue>.NotFound($"引当ID {id} は登録されていません。");
+            return Outcome<ToolIssue>.NotFound(ApiText.T("引当ID {0} は登録されていません。", id));
         }
         if (issue.Status != ToolIssueStatus.Allocated)
         {
-            return Outcome<ToolIssue>.Conflict("払出済みの引当は取り消せません。返却で戻してください。");
+            return Outcome<ToolIssue>.Conflict(ApiText.T("払出済みの引当は取り消せません。返却で戻してください。"));
         }
 
         issue.Status = ToolIssueStatus.Canceled;

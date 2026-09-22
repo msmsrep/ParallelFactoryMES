@@ -1,4 +1,5 @@
-﻿using MesApp.Api.Policies;
+﻿using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -42,12 +43,12 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
     {
         if (await db.Equipments.AnyAsync(e => e.AssetNo == request.AssetNo, ct))
         {
-            return this.ConflictProblem($"資産番号 '{request.AssetNo}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("資産番号 '{0}' は既に存在します。", request.AssetNo));
         }
         var workCenter = await FindWorkCenterAsync(request.WorkCenterId, ct);
         if (request.WorkCenterId is { } missing && workCenter is null)
         {
-            return this.BadRequestProblem($"作業区（ID {missing}）が見つかりません。");
+            return this.BadRequestProblem(ApiText.T("作業区（ID {0}）が見つかりません。", missing));
         }
         if (WorkCenterHierarchyPolicy.CheckEquipmentPlacement(workCenter) is { } reason)
         {
@@ -82,12 +83,12 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (await db.Equipments.AnyAsync(x => x.AssetNo == request.AssetNo && x.Id != id, ct))
         {
-            return this.ConflictProblem($"資産番号 '{request.AssetNo}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("資産番号 '{0}' は既に存在します。", request.AssetNo));
         }
         var workCenter = await FindWorkCenterAsync(request.WorkCenterId, ct);
         if (request.WorkCenterId is { } missing && workCenter is null)
         {
-            return this.BadRequestProblem($"作業区（ID {missing}）が見つかりません。");
+            return this.BadRequestProblem(ApiText.T("作業区（ID {0}）が見つかりません。", missing));
         }
         if (WorkCenterHierarchyPolicy.CheckEquipmentPlacement(workCenter) is { } reason)
         {
@@ -143,13 +144,13 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (parts.GroupBy(p => p.ProductId).Any(g => g.Count() > 1))
         {
-            return this.BadRequestProblem("同じ品目が複数行あります。");
+            return this.BadRequestProblem(ApiText.T("同じ品目が複数行あります。"));
         }
         var productIds = parts.Select(p => p.ProductId).Distinct().ToList();
         if (productIds.Count > 0
             && await db.Products.CountAsync(p => productIds.Contains(p.Id), ct) != productIds.Count)
         {
-            return this.BadRequestProblem("存在しない品目IDが含まれています。");
+            return this.BadRequestProblem(ApiText.T("存在しない品目IDが含まれています。"));
         }
 
         var existing = await db.EquipmentParts.Where(p => p.EquipmentId == id).ToListAsync(ct);

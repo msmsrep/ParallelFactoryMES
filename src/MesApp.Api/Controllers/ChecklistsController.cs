@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -40,11 +41,11 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
     {
         if (await db.Checklists.AnyAsync(c => c.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"チェックリストコード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("チェックリストコード '{0}' は既に存在します。", request.Code));
         }
         if (request.Items.GroupBy(i => i.Sequence).Any(g => g.Count() > 1))
         {
-            return this.BadRequestProblem("項目の表示順が重複しています。");
+            return this.BadRequestProblem(ApiText.T("項目の表示順が重複しています。"));
         }
 
         var c = new Checklist
@@ -75,11 +76,11 @@ public class ChecklistsController(MesAppDbContext db, IAuditLogger auditLogger) 
         }
         if (await db.Checklists.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return this.ConflictProblem($"チェックリストコード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("チェックリストコード '{0}' は既に存在します。", request.Code));
         }
         if (request.Items.GroupBy(i => i.Sequence).Any(g => g.Count() > 1))
         {
-            return this.BadRequestProblem("項目の表示順が重複しています。");
+            return this.BadRequestProblem(ApiText.T("項目の表示順が重複しています。"));
         }
 
         c.Code = request.Code;

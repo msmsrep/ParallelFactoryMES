@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
@@ -19,11 +20,11 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
     {
         if (items.Any(i => i.ChildProductId == productId))
         {
-            return "品目自身をMBOMの子品目にはできません。";
+            return ApiText.T("品目自身をMBOMの子品目にはできません。");
         }
         if (items.GroupBy(i => i.ChildProductId).Any(g => g.Count() > 1))
         {
-            return "同一の子品目が重複しています。";
+            return ApiText.T("同一の子品目が重複しています。");
         }
 
         var childIds = items.Select(i => i.ChildProductId).ToList();
@@ -31,7 +32,7 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
             .Where(p => childIds.Contains(p.Id)).Select(p => p.Id).ToListAsync(ct);
         if (childIds.Except(validChildIds).Any())
         {
-            return "存在しない子品目IDが含まれています。";
+            return ApiText.T("存在しない子品目IDが含まれています。");
         }
 
         var existing = await db.BomItems.Where(b => b.ParentProductId == productId).ToListAsync(ct);
@@ -56,26 +57,26 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
     {
         if (steps.GroupBy(s => s.Sequence).Any(g => g.Count() > 1))
         {
-            return "工程順序が重複しています。";
+            return ApiText.T("工程順序が重複しています。");
         }
 
         var processIds = steps.Select(s => s.ProcessId).Distinct().ToList();
         var validProcessCount = await db.Processes.CountAsync(p => processIds.Contains(p.Id), ct);
         if (validProcessCount != processIds.Count)
         {
-            return "存在しない工程IDが含まれています。";
+            return ApiText.T("存在しない工程IDが含まれています。");
         }
         foreach (var (ids, set, label) in new[]
         {
-            (steps.Where(s => s.RequiredSkillId != null).Select(s => s.RequiredSkillId!.Value), db.Skills.Select(x => x.Id), "スキル"),
-            (steps.Where(s => s.EquipmentId != null).Select(s => s.EquipmentId!.Value), db.Equipments.Select(x => x.Id), "設備"),
-            (steps.Where(s => s.ToolId != null).Select(s => s.ToolId!.Value), db.Tools.Select(x => x.Id), "治工具"),
-            (steps.Where(s => s.ChecklistId != null).Select(s => s.ChecklistId!.Value), db.Checklists.Select(x => x.Id), "チェックリスト"),
+            (steps.Where(s => s.RequiredSkillId != null).Select(s => s.RequiredSkillId!.Value), db.Skills.Select(x => x.Id), ApiText.T("スキル")),
+            (steps.Where(s => s.EquipmentId != null).Select(s => s.EquipmentId!.Value), db.Equipments.Select(x => x.Id), ApiText.T("設備")),
+            (steps.Where(s => s.ToolId != null).Select(s => s.ToolId!.Value), db.Tools.Select(x => x.Id), ApiText.T("治工具")),
+            (steps.Where(s => s.ChecklistId != null).Select(s => s.ChecklistId!.Value), db.Checklists.Select(x => x.Id), ApiText.T("チェックリスト")),
             (steps.Where(s => s.WorkProcedureId != null).Select(s => s.WorkProcedureId!.Value),
-                ProductStructurePolicy.AssignableWorkProcedures(db.WorkProcedures).Select(x => x.Id), "作業手順書"),
-            (steps.SelectMany(s => s.EquipmentIds ?? []), db.Equipments.Select(x => x.Id), "候補設備"),
+                ProductStructurePolicy.AssignableWorkProcedures(db.WorkProcedures).Select(x => x.Id), ApiText.T("作業手順書")),
+            (steps.SelectMany(s => s.EquipmentIds ?? []), db.Equipments.Select(x => x.Id), ApiText.T("候補設備")),
             (steps.Where(s => s.WorkCenterId != null).Select(s => s.WorkCenterId!.Value),
-                ProductStructurePolicy.AssignableWorkCenters(db.WorkCenters).Select(x => x.Id), "作業区"),
+                ProductStructurePolicy.AssignableWorkCenters(db.WorkCenters).Select(x => x.Id), ApiText.T("作業区")),
         })
         {
             var wanted = ids.Distinct().ToList();
@@ -84,7 +85,7 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
                 var found = await set.Where(x => wanted.Contains(x)).CountAsync(ct);
                 if (found != wanted.Count)
                 {
-                    return $"存在しない{label}IDが含まれています。";
+                    return ApiText.T("存在しない{0}IDが含まれています。", label);
                 }
             }
         }

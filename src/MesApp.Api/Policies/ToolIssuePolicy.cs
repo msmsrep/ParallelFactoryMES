@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Policies;
@@ -22,23 +23,23 @@ public static class ToolIssuePolicy
     {
         if (!tool.IsActive)
         {
-            return $"治工具 '{tool.Code}' は無効化されています。";
+            return ApiText.T("治工具 '{0}' は無効化されています。", tool.Code);
         }
         if (tool.Status == ToolStatus.Retired)
         {
-            return $"治工具 '{tool.Code}' は廃棄済みです。";
+            return ApiText.T("治工具 '{0}' は廃棄済みです。", tool.Code);
         }
         if (tool.Status == ToolStatus.UnderMaintenance)
         {
-            return $"治工具 '{tool.Code}' はメンテナンス中です。";
+            return ApiText.T("治工具 '{0}' はメンテナンス中です。", tool.Code);
         }
         if (isLifeReached)
         {
-            return $"治工具 '{tool.Code}' は寿命に達しています。交換してから引き当ててください。";
+            return ApiText.T("治工具 '{0}' は寿命に達しています。交換してから引き当ててください。", tool.Code);
         }
         if (hasOpenIssue)
         {
-            return $"治工具 '{tool.Code}' は他の作業指示に引当中です。返却されてから引き当ててください。";
+            return ApiText.T("治工具 '{0}' は他の作業指示に引当中です。返却されてから引き当ててください。", tool.Code);
         }
         return null;
     }
@@ -61,11 +62,11 @@ public static class ToolIssuePolicy
     {
         if (requested == ToolStatus.InUse && current != ToolStatus.InUse)
         {
-            return $"治工具 '{code}' を手で使用中にはできません。使用中は作業指示への引当で設定されます。";
+            return ApiText.T("治工具 '{0}' を手で使用中にはできません。使用中は作業指示への引当で設定されます。", code);
         }
         if (requested == ToolStatus.Available && hasOpenIssue)
         {
-            return $"治工具 '{code}' は作業指示に引当中のため使用可能にできません。返却または引当の取消をしてください。";
+            return ApiText.T("治工具 '{0}' は作業指示に引当中のため使用可能にできません。返却または引当の取消をしてください。", code);
         }
         return null;
     }

@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -57,16 +59,16 @@ public class TransferOrdersController(
     {
         if (!await db.Lots.AnyAsync(l => l.Id == request.LotId, ct))
         {
-            return this.BadRequestProblem("存在しないロットIDです。");
+            return this.BadRequestProblem(ApiText.T("存在しないロットIDです。"));
         }
         if (request.FromLocationId == request.ToLocationId)
         {
-            return this.BadRequestProblem("移動元と移動先が同一です。");
+            return this.BadRequestProblem(ApiText.T("移動元と移動先が同一です。"));
         }
         var locationIds = new[] { request.FromLocationId, request.ToLocationId };
         if (await db.Locations.CountAsync(l => locationIds.Contains(l.Id) && l.IsActive, ct) != 2)
         {
-            return this.BadRequestProblem("存在しない（または無効な）ロケーションが含まれています。");
+            return this.BadRequestProblem(ApiText.T("存在しない（または無効な）ロケーションが含まれています。"));
         }
 
         var order = new TransferOrder
@@ -97,7 +99,7 @@ public class TransferOrdersController(
         }
         if (order.Status != TransferOrderStatus.Instructed)
         {
-            return this.ConflictProblem($"状態 '{order.Status}' の搬送指示は実行できません。");
+            return this.ConflictProblem(ApiText.T("状態 '{0}' の搬送指示は実行できません。", EnumLabels.Of(order.Status)));
         }
 
         try
@@ -130,7 +132,7 @@ public class TransferOrdersController(
         }
         if (order.Status != TransferOrderStatus.Instructed)
         {
-            return this.ConflictProblem($"状態 '{order.Status}' の搬送指示は取消できません。");
+            return this.ConflictProblem(ApiText.T("状態 '{0}' の搬送指示は取消できません。", EnumLabels.Of(order.Status)));
         }
         var before = order.Status;
         order.Status = TransferOrderStatus.Canceled;

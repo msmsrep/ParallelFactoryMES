@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Entities;
@@ -40,7 +42,7 @@ public sealed class ManufacturingOrderService(
         var product = await db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, ct);
         if (product is null || !product.IsActive)
         {
-            return OrderOutcome.Invalid("存在しない（または無効な）品目IDです。");
+            return OrderOutcome.Invalid(ApiText.T("存在しない（または無効な）品目IDです。"));
         }
 
         ManufacturingOrder? source = null;
@@ -48,17 +50,17 @@ public sealed class ManufacturingOrderService(
         {
             if (request.SourceOrderId is null)
             {
-                return OrderOutcome.Invalid("リワーク指図には元指図ID（sourceOrderId）が必要です。");
+                return OrderOutcome.Invalid(ApiText.T("リワーク指図には元指図ID（sourceOrderId）が必要です。"));
             }
             source = await db.ManufacturingOrders.FindAsync([request.SourceOrderId.Value], ct);
             if (source is null)
             {
-                return OrderOutcome.Invalid("元指図が存在しません。");
+                return OrderOutcome.Invalid(ApiText.T("元指図が存在しません。"));
             }
         }
         else if (request.SourceOrderId is not null)
         {
-            return OrderOutcome.Invalid("元指図IDはリワーク指図でのみ指定できます。");
+            return OrderOutcome.Invalid(ApiText.T("元指図IDはリワーク指図でのみ指定できます。"));
         }
 
         if (string.IsNullOrWhiteSpace(orderNo))
@@ -69,11 +71,11 @@ public sealed class ManufacturingOrderService(
         {
             // 自動採番の連番は採番テーブルで管理しており、同じ形式の手入力番号があると後で衝突する
             return OrderOutcome.Invalid(
-                $"指図番号 '{orderNo}' は自動採番の形式（{AutoOrderNoPrefix}〜）と重なるため指定できません。");
+                ApiText.T("指図番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", orderNo, AutoOrderNoPrefix));
         }
         else if (await db.ManufacturingOrders.AnyAsync(o => o.OrderNo == orderNo, ct))
         {
-            return OrderOutcome.Conflict($"指図番号 '{orderNo}' は既に存在します。");
+            return OrderOutcome.Conflict(ApiText.T("指図番号 '{0}' は既に存在します。", orderNo));
         }
 
         var order = new ManufacturingOrder
@@ -100,7 +102,7 @@ public sealed class ManufacturingOrderService(
     {
         if (order.Status != ManufacturingOrderStatus.Draft)
         {
-            return OrderOutcome.Conflict($"状態 '{order.Status}' の指図は承認できません。");
+            return OrderOutcome.Conflict(ApiText.T("状態 '{0}' の指図は承認できません。", EnumLabels.Of(order.Status)));
         }
 
         order.Status = ManufacturingOrderStatus.Approved;
@@ -123,7 +125,7 @@ public sealed class ManufacturingOrderService(
         if (order.Status is not (ManufacturingOrderStatus.Draft or ManufacturingOrderStatus.Approved))
         {
             return OrderOutcome.Conflict(
-                $"状態 '{order.Status}' の指図は変更できません（展開済み以降は取消のみ可能です）。");
+                ApiText.T("状態 '{0}' の指図は変更できません（展開済み以降は取消のみ可能です）。", EnumLabels.Of(order.Status)));
         }
 
         var reapproval = order.Status == ManufacturingOrderStatus.Approved;
@@ -151,7 +153,7 @@ public sealed class ManufacturingOrderService(
     {
         if (order.Status is ManufacturingOrderStatus.Completed or ManufacturingOrderStatus.Canceled)
         {
-            return OrderOutcome.Conflict($"状態 '{order.Status}' の指図は取消できません。");
+            return OrderOutcome.Conflict(ApiText.T("状態 '{0}' の指図は取消できません。", EnumLabels.Of(order.Status)));
         }
 
         order.Status = ManufacturingOrderStatus.Canceled;
@@ -198,7 +200,7 @@ public sealed class ManufacturingOrderService(
     {
         if (order.Status != ManufacturingOrderStatus.Approved)
         {
-            return OrderOutcome.Conflict($"状態 '{order.Status}' の指図は展開できません（承認済みの指図のみ）。");
+            return OrderOutcome.Conflict(ApiText.T("状態 '{0}' の指図は展開できません（承認済みの指図のみ）。", EnumLabels.Of(order.Status)));
         }
 
         var routing = await db.Routings
@@ -208,7 +210,7 @@ public sealed class ManufacturingOrderService(
             .ToListAsync(ct);
         if (routing.Count == 0)
         {
-            return OrderOutcome.Invalid($"品目 '{order.Product!.Code}' に工順（BOP）が登録されていません。");
+            return OrderOutcome.Invalid(ApiText.T("品目 '{0}' に工順（BOP）が登録されていません。", order.Product!.Code));
         }
 
         // 産出ロット採番（手入力があれば一意性を確認して使用）
@@ -218,7 +220,7 @@ public sealed class ManufacturingOrderService(
         }
         else if (await db.Lots.AnyAsync(l => l.LotNumber == lotNumber, ct))
         {
-            return OrderOutcome.Conflict($"ロット番号 '{lotNumber}' は既に存在します。");
+            return OrderOutcome.Conflict(ApiText.T("ロット番号 '{0}' は既に存在します。", lotNumber));
         }
 
         var lot = new Lot

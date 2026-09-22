@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Policies;
@@ -28,12 +29,11 @@ public static class InspectionDeviceCalibrationPolicy
     {
         if (!device.IsActive)
         {
-            return $"検査機 '{device.Code}' は無効化されています。";
+            return ApiText.T("検査機 '{0}' は無効化されています。", device.Code);
         }
         if (IsExpired(device.CalibrationDueOn, businessDate))
         {
-            return $"検査機 '{device.Code}' は校正期限（{device.CalibrationDueOn:yyyy-MM-dd}）を過ぎています。"
-                   + "校正を実施してから検査実績を登録してください。";
+            return ApiText.T("検査機 '{0}' は校正期限（{1:yyyy-MM-dd}）を過ぎています。校正を実施してから検査実績を登録してください。", device.Code, device.CalibrationDueOn);
         }
         return null;
     }

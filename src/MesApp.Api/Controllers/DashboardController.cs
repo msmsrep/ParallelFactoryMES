@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Dashboard;
@@ -35,7 +36,7 @@ public class DashboardController(DashboardService dashboard, IBusinessDateServic
         if (DashboardService.CountPeriods(filter.From, filter.To, unit) > DashboardService.MaxPeriods)
         {
             return this.BadRequestProblem(
-                $"区切りが多すぎます（上限 {DashboardService.MaxPeriods}）。期間を短くするか、週・月の単位で表示してください。");
+                ApiText.T("区切りが多すぎます（上限 {0}）。期間を短くするか、週・月の単位で表示してください。", DashboardService.MaxPeriods));
         }
         return await dashboard.GetTrendAsync(filter, unit, ct);
     }
@@ -62,6 +63,6 @@ public class DashboardController(DashboardService dashboard, IBusinessDateServic
 
     private BadRequestObjectResult? Validate(DashboardService.Filter filter) =>
         filter.From > filter.To
-            ? this.BadRequestProblem("期間の開始日が終了日より後になっています。")
+            ? this.BadRequestProblem(ApiText.T("期間の開始日が終了日より後になっています。"))
             : null;
 }

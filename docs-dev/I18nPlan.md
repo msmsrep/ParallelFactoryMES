@@ -13,7 +13,7 @@ API の日本語リテラルが約850（うち CSV 関連が約420）、enum を
 | 仕組み | `IStringLocalizer` ＋ `.resx` | .NET 標準。API・画面の両方で同じ仕組みを使える |
 | キー | **日本語の原文をそのままキーにする**（`L["登録に失敗しました。"]`）。`en.resx` だけを持つ | 訳が無いときは日本語のまま出るので段階的に移行できる。文言を変えるとキーも変わるため、`I18nCheck` で拾う |
 | 言語の保存先 | **ブラウザごと**（localStorage）。切替時に再読込 | スキーマ変更が要らない |
-| API のエラー文言 | API が `Accept-Language` で訳す。クライアントがヘッダを付ける | `ProblemResultExtensions` / `ApiErrors.ReadErrorAsync` の約束（Title に文言）を変えない |
+| API のエラー文言 | API が `Accept-Language` で訳す（`ApiText.T(原文, 値…)`）。クライアントがヘッダを付ける | `ProblemResultExtensions` / `ApiErrors.ReadErrorAsync` の約束（Title に文言）を変えない。Controller・Policy・Service のどこで作る文言も同じ1つの規則で包める |
 | enum の表示名 | `Core/Localization/` に集約し、API・画面で共用 | 37か所の重複を解消する |
 | 訳さないもの | マスタの値、監査ログの detail、保存済みの理由、Spec.md、コードコメント、コミットメッセージ | データや記録は訳さず、表示だけを訳す |
 | 日付・数値 | `yyyy-MM-dd` のまま（カルチャ依存にしない） | 両言語で通じる |
@@ -25,7 +25,7 @@ API の日本語リテラルが約850（うち CSV 関連が約420）、enum を
 |:--|:--|:--|
 | I18N-01 | 基盤：Localization 登録、言語切替（`MainLayout`）、`<html lang>`、`Accept-Language` の伝搬、API の RequestLocalization、bUnit テスト、Spec.md の節 | **対応済**（Spec.md 改訂100。レイアウト・ログイン画面・認証APIの文言も訳した） |
 | I18N-02 | enum の表示名を Core に集約（`Labels.cs` と各 `XxxLabel`） | **対応済**（Spec.md 改訂101。`Core/Localization/EnumLabels.cs`。補足付きの選択肢は画面の段で訳す） |
-| I18N-03 | API のエラー文言（Controller / Policy / Service）。`Accept-Language: en` のテストを領域ごとに数件 | 未着手 |
+| I18N-03 | API のエラー文言（Controller / Policy / Service）。`Accept-Language: en` のテストを領域ごとに数件 | **対応済**（Spec.md 改訂102。`ApiText.T` で包む。保存される文字列は包まない。CSV 取込のエラーは I18N-09） |
 | I18N-04 | 画面：Layout・NavMenu・Shared | 未着手 |
 | I18N-05 | 画面：マスタ | 未着手 |
 | I18N-06 | 画面：製造・実行 | 未着手 |

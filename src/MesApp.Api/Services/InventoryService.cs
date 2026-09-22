@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
@@ -53,7 +54,7 @@ public class InventoryService(MesAppDbContext db, IBusinessDateService businessD
         if (stock is null || stock.Quantity < quantity)
         {
             throw new InventoryException(
-                $"在庫が不足しています（ロット '{lot.LotNumber}'、現在数量 {stock?.Quantity ?? 0}、要求 {quantity}）。");
+                ApiText.T("在庫が不足しています（ロット '{0}'、現在数量 {1}、要求 {2}）。", lot.LotNumber, stock?.Quantity ?? 0, quantity));
         }
         stock.Quantity -= quantity;
         stock.ConcurrencyStamp = Guid.NewGuid().ToString("N");
@@ -73,7 +74,7 @@ public class InventoryService(MesAppDbContext db, IBusinessDateService businessD
         if (from is null || from.Quantity < quantity)
         {
             throw new InventoryException(
-                $"移動元の在庫が不足しています（ロット '{lot.LotNumber}'、現在数量 {from?.Quantity ?? 0}、要求 {quantity}）。");
+                ApiText.T("移動元の在庫が不足しています（ロット '{0}'、現在数量 {1}、要求 {2}）。", lot.LotNumber, from?.Quantity ?? 0, quantity));
         }
         from.Quantity -= quantity;
         from.ConcurrencyStamp = Guid.NewGuid().ToString("N");
@@ -131,7 +132,7 @@ public class InventoryService(MesAppDbContext db, IBusinessDateService businessD
             var productCode = await db.Products.Where(p => p.Id == productId)
                 .Select(p => p.Code).FirstOrDefaultAsync(ct);
             throw new InventoryException(
-                $"品目 '{productCode}' の利用可能在庫が不足しています（不足数量 {remaining}）。");
+                ApiText.T("品目 '{0}' の利用可能在庫が不足しています（不足数量 {1}）。", productCode, remaining));
         }
         return result;
     }

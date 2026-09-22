@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -41,7 +42,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
     {
         if (await db.Processes.AnyAsync(p => p.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"工程コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("工程コード '{0}' は既に存在します。", request.Code));
         }
         var p = new ProcessMaster { Code = request.Code, Name = request.Name, Category = request.Category };
         db.Processes.Add(p);
@@ -63,7 +64,7 @@ public class ProcessesController(MesAppDbContext db, IAuditLogger auditLogger) :
         }
         if (await db.Processes.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return this.ConflictProblem($"工程コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("工程コード '{0}' は既に存在します。", request.Code));
         }
         p.Code = request.Code;
         p.Name = request.Name;

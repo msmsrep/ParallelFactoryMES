@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Production;
@@ -33,7 +34,7 @@ public sealed class WorkOrderDispatchService(
     {
         if (workOrder.Status is not (WorkOrderStatus.Created or WorkOrderStatus.Dispatched))
         {
-            return Outcome<WorkOrder>.Conflict($"状態 '{workOrder.Status}' の作業指示は差立できません。");
+            return Outcome<WorkOrder>.Conflict(ApiText.T("状態 '{0}' の作業指示は差立できません。", EnumLabels.Of(workOrder.Status)));
         }
 
         // 作業員割当：スキル・資格照合（F-20-30-01）
@@ -42,7 +43,7 @@ public sealed class WorkOrderDispatchService(
             var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.AssignedUserId, ct);
             if (user is null || !user.IsActive)
             {
-                return Outcome<WorkOrder>.Invalid("割当作業者が存在しないか無効です。");
+                return Outcome<WorkOrder>.Invalid(ApiText.T("割当作業者が存在しないか無効です。"));
             }
 
             // 必要スキルは工順マスタの現在値ではなく、展開時点のスナップショットを使う（Spec.md 5.7）
@@ -56,12 +57,12 @@ public sealed class WorkOrderDispatchService(
                 if (userSkill is null)
                 {
                     return Outcome<WorkOrder>.Invalid(
-                        $"作業者 '{user.DisplayName}' は必要スキル '{skillName}' を保有していません。");
+                        ApiText.T("作業者 '{0}' は必要スキル '{1}' を保有していません。", user.DisplayName, skillName));
                 }
                 if (userSkill.Skill!.RequiresExpiry && (userSkill.ExpiresOn is null || userSkill.ExpiresOn < today))
                 {
                     return Outcome<WorkOrder>.Invalid(
-                        $"作業者 '{user.DisplayName}' のスキル '{skillName}' は有効期限切れです。");
+                        ApiText.T("作業者 '{0}' のスキル '{1}' は有効期限切れです。", user.DisplayName, skillName));
                 }
             }
         }
@@ -72,14 +73,14 @@ public sealed class WorkOrderDispatchService(
             var equipment = await db.Equipments.FindAsync([equipmentId], ct);
             if (equipment is null || !equipment.IsActive)
             {
-                return Outcome<WorkOrder>.Invalid("割当設備が存在しないか無効です。");
+                return Outcome<WorkOrder>.Invalid(ApiText.T("割当設備が存在しないか無効です。"));
             }
             // 停止中・保全中・廃棄の設備には新しく割り当てさせない。既に割り当て済みの設備のまま
             // 着手順だけを変える差立は通す（保全に入った設備の作業指示を画面から触れなくしないため）
             if (equipmentId != workOrder.AssignedEquipmentId && equipment.Status != EquipmentStatus.Available)
             {
                 return Outcome<WorkOrder>.Conflict(
-                    $"設備 '{equipment.AssetNo}' は{EnumLabels.Of(equipment.Status)}のため割り当てられません。");
+                    ApiText.T("設備 '{0}' は{1}のため割り当てられません。", equipment.AssetNo, EnumLabels.Of(equipment.Status)));
             }
 
             // 工順に候補設備が登録されていれば、その中からしか選べない。候補が未登録の工順は従来どおり設備を限定しない
@@ -89,8 +90,7 @@ public sealed class WorkOrderDispatchService(
             if (candidates.Count > 0 && candidates.All(c => c.EquipmentId != equipmentId))
             {
                 return Outcome<WorkOrder>.Invalid(
-                    $"設備 '{equipment.AssetNo}' はこの工程の候補設備ではありません" +
-                    $"（候補：{string.Join("、", candidates.Select(c => c.AssetNo))}）。");
+                    ApiText.T("設備 '{0}' はこの工程の候補設備ではありません（候補：{1}）。", equipment.AssetNo, string.Join("、", candidates.Select(c => c.AssetNo))));
             }
         }
 

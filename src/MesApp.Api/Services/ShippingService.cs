@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Inventory;
@@ -27,12 +29,12 @@ public sealed class ShippingService(
     {
         if (request.Lines.Count == 0)
         {
-            return Outcome<ShippingOrder>.Invalid("明細がありません。");
+            return Outcome<ShippingOrder>.Invalid(ApiText.T("明細がありません。"));
         }
         var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
         if (await db.Products.CountAsync(p => productIds.Contains(p.Id), ct) != productIds.Count)
         {
-            return Outcome<ShippingOrder>.Invalid("存在しない品目IDが含まれています。");
+            return Outcome<ShippingOrder>.Invalid(ApiText.T("存在しない品目IDが含まれています。"));
         }
 
         var order = new ShippingOrder
@@ -63,15 +65,15 @@ public sealed class ShippingService(
             .FirstOrDefaultAsync(s => s.Id == id, ct);
         if (order is null)
         {
-            return Outcome<ShippingOrder>.NotFound("存在しない出荷指示IDです。");
+            return Outcome<ShippingOrder>.NotFound(ApiText.T("存在しない出荷指示IDです。"));
         }
         if (order.Status != ShippingOrderStatus.Instructed)
         {
-            return Outcome<ShippingOrder>.Conflict($"状態 '{order.Status}' の出荷指示は実行できません。");
+            return Outcome<ShippingOrder>.Conflict(ApiText.T("状態 '{0}' の出荷指示は実行できません。", EnumLabels.Of(order.Status)));
         }
         if (request.Lines.Count == 0)
         {
-            return Outcome<ShippingOrder>.Invalid("出荷明細がありません。");
+            return Outcome<ShippingOrder>.Invalid(ApiText.T("出荷明細がありません。"));
         }
 
         // 出荷判定ゲート（H-10-10、Spec.md 5.3 出荷判定参照）：
@@ -93,7 +95,7 @@ public sealed class ShippingService(
         {
             if (!lots.TryGetValue(line.LotId, out var lot))
             {
-                return Outcome<ShippingOrder>.Invalid("存在しないロットIDが含まれています。");
+                return Outcome<ShippingOrder>.Invalid(ApiText.T("存在しないロットIDが含まれています。"));
             }
             // 出荷判定の承認後に保留・不良になったロットを出荷させない（判定書の存在だけでは不十分）。
             // 特採は不適合承認時にステータスが正常へ戻るため、ここでは正常のみを許可すればよい
@@ -108,12 +110,12 @@ public sealed class ShippingService(
             var orderLine = order.Lines.FirstOrDefault(l => l.ProductId == productId);
             if (orderLine is null)
             {
-                return Outcome<ShippingOrder>.Invalid("出荷指示に含まれない品目のロットが指定されています。");
+                return Outcome<ShippingOrder>.Invalid(ApiText.T("出荷指示に含まれない品目のロットが指定されています。"));
             }
             if (orderLine.ShippedQuantity + qty > orderLine.Quantity)
             {
                 return Outcome<ShippingOrder>.Invalid(
-                    $"出荷数量が指示数量を超えています（指示 {orderLine.Quantity}、出荷済 {orderLine.ShippedQuantity}、今回 {qty}）。");
+                    ApiText.T("出荷数量が指示数量を超えています（指示 {0}、出荷済 {1}、今回 {2}）。", orderLine.Quantity, orderLine.ShippedQuantity, qty));
             }
         }
 
@@ -153,11 +155,11 @@ public sealed class ShippingService(
         var order = await db.ShippingOrders.FindAsync([id], ct);
         if (order is null)
         {
-            return Outcome<ShippingOrder>.NotFound("存在しない出荷指示IDです。");
+            return Outcome<ShippingOrder>.NotFound(ApiText.T("存在しない出荷指示IDです。"));
         }
         if (order.Status != ShippingOrderStatus.Instructed)
         {
-            return Outcome<ShippingOrder>.Conflict($"状態 '{order.Status}' の出荷指示は取消できません。");
+            return Outcome<ShippingOrder>.Conflict(ApiText.T("状態 '{0}' の出荷指示は取消できません。", EnumLabels.Of(order.Status)));
         }
         var before = order.Status;
         order.Status = ShippingOrderStatus.Canceled;

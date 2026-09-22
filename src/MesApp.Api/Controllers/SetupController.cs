@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Setup;
@@ -29,7 +30,7 @@ public class SetupController(
     {
         if (await userManager.Users.AnyAsync(ct))
         {
-            return this.ConflictProblem("初期セットアップは完了済みです。");
+            return this.ConflictProblem(ApiText.T("初期セットアップは完了済みです。"));
         }
 
         var user = new AppUser

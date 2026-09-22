@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -54,7 +55,7 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
     {
         if (await db.ControlItems.AnyAsync(i => i.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"工程管理項目コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("工程管理項目コード '{0}' は既に存在します。", request.Code));
         }
         if (await ValidateAsync(request, ct) is { } error)
         {
@@ -91,7 +92,7 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
         }
         if (await db.ControlItems.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return this.ConflictProblem($"工程管理項目コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("工程管理項目コード '{0}' は既に存在します。", request.Code));
         }
         if (await ValidateAsync(request, ct) is { } error)
         {
@@ -123,29 +124,29 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
     {
         if (request.LowerLimit is { } lower && request.UpperLimit is { } upper && lower > upper)
         {
-            return "許容下限は許容上限以下で指定してください。";
+            return ApiText.T("許容下限は許容上限以下で指定してください。");
         }
         // 指示値が許容範囲の外にあると、指示どおりに作っても逸脱と判定されてしまう
         if (request.TargetValue is { } target)
         {
             if (request.LowerLimit is { } l && target < l)
             {
-                return "指示値が許容下限を下回っています。";
+                return ApiText.T("指示値が許容下限を下回っています。");
             }
             if (request.UpperLimit is { } u && target > u)
             {
-                return "指示値が許容上限を超えています。";
+                return ApiText.T("指示値が許容上限を超えています。");
             }
         }
         if (request.TargetProductId is { } productId
             && !await db.Products.AnyAsync(p => p.Id == productId, ct))
         {
-            return $"対象品目（ID {productId}）が見つかりません。";
+            return ApiText.T("対象品目（ID {0}）が見つかりません。", productId);
         }
         if (request.TargetProcessId is { } processId
             && !await db.Processes.AnyAsync(p => p.Id == processId, ct))
         {
-            return $"対象工程（ID {processId}）が見つかりません。";
+            return ApiText.T("対象工程（ID {0}）が見つかりません。", processId);
         }
         return null;
     }

@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
-using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -51,8 +50,6 @@ public static class MesAppHost
         builder.Services.AddHttpContextAccessor();
         // MesAppExceptionFilterで拾わない想定外の例外も、本文なしの500ではなくProblemDetailsで返す
         builder.Services.AddProblemDetails();
-        // 応答の文言を Accept-Language で訳す（Spec.md 7.9）。リソースは Localization/ApiText.*.resx
-        builder.Services.AddLocalization();
 
         // DB・監査ログ（Spec.md 4章・7.6）
         builder.Services.AddMesAppInfrastructure(builder.Configuration);
@@ -139,7 +136,7 @@ public static class MesAppHost
         // 想定外の例外のフォールバック（開発環境では先に開発者例外ページが処理する）
         app.UseExceptionHandler();
 
-        // 表示言語（UICulture）だけを Accept-Language で切り替える。数値・日付の書式（Culture）は
+        // 表示言語（UICulture）だけを Accept-Language で切り替える（応答の文言は ApiText.T が訳す）。数値・日付の書式（Culture）は
         // サーバーの既定のまま変えない（言語によって CSV やログの書式が変わらないようにする。Spec.md 7.9）
         var formatCulture = CultureInfo.CurrentCulture;
         app.UseRequestLocalization(options =>
@@ -166,8 +163,8 @@ public static class MesAppHost
         // api/ 配下で未マッチのものは404にする。除外しないとフォールバックが拾い、
         // 打ち間違い・未実装のAPIパスがindex.htmlの200になって、
         // 呼び出し側は404ではなくJSONパース失敗という無関係なエラーを受け取る
-        app.MapFallback("api/{**rest}", (IStringLocalizer<ApiText> localizer) => Results.Problem(
-            title: localizer["指定されたAPIは存在しません。"], statusCode: StatusCodes.Status404NotFound));
+        app.MapFallback("api/{**rest}", () => Results.Problem(
+            title: ApiText.T("指定されたAPIは存在しません。"), statusCode: StatusCodes.Status404NotFound));
         app.MapFallbackToFile("index.html");
 
         return app;

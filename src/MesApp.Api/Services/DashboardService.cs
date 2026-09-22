@@ -1,3 +1,4 @@
+﻿using MesApp.Api.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
@@ -26,7 +27,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
     /// <summary>1回に返す区切りの上限（日次で約1年）</summary>
     public const int MaxPeriods = 400;
 
-    public const string NoWorkCenter = "（作業区なし）";
+    public static string NoWorkCenter => ApiText.T("（作業区なし）");
 
     /// <summary>集計の絞り込み条件</summary>
     public record Filter(DateOnly From, DateOnly To, int? ProcessId, int? ProductId, int? WorkCenterId);
@@ -75,7 +76,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
         }
 
         return new DashboardSummaryResponse(filter.From, filter.To,
-            Aggregate("total", "合計", filter.From, filter.To, production, logs, productionAvailable, utilizationAvailable),
+            Aggregate("total", ApiText.T("合計"), filter.From, filter.To, production, logs, productionAvailable, utilizationAvailable),
             rows, productionAvailable, utilizationAvailable);
     }
 
@@ -145,7 +146,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
             .ToList();
 
         return new DashboardSummaryResponse(filter.From, filter.To,
-            Aggregate("total", "合計", filter.From, filter.To, production, logs, productionAvailable, utilizationAvailable),
+            Aggregate("total", ApiText.T("合計"), filter.From, filter.To, production, logs, productionAvailable, utilizationAvailable),
             rows, productionAvailable, utilizationAvailable);
     }
 

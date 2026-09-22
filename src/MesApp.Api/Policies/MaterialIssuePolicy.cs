@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Policies;
@@ -30,19 +31,17 @@ public static class MaterialIssuePolicy
     {
         if (planned.Count == 0)
         {
-            return $"この指図には予定材料がありません（品目 '{parentProductCode}' のMBOMが未登録のまま展開されています）。" +
-                   "MBOMを登録してから指図を展開し直してください。";
+            return ApiText.T("この指図には予定材料がありません（品目 '{0}' のMBOMが未登録のまま展開されています）。MBOMを登録してから指図を展開し直してください。", parentProductCode);
         }
         var target = planned.FirstOrDefault(m => m.ChildProductId == material.Id);
         if (target is null)
         {
-            return $"品目 '{material.Code}' は '{parentProductCode}' の予定材料に含まれないため投入できません" +
-                   "（代替部品として使う場合はMBOMの代替部品グループへ登録し、指図を展開し直してください）。";
+            return ApiText.T("品目 '{0}' は '{1}' の予定材料に含まれないため投入できません（代替部品として使う場合はMBOMの代替部品グループへ登録し、指図を展開し直してください）。", material.Code, parentProductCode);
         }
         // 代替部品の投入は「誰がどの理由で認めたか」を残す（A-40-10-04）
         if (target.IsAlternative && string.IsNullOrWhiteSpace(substituteReason))
         {
-            return $"品目 '{material.Code}' は代替部品のため、代替を使う理由（substituteReason）の入力が必要です。";
+            return ApiText.T("品目 '{0}' は代替部品のため、代替を使う理由（substituteReason）の入力が必要です。", material.Code);
         }
         return null;
     }

@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
@@ -23,20 +25,20 @@ public sealed class PickingService(
     {
         if (request.Lines.Count == 0)
         {
-            return Outcome<PickingOrder>.Invalid("明細がありません。");
+            return Outcome<PickingOrder>.Invalid(ApiText.T("明細がありません。"));
         }
         if (request.Type == PickingOrderType.ProcessIssue)
         {
             if (request.WorkOrderId is null
                 || !await db.WorkOrders.AnyAsync(w => w.Id == request.WorkOrderId, ct))
             {
-                return Outcome<PickingOrder>.Invalid("工程払出には有効な作業指示ID（workOrderId）が必要です。");
+                return Outcome<PickingOrder>.Invalid(ApiText.T("工程払出には有効な作業指示ID（workOrderId）が必要です。"));
             }
         }
         else if (request.ShippingOrderId is null
                  || !await db.ShippingOrders.AnyAsync(s => s.Id == request.ShippingOrderId, ct))
         {
-            return Outcome<PickingOrder>.Invalid("出荷ピッキングには有効な出荷指示ID（shippingOrderId）が必要です。");
+            return Outcome<PickingOrder>.Invalid(ApiText.T("出荷ピッキングには有効な出荷指示ID（shippingOrderId）が必要です。"));
         }
 
         var order = new PickingOrder
@@ -82,11 +84,11 @@ public sealed class PickingService(
             .FirstOrDefaultAsync(p => p.Id == id, ct);
         if (order is null)
         {
-            return Outcome<PickingOrder>.NotFound("存在しないピッキング指示IDです。");
+            return Outcome<PickingOrder>.NotFound(ApiText.T("存在しないピッキング指示IDです。"));
         }
         if (order.Status != PickingOrderStatus.Instructed)
         {
-            return Outcome<PickingOrder>.Conflict($"状態 '{order.Status}' のピッキング指示は実行できません。");
+            return Outcome<PickingOrder>.Conflict(ApiText.T("状態 '{0}' のピッキング指示は実行できません。", EnumLabels.Of(order.Status)));
         }
 
         var type = order.Type == PickingOrderType.ProcessIssue
@@ -122,11 +124,11 @@ public sealed class PickingService(
         var order = await db.PickingOrders.FindAsync([id], ct);
         if (order is null)
         {
-            return Outcome<PickingOrder>.NotFound("存在しないピッキング指示IDです。");
+            return Outcome<PickingOrder>.NotFound(ApiText.T("存在しないピッキング指示IDです。"));
         }
         if (order.Status != PickingOrderStatus.Instructed)
         {
-            return Outcome<PickingOrder>.Conflict($"状態 '{order.Status}' のピッキング指示は取消できません。");
+            return Outcome<PickingOrder>.Conflict(ApiText.T("状態 '{0}' のピッキング指示は取消できません。", EnumLabels.Of(order.Status)));
         }
         var before = order.Status;
         order.Status = PickingOrderStatus.Canceled;

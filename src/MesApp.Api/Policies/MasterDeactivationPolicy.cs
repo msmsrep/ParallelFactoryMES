@@ -1,3 +1,5 @@
+using MesApp.Api.Localization;
+
 namespace MesApp.Api.Policies;
 
 /// <summary>
@@ -20,8 +22,7 @@ public static class MasterDeactivationPolicy
         string procedureNo, IReadOnlyCollection<string> referencingProductCodes) =>
         referencingProductCodes.Count == 0
             ? null
-            : $"手順書 '{procedureNo}' は品目 {string.Join("、", referencingProductCodes)} の工順から" +
-              "参照されているため無効化できません。";
+            : ApiText.T("手順書 '{0}' は品目 {1} の工順から参照されているため無効化できません。", procedureNo, string.Join("、", referencingProductCodes));
 
     /// <summary>
     /// 勤務シフト（F-10-10-01）。所属する直として使われている間に無効化すると、従業員の所属が宙に浮く。
@@ -30,5 +31,5 @@ public static class MasterDeactivationPolicy
     public static string? CheckShift(string code, int assignedActiveUserCount) =>
         assignedActiveUserCount == 0
             ? null
-            : $"直 '{code}' は在籍中の従業員 {assignedActiveUserCount} 名の所属になっているため無効化できません。";
+            : ApiText.T("直 '{0}' は在籍中の従業員 {1} 名の所属になっているため無効化できません。", code, assignedActiveUserCount);
 }

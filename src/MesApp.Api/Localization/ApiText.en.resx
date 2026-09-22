@@ -12,11 +12,98 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="ユーザー名またはパスワードが正しくありません。" xml:space="preserve">
-    <value>The user name or password is incorrect.</value>
+  <data name=" / 直: {0} {1}" xml:space="preserve">
+    <value> / Shift: {0} {1}</value>
+  </data>
+  <data name=" 判定: {0}" xml:space="preserve">
+    <value> Judgment: {0}</value>
+  </data>
+  <data name=" 原因: {0}" xml:space="preserve">
+    <value> Cause: {0}</value>
+  </data>
+  <data name="'{0}' には上位の資源（{1}）の指定が必要です。" xml:space="preserve">
+    <value>'{0}' requires a parent resource ({1}).</value>
+  </data>
+  <data name="'{0}' には下位の資源があるため、段を変更できません（下位の資源を付け替えてから変更してください）。" xml:space="preserve">
+    <value>The level of '{0}' cannot be changed because it has child resources (reassign the child resources first).</value>
+  </data>
+  <data name="'{0}' には有効な下位の資源があるため、無効化できません（下位の資源を先に無効化するか、付け替えてください）。" xml:space="preserve">
+    <value>'{0}' cannot be deactivated because it has active child resources (deactivate or reassign the child resources first).</value>
+  </data>
+  <data name="'{0}' の上位に自分自身は指定できません。" xml:space="preserve">
+    <value>'{0}' cannot be its own parent.</value>
+  </data>
+  <data name="'{0}' は '{1}' の配下にあるため、上位に指定できません（循環します）。" xml:space="preserve">
+    <value>'{0}' cannot be the parent because it is under '{1}' (circular reference).</value>
+  </data>
+  <data name="'{0}' は工場のため、上位の資源を指定できません。" xml:space="preserve">
+    <value>'{0}' is a plant and cannot have a parent resource.</value>
+  </data>
+  <data name="'{0}'（{1}）の上位には{2}を指定してください（'{3}' は{4}です）。" xml:space="preserve">
+    <value>The parent of '{0}' ({1}) must be a {2} ('{3}' is a {4}).</value>
+  </data>
+  <data name="[{0}] 数量{1}" xml:space="preserve">
+    <value>[{0}] Qty {1}</value>
+  </data>
+  <data name="{0:HH:mm}〜翌{1:HH:mm}" xml:space="preserve">
+    <value>{0:HH:mm}–{1:HH:mm} (next day)</value>
+  </data>
+  <data name="{0}: 実績 {1}（許容 {2}〜{3}{4}） {5:yyyy-MM-dd HH:mm} ({6})" xml:space="preserve">
+    <value>{0}: actual {1} (allowed {2}–{3}{4}) {5:yyyy-MM-dd HH:mm} ({6})</value>
+  </data>
+  <data name="{0}: 良品{1} 不良{2} (作業者: {3}" xml:space="preserve">
+    <value>{0}: good {1}, defective {2} (operator: {3}</value>
+  </data>
+  <data name="この作業指示には作業手順書が紐付いていません。" xml:space="preserve">
+    <value>No work procedure is linked to this work order.</value>
+  </data>
+  <data name="この指図には予定材料がありません（品目 '{0}' のMBOMが未登録のまま展開されています）。MBOMを登録してから指図を展開し直してください。" xml:space="preserve">
+    <value>This order has no planned materials (item '{0}' was released without an MBOM). Register the MBOM and release the order again.</value>
+  </data>
+  <data name="この直は製造日の境界時刻（{0:HH:mm}）をまたぎます。同じ直の実績が2つの製造日へ分かれるため、日次集計と直別集計で母数が食い違います。" xml:space="preserve">
+    <value>This shift crosses the production day boundary ({0:HH:mm}). Its records would be split across two production days, so daily and per-shift totals would not match.</value>
   </data>
   <data name="アカウントが一時的にロックされています。しばらく待って再試行してください。" xml:space="preserve">
     <value>The account is temporarily locked. Please wait a while and try again.</value>
+  </data>
+  <data name="クローズ済みの不適合には対応指示できません。" xml:space="preserve">
+    <value>A closed nonconformance cannot be given an action instruction.</value>
+  </data>
+  <data name="サンプル {0} は既に保管を終えています。" xml:space="preserve">
+    <value>Sample {0} is no longer in storage.</value>
+  </data>
+  <data name="シフトコード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Shift code '{0}' already exists.</value>
+  </data>
+  <data name="スキル" xml:space="preserve">
+    <value>Skill</value>
+  </data>
+  <data name="スキル・資格コード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Skill/certification code '{0}' already exists.</value>
+  </data>
+  <data name="ステータス '{0}' のロット '{1}' は出荷できません。" xml:space="preserve">
+    <value>Lot '{1}' with status '{0}' cannot be shipped.</value>
+  </data>
+  <data name="ステータス '{0}' のロット '{1}' は投入できません。" xml:space="preserve">
+    <value>Lot '{1}' with status '{0}' cannot be issued.</value>
+  </data>
+  <data name="セッションを失効させました。お手数ですが再ログインしてください。" xml:space="preserve">
+    <value>Your session has been revoked. Please sign in again.</value>
+  </data>
+  <data name="チェックリスト" xml:space="preserve">
+    <value>Checklist</value>
+  </data>
+  <data name="チェックリストに存在しない項目IDが含まれています。" xml:space="preserve">
+    <value>The request contains item IDs that are not in the checklist.</value>
+  </data>
+  <data name="チェックリストコード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Checklist code '{0}' already exists.</value>
+  </data>
+  <data name="トラブル報告の状態を「{0}」から「{1}」へは変更できません。" xml:space="preserve">
+    <value>The trouble report status cannot be changed from '{0}' to '{1}'.</value>
+  </data>
+  <data name="ユーザー名またはパスワードが正しくありません。" xml:space="preserve">
+    <value>The user name or password is incorrect.</value>
   </data>
   <data name="リフレッシュトークンがありません。再ログインしてください。" xml:space="preserve">
     <value>No refresh token was found. Please sign in again.</value>
@@ -24,10 +111,667 @@
   <data name="リフレッシュトークンが無効です。再ログインしてください。" xml:space="preserve">
     <value>The refresh token is invalid. Please sign in again.</value>
   </data>
+  <data name="リワーク指図には元指図ID（sourceOrderId）が必要です。" xml:space="preserve">
+    <value>A rework order requires the source order ID (sourceOrderId).</value>
+  </data>
+  <data name="ロケーションコード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Location code '{0}' already exists.</value>
+  </data>
+  <data name="ロット {0} の在庫がありません。" xml:space="preserve">
+    <value>Lot {0} has no stock.</value>
+  </data>
+  <data name="ロットID {0} は登録されていません。" xml:space="preserve">
+    <value>Lot ID {0} is not registered.</value>
+  </data>
+  <data name="ロット番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Lot number '{0}' already exists.</value>
+  </data>
+  <data name="上位の資源（ID {0}）が見つかりません。" xml:space="preserve">
+    <value>The parent resource (ID {0}) was not found.</value>
+  </data>
+  <data name="不明なロールが含まれています: {0}" xml:space="preserve">
+    <value>The request contains unknown roles: {0}</value>
+  </data>
+  <data name="不良理由コード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Defect reason code '{0}' already exists.</value>
+  </data>
+  <data name="不良理由別の内訳の合計（{0}）が不良数（{1}）を超えています。" xml:space="preserve">
+    <value>The total of the defect reason breakdown ({0}) exceeds the defective quantity ({1}).</value>
+  </data>
+  <data name="予定材料が未登録（展開時にMBOMが未登録）のためバックフラッシュできません。" xml:space="preserve">
+    <value>Backflush is not possible because the planned materials are missing (no MBOM at release).</value>
+  </data>
+  <data name="他の操作と競合したため保存できませんでした。最新の内容を読み込み直してから、もう一度実行してください。" xml:space="preserve">
+    <value>The data could not be saved because of a conflict with another operation. Reload the latest data and try again.</value>
+  </data>
+  <data name="他の操作と競合したため保存できませんでした（番号やコードの重複、または関連データの不整合）。内容を確認して、もう一度実行してください。" xml:space="preserve">
+    <value>The data could not be saved because of a conflict with another operation (duplicate number or code, or inconsistent related data). Check the data and try again.</value>
+  </data>
+  <data name="作業区" xml:space="preserve">
+    <value>Work center</value>
+  </data>
+  <data name="作業区 '{0}' は無効のため、所属先に指定できません。" xml:space="preserve">
+    <value>Work center '{0}' is inactive and cannot be used as the assignment.</value>
+  </data>
+  <data name="作業区 '{0}' は無効のため、設置場所に指定できません。" xml:space="preserve">
+    <value>Work center '{0}' is inactive and cannot be used as the installation location.</value>
+  </data>
+  <data name="作業区コード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Work center code '{0}' already exists.</value>
+  </data>
+  <data name="作業区（ID {0}）が見つかりません。" xml:space="preserve">
+    <value>The work center (ID {0}) was not found.</value>
+  </data>
+  <data name="作業手順書" xml:space="preserve">
+    <value>Work procedure</value>
+  </data>
+  <data name="作業指示ID {0} は登録されていません。" xml:space="preserve">
+    <value>Work order ID {0} is not registered.</value>
+  </data>
+  <data name="作業指示が存在しません。" xml:space="preserve">
+    <value>The work order does not exist.</value>
+  </data>
+  <data name="作業指示（ID {0}）が見つかりません。" xml:space="preserve">
+    <value>The work order (ID {0}) was not found.</value>
+  </data>
+  <data name="作業者 '{0}' のスキル '{1}' は有効期限切れです。" xml:space="preserve">
+    <value>Skill '{1}' of operator '{0}' has expired.</value>
+  </data>
+  <data name="作業者 '{0}' は必要スキル '{1}' を保有していません。" xml:space="preserve">
+    <value>Operator '{0}' does not have the required skill '{1}'.</value>
+  </data>
+  <data name="使用回数または使用時間のどちらかを記録してください。" xml:space="preserve">
+    <value>Record either the usage count or the usage time.</value>
+  </data>
+  <data name="保全指示が見つかりません。" xml:space="preserve">
+    <value>The maintenance order was not found.</value>
+  </data>
+  <data name="保全指示を発行済みの計画は取消できません。先に保全指示を取り消してください。" xml:space="preserve">
+    <value>A plan whose maintenance order has been issued cannot be canceled. Cancel the maintenance order first.</value>
+  </data>
+  <data name="保全計画が見つかりません。" xml:space="preserve">
+    <value>The maintenance plan was not found.</value>
+  </data>
+  <data name="保持期間内の監査ログは削除できません（{0:yyyy-MM-dd} 以前が対象です）。" xml:space="preserve">
+    <value>Audit logs within the retention period cannot be deleted (only logs on or before {0:yyyy-MM-dd} can be deleted).</value>
+  </data>
+  <data name="保管場所が見つからないか無効です。" xml:space="preserve">
+    <value>The storage location was not found or is inactive.</value>
+  </data>
+  <data name="候補設備" xml:space="preserve">
+    <value>Candidate equipment</value>
+  </data>
+  <data name="停止・故障の記録には停止原因（stopCause）が必要です（B-40-20-02）。" xml:space="preserve">
+    <value>Stop and failure records require a stop cause (stopCause) (B-40-20-02).</value>
+  </data>
+  <data name="元指図IDはリワーク指図でのみ指定できます。" xml:space="preserve">
+    <value>A source order ID can be specified only for rework orders.</value>
+  </data>
+  <data name="元指図が存在しません。" xml:space="preserve">
+    <value>The source order does not exist.</value>
+  </data>
+  <data name="出庫ピッキング" xml:space="preserve">
+    <value>Issue picking</value>
+  </data>
+  <data name="出荷" xml:space="preserve">
+    <value>Shipping</value>
+  </data>
+  <data name="出荷ピッキングには有効な出荷指示ID（shippingOrderId）が必要です。" xml:space="preserve">
+    <value>Shipping picking requires a valid shipping order ID (shippingOrderId).</value>
+  </data>
+  <data name="出荷指示に含まれない品目のロットが指定されています。" xml:space="preserve">
+    <value>A lot of an item that is not in the shipping order was specified.</value>
+  </data>
+  <data name="出荷数量が指示数量を超えています（指示 {0}、出荷済 {1}、今回 {2}）。" xml:space="preserve">
+    <value>The shipped quantity exceeds the ordered quantity (ordered {0}, shipped {1}, this time {2}).</value>
+  </data>
+  <data name="出荷明細がありません。" xml:space="preserve">
+    <value>There are no shipping lines.</value>
+  </data>
+  <data name="初期セットアップは完了済みです。" xml:space="preserve">
+    <value>Initial setup has already been completed.</value>
+  </data>
+  <data name="初期パスワードのままです。パスワードを変更してから操作してください。" xml:space="preserve">
+    <value>You are still using the initial password. Change your password before continuing.</value>
+  </data>
+  <data name="割当作業者が存在しないか無効です。" xml:space="preserve">
+    <value>The assigned operator does not exist or is inactive.</value>
+  </data>
+  <data name="割当設備が存在しないか無効です。" xml:space="preserve">
+    <value>The assigned equipment does not exist or is inactive.</value>
+  </data>
+  <data name="区切りが多すぎます（上限 {0}）。期間を短くするか、週・月の単位で表示してください。" xml:space="preserve">
+    <value>Too many periods (maximum {0}). Shorten the range or view by week or month.</value>
+  </data>
+  <data name="受入後に在庫が変動しているため取消できません（数量調整で対応してください）。" xml:space="preserve">
+    <value>The receipt cannot be canceled because the stock has changed since receiving (use a quantity adjustment instead).</value>
+  </data>
+  <data name="受入由来のロットではありません。" xml:space="preserve">
+    <value>This lot did not originate from receiving.</value>
+  </data>
+  <data name="受領者が登録されていません。" xml:space="preserve">
+    <value>The recipient is not registered.</value>
+  </data>
+  <data name="合計" xml:space="preserve">
+    <value>Total</value>
+  </data>
+  <data name="同じ不良理由が重複しています。" xml:space="preserve">
+    <value>The same defect reason is listed more than once.</value>
+  </data>
+  <data name="同じ品目が複数行あります。" xml:space="preserve">
+    <value>The same item appears on more than one line.</value>
+  </data>
+  <data name="同じ品目の在庫がある（{0:0.##} {1}）" xml:space="preserve">
+    <value>Stock of the same item exists ({0:0.##} {1})</value>
+  </data>
+  <data name="同一の子品目が重複しています。" xml:space="preserve">
+    <value>The same child item is listed more than once.</value>
+  </data>
+  <data name="同一スキルが重複しています。" xml:space="preserve">
+    <value>The same skill is listed more than once.</value>
+  </data>
+  <data name="品目 '{0}' に工順（BOP）が登録されていません。" xml:space="preserve">
+    <value>No routing (BOP) is registered for item '{0}'.</value>
+  </data>
+  <data name="品目 '{0}' の利用可能在庫が不足しています（不足数量 {1}）。" xml:space="preserve">
+    <value>Available stock of item '{0}' is insufficient (short by {1}).</value>
+  </data>
+  <data name="品目 '{0}' は '{1}' の予定材料に含まれないため投入できません（代替部品として使う場合はMBOMの代替部品グループへ登録し、指図を展開し直してください）。" xml:space="preserve">
+    <value>Item '{0}' cannot be issued because it is not a planned material of '{1}' (to use it as a substitute, register it in the MBOM substitute group and release the order again).</value>
+  </data>
+  <data name="品目 '{0}' は代替部品のため、代替を使う理由（substituteReason）の入力が必要です。" xml:space="preserve">
+    <value>Item '{0}' is a substitute part, so a reason for the substitution (substituteReason) is required.</value>
+  </data>
+  <data name="品目 '{0}' は資産管理部品のため在庫引落しの対象外です（個体と寿命は治工具の寿命管理で扱います）。" xml:space="preserve">
+    <value>Item '{0}' is an asset-managed part and is not deducted from stock (individual units and life are managed as tools).</value>
+  </data>
+  <data name="品目ID {0} は登録されていません。" xml:space="preserve">
+    <value>Item ID {0} is not registered.</value>
+  </data>
+  <data name="品目が異なるロットは統合できません。" xml:space="preserve">
+    <value>Lots of different items cannot be merged.</value>
+  </data>
+  <data name="品目コード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Item code '{0}' already exists.</value>
+  </data>
+  <data name="品目マスタの既定ロケーション" xml:space="preserve">
+    <value>Default location in the item master</value>
+  </data>
+  <data name="品目区分「{0}」の既定エリア" xml:space="preserve">
+    <value>Default area for item type '{0}'</value>
+  </data>
+  <data name="品目自身をMBOMの子品目にはできません。" xml:space="preserve">
+    <value>An item cannot be a child item in its own MBOM.</value>
+  </data>
+  <data name="在庫が不足しています（ロット '{0}'、現在数量 {1}、要求 {2}）。" xml:space="preserve">
+    <value>Insufficient stock (lot '{0}', current quantity {1}, requested {2}).</value>
+  </data>
+  <data name="在庫移動" xml:space="preserve">
+    <value>Stock move</value>
+  </data>
+  <data name="存在しない{0}IDが含まれています。" xml:space="preserve">
+    <value>The request contains {0} IDs that do not exist.</value>
+  </data>
+  <data name="存在しないスキルIDが含まれています。" xml:space="preserve">
+    <value>The request contains skill IDs that do not exist.</value>
+  </data>
+  <data name="存在しないチェックリストIDです。" xml:space="preserve">
+    <value>The checklist ID does not exist.</value>
+  </data>
+  <data name="存在しないピッキング指示IDです。" xml:space="preserve">
+    <value>The picking order ID does not exist.</value>
+  </data>
+  <data name="存在しないロケーションIDです。" xml:space="preserve">
+    <value>The location ID does not exist.</value>
+  </data>
+  <data name="存在しないロットIDが含まれています。" xml:space="preserve">
+    <value>The request contains lot IDs that do not exist.</value>
+  </data>
+  <data name="存在しないロットIDです。" xml:space="preserve">
+    <value>The lot ID does not exist.</value>
+  </data>
+  <data name="存在しない不適合IDです。" xml:space="preserve">
+    <value>The nonconformance ID does not exist.</value>
+  </data>
+  <data name="存在しない作業指示IDです。" xml:space="preserve">
+    <value>The work order ID does not exist.</value>
+  </data>
+  <data name="存在しない保全計画IDです。" xml:space="preserve">
+    <value>The maintenance plan ID does not exist.</value>
+  </data>
+  <data name="存在しない出荷指示IDです。" xml:space="preserve">
+    <value>The shipping order ID does not exist.</value>
+  </data>
+  <data name="存在しない品目IDが含まれています。" xml:space="preserve">
+    <value>The request contains item IDs that do not exist.</value>
+  </data>
+  <data name="存在しない子品目IDが含まれています。" xml:space="preserve">
+    <value>The request contains child item IDs that do not exist.</value>
+  </data>
+  <data name="存在しない対象品目IDです。" xml:space="preserve">
+    <value>The target item ID does not exist.</value>
+  </data>
+  <data name="存在しない対象工程IDです。" xml:space="preserve">
+    <value>The target process ID does not exist.</value>
+  </data>
+  <data name="存在しない対象治工具IDです。" xml:space="preserve">
+    <value>The target tool ID does not exist.</value>
+  </data>
+  <data name="存在しない対象設備IDです。" xml:space="preserve">
+    <value>The target equipment ID does not exist.</value>
+  </data>
+  <data name="存在しない工程IDが含まれています。" xml:space="preserve">
+    <value>The request contains process IDs that do not exist.</value>
+  </data>
+  <data name="存在しない明細ID {0} が含まれています。" xml:space="preserve">
+    <value>The request contains a line ID {0} that does not exist.</value>
+  </data>
+  <data name="存在しない棚卸IDです。" xml:space="preserve">
+    <value>The stocktake ID does not exist.</value>
+  </data>
+  <data name="存在しない検査指示IDです。" xml:space="preserve">
+    <value>The inspection order ID does not exist.</value>
+  </data>
+  <data name="存在しない検査項目IDが含まれています。" xml:space="preserve">
+    <value>The request contains inspection item IDs that do not exist.</value>
+  </data>
+  <data name="存在しない治工具IDです。" xml:space="preserve">
+    <value>The tool ID does not exist.</value>
+  </data>
+  <data name="存在しない設備IDです。" xml:space="preserve">
+    <value>The equipment ID does not exist.</value>
+  </data>
+  <data name="存在しない（または無効な）ロケーションIDです。" xml:space="preserve">
+    <value>The location ID does not exist or is inactive.</value>
+  </data>
+  <data name="存在しない（または無効な）ロケーションが含まれています。" xml:space="preserve">
+    <value>The request contains locations that do not exist or are inactive.</value>
+  </data>
+  <data name="存在しない（または無効な）不良理由IDが含まれています。" xml:space="preserve">
+    <value>The request contains defect reason IDs that do not exist or are inactive.</value>
+  </data>
+  <data name="存在しない（または無効な）入庫先ロケーションです。" xml:space="preserve">
+    <value>The put-away location does not exist or is inactive.</value>
+  </data>
+  <data name="存在しない（または無効な）品目IDです。" xml:space="preserve">
+    <value>The item ID does not exist or is inactive.</value>
+  </data>
+  <data name="存在しない（または無効な）手順書IDです。" xml:space="preserve">
+    <value>The work procedure ID does not exist or is inactive.</value>
+  </data>
+  <data name="存在しない（または無効な）振替先品目IDです。" xml:space="preserve">
+    <value>The transfer target item ID does not exist or is inactive.</value>
+  </data>
+  <data name="存在しない（または無効な）治工具IDです。" xml:space="preserve">
+    <value>The tool ID does not exist or is inactive.</value>
+  </data>
+  <data name="存在しない（または無効な）移動先ロケーションです。" xml:space="preserve">
+    <value>The destination location does not exist or is inactive.</value>
+  </data>
+  <data name="存在しない（または無効な）設備IDです。" xml:space="preserve">
+    <value>The equipment ID does not exist or is inactive.</value>
+  </data>
+  <data name="完了したトラブル報告を対応中へ戻すときは、理由を対応履歴に入力してください。" xml:space="preserve">
+    <value>To move a completed trouble report back to in progress, enter the reason in the action history.</value>
+  </data>
+  <data name="実棚数が1件も登録されていません。" xml:space="preserve">
+    <value>No counted quantities have been registered.</value>
+  </data>
+  <data name="実績未登録の検査項目が {0} 件あります。全項目の実績登録後に判定してください。" xml:space="preserve">
+    <value>{0} inspection items have no results. Register results for all items before judging.</value>
+  </data>
+  <data name="対応指示前の不適合は承認できません。" xml:space="preserve">
+    <value>A nonconformance cannot be approved before an action is instructed.</value>
+  </data>
+  <data name="対応指示済みの不適合のみ対応実績を記録できます。" xml:space="preserve">
+    <value>Action results can be recorded only for nonconformances with an instructed action.</value>
+  </data>
+  <data name="対象に合致する検査基準がありません。検査項目マスタを登録するか itemIds を指定してください。" xml:space="preserve">
+    <value>No inspection criteria match the target. Register inspection items or specify itemIds.</value>
+  </data>
+  <data name="対象ロットIDまたは出荷指示IDを指定してください。" xml:space="preserve">
+    <value>Specify a target lot ID or a shipping order ID.</value>
+  </data>
+  <data name="対象ロットID（targetLotId）が必要です。" xml:space="preserve">
+    <value>A target lot ID (targetLotId) is required.</value>
+  </data>
+  <data name="対象品目（ID {0}）が見つかりません。" xml:space="preserve">
+    <value>The target item (ID {0}) was not found.</value>
+  </data>
+  <data name="対象在庫がありません。" xml:space="preserve">
+    <value>There is no target stock.</value>
+  </data>
+  <data name="対象工程（ID {0}）が見つかりません。" xml:space="preserve">
+    <value>The target process (ID {0}) was not found.</value>
+  </data>
+  <data name="対象設備IDまたは対象治工具IDのどちらか一方を指定してください。" xml:space="preserve">
+    <value>Specify either a target equipment ID or a target tool ID, not both.</value>
+  </data>
+  <data name="寿命リセットは治工具メンテナンスの指示でのみ指定できます。" xml:space="preserve">
+    <value>Life reset can be specified only for tool maintenance orders.</value>
+  </data>
+  <data name="工程コード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Process code '{0}' already exists.</value>
+  </data>
+  <data name="工程内検査には対象作業指示ID（targetWorkOrderId）が必要です。" xml:space="preserve">
+    <value>In-process inspection requires a target work order ID (targetWorkOrderId).</value>
+  </data>
+  <data name="工程払出には有効な作業指示ID（workOrderId）が必要です。" xml:space="preserve">
+    <value>Process issue requires a valid work order ID (workOrderId).</value>
+  </data>
+  <data name="工程管理項目の指示を指定した記録には、判定に使う数値（numericValue）が必要です。" xml:space="preserve">
+    <value>A record with a control item instruction requires a numeric value (numericValue) for judgment.</value>
+  </data>
+  <data name="工程管理項目の指示（ID {0}）はこの作業指示のものではありません。" xml:space="preserve">
+    <value>The control item instruction (ID {0}) does not belong to this work order.</value>
+  </data>
+  <data name="工程管理項目コード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Control item code '{0}' already exists.</value>
+  </data>
+  <data name="工程順序が重複しています。" xml:space="preserve">
+    <value>Process sequence numbers are duplicated.</value>
+  </data>
+  <data name="廃棄数と再作業待ち数の合計（{0}）が不良数（{1}）を超えています。" xml:space="preserve">
+    <value>The total of scrap and rework-pending quantities ({0}) exceeds the defective quantity ({1}).</value>
+  </data>
+  <data name="引当ID {0} は登録されていません。" xml:space="preserve">
+    <value>Allocation ID {0} is not registered.</value>
+  </data>
+  <data name="必須項目が未チェックです: {0}" xml:space="preserve">
+    <value>Required items are not checked: {0}</value>
+  </data>
+  <data name="手順ステップか、手順書の所在のどちらかを入力してください。" xml:space="preserve">
+    <value>Enter either the procedure steps or the location of the procedure document.</value>
+  </data>
+  <data name="手順書 '{0}' は品目 {1} の工順から参照されているため無効化できません。" xml:space="preserve">
+    <value>Work procedure '{0}' cannot be deactivated because it is referenced by the routing of item {1}.</value>
+  </data>
+  <data name="手順書番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Procedure number '{0}' already exists.</value>
+  </data>
+  <data name="払出済か廃棄済かを指定してください。" xml:space="preserve">
+    <value>Specify whether the sample was issued or disposed.</value>
+  </data>
+  <data name="払出済みの引当は取り消せません。返却で戻してください。" xml:space="preserve">
+    <value>An issued allocation cannot be canceled. Return it instead.</value>
+  </data>
+  <data name="承認済みの出荷判定（可または特採）がないため出荷できません（H-10-10）。" xml:space="preserve">
+    <value>Shipping is not possible because there is no approved shipment judgment (approved or special acceptance) (H-10-10).</value>
+  </data>
+  <data name="承認済みの検査は訂正できません。" xml:space="preserve">
+    <value>An approved inspection cannot be corrected.</value>
+  </data>
+  <data name="指図番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Order number '{0}' already exists.</value>
+  </data>
+  <data name="指図番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Order number '{0}' cannot be used because it overlaps the automatic numbering format ({1}...).</value>
+  </data>
   <data name="指定されたAPIは存在しません。" xml:space="preserve">
     <value>The requested API does not exist.</value>
   </data>
-  <data name="セッションを失効させました。お手数ですが再ログインしてください。" xml:space="preserve">
-    <value>Your session has been revoked. Please sign in again.</value>
+  <data name="指示値が許容上限を超えています。" xml:space="preserve">
+    <value>The instructed value exceeds the upper limit.</value>
+  </data>
+  <data name="指示値が許容下限を下回っています。" xml:space="preserve">
+    <value>The instructed value is below the lower limit.</value>
+  </data>
+  <data name="新品目ID（品目振替）または新ロット番号（ロット振替）を指定してください。" xml:space="preserve">
+    <value>Specify a new item ID (item transfer) or a new lot number (lot transfer).</value>
+  </data>
+  <data name="既にクローズ済みです。" xml:space="preserve">
+    <value>It has already been closed.</value>
+  </data>
+  <data name="既に承認済みです。" xml:space="preserve">
+    <value>It has already been approved.</value>
+  </data>
+  <data name="既定ロケーション（ID {0}）が見つからないか無効です。" xml:space="preserve">
+    <value>The default location (ID {0}) was not found or is inactive.</value>
+  </data>
+  <data name="明細がありません。" xml:space="preserve">
+    <value>There are no lines.</value>
+  </data>
+  <data name="最終工程の実績には入庫先ロケーション（outputLocationId）が必要です。" xml:space="preserve">
+    <value>A record for the final process requires a put-away location (outputLocationId).</value>
+  </data>
+  <data name="有効なシステム管理者がいなくなるため、この変更はできません。先に別のユーザーへシステム管理者ロールを割り当ててください。" xml:space="preserve">
+    <value>This change is not allowed because no active system administrator would remain. Assign the system administrator role to another user first.</value>
+  </data>
+  <data name="有効期限切れのロット '{0}' は出荷できません（期限 {1:yyyy-MM-dd}）。" xml:space="preserve">
+    <value>Expired lot '{0}' cannot be shipped (expiry {1:yyyy-MM-dd}).</value>
+  </data>
+  <data name="有効期限切れのロット '{0}' は投入できません（期限 {1:yyyy-MM-dd}）。" xml:space="preserve">
+    <value>Expired lot '{0}' cannot be issued (expiry {1:yyyy-MM-dd}).</value>
+  </data>
+  <data name="期間の開始日が終了日より後になっています。" xml:space="preserve">
+    <value>The start date of the period is after the end date.</value>
+  </data>
+  <data name="棚卸" xml:space="preserve">
+    <value>Stocktake</value>
+  </data>
+  <data name="検査実績が存在しません。" xml:space="preserve">
+    <value>The inspection result does not exist.</value>
+  </data>
+  <data name="検査指示ID {0} は登録されていません。" xml:space="preserve">
+    <value>Inspection order ID {0} is not registered.</value>
+  </data>
+  <data name="検査指示が存在しません。" xml:space="preserve">
+    <value>The inspection order does not exist.</value>
+  </data>
+  <data name="検査機 '{0}' は校正期限（{1:yyyy-MM-dd}）を過ぎています。校正を実施してから検査実績を登録してください。" xml:space="preserve">
+    <value>Inspection device '{0}' is past its calibration due date ({1:yyyy-MM-dd}). Calibrate it before registering inspection results.</value>
+  </data>
+  <data name="検査機 '{0}' は無効化されています。" xml:space="preserve">
+    <value>Inspection device '{0}' has been deactivated.</value>
+  </data>
+  <data name="検査機ID {0} は登録されていません。" xml:space="preserve">
+    <value>Inspection device ID {0} is not registered.</value>
+  </data>
+  <data name="検査機コード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Inspection device code '{0}' already exists.</value>
+  </data>
+  <data name="検査項目 '{0}' は規格値による自動判定ができません。judgmentを指定してください。" xml:space="preserve">
+    <value>Inspection item '{0}' cannot be judged automatically from specification limits. Specify judgment.</value>
+  </data>
+  <data name="検査項目ID {0} はこの検査指示の対象ではありません。" xml:space="preserve">
+    <value>Inspection item ID {0} is not a target of this inspection order.</value>
+  </data>
+  <data name="検査項目コード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Inspection item code '{0}' already exists.</value>
+  </data>
+  <data name="治工具" xml:space="preserve">
+    <value>Tool</value>
+  </data>
+  <data name="治工具 '{0}' はメンテナンス中です。" xml:space="preserve">
+    <value>Tool '{0}' is under maintenance.</value>
+  </data>
+  <data name="治工具 '{0}' は他の作業指示に引当中です。返却されてから引き当ててください。" xml:space="preserve">
+    <value>Tool '{0}' is allocated to another work order. Allocate it after it is returned.</value>
+  </data>
+  <data name="治工具 '{0}' は作業指示に引当中のため使用可能にできません。返却または引当の取消をしてください。" xml:space="preserve">
+    <value>Tool '{0}' cannot be made available because it is allocated to a work order. Return it or cancel the allocation.</value>
+  </data>
+  <data name="治工具 '{0}' は寿命に達しています。交換してから引き当ててください。" xml:space="preserve">
+    <value>Tool '{0}' has reached the end of its life. Replace it before allocating.</value>
+  </data>
+  <data name="治工具 '{0}' は廃棄済みです。" xml:space="preserve">
+    <value>Tool '{0}' has been scrapped.</value>
+  </data>
+  <data name="治工具 '{0}' は無効化されています。" xml:space="preserve">
+    <value>Tool '{0}' has been deactivated.</value>
+  </data>
+  <data name="治工具 '{0}' を手で使用中にはできません。使用中は作業指示への引当で設定されます。" xml:space="preserve">
+    <value>Tool '{0}' cannot be set to in use manually. In-use status is set by allocating it to a work order.</value>
+  </data>
+  <data name="治工具ID {0} は登録されていません。" xml:space="preserve">
+    <value>Tool ID {0} is not registered.</value>
+  </data>
+  <data name="治工具コード '{0}' は既に存在します。" xml:space="preserve">
+    <value>Tool code '{0}' already exists.</value>
+  </data>
+  <data name="状態 '{0}' のピッキング指示は取消できません。" xml:space="preserve">
+    <value>A picking order with status '{0}' cannot be canceled.</value>
+  </data>
+  <data name="状態 '{0}' のピッキング指示は実行できません。" xml:space="preserve">
+    <value>A picking order with status '{0}' cannot be executed.</value>
+  </data>
+  <data name="状態 '{0}' の作業指示には実績を記録できません。" xml:space="preserve">
+    <value>Results cannot be recorded for a work order with status '{0}'.</value>
+  </data>
+  <data name="状態 '{0}' の作業指示には記録できません。" xml:space="preserve">
+    <value>Records cannot be added to a work order with status '{0}'.</value>
+  </data>
+  <data name="状態 '{0}' の作業指示は差立できません。" xml:space="preserve">
+    <value>A work order with status '{0}' cannot be dispatched.</value>
+  </data>
+  <data name="状態 '{0}' の作業指示は承認できません（完了済みのみ）。" xml:space="preserve">
+    <value>A work order with status '{0}' cannot be approved (only completed work orders).</value>
+  </data>
+  <data name="状態 '{0}' の作業指示は着手できません。" xml:space="preserve">
+    <value>A work order with status '{0}' cannot be started.</value>
+  </data>
+  <data name="状態 '{0}' の保全指示には実績を登録できません。" xml:space="preserve">
+    <value>Results cannot be registered for a maintenance order with status '{0}'.</value>
+  </data>
+  <data name="状態 '{0}' の保全指示は取消できません。" xml:space="preserve">
+    <value>A maintenance order with status '{0}' cannot be canceled.</value>
+  </data>
+  <data name="状態 '{0}' の保全計画からは指示を作成できません。" xml:space="preserve">
+    <value>An order cannot be created from a maintenance plan with status '{0}'.</value>
+  </data>
+  <data name="状態 '{0}' の保全計画は取消できません。" xml:space="preserve">
+    <value>A maintenance plan with status '{0}' cannot be canceled.</value>
+  </data>
+  <data name="状態 '{0}' の保全計画は変更できません。" xml:space="preserve">
+    <value>A maintenance plan with status '{0}' cannot be changed.</value>
+  </data>
+  <data name="状態 '{0}' の出荷指示は取消できません。" xml:space="preserve">
+    <value>A shipping order with status '{0}' cannot be canceled.</value>
+  </data>
+  <data name="状態 '{0}' の出荷指示は実行できません。" xml:space="preserve">
+    <value>A shipping order with status '{0}' cannot be executed.</value>
+  </data>
+  <data name="状態 '{0}' の引当は払い出せません。" xml:space="preserve">
+    <value>An allocation with status '{0}' cannot be issued.</value>
+  </data>
+  <data name="状態 '{0}' の引当は返却できません。" xml:space="preserve">
+    <value>An allocation with status '{0}' cannot be returned.</value>
+  </data>
+  <data name="状態 '{0}' の指図は取消できません。" xml:space="preserve">
+    <value>An order with status '{0}' cannot be canceled.</value>
+  </data>
+  <data name="状態 '{0}' の指図は変更できません（展開済み以降は取消のみ可能です）。" xml:space="preserve">
+    <value>An order with status '{0}' cannot be changed (after release it can only be canceled).</value>
+  </data>
+  <data name="状態 '{0}' の指図は展開できません（承認済みの指図のみ）。" xml:space="preserve">
+    <value>An order with status '{0}' cannot be released (only approved orders).</value>
+  </data>
+  <data name="状態 '{0}' の指図は承認できません。" xml:space="preserve">
+    <value>An order with status '{0}' cannot be approved.</value>
+  </data>
+  <data name="状態 '{0}' の搬送指示は取消できません。" xml:space="preserve">
+    <value>A transfer order with status '{0}' cannot be canceled.</value>
+  </data>
+  <data name="状態 '{0}' の搬送指示は実行できません。" xml:space="preserve">
+    <value>A transfer order with status '{0}' cannot be executed.</value>
+  </data>
+  <data name="状態 '{0}' の棚卸には登録できません。" xml:space="preserve">
+    <value>Counts cannot be registered for a stocktake with status '{0}'.</value>
+  </data>
+  <data name="状態 '{0}' の棚卸は取消できません。" xml:space="preserve">
+    <value>A stocktake with status '{0}' cannot be canceled.</value>
+  </data>
+  <data name="状態 '{0}' の棚卸は確定できません。" xml:space="preserve">
+    <value>A stocktake with status '{0}' cannot be finalized.</value>
+  </data>
+  <data name="状態 '{0}' の検査指示には実績を登録できません。" xml:space="preserve">
+    <value>Results cannot be registered for an inspection order with status '{0}'.</value>
+  </data>
+  <data name="状態 '{0}' の検査指示は判定できません。" xml:space="preserve">
+    <value>An inspection order with status '{0}' cannot be judged.</value>
+  </data>
+  <data name="状態 '{0}' の検査指示は取消できません。" xml:space="preserve">
+    <value>An inspection order with status '{0}' cannot be canceled.</value>
+  </data>
+  <data name="状態 '{0}' の検査指示は承認できません（判定済みのみ）。" xml:space="preserve">
+    <value>An inspection order with status '{0}' cannot be approved (only judged orders).</value>
+  </data>
+  <data name="現在数量と同じため調整は不要です。" xml:space="preserve">
+    <value>No adjustment is needed because the quantity is the same as the current quantity.</value>
+  </data>
+  <data name="産出ロットが未採番です（指図が正しく展開されていません）。" xml:space="preserve">
+    <value>The output lot has not been numbered (the order was not released correctly).</value>
+  </data>
+  <data name="登録する実績がありません。" xml:space="preserve">
+    <value>There are no results to register.</value>
+  </data>
+  <data name="直 '{0}' は在籍中の従業員 {1} 名の所属になっているため無効化できません。" xml:space="preserve">
+    <value>Shift '{0}' cannot be deactivated because {1} active employees belong to it.</value>
+  </data>
+  <data name="直 '{0}'（{1}）と時間帯が重なっています。" xml:space="preserve">
+    <value>The time range overlaps shift '{0}' ({1}).</value>
+  </data>
+  <data name="直接作業には作業指示ID（workOrderId）が必要です。" xml:space="preserve">
+    <value>Direct work requires a work order ID (workOrderId).</value>
+  </data>
+  <data name="直（ID {0}）が見つからないか無効です。" xml:space="preserve">
+    <value>The shift (ID {0}) was not found or is inactive.</value>
+  </data>
+  <data name="移動元と移動先が同一です。" xml:space="preserve">
+    <value>The source and destination are the same.</value>
+  </data>
+  <data name="移動元の在庫が不足しています（ロット '{0}'、現在数量 {1}、要求 {2}）。" xml:space="preserve">
+    <value>Insufficient stock at the source (lot '{0}', current quantity {1}, requested {2}).</value>
+  </data>
+  <data name="終了時刻は開始時刻より後である必要があります。" xml:space="preserve">
+    <value>The end time must be after the start time.</value>
+  </data>
+  <data name="統合元と統合先が同一ロットです。" xml:space="preserve">
+    <value>The source and target lots are the same.</value>
+  </data>
+  <data name="統合元の在庫がありません。" xml:space="preserve">
+    <value>The source lot has no stock.</value>
+  </data>
+  <data name="良品数と不良数の合計は0より大きい必要があります。" xml:space="preserve">
+    <value>The total of good and defective quantities must be greater than 0.</value>
+  </data>
+  <data name="規格値の下限が上限を超えています。" xml:space="preserve">
+    <value>The lower specification limit exceeds the upper limit.</value>
+  </data>
+  <data name="記録する項目がありません。" xml:space="preserve">
+    <value>There are no items to record.</value>
+  </data>
+  <data name="設備" xml:space="preserve">
+    <value>Equipment</value>
+  </data>
+  <data name="設備 '{0}' は{1}のため割り当てられません。" xml:space="preserve">
+    <value>Equipment '{0}' cannot be assigned because it is {1}.</value>
+  </data>
+  <data name="設備 '{0}' はこの工程の候補設備ではありません（候補：{1}）。" xml:space="preserve">
+    <value>Equipment '{0}' is not a candidate for this process (candidates: {1}).</value>
+  </data>
+  <data name="設備の設置場所には作業区を指定してください（'{0}' は{1}です）。" xml:space="preserve">
+    <value>Specify a work center as the equipment installation location ('{0}' is a {1}).</value>
+  </data>
+  <data name="許容下限は許容上限以下で指定してください。" xml:space="preserve">
+    <value>The lower limit must be less than or equal to the upper limit.</value>
+  </data>
+  <data name="資産番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Asset number '{0}' already exists.</value>
+  </data>
+  <data name="開始時刻と終了時刻が同じです。24時間の直は表せないため、時間帯を分けて登録してください。" xml:space="preserve">
+    <value>The start and end times are the same. A 24-hour shift cannot be represented; register it as separate time ranges.</value>
+  </data>
+  <data name="項目の表示順が重複しています。" xml:space="preserve">
+    <value>Item display orders are duplicated.</value>
+  </data>
+  <data name="（作業区なし）" xml:space="preserve">
+    <value>(No work center)</value>
+  </data>
+  <data name="（未分類）" xml:space="preserve">
+    <value>(Uncategorized)</value>
+  </data>
+  <data name="（継続中）" xml:space="preserve">
+    <value>(ongoing)</value>
   </data>
 </root>

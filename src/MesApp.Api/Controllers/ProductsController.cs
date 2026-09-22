@@ -1,4 +1,5 @@
-﻿using System.Linq.Expressions;
+﻿using MesApp.Api.Localization;
+using System.Linq.Expressions;
 using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -70,7 +71,7 @@ public class ProductsController(
     {
         if (await db.Products.AnyAsync(p => p.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"品目コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("品目コード '{0}' は既に存在します。", request.Code));
         }
         if (await CheckDefaultLocationAsync(request.DefaultLocationId, ct) is { } invalid)
         {
@@ -105,7 +106,7 @@ public class ProductsController(
         }
         if (await db.Products.AnyAsync(p => p.Code == request.Code && p.Id != id, ct))
         {
-            return this.ConflictProblem($"品目コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("品目コード '{0}' は既に存在します。", request.Code));
         }
         if (await CheckDefaultLocationAsync(request.DefaultLocationId, ct) is { } invalid)
         {
@@ -232,7 +233,7 @@ public class ProductsController(
         }
         return await ProductStructurePolicy.AssignableDefaultLocations(db.Locations).AnyAsync(l => l.Id == id, ct)
             ? null
-            : $"既定ロケーション（ID {id}）が見つからないか無効です。";
+            : ApiText.T("既定ロケーション（ID {0}）が見つからないか無効です。", id);
     }
 
     private async Task<ProductResponse> LoadAsync(int id, CancellationToken ct) =>

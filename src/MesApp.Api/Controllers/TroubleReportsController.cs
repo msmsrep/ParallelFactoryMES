@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
@@ -86,11 +87,11 @@ public class TroubleReportsController(MesAppDbContext db, ShopFloorReportService
         {
             // 「発生」へ戻すと対応を始めた事実が消えるため、戻しは完了からの再オープンだけに限る
             return this.ConflictProblem(
-                $"トラブル報告の状態を「{EnumLabels.Of(before)}」から「{EnumLabels.Of(request.Status)}」へは変更できません。");
+                ApiText.T("トラブル報告の状態を「{0}」から「{1}」へは変更できません。", EnumLabels.Of(before), EnumLabels.Of(request.Status)));
         }
         if (reopen && string.IsNullOrWhiteSpace(request.ResponseNote))
         {
-            return this.BadRequestProblem("完了したトラブル報告を対応中へ戻すときは、理由を対応履歴に入力してください。");
+            return this.BadRequestProblem(ApiText.T("完了したトラブル報告を対応中へ戻すときは、理由を対応履歴に入力してください。"));
         }
 
         if (!string.IsNullOrWhiteSpace(request.ResponseNote))

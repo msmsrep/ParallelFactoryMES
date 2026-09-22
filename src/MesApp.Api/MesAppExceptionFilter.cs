@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -28,13 +29,12 @@ public class MesAppExceptionFilter(ILogger<MesAppExceptionFilter> logger) : IExc
             // 楽観的同時実行制御での競合（別の操作が先に同じ在庫を更新した）
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,
-                "他の操作と競合したため保存できませんでした。最新の内容を読み込み直してから、もう一度実行してください。"),
+                ApiText.T("他の操作と競合したため保存できませんでした。最新の内容を読み込み直してから、もう一度実行してください。")),
 
             // 一意制約違反など、DBが書き込みを拒否した場合（同時採番の衝突が主な原因）
             DbUpdateException => (
                 StatusCodes.Status409Conflict,
-                "他の操作と競合したため保存できませんでした（番号やコードの重複、または関連データの不整合）。"
-                + "内容を確認して、もう一度実行してください。"),
+                ApiText.T("他の操作と競合したため保存できませんでした（番号やコードの重複、または関連データの不整合）。内容を確認して、もう一度実行してください。")),
 
             // 在庫不足など。各コントローラでも捕捉しているが、取りこぼしを500にしないための保険
             InventoryException inventory => (StatusCodes.Status400BadRequest, inventory.Message),

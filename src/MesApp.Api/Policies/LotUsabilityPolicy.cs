@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using System.Linq.Expressions;
 using MesApp.Core.Entities;
 
@@ -34,11 +36,11 @@ public static class LotUsabilityPolicy
     {
         if (!IsUsableStatus(lot.StockStatus))
         {
-            return $"ステータス '{lot.StockStatus}' のロット '{lot.LotNumber}' は投入できません。";
+            return ApiText.T("ステータス '{0}' のロット '{1}' は投入できません。", EnumLabels.Of(lot.StockStatus), lot.LotNumber);
         }
         if (IsExpired(lot.ExpiresOn, businessDate))
         {
-            return $"有効期限切れのロット '{lot.LotNumber}' は投入できません（期限 {lot.ExpiresOn:yyyy-MM-dd}）。";
+            return ApiText.T("有効期限切れのロット '{0}' は投入できません（期限 {1:yyyy-MM-dd}）。", lot.LotNumber, lot.ExpiresOn);
         }
         return null;
     }
@@ -48,11 +50,11 @@ public static class LotUsabilityPolicy
     {
         if (!IsUsableStatus(lot.StockStatus))
         {
-            return $"ステータス '{lot.StockStatus}' のロット '{lot.LotNumber}' は出荷できません。";
+            return ApiText.T("ステータス '{0}' のロット '{1}' は出荷できません。", EnumLabels.Of(lot.StockStatus), lot.LotNumber);
         }
         if (IsExpired(lot.ExpiresOn, businessDate))
         {
-            return $"有効期限切れのロット '{lot.LotNumber}' は出荷できません（期限 {lot.ExpiresOn:yyyy-MM-dd}）。";
+            return ApiText.T("有効期限切れのロット '{0}' は出荷できません（期限 {1:yyyy-MM-dd}）。", lot.LotNumber, lot.ExpiresOn);
         }
         return null;
     }

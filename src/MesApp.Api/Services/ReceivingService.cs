@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
@@ -30,11 +31,11 @@ public sealed class ReceivingService(
         var product = await db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, ct);
         if (product is null || !product.IsActive)
         {
-            return new ReceivingOutcome(null, null, "存在しない（または無効な）品目IDです。");
+            return new ReceivingOutcome(null, null, ApiText.T("存在しない（または無効な）品目IDです。"));
         }
         if (!await db.Locations.AnyAsync(l => l.Id == request.LocationId && l.IsActive, ct))
         {
-            return new ReceivingOutcome(null, product, "存在しない（または無効な）ロケーションIDです。");
+            return new ReceivingOutcome(null, product, ApiText.T("存在しない（または無効な）ロケーションIDです。"));
         }
 
         var lotNumber = request.LotNumber;
@@ -44,7 +45,7 @@ public sealed class ReceivingService(
         }
         else if (await db.Lots.AnyAsync(l => l.LotNumber == lotNumber, ct))
         {
-            return new ReceivingOutcome(null, product, $"ロット番号 '{lotNumber}' は既に存在します。", IsConflict: true);
+            return new ReceivingOutcome(null, product, ApiText.T("ロット番号 '{0}' は既に存在します。", lotNumber), IsConflict: true);
         }
 
         var lot = new Lot

@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -41,7 +42,7 @@ public sealed class MustChangePasswordFilter : IAuthorizationFilter
         context.Result = new ObjectResult(new ProblemDetails
         {
             Status = StatusCodes.Status403Forbidden,
-            Title = "初期パスワードのままです。パスワードを変更してから操作してください。",
+            Title = ApiText.T("初期パスワードのままです。パスワードを変更してから操作してください。"),
         })
         {
             StatusCode = StatusCodes.Status403Forbidden,
