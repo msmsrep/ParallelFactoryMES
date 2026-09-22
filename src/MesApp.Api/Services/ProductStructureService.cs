@@ -47,14 +47,13 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
             .ToDictionary(g => g.Key, g => g.Select(b => b.ChildProductId).ToList());
         if (ProductStructurePolicy.FindBomCycle(edges, productId, childIds) is { } cycle)
         {
-            var codes = await db.Products.AsNoTracking()
+            var cycleCodes = await db.Products.AsNoTracking()
                 .Where(p => cycle.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Code, ct);
-            return ApiText.T("MBOMが循環します（{0}）。", string.Join(" → ", cycle.Select(id => codes[id])));
+            return ApiText.T("MBOMが循環します（{0}）。", string.Join(" → ", cycle.Select(id => cycleCodes[id])));
         }
 
         var existing = await db.BomItems.Where(b => b.ParentProductId == productId).ToListAsync(ct);
-        db.BomItems.RemoveRange(existing);
-        db.BomItems.AddRange(items.Select(i => new BomItem
+        var lines = items.Select(i => new BomItem
         {
             ParentProductId = productId,
             ChildProductId = i.ChildProductId,
@@ -63,11 +62,40 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
             AlternativeGroup = ProductStructurePolicy.NormalizeAlternativeGroup(i.AlternativeGroup),
             IsAlternative = i.IsAlternative,
             RoutingSequence = i.RoutingSequence,
-        }));
+        }).ToList();
+        var codeIds = existing.Select(b => b.ChildProductId).Except(childCodes.Keys).ToList();
+        var codes = childCodes.Concat(await db.Products.AsNoTracking()
+                .Where(p => codeIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Code, ct))
+            .ToDictionary();
+        var detail = BomChangeDetail(existing, lines, codes);
+        db.BomItems.RemoveRange(existing);
+        db.BomItems.AddRange(lines);
         await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Master", "Update", "Bom", productId.ToString(),
-            detail: $"items={items.Count}", ct: ct);
+        await auditLogger.LogAsync("Master", "Update", "Bom", productId.ToString(), detail: detail, ct: ct);
         return null;
+    }
+
+    /// <summary>
+    /// MBOM改訂の監査ログの内容（変更前後の明細。A-40-10-05 設計変更）。
+    /// 一括置換なので件数だけでは何を変えたか追えない。子品目はIDでなくコードで残す（品目を無効化・改名しても読めるように）。
+    /// 単票APIとマスタCSV取込の両方で同じ形にする
+    /// </summary>
+    internal static object BomChangeDetail(
+        IEnumerable<BomItem> before, IEnumerable<BomItem> after, IReadOnlyDictionary<int, string> codeById)
+    {
+        object[] Snapshot(IEnumerable<BomItem> lines) =>
+        [
+            .. lines.OrderBy(b => codeById[b.ChildProductId], StringComparer.Ordinal).Select(b => new
+            {
+                child = codeById[b.ChildProductId],
+                quantityPer = b.QuantityPer,
+                makeOrBuy = b.MakeOrBuy.ToString(),
+                alternativeGroup = b.AlternativeGroup,
+                isAlternative = b.IsAlternative,
+                routingSequence = b.RoutingSequence,
+            }),
+        ];
+        return new { before = Snapshot(before), after = Snapshot(after), reason = (string?)null };
     }
 
     /// <summary>工順（BOP）の一括置換（工程変更 A-40-20-03、I-50-30 も本処理で反映）</summary>

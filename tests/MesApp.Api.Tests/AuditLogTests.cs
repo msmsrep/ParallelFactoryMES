@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Common;
@@ -155,6 +156,56 @@ public class AuditLogTests
         Assert.Equal(2, logs!.Total);
         Assert.Contains("95", logs.Items[0].Detail);  // 新しい順：2回目の記録に上書き前の95が入る
         Assert.Contains("90", logs.Items[0].Detail);
+    }
+
+    [Fact]
+    public async Task MBOMの改訂は変更前後の明細が監査ログに残る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);  // FG-01 の MBOM：RM-01 × 2
+        var rm2 = await MasterTests.CreateProductAsync(admin, "RM-02", "梱包材", ProductType.Material);
+
+        // 設計変更（A-40-10-05）は一括置換なので、件数だけでは何を変えたか追えない
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom", new List<BomItemRequest>
+        {
+            new(ctx.MaterialId, 3m, MakeOrBuy.InHouse, null),
+            new(rm2.Id, 1m, MakeOrBuy.InHouse, null, RoutingSequence: 2),
+        })).EnsureSuccessStatusCode();
+        var api = await LatestBomLogAsync();
+        using (var detail = JsonDocument.Parse(api.Detail!))
+        {
+            var before = detail.RootElement.GetProperty("before");
+            var after = detail.RootElement.GetProperty("after");
+            Assert.Equal(1, before.GetArrayLength());
+            Assert.Equal("RM-01", before[0].GetProperty("child").GetString());
+            Assert.Equal(2m, before[0].GetProperty("quantityPer").GetDecimal());
+            Assert.Equal(["RM-01", "RM-02"], after.EnumerateArray().Select(l => l.GetProperty("child").GetString()));
+            Assert.Equal(3m, after[0].GetProperty("quantityPer").GetDecimal());
+            Assert.Equal(2, after[1].GetProperty("routingSequence").GetInt32());
+        }
+
+        // CSVから改訂しても同じ形で残る（CSVが追跡の抜け道にならない）
+        Assert.True((await Phase3TestData.ImportCsvAsync(admin, "masters/csv/bom", """
+            ParentProductCode,ChildProductCode,QuantityPer
+            FG-01,RM-02,4
+            """)).Succeeded);
+        var csv = await LatestBomLogAsync();
+        Assert.NotEqual(api.Id, csv.Id);
+        using (var detail = JsonDocument.Parse(csv.Detail!))
+        {
+            Assert.Equal(2, detail.RootElement.GetProperty("before").GetArrayLength());
+            var after = detail.RootElement.GetProperty("after");
+            Assert.Equal(1, after.GetArrayLength());
+            Assert.Equal(4m, after[0].GetProperty("quantityPer").GetDecimal());
+        }
+
+        async Task<AuditLogResponse> LatestBomLogAsync()
+        {
+            var logs = await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>(
+                $"/api/audit-logs?targetType=Bom&targetId={ctx.ProductId}&action=Update");
+            return logs!.Items[0];  // 新しい順
+        }
     }
 
     /// <summary>

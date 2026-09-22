@@ -20,6 +20,12 @@ public sealed partial class MasterCsvService
 
         /// <summary>取り込めたが伝えたいこと（エラーと違いロールバックしない。<c>CsvImportResult.Warnings</c>）</summary>
         public List<CsvImportError> Warnings { get; } = [];
+
+        /// <summary>
+        /// 保存の後に書く個別の監査ログ（対象の種類・ID・内容）。監査ログは書くたびに保存するため、
+        /// 取込の途中で書くと検証前の変更まで保存してしまう。全行の検証が通って保存した後にまとめて書く
+        /// </summary>
+        public List<(string TargetType, string TargetId, object Detail)> Audits { get; } = [];
     }
 
     public async Task<CsvImportResult> ImportAsync(
@@ -113,6 +119,10 @@ public sealed partial class MasterCsvService
             await db.SaveChangesAsync(ct);
             await auditLogger.LogAsync("Master", "CsvImport", kind.Kind, null,
                 detail: $"rows={table.Rows.Count}, created={counter.Created}, updated={counter.Updated}", ct: ct);
+            foreach (var (targetType, targetId, detail) in counter.Audits)
+            {
+                await auditLogger.LogAsync("Master", "Update", targetType, targetId, detail: detail, ct: ct);
+            }
         }
         return new CsvFileImportCount(counter.Created, counter.Updated) { Warnings = counter.Warnings };
     }
@@ -979,6 +989,8 @@ public sealed partial class MasterCsvService
             edges[parentId] = [.. lines.Select(l => l.ChildProductId)];
 
             var current = existing.Where(b => b.ParentProductId == parentId).ToList();
+            // 設計変更の追跡（A-40-10-05）は単票APIと同じ形で残す。CSVから改訂すると中身が追えない、にしない
+            counter.Audits.Add(("Bom", parentId.ToString(), ProductStructureService.BomChangeDetail(current, lines, codeById)));
             db.BomItems.RemoveRange(current);
             db.BomItems.AddRange(lines);
             if (current.Count > 0)
