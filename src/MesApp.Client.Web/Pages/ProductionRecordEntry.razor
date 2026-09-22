@@ -2,20 +2,20 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>実績入力 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["実績入力 - Parallel Factory MES"]</PageTitle>
 
 @* 実績入力（B-40-10-01）。着手・出来高報告・訂正・承認だけをここに置き、
    部材投入・作業手順書・製造条件・状態履歴は Pages/ProductionRecord/ の各節が自分で読み込む *@
 @if (_workOrder is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
-    <h1>実績入力：@_workOrder.WorkOrderNo</h1>
+    <h1>@L["実績入力：{0}", _workOrder.WorkOrderNo]</h1>
     <p class="text-muted">
-        @_workOrder.ProductCode @_workOrder.ProductName ／ 工程 @_workOrder.ProcessCode @_workOrder.ProcessName
-        ／ 計画数 @_workOrder.PlannedQuantity ／ 状態 <StatusBadge Status="@_workOrder.Status.ToString()" />
+        @_workOrder.ProductCode @_workOrder.ProductName ／ @L["工程"] @_workOrder.ProcessCode @_workOrder.ProcessName
+        ／ @L["計画数"] @_workOrder.PlannedQuantity ／ @L["状態"] <StatusBadge Status="@_workOrder.Status.ToString()" />
     </p>
 
     @if (_error is not null)
@@ -32,44 +32,44 @@ else
     @if (_workOrder.Status is WorkOrderStatus.Created or WorkOrderStatus.Dispatched)
     {
         <div class="card">
-            <button class="btn" disabled="@_busy" @onclick="StartAsync">着手（B-30-30-01）</button>
+            <button class="btn" disabled="@_busy" @onclick="StartAsync">@L["着手（B-30-30-01）"]</button>
         </div>
     }
 
     @if (Editable)
     {
         <div class="card">
-            <h2 style="margin-top:0;">出来高報告（B-40-10-01）</h2>
+            <h2 style="margin-top:0;">@L["出来高報告（B-40-10-01）"]</h2>
             <div class="form-grid">
                 <div class="form-field">
-                    <label>良品数</label>
+                    <label>@L["良品数"]</label>
                     <input type="number" @bind="_good" min="0" />
                 </div>
                 <div class="form-field">
-                    <label>不良数</label>
+                    <label>@L["不良数"]</label>
                     <input type="number" @bind="_defect" min="0" />
                 </div>
                 @* 廃棄・再作業待ちは不良数の内訳（B-40-10-01）。残りは判定待ち・保留中の数量 *@
                 <div class="form-field">
-                    <label>うち廃棄数</label>
+                    <label>@L["うち廃棄数"]</label>
                     <input type="number" @bind="_scrap" min="0" />
                 </div>
                 <div class="form-field">
-                    <label>うち再作業待ち数</label>
+                    <label>@L["うち再作業待ち数"]</label>
                     <input type="number" @bind="_rework" min="0" />
                 </div>
                 <div class="form-field">
-                    <label>開始時刻</label>
+                    <label>@L["開始時刻"]</label>
                     <input type="datetime-local" @bind="_startedAt" />
                 </div>
                 <div class="form-field">
-                    <label>終了時刻</label>
+                    <label>@L["終了時刻"]</label>
                     <input type="datetime-local" @bind="_endedAt" />
                 </div>
                 <div class="form-field">
-                    <label>入庫先ロケーション（最終工程のみ必須）</label>
+                    <label>@L["入庫先ロケーション（最終工程のみ必須）"]</label>
                     <select @bind="_outputLocationId">
-                        <option value="0">選択してください</option>
+                        <option value="0">@L["選択してください"]</option>
                         @foreach (var location in _locations)
                         {
                             <option value="@location.Id">@location.Code</option>
@@ -79,7 +79,7 @@ else
                     @if (_locationRecommendations is { Count: > 0 })
                     {
                         <p class="text-muted">
-                            推奨：
+                            @L["推奨："]
                             @foreach (var r in _locationRecommendations)
                             {
                                 <button class="btn btn-secondary btn-sm"
@@ -88,14 +88,14 @@ else
                             }
                         </p>
                         <p class="text-muted">
-                            @_locationRecommendations[0].Code：@_locationRecommendations[0].Reason
+                            @_locationRecommendations[0].Code: @_locationRecommendations[0].Reason
                         </p>
                     }
                 </div>
                 <div class="form-field">
                     <label>
                         <input type="checkbox" @bind="_backflush" style="width:auto;" />
-                        バックフラッシュ（MBOMから部材を自動消費。B-40-10-09）
+                        @L["バックフラッシュ（MBOMから部材を自動消費。B-40-10-09）"]
                     </label>
                 </div>
             </div>
@@ -103,9 +103,9 @@ else
             @* 不良理由別の内訳（C-40-10-01）。合計は不良数を超えられない。残りは理由未分類 *@
             @if (_defectReasons.Count > 0 && _defect > 0)
             {
-                <h3>不良理由別の内訳</h3>
+                <h3>@L["不良理由別の内訳"]</h3>
                 <table class="table">
-                    <thead><tr><th>不良理由</th><th>区分</th><th>数量</th></tr></thead>
+                    <thead><tr><th>@L["不良理由"]</th><th>@L["区分"]</th><th>@L["数量"]</th></tr></thead>
                     <tbody>
                         @foreach (var reason in _defectReasons)
                         {
@@ -121,36 +121,36 @@ else
                         }
                     </tbody>
                 </table>
-                <p class="text-muted">内訳の合計 @_defectByReason.Values.Sum() / 不良数 @_defect</p>
+                <p class="text-muted">@L["内訳の合計 {0} / 不良数 {1}", _defectByReason.Values.Sum(), _defect]</p>
             }
 
-            <button class="btn" disabled="@_busy" @onclick="SubmitAsync">実績を登録（作業完了報告）</button>
+            <button class="btn" disabled="@_busy" @onclick="SubmitAsync">@L["実績を登録（作業完了報告）"]</button>
         </div>
     }
     </AuthorizeView>
 
-    <h2>登録済みの実績</h2>
+    <h2>@L["登録済みの実績"]</h2>
     @if (_records.Count == 0)
     {
-        <p class="text-muted">実績はまだありません。</p>
+        <p class="text-muted">@L["実績はまだありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
                 <tr>
-                    <th>良品数</th>
-                    <th>不良数</th>
-                    <th>廃棄</th>
-                    <th>再作業待ち</th>
-                    <th>不良理由内訳</th>
-                    <th>作業者</th>
-                    <th>直</th>
-                    <th>開始</th>
-                    <th>終了</th>
-                    <th>産出ロット</th>
-                    <th>承認</th>
-                    <th>訂正</th>
+                    <th>@L["良品数"]</th>
+                    <th>@L["不良数"]</th>
+                    <th>@L["廃棄"]</th>
+                    <th>@L["再作業待ち"]</th>
+                    <th>@L["不良理由内訳"]</th>
+                    <th>@L["作業者"]</th>
+                    <th>@L["直"]</th>
+                    <th>@L["開始"]</th>
+                    <th>@L["終了"]</th>
+                    <th>@L["産出ロット"]</th>
+                    <th>@L["承認"]</th>
+                    <th>@L["訂正"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -177,12 +177,12 @@ else
                         <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
                         <td>@(record.OutputLotNumber ?? "-")</td>
-                        <td>@(record.ApprovedAt is null ? "未承認" : "承認済")</td>
+                        <td>@(record.ApprovedAt is null ? L["未承認"] : L["承認済"])</td>
                         <td>
                             @* 実績訂正（B-70-30-01）。APIと同じ生産管理権限 *@
                             <AuthorizeView Roles="@MesRoleGroups.ProductionManage" Context="correct">
                                 <button class="btn btn-secondary btn-sm"
-                                        @onclick="() => StartCorrection(record)">訂正</button>
+                                        @onclick="() => StartCorrection(record)">@L["訂正"]</button>
                             </AuthorizeView>
                         </td>
                     </tr>
@@ -195,36 +195,36 @@ else
     @if (_correcting is not null)
     {
         <div class="card">
-            <h2 style="margin-top:0;">実績の訂正（B-70-30-01。理由必須・訂正履歴と監査ログに残ります）</h2>
+            <h2 style="margin-top:0;">@L["実績の訂正（B-70-30-01。理由必須・訂正履歴と監査ログに残ります）"]</h2>
             <p class="text-muted">
-                訂正前：良品 @_correcting.GoodQuantity ／ 不良 @_correcting.DefectQuantity ／
-                廃棄 @_correcting.ScrapQuantity ／ 再作業待ち @_correcting.ReworkQuantity
+                @L["訂正前：良品 {0} ／ 不良 {1} ／ 廃棄 {2} ／ 再作業待ち {3}", _correcting.GoodQuantity, _correcting.DefectQuantity,
+                    _correcting.ScrapQuantity, _correcting.ReworkQuantity]
             </p>
             <div class="form-grid">
                 <div class="form-field">
-                    <label>良品数</label>
+                    <label>@L["良品数"]</label>
                     <input type="number" step="any" @bind="_correctGood" min="0" />
                 </div>
                 <div class="form-field">
-                    <label>不良数</label>
+                    <label>@L["不良数"]</label>
                     <input type="number" step="any" @bind="_correctDefect" min="0" />
                 </div>
                 <div class="form-field">
-                    <label>廃棄数</label>
+                    <label>@L["廃棄数"]</label>
                     <input type="number" step="any" @bind="_correctScrap" min="0" />
                 </div>
                 <div class="form-field">
-                    <label>再作業待ち数</label>
+                    <label>@L["再作業待ち数"]</label>
                     <input type="number" step="any" @bind="_correctRework" min="0" />
                 </div>
                 <div class="form-field">
-                    <label>訂正理由</label>
+                    <label>@L["訂正理由"]</label>
                     <input @bind="_correctReason" />
                 </div>
             </div>
             <div class="actions">
-                <button class="btn" disabled="@_busy" @onclick="SubmitCorrectionAsync">訂正を登録</button>
-                <button class="btn btn-secondary" @onclick="() => _correcting = null">キャンセル</button>
+                <button class="btn" disabled="@_busy" @onclick="SubmitCorrectionAsync">@L["訂正を登録"]</button>
+                <button class="btn btn-secondary" @onclick="() => _correcting = null">@L["キャンセル"]</button>
             </div>
         </div>
     }
@@ -242,7 +242,7 @@ else
         @if (_workOrder.Status == WorkOrderStatus.Completed)
         {
             <div class="card">
-                <button class="btn" disabled="@_busy" @onclick="ApproveAsync">製造完了承認（B-40-10-10）</button>
+                <button class="btn" disabled="@_busy" @onclick="ApproveAsync">@L["製造完了承認（B-40-10-10）"]</button>
             </div>
         }
     </AuthorizeView>
@@ -357,12 +357,12 @@ else
         }
         if (string.IsNullOrWhiteSpace(_correctReason))
         {
-            _error = "訂正理由を入力してください。";
+            _error = L["訂正理由を入力してください。"];
             return;
         }
         if (_correctScrap + _correctRework > _correctDefect)
         {
-            _error = "廃棄数と再作業待ち数の合計は不良数を超えられません。";
+            _error = L["廃棄数と再作業待ち数の合計は不良数を超えられません。"];
             return;
         }
         _busy = true;
@@ -373,12 +373,12 @@ else
             var response = await Http.PutAsJsonAsync($"api/production-records/{_correcting.Id}",
                 new ProductionRecordCorrectionRequest(
                     _correctGood, _correctDefect, _correctReason, _correctScrap, _correctRework));
-            if (await response.ReadErrorAsync("訂正に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["訂正に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "実績を訂正しました（訂正前の値は訂正履歴に残ります）。";
+            _message = L["実績を訂正しました（訂正前の値は訂正履歴に残ります）。"];
             _correcting = null;
             await LoadAsync();
         }
@@ -395,12 +395,12 @@ else
         try
         {
             var response = await Http.PostAsync($"api/work-orders/{Id}/start", null);
-            if (await response.ReadErrorAsync("着手に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["着手に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "着手しました。";
+            _message = L["着手しました。"];
             await LoadAsync();
         }
         finally
@@ -417,17 +417,17 @@ else
         }
         if (_good + _defect <= 0)
         {
-            _error = "良品数と不良数の合計は0より大きい必要があります。";
+            _error = L["良品数と不良数の合計は0より大きい必要があります。"];
             return;
         }
         if (_scrap + _rework > _defect)
         {
-            _error = "廃棄数と再作業待ち数の合計は不良数を超えられません。";
+            _error = L["廃棄数と再作業待ち数の合計は不良数を超えられません。"];
             return;
         }
         if (_defectByReason.Values.Sum() > _defect)
         {
-            _error = "不良理由別の内訳の合計は不良数を超えられません。";
+            _error = L["不良理由別の内訳の合計は不良数を超えられません。"];
             return;
         }
         _busy = true;
@@ -445,12 +445,12 @@ else
                     _defectByReason.Where(x => x.Value > 0)
                         .Select(x => new ProductionDefectRequest(x.Key, x.Value))
                         .ToList()));
-            if (await response.ReadErrorAsync("実績登録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["実績登録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "実績を登録しました。";
+            _message = L["実績を登録しました。"];
             _good = 0;
             _defect = 0;
             _scrap = 0;
@@ -471,12 +471,12 @@ else
         try
         {
             var response = await Http.PostAsync($"api/work-orders/{Id}/approve", null);
-            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["承認に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "承認しました。";
+            _message = L["承認しました。"];
             await LoadAsync();
         }
         finally

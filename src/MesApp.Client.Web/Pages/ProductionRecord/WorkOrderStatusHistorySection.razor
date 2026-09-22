@@ -1,15 +1,15 @@
 ﻿@inject HttpClient Http
 
 @* 状態の履歴（Spec.md 5.2 WorkOrderStatusHistory）。現在の状態だけでは経緯を説明できないため *@
-<h2>状態の履歴</h2>
+<h2>@L["状態の履歴"]</h2>
 @if (_statusHistory.Count == 0)
 {
-    <p class="text-muted">履歴はまだありません。</p>
+    <p class="text-muted">@L["履歴はまだありません。"]</p>
 }
 else
 {
     <table class="table">
-        <thead><tr><th>日時</th><th>変更前</th><th>変更後</th><th>契機</th><th>備考</th><th>変更者</th></tr></thead>
+        <thead><tr><th>@L["日時"]</th><th>@L["変更前"]</th><th>@L["変更後"]</th><th>@L["契機"]</th><th>@L["備考"]</th><th>@L["変更者"]</th></tr></thead>
         <tbody>
             @foreach (var history in _statusHistory)
             {
