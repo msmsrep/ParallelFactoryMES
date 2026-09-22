@@ -2,7 +2,8 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-@* 作業指示書（B-10-30-04）。構成部品（MBOM）・工程情報を含む *@
+@* 作業指示書（B-10-30-04）。この工程で使う部材と工程情報を含む。
+   部材は現行のMBOMではなく指図の予定材料（展開時に固定。Spec.md 5.7）から、この工程を消費工程とする行だけを出す *@
 <PageTitle>@L["作業指示書 - Parallel Factory MES"]</PageTitle>
 
 @if (_workOrder is null)
@@ -36,23 +37,23 @@ else
             </tbody>
         </table>
 
-        <h2>@L["構成部品（MBOM）"]</h2>
-        @if (_bom.Count == 0)
+        <h2>@L["この工程で使う部材（予定材料）"]</h2>
+        @if (_materials.Count == 0)
         {
-            <p class="text-muted">@L["MBOMは登録されていません。"]</p>
+            <p class="text-muted">@L["この工程で使う部材はありません。"]</p>
         }
         else
         {
             <table class="table">
-                <thead><tr><th>@L["子品目"]</th><th>@L["品目名"]</th><th>@L["必要数量（計画数分）"]</th><th>@L["内外製"]</th></tr></thead>
+                <thead><tr><th>@L["子品目"]</th><th>@L["品目名"]</th><th>@L["必要数量（計画数分）"]</th><th>@L["代替部品グループ"]</th></tr></thead>
                 <tbody>
-                    @foreach (var line in _bom)
+                    @foreach (var line in _materials)
                     {
                         <tr>
-                            <td>@line.ChildProductCode</td>
-                            <td>@line.ChildProductName</td>
+                            <td>@line.ProductCode</td>
+                            <td>@line.ProductName</td>
                             <td>@(line.QuantityPer * _workOrder.PlannedQuantity)</td>
-                            <td>@EnumLabels.Of(line.MakeOrBuy)</td>
+                            <td>@(line.AlternativeGroup ?? "-")</td>
                         </tr>
                     }
                 </tbody>
@@ -76,15 +77,22 @@ else
     [Parameter] public int Id { get; set; }
 
     private WorkOrderResponse? _workOrder;
-    private List<BomItemResponse> _bom = [];
+    private List<OrderMaterialResponse> _materials = [];
 
     protected override async Task OnParametersSetAsync()
     {
         _workOrder = await Http.GetFromJsonAsync<WorkOrderResponse>($"api/work-orders/{Id}");
         if (_workOrder is not null)
         {
-            _bom = await Http.GetFromJsonAsync<List<BomItemResponse>>(
-                $"api/products/{_workOrder.ProductId}/bom") ?? [];
+            var order = await Http.GetFromJsonAsync<ManufacturingOrderDetailResponse>(
+                $"api/manufacturing-orders/{_workOrder.ManufacturingOrderId}");
+            // 消費工程が空の行は消費工程の追加前に展開した指図のもので、最終工程で使う扱い（バックフラッシュと同じ）
+            var finalSequence = order?.WorkOrders
+                .Where(w => w.Status != WorkOrderStatus.Canceled)
+                .Max(w => (int?)w.RoutingSequence);
+            var sequence = _workOrder.RoutingSequence;
+            _materials = [.. (order?.Materials ?? [])
+                .Where(m => m.RoutingSequence == sequence || (m.RoutingSequence is null && sequence == finalSequence))];
         }
     }
 }
