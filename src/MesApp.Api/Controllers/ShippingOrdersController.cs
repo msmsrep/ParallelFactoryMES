@@ -55,7 +55,7 @@ public class ShippingOrdersController(
     public async Task<ActionResult<ShippingOrderResponse>> Create(
         ShippingOrderCreateRequest request, CancellationToken ct)
     {
-        var outcome = await shipping.CreateAsync(request, CurrentUserId, ct);
+        var outcome = await shipping.CreateAsync(request, shippingNo: null, CurrentUserId, ct);
         if (outcome.Failed)
         {
             return ToProblem(outcome);

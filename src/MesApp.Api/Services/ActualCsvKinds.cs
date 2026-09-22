@@ -28,9 +28,13 @@ public static class ActualCsvKinds
     public const string WorkTimeRecords = "work-time-records";
     public const string TroubleReports = "trouble-reports";
     public const string EquipmentLogs = "equipment-logs";
+    public const string ShippingOrders = "shipping-orders";
+    public const string ShipmentJudgments = "shipment-judgments";
+    public const string Shipments = "shipments";
 
     private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
     private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
+    private const string ShippingNoNote = "登録済みの出荷番号（出荷指示CSVの ShippingNo）";
     private const string DateTimeNote = "yyyy-MM-dd HH:mm（工場の時刻）。+09:00 などのオフセット付きも可";
 
     public static readonly List<ActualCsvKind> All =
@@ -158,6 +162,30 @@ public static class ActualCsvKinds
             new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
             new("Note", "備考", false, null),
         ]), AnyRole),
+        new(new CsvKindInfo(ShippingOrders, "出荷指示", false,
+        [
+            new("ShippingNo", "出荷番号", true,
+                "同じ番号の行を1件の出荷指示にまとめる。後続の出荷判定・出荷実行CSVから指示を指す。SHで始まる番号は自動採番用のため使えない"),
+            new("Destination", "出荷先", true, "まとまりの最初の行の値を使う"),
+            new("PlannedDate", "出荷予定日", false, "yyyy-MM-dd。まとまりの最初の行の値を使う"),
+            new("ProductCode", "品目コード", true, "登録済みで有効な品目コード。1件の指示に同じ品目を2行書けない"),
+            new("Quantity", "指示数量", true, "0より大きい数値"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(ShipmentJudgments, "出荷判定", false,
+        [
+            new("ShippingNo", "出荷番号", false, ShippingNoNote + "。出荷実行には出荷指示を対象にした承認済みの判定が必要"),
+            new("LotNumber", "対象ロット番号", false, "登録済みのロット番号。ShippingNo と少なくともどちらかは必須"),
+            new("Result", "判定", true, "Approved（可）/ Hold（保留）/ SpecialAcceptance（特採）"),
+            new("Approve", "承認する", false, "true で判定の登録に続けて承認する"),
+            new("Note", "備考", false, null),
+        ]), MesRoleGroups.QaManage),
+        new(new CsvKindInfo(Shipments, "出荷実行", false,
+        [
+            new("ShippingNo", "出荷番号", true, ShippingNoNote + "。同じ番号の行を1回の出荷にまとめる"),
+            new("LotNumber", "出荷ロット番号", true, "登録済みのロット番号。出荷指示に含まれる品目で、使える状態（正常・期限内）であること"),
+            new("LocationCode", "出荷元ロケーションコード", true, null),
+            new("Quantity", "出荷数量", true, "0より大きい数値。出荷済みと合わせて指示数量を超えられない"),
+        ]), MesRoleGroups.InventoryManage),
     ];
 
     /// <summary>

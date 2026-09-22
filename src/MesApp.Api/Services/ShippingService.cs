@@ -23,9 +23,15 @@ public sealed class ShippingService(
     IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
-    /// <summary>出荷指示の作成（D-40-20-01）</summary>
+    /// <summary>自動採番の出荷番号の接頭辞（手入力の番号と衝突させないため、手入力では使わせない）</summary>
+    public const string AutoShippingNoPrefix = "SH";
+
+    /// <summary>
+    /// 出荷指示の作成（D-40-20-01）。
+    /// shippingNo を渡すとその番号で登録する（CSV取込で後続の出荷判定・出荷実行から指示を指すため。空なら自動採番）
+    /// </summary>
     public async Task<Outcome<ShippingOrder>> CreateAsync(
-        ShippingOrderCreateRequest request, string? userId, CancellationToken ct)
+        ShippingOrderCreateRequest request, string? shippingNo, string? userId, CancellationToken ct)
     {
         if (request.Lines.Count == 0)
         {
@@ -37,9 +43,24 @@ public sealed class ShippingService(
             return Outcome<ShippingOrder>.Invalid(ApiText.T("存在しない品目IDが含まれています。"));
         }
 
+        if (string.IsNullOrWhiteSpace(shippingNo))
+        {
+            shippingNo = await numbering.NextShippingNoAsync(ct);
+        }
+        else if (shippingNo.StartsWith(AutoShippingNoPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            // 自動採番の連番は採番テーブルで管理しており、同じ形式の手入力番号があると後で衝突する
+            return Outcome<ShippingOrder>.Invalid(
+                ApiText.T("出荷番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", shippingNo, AutoShippingNoPrefix));
+        }
+        else if (await db.ShippingOrders.AnyAsync(s => s.ShippingNo == shippingNo, ct))
+        {
+            return Outcome<ShippingOrder>.Conflict(ApiText.T("出荷番号 '{0}' は既に存在します。", shippingNo));
+        }
+
         var order = new ShippingOrder
         {
-            ShippingNo = await numbering.NextShippingNoAsync(ct),
+            ShippingNo = shippingNo,
             Destination = request.Destination,
             PlannedDate = request.PlannedDate,
             CreatedByUserId = userId,

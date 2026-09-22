@@ -1315,7 +1315,12 @@ public class MasterCsvTests
         // 実績は同じ種別を番号違いで複数含む（05_consumptions と 07_consumptions）
         var actualResult = await PostBundleAsync(client, "actuals", actuals);
         Assert.True(actualResult.Succeeded, Describe(actualResult));
-        Assert.Equal(12, actualResult.Files.Count);
+        Assert.Equal(15, actualResult.Files.Count);
+        // 出荷は判定を承認した SMP-SH-001 だけが出荷まで進み、保留の SMP-SH-002 は指示のまま残る
+        var shipping = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.ShippingOrderResponse>>(
+            "/api/shipping-orders"))!.Items;
+        Assert.Equal(ShippingOrderStatus.Completed, shipping.Single(s => s.ShippingNo == "SMP-SH-001").Status);
+        Assert.Equal(ShippingOrderStatus.Instructed, shipping.Single(s => s.ShippingNo == "SMP-SH-002").Status);
 
         // マスタと実績が混ざったZIPはどちらの一括取込でも受け付けない
         var mixed = ZipFiles(("01_processes.csv", "Code,Name\nPR-99,検査\n"), ("02_receiving.csv", "ProductCode,Quantity,LocationCode\nRM-3001,1,WH-M01\n"));
