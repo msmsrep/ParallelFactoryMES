@@ -22,8 +22,11 @@ public static class MesAppDataDirectory
         var configured = Environment.GetEnvironmentVariable(EnvironmentVariableName);
         var path = !string.IsNullOrWhiteSpace(configured)
             ? Path.GetFullPath(configured)
-            // MSIXパッケージ内ではLocalApplicationDataへの書き込みがパッケージ専用の領域に自動リダイレクトされる
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), FolderName);
+            // MSIXパッケージ内ではLocalApplicationDataへの書き込みがパッケージ専用の領域に自動リダイレクトされる。
+            // Create を付けないと、Linux で ~/.local/share が未作成のとき空文字が返り、カレントディレクトリ直下に作られてしまう
+            : Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create),
+                FolderName);
 
         Directory.CreateDirectory(path);
         return path;

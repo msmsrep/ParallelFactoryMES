@@ -22,21 +22,45 @@ Webクライアント（Blazor WebAssembly）は、APIサーバー（ASP.NET Cor
 
 ## 配布と起動
 
-### 配布ファイルを作る
+サーバーに置く方法は3通りあります。1台のPCだけで使う場合は、Microsoft Store のデスクトップ版が手軽です。
+
+| 方法 | 向いている場面 | 入手先 |
+|---|---|---|
+| ZIP（自己完結版） | Windows / Linux のサーバーに直接置く。.NET のインストールは不要 | [GitHub Releases](https://github.com/msmsrep/ParallelFactoryMES/releases) の `ParallelFactoryMES-<版>-win-x64.zip` / `-linux-x64.zip` |
+| Docker | コンテナで動かす（amd64 / arm64） | `ghcr.io/msmsrep/parallelfactorymes` |
+| ソースから発行 | 手元で改造したものを配る | `dotnet publish src/MesApp.Api -c Release -o publish` |
+
+### ZIP で起動する
+
+展開したフォルダで、Windows は `start.cmd` をダブルクリック、Linux は `sh start.sh` を実行します。
+既定のポートは 5000 です。変えるときは環境変数 `MESAPP_URLS`（例 `http://0.0.0.0:8080`）を設定してから起動します。
+
+バージョンアップは、サーバーを停止し、展開したフォルダを新しい版に差し替えて起動します。
+データはデータ保存先（下記）にあるため、フォルダを差し替えても消えません。データベースは起動時に自動で更新されます。
+
+### Docker で起動する  {#docker}
 
 ```bash
-dotnet publish src/MesApp.Api -c Release -o publish
+docker compose up -d
 ```
 
-生成された `publish` フォルダを対象PCにコピーします。
+リポジトリの `compose.yaml` を使うと SQLite で、`compose.postgres.yaml` を使うと PostgreSQL 付きで起動します
+（`.env` に `POSTGRES_PASSWORD=...` を書いてから `docker compose -f compose.postgres.yaml up -d`）。
+ブラウザで `http://<サーバーのIP>:8080` を開きます。
 
-### 起動する
+- データベースと署名鍵はボリューム（コンテナ内の `/data`）に置かれます。コンテナを作り直しても消えません
+- タイムゾーンの既定は `TZ=Asia/Tokyo` です。業務日付の境界時刻はこの時刻で判定されます
+- HTTPS はコンテナでは扱いません。前段のリバースプロキシで終端し、プロキシのいるネットワークを
+  `ReverseProxy__KnownNetworks__0`（例 `172.16.0.0/12`）で指定します（[HTTPSで運用する](#https)）
+- バージョンアップは `docker compose pull` → `docker compose up -d` です
+
+### ソースから発行して起動する
 
 ```bash
 dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 ```
 
-同じLAN内の他のPCからは `http://<サーバーのIP>:5000` でアクセスできます。
+ASP.NET Core 10 Runtime が必要です。同じLAN内の他のPCからは `http://<サーバーのIP>:5000` でアクセスできます。
 
 <div class="warn">
 <p>Windowsファイアウォールで、該当ポートの<strong>受信許可</strong>が必要です。
@@ -44,7 +68,7 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 </div>
 
 データベースファイル（`mesapp.db`）とJWT署名鍵（`jwt-signing.key`）は、
-**データ保存先（既定 `%LOCALAPPDATA%\ParallelFactoryMES`、環境変数 `MESAPP_DATA_DIR` で変更可）** に自動生成されます。
+**データ保存先（既定 `%LOCALAPPDATA%\ParallelFactoryMES`、Linux は `~/.local/share/ParallelFactoryMES`、Docker は `/data`。環境変数 `MESAPP_DATA_DIR` で変更可）** に自動生成されます。
 設定値に絶対パスを書いた場合はそのパスを使います。
 
 ## 設定項目  {#settings}
@@ -55,7 +79,7 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 |---|---|---|
 | DB接続文字列（SQLiteはファイルの場所） | `Database__ConnectionString` | `Data Source=mesapp.db` |
 | DBプロバイダー | `Database__Provider` | `Sqlite`（`PostgreSql` / `SqlServer` も可） |
-| データの保存先（DB・署名鍵） | `MESAPP_DATA_DIR` | `%LOCALAPPDATA%\ParallelFactoryMES` |
+| データの保存先（DB・署名鍵） | `MESAPP_DATA_DIR` | `%LOCALAPPDATA%\ParallelFactoryMES`（Linux は `~/.local/share/ParallelFactoryMES`、Docker は `/data`） |
 | 業務日付の境界時刻 | `BusinessDay__BoundaryHour` | `6`（午前6時） |
 | 監査ログの保持期間（年） | `Audit__RetentionYears` | `5` |
 | アクセストークン有効期限（分） | `Jwt__AccessTokenLifetimeMinutes` | `60` |
@@ -312,6 +336,15 @@ SQLiteはWALモードで動作するため、コピーしたファイルが壊�
 
 1. サーバーを停止してから `mesapp.db` をコピーする
 2. 稼働中なら SQLite の `VACUUM INTO` でバックアップファイルを作る
+
+Docker の場合は、コンテナを止めてからボリュームごと退避します（署名鍵も一緒に残ります）。
+ボリューム名は `docker volume ls` で確認してください（compose では `<フォルダ名>_mesapp-data`）。
+
+```bash
+docker compose stop
+docker run --rm -v <ボリューム名>:/data -v "$PWD":/backup alpine tar czf /backup/mesapp-data.tgz -C /data .
+docker compose start
+```
 
 `mesapp.db*`（`-wal` / `-shm` を含む）をすべて削除して再起動すると、初期状態に戻ります。
 検証環境をリセットしたいときに使えます。

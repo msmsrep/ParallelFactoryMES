@@ -1,0 +1,83 @@
+# リリース（タグ v1.2.3 の push で起動）
+#   1. ビルドとテスト（ci.yml）
+#   2. 自己完結版 ZIP（win-x64 / linux-x64）を作って GitHub Release に添付する（build/Pack-Zip.ps1）
+#   3. コンテナイメージ（linux/amd64・linux/arm64）を GHCR に登録する（Dockerfile）
+# v1.2.3-rc.1 のようなプレリリースのタグは Release をプレリリース扱いにし、イメージに latest を付けない
+# MSIX（Microsoft Store）は署名と提出が手作業なので対象外（docs-dev/MsixRelease.md）
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  zip:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: ZIP を作る
+        shell: pwsh
+        run: ./build/Pack-Zip.ps1 -Version "$($env:GITHUB_REF_NAME.TrimStart('v'))" -Commit $env:GITHUB_SHA -Runtime win-x64,linux-x64
+
+      - name: GitHub Release に添付する
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" artifacts/zip/*.zip \
+            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag $prerelease
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # コンパイルはビルド段でクロス発行するが、実行段の RUN（mkdir/chown）は対象アーキテクチャで動くため QEMU が要る
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/parallelfactorymes
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

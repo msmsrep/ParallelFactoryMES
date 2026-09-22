@@ -39,7 +39,7 @@ Spec.md 中の業務プロセスNo（`A-20-10-01` 等）は、同一覧の項目
 | 5 | 設備保全API（保全計画・指示・実績、治工具寿命管理） | 実装済 |
 | 6〜7 | Blazor WebAssembly クライアント（全画面）、帳票・ラベル出力、バーコード/QRスキャン | 実装済 |
 | 8〜9 | （欠番。シート・端末管理とWPFライセンスアプリは実装しないことにした） | — |
-| 10 | DBプロバイダー切替（PostgreSQL / SQL Server）、Docker化、Zip配布 | 一部実装（DB切替のみ。Docker化・Zip配布は未実装） |
+| 10 | DBプロバイダー切替（PostgreSQL / SQL Server）、Docker化、Zip配布 | 実装済 |
 
 本システムは AGPL-3.0 のみで提供し、シート・端末単位のライセンス管理は持ちません。**アクティベーション不要で全端末から利用できます**。
 
@@ -97,6 +97,21 @@ DBファイル（`mesapp.db`）とJWT署名鍵（`jwt-signing.key`）は**デー
 
 ## 配布・本番相当の実行
 
+ビルド済みのものを使う場合（手順の詳細は [管理者向け運用](docs/operations.md)）:
+
+- **ZIP（自己完結版・.NET不要）**: [Releases](https://github.com/msmsrep/ParallelFactoryMES/releases) から
+  `ParallelFactoryMES-<版>-win-x64.zip` / `-linux-x64.zip` を取得し、展開して `start.cmd`（Linux は `sh start.sh`）で起動します（ポート 5000）
+- **Docker（amd64 / arm64）**: `docker compose up -d` で起動します（ポート 8080。PostgreSQL 付きは `compose.postgres.yaml`）
+
+  ```bash
+  docker run -d -p 8080:8080 -v mesapp-data:/data ghcr.io/msmsrep/parallelfactorymes
+  ```
+
+リリースは `v1.2.3` 形式のタグを push すると GitHub Actions が作ります（ZIP を Release に添付し、イメージを GHCR に登録）。
+手元で ZIP を作るときは `./build/Pack-Zip.ps1`、イメージは `docker build -t parallelfactorymes .` です。
+
+ソースから発行する場合:
+
 ```bash
 dotnet publish src/MesApp.Api -c Release -o publish
 ```
@@ -123,7 +138,7 @@ dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
 | リフレッシュトークン有効期限（時間） | `Jwt__RefreshTokenLifetimeHours` | `12` |
 | JWT署名鍵ファイル | `Jwt__SigningKeyFile` | `jwt-signing.key`（未存在なら自動生成） |
 | 初期管理者の自動作成 | `MesAdmin__UserName` / `MesAdmin__Password` / `MesAdmin__DisplayName` | 未設定 |
-| データの保存先（DB・署名鍵） | `MESAPP_DATA_DIR` | `%LOCALAPPDATA%\ParallelFactoryMES` |
+| データの保存先（DB・署名鍵） | `MESAPP_DATA_DIR` | `%LOCALAPPDATA%\ParallelFactoryMES`（Linux は `~/.local/share/ParallelFactoryMES`、Docker は `/data`） |
 
 無人セットアップの例（ユーザーが0件のときのみ適用され、初回ログイン時にパスワード変更を強制します）。
 
