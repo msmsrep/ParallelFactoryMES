@@ -1,4 +1,4 @@
-@* ダッシュボードの内訳（Spec.md 3.8。期間の実績を工程・品目・直・ライン・作業区・設備の軸で分ける。
+﻿@* ダッシュボードの内訳（Spec.md 3.8。期間の実績を工程・品目・直・ライン・作業区・設備の軸で分ける。
    B-60-10-05 生産性モニタリング／C-40-10-05 不適合モニタリング／E-20-10-03 稼働モニタリング）。
    集計は api/dashboard/breakdown が行い、画面では数えない（Spec.md 7.5） *@
 @inject HttpClient Http
@@ -50,6 +50,34 @@ else
     }
     else
     {
+        var axisLabel = DashboardPeriods.AxisLabel(_dataAxis);
+        @if (_data.ProductionAvailable)
+        {
+            var production = _data.Rows
+                .Where(r => r.GoodQuantity is not null)
+                .OrderByDescending(r => (r.GoodQuantity ?? 0) + (r.DefectQuantity ?? 0))
+                .ToList();
+            <h2>@(axisLabel)別の生産数@(TopNote(production.Count))</h2>
+            <HBarChart AriaLabel="@($"{axisLabel}別の良品数・不良数")"
+                       Items="@([.. production.Take(TopCount).Select(r => new HBarItem(r.Label,
+                           [r.GoodQuantity ?? 0, r.DefectQuantity ?? 0],
+                           r.DefectRate is { } rate ? $"不良率 {rate:0.##}%" : null))])"
+                       Legend="@([new ChartLegendItem("良品数", "var(--primary)"), new ChartLegendItem("不良数", "var(--danger)")])" />
+        }
+        @if (_data.UtilizationAvailable)
+        {
+            var utilization = _data.Rows
+                .Where(r => r.UtilizationRate is not null)
+                .OrderByDescending(r => r.UtilizationRate)
+                .ToList();
+            <h2>@(axisLabel)別の設備稼働率@(TopNote(utilization.Count))</h2>
+            <HBarChart AriaLabel="@($"{axisLabel}別の設備稼働率")" Unit="%" MaxValue="100" LevelHighIsBad="false"
+                       Items="@([.. utilization.Take(TopCount).Select(r => new HBarItem(r.Label,
+                           [r.UtilizationRate ?? 0],
+                           $"故障 {r.FailureCount} 件"))])"
+                       Legend="@([new ChartLegendItem("設備稼働率", "var(--primary)")])" />
+        }
+
         <table class="table">
             <thead>
                 <tr>
@@ -121,6 +149,11 @@ else
     private DashboardAxis _dataAxis = DashboardAxis.Process;
     private int _workCenterId;
     private string? _error;
+
+    /// <summary>グラフに出す件数の上限（品目などは数が多く、全部並べると読めない。全件は表で見る）</summary>
+    private const int TopCount = 10;
+
+    private static string TopNote(int count) => count > TopCount ? $"（上位{TopCount}件。全{count}件は下の表）" : "";
     private int _requestNo;
 
     protected override async Task OnInitializedAsync()
