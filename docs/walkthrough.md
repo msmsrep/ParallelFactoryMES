@@ -433,13 +433,13 @@ MBOMと工順の登録方法は、[マスタ管理の品目・MBOM・工順](mas
 </figure>
 
 <figure class="shot">
-<img src="assets/walkthrough/shipment-judgments.webp" width="1440" height="687" alt="出荷判定画面。SH20260922-0001 と FG1000-S001 を対象にした判定「可」が承認済で並んでいる" loading="lazy">
-<figcaption>出荷判定。対象の出荷指示とロットを選び、判定を登録して承認する</figcaption>
+<img src="assets/walkthrough/shipment-judgments.webp" width="1440" height="730" alt="出荷判定画面。SMP-SH-001 と FG1000-S001 を対象にした判定「可」が承認済、SMP-SH-002 の判定「保留」が未承認で並んでいる" loading="lazy">
+<figcaption>出荷判定。対象の出荷指示とロットを選び、判定を登録して承認する。サンプルでは SMP-SH-002 を「保留」のままにしてある</figcaption>
 </figure>
 
 <figure class="shot">
-<img src="assets/walkthrough/shipping.webp" width="1440" height="732" alt="出荷管理画面。サンプル商事株式会社あての出荷指示が完了になり、FG-1000 が指示数5・出荷済5になっている" loading="lazy">
-<figcaption>出荷管理。出荷を実行すると「出荷済」の数が増え、全明細がそろうと指示が「完了」になる</figcaption>
+<img src="assets/walkthrough/shipping.webp" width="1440" height="1156" alt="出荷管理画面。サンプル商事株式会社あての SMP-SH-001 が完了（FG-1000 指示数5・出荷済5）、サンプル工業株式会社あての SMP-SH-002 が指示のままになっている" loading="lazy">
+<figcaption>出荷管理。出荷を実行すると「出荷済」の数が増え、全明細がそろうと指示が「完了」になる。SMP-SH-002 は判定が保留なので、出荷実行を押しても止まる</figcaption>
 </figure>
 
 サンプルでは、出荷指示・出荷判定・出荷実行もCSV（`13`〜`15`）で入ります。出荷番号はCSVで指定した SMP-SH-001 ですが、判定書番号は採番した日で決まるので、取り込んだ日によって変わります。
