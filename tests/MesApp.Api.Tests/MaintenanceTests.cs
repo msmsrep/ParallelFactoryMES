@@ -234,7 +234,8 @@ public class MaintenanceTests
         Assert.Equal(7m, row.StockOnHand);
 
         // 期間で絞れる（SQLiteはDateTimeOffsetの比較をSQLへ翻訳できないため、取り出してから絞る経路を通す）
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        // 期間はAPIが製造日で切るので、今日も製造日で取る（UTCの暦日だと日本の7〜9時に1日ずれて外れる）
+        var today = (await admin.GetFromJsonAsync<BusinessDateResponse>("/api/business-date"))!.Today;
         var inRange = await admin.GetFromJsonAsync<List<MaintenancePartConsumptionRow>>(
             $"/api/maintenance-orders/parts-consumption?from={today.AddDays(-1):yyyy-MM-dd}&to={today:yyyy-MM-dd}");
         Assert.Single(inRange!);

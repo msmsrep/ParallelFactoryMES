@@ -652,10 +652,12 @@ public class ProductionTests
         using var admin = await TestAuth.CreateAdminClientAsync(factory);
         var ctx = await Phase3TestData.SetupAsync(admin);
 
-        // 納期が過去の指図（工順1段目は 作業30分/個・段取り10分）
+        // 納期が過去の指図（工順1段目は 作業30分/個・段取り10分）。
+        // 超過日数はAPIが製造日で数えるので、今日も製造日で取る（暦日だと境界時刻前の実行で1日ずれる）
+        var today = (await admin.GetFromJsonAsync<BusinessDateResponse>("/api/business-date"))!.Today;
         var overdue = await admin.PostAsJsonAsync("/api/manufacturing-orders",
             new CreateManufacturingOrderRequest(ctx.ProductId, 10m,
-                DateOnly.FromDateTime(DateTime.Today).AddDays(-3),
+                today.AddDays(-3),
                 ManufacturingOrderType.Normal, null, null));
         overdue.EnsureSuccessStatusCode();
         var overdueOrder = (await overdue.Content.ReadFromJsonAsync<ManufacturingOrderResponse>())!;
