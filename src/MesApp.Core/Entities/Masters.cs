@@ -20,7 +20,10 @@ public class Product : IDeactivatableMaster
 
     public ProductType Type { get; set; }
 
-    /// <summary>標準不良率（%。A-40-10-04）</summary>
+    /// <summary>
+    /// 標準不良率（%。A-40-10-04）。指図の展開で予定材料の数量を 原単位×指図数量÷(1－率) に割り増す。
+    /// 不良品も部材を消費する（バックフラッシュは良品＋不良の数で引く）ため、良品を指図数量だけ得るのに要る部材を見込む
+    /// </summary>
     public decimal StandardDefectRate { get; set; }
 
     /// <summary>

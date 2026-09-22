@@ -161,7 +161,7 @@ public class MasterCsvTests
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Errors, e => e.Line == 2 && e.Message == "Name is required.");
-        Assert.Contains(result.Errors, e => e.Line == 3 && e.Message == "StandardDefectRate must be 100 or less ('200').");
+        Assert.Contains(result.Errors, e => e.Line == 3 && e.Message == "StandardDefectRate must be 99.99 or less ('200').");
         Assert.Contains(result.Errors, e => e.Line == 5 && e.Message == "Item code 'P-003' appears on multiple rows.");
     }
 

@@ -313,7 +313,7 @@ public sealed class ManufacturingOrderService(
                 ManufacturingOrder = order,
                 ChildProductId = item.ChildProductId,
                 QuantityPer = item.QuantityPer,
-                PlannedQuantity = item.QuantityPer * order.Quantity,
+                PlannedQuantity = PlannedMaterialQuantity(item.QuantityPer, order.Quantity, order.Product!.StandardDefectRate),
                 AlternativeGroup = item.AlternativeGroup,
                 IsAlternative = item.IsAlternative,
                 RoutingSequence = item.RoutingSequence ?? finalSequence,
@@ -333,5 +333,16 @@ public sealed class ManufacturingOrderService(
                 materials = bom.Count,
             }, ct: ct);
         return OrderOutcome.Ok(order);
+    }
+
+    /// <summary>
+    /// 予定材料の数量（A-40-10-04）。親品目の標準不良率ぶん割り増す：原単位×指図数量÷(1－率)。
+    /// 不良品も部材を消費するため、良品を指図数量だけ得るには不良になる分の部材も要る。
+    /// 割り切れない値は列の精度（小数6桁）で切り上げる（切り捨てると欠品側にずれる）
+    /// </summary>
+    internal static decimal PlannedMaterialQuantity(decimal quantityPer, decimal orderQuantity, decimal defectRatePercent)
+    {
+        var quantity = quantityPer * orderQuantity / (1m - defectRatePercent / 100m);
+        return Math.Ceiling(quantity * 1_000_000m) / 1_000_000m;
     }
 }

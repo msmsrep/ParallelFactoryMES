@@ -11,7 +11,8 @@ public record ProductRequest(
     [Required, MaxLength(20)] string Unit,
     string? Specification,
     ProductType Type,
-    [Range(0, 100)] decimal StandardDefectRate,
+    /// <summary>標準不良率（%）。予定材料の数量を割り増す（÷(1－率)）ため100%は受け付けない</summary>
+    [Range(0, 99.99)] decimal StandardDefectRate,
     /// <summary>既定の入庫先ロケーション（推奨ロケーション指示の第一候補。D-10-30-03、D-40-40-03）</summary>
     int? DefaultLocationId = null);
 

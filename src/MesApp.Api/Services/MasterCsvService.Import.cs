@@ -144,7 +144,7 @@ public sealed partial class MasterCsvService
             var unit = reader.RequiredText("Unit", 20);
             var specification = reader.Text("Specification", product.Specification);
             var type = reader.Enum("Type", product.Type, CsvEnumLabels.ProductTypes);
-            var defectRate = reader.Number("StandardDefectRate", product.StandardDefectRate, 0, 100);
+            var defectRate = reader.Number("StandardDefectRate", product.StandardDefectRate, 0, 99.99m);
             var defaultLocationId = reader.Reference(
                 "DefaultLocationCode", product.DefaultLocationId, locationIds, "ロケーション");
             var isActive = reader.Bool("IsActive", product.IsActive);

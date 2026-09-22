@@ -1995,4 +1995,7 @@
   <data name="親品目の工順の工程順序。空なら最終工程。バックフラッシュはこの工程で部材を引く" xml:space="preserve">
     <value>Sequence in the parent item's routing. Blank means the final step. Backflush consumes the material at this step</value>
   </data>
+  <data name="0〜99.99。指図の予定材料をこの率ぶん割り増す" xml:space="preserve">
+    <value>0 to 99.99. Planned materials of an order are increased by this rate</value>
+  </data>
 </root>
