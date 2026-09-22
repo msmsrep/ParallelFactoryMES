@@ -1,0 +1,304 @@
+@inject HttpClient Http
+
+@* 生産計画の登録（Spec.md 3.1・5.2 ProductionPlan。A-30-10-01）。
+   キーは 製造日・品目・工程・作業区（作業区なしも1つの値）。重複や参照先の確認は API が行う *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@MesRoleGroups.ProductionManage">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? L["計画の登録"] : L["計画の変更"])</h2>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>@L["製造日"]</label>
+                <input type="date" @bind="_form.BusinessDate" />
+            </div>
+            <div class="form-field">
+                <label>@L["品目"]</label>
+                <select @bind="_form.ProductId">
+                    <option value="0">@L["選択してください"]</option>
+                    @foreach (var product in _products)
+                    {
+                        <option value="@product.Id">@product.Code @product.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@L["工程"]</label>
+                <select @bind="_form.ProcessId">
+                    <option value="0">@L["選択してください"]</option>
+                    @foreach (var process in _processes)
+                    {
+                        <option value="@process.Id">@process.Code @process.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@L["作業区（任意）"]</label>
+                <select @bind="_form.WorkCenterId">
+                    <option value="0">@L["（指定なし）"]</option>
+                    @foreach (var workCenter in _workCenters)
+                    {
+                        <option value="@workCenter.Id">@workCenter.Code @workCenter.Name（@EnumLabels.Of(workCenter.Level)）</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@L["計画数量"]</label>
+                <input type="number" min="0" step="any" @bind="_form.PlannedQuantity" />
+            </div>
+            <div class="form-field">
+                <label>@L["備考"]</label>
+                <input @bind="_form.Note" />
+            </div>
+        </div>
+        <p class="text-muted">@L["計画数量 0 は計画上の休止を表す。同じ製造日・品目・工程・作業区の計画は二重に登録できない（変更は一覧の「編集」から行う）。"]</p>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" disabled="@_busy" @onclick="CancelEdit">@L["キャンセル"]</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<div class="card">
+    <div class="form-grid">
+        <div class="form-field">
+            <label>@L["製造日（から）"]</label>
+            <input type="date" @bind="_filterFrom" />
+        </div>
+        <div class="form-field">
+            <label>@L["製造日（まで）"]</label>
+            <input type="date" @bind="_filterTo" />
+        </div>
+        <div class="form-field">
+            <label>@L["品目"]</label>
+            <select @bind="_filterProductId">
+                <option value="0">@L["（すべて）"]</option>
+                @foreach (var product in _products)
+                {
+                    <option value="@product.Id">@product.Code @product.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>@L["工程"]</label>
+            <select @bind="_filterProcessId">
+                <option value="0">@L["（すべて）"]</option>
+                @foreach (var process in _processes)
+                {
+                    <option value="@process.Id">@process.Code @process.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>@L["作業区（配下を含む）"]</label>
+            <select @bind="_filterWorkCenterId">
+                <option value="0">@L["（すべて）"]</option>
+                @foreach (var workCenter in _workCenters)
+                {
+                    <option value="@workCenter.Id">@workCenter.Code @workCenter.Name（@EnumLabels.Of(workCenter.Level)）</option>
+                }
+            </select>
+        </div>
+    </div>
+    <button class="btn btn-secondary" disabled="@_busy" @onclick="LoadAsync">@L["検索"]</button>
+</div>
+
+<div class="card">
+    @if (_plans is null)
+    {
+        <p class="text-muted">@L["読み込み中..."]</p>
+    }
+    else if (_plans.Count == 0)
+    {
+        <p class="text-muted">@L["条件に合う生産計画はありません。"]</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th>@L["製造日"]</th><th>@L["品目"]</th><th>@L["工程"]</th><th>@L["作業区"]</th><th>@L["計画数量"]</th><th>@L["備考"]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var plan in _plans)
+                {
+                    <tr>
+                        <td>@plan.BusinessDate.ToString("yyyy-MM-dd")</td>
+                        <td>@plan.ProductCode @plan.ProductName</td>
+                        <td>@plan.ProcessCode @plan.ProcessName</td>
+                        <td>@(plan.WorkCenterCode is null ? "-" : $"{plan.WorkCenterCode} {plan.WorkCenterName}")</td>
+                        <td>@plan.PlannedQuantity.ToString("0.###")</td>
+                        <td>@plan.Note</td>
+                        <td>
+                            <AuthorizeView Roles="@MesRoleGroups.ProductionManage" Context="pm">
+                                <button class="btn btn-sm btn-secondary" disabled="@_busy" @onclick="() => Edit(plan)">@L["編集"]</button>
+                                <button class="btn btn-sm btn-secondary" disabled="@_busy" @onclick="() => DeleteAsync(plan)">@L["削除"]</button>
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private sealed class PlanForm
+    {
+        public DateOnly BusinessDate { get; set; }
+        public int ProductId { get; set; }
+        public int ProcessId { get; set; }
+        public int WorkCenterId { get; set; }
+        public decimal PlannedQuantity { get; set; }
+        public string? Note { get; set; }
+    }
+
+    private List<ProductResponse> _products = [];
+    private List<ProcessResponse> _processes = [];
+    private List<WorkCenterResponse> _workCenters = [];
+    private List<ProductionPlanResponse>? _plans;
+
+    private PlanForm _form = new();
+    private int? _editingId;
+
+    private DateOnly _filterFrom;
+    private DateOnly _filterTo;
+    private int _filterProductId;
+    private int _filterProcessId;
+    private int _filterWorkCenterId;
+
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 既定の期間は今日の製造日から1週間（「今日」は境界時刻を知っているサーバーから受け取る。Spec.md 3.9）
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        try
+        {
+            today = (await Http.GetFromJsonAsync<BusinessDateResponse>("api/business-date"))!.Today;
+        }
+        catch (HttpRequestException)
+        {
+            _error = L["製造日を取得できなかったため、端末の日付で表示しています。"];
+        }
+        _filterFrom = today;
+        _filterTo = today.AddDays(6);
+        _form.BusinessDate = today;
+
+        _products = [.. (await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? []).Where(p => p.IsActive)];
+        _processes = [.. (await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? []).Where(p => p.IsActive)];
+        _workCenters = [.. (await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers") ?? []).Where(w => w.IsActive)];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var query = $"api/production-plans?from={_filterFrom:yyyy-MM-dd}&to={_filterTo:yyyy-MM-dd}";
+        if (_filterProductId != 0)
+        {
+            query += $"&productId={_filterProductId}";
+        }
+        if (_filterProcessId != 0)
+        {
+            query += $"&processId={_filterProcessId}";
+        }
+        if (_filterWorkCenterId != 0)
+        {
+            query += $"&workCenterId={_filterWorkCenterId}";
+        }
+        var response = await Http.GetAsync(query);
+        if (await response.ReadErrorAsync(L["生産計画を取得できませんでした。"]) is { } error)
+        {
+            _error = error;
+            _plans = [];
+            return;
+        }
+        _plans = await response.Content.ReadFromJsonAsync<List<ProductionPlanResponse>>() ?? [];
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _message = null;
+        if (_form.ProductId == 0 || _form.ProcessId == 0)
+        {
+            _error = L["品目と工程を選択してください。"];
+            return;
+        }
+        _busy = true;
+        try
+        {
+            var request = new ProductionPlanRequest(_form.BusinessDate, _form.ProductId, _form.ProcessId,
+                _form.WorkCenterId == 0 ? null : _form.WorkCenterId, _form.PlannedQuantity,
+                string.IsNullOrWhiteSpace(_form.Note) ? null : _form.Note);
+            var response = _editingId is { } id
+                ? await Http.PutAsJsonAsync($"api/production-plans/{id}", request)
+                : await Http.PostAsJsonAsync("api/production-plans", request);
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = _editingId is null ? L["生産計画を登録しました。"] : L["生産計画を更新しました。"];
+            // 続けて同じ品目・工程の別の日を入れやすいよう、キャンセル時以外は入力を残す
+            _editingId = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Edit(ProductionPlanResponse plan)
+    {
+        _editingId = plan.Id;
+        _form = new PlanForm
+        {
+            BusinessDate = plan.BusinessDate,
+            ProductId = plan.ProductId,
+            ProcessId = plan.ProcessId,
+            WorkCenterId = plan.WorkCenterId ?? 0,
+            PlannedQuantity = plan.PlannedQuantity,
+            Note = plan.Note,
+        };
+        _error = null;
+        _message = null;
+    }
+
+    private void CancelEdit()
+    {
+        _editingId = null;
+        _form = new PlanForm { BusinessDate = _form.BusinessDate };
+    }
+
+    private async Task DeleteAsync(ProductionPlanResponse plan)
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/production-plans/{plan.Id}");
+            if (await response.ReadErrorAsync(L["削除に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            if (_editingId == plan.Id)
+            {
+                CancelEdit();
+            }
+            _message = L["生産計画を削除しました。"];
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
