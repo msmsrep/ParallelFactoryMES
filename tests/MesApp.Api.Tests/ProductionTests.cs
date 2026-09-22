@@ -948,6 +948,129 @@ public class ProductionTests
         Assert.All(logs.Items, a => Assert.Equal("Planning", a.Category));
     }
 
+    [Fact]
+    public async Task 予実は開始時刻の製造日で実績を振り分けリワーク指図の産出を数えない()
+    {
+        // +09:00 の時刻で製造日の境目を検証するので工場のタイムゾーンを日本に固定する
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["BusinessDay:TimeZone"] = "Asia/Tokyo",
+        });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 1000m, ctx.MaterialLocationId);
+        var wc = await MasterTests.CreateWorkCenterAsync(admin, "P1", "第一工場", WorkCenterLevel.Plant, null);
+
+        var d1 = new DateOnly(2026, 9, 1);
+        var d2 = new DateOnly(2026, 9, 2);
+        var d3 = new DateOnly(2026, 9, 3);
+        // 作業区違いの計画は1行に合算する。計画0（休止）の日は実績が無くても行になる
+        await CreatePlanAsync(admin, new(d1, ctx.ProductId, ctx.ProcessId, null, 20m, null));
+        await CreatePlanAsync(admin, new(d1, ctx.ProductId, ctx.ProcessId, wc.Id, 5m, null));
+        await CreatePlanAsync(admin, new(d2, ctx.ProductId, ctx.ProcessId, null, 0m, "休止"));
+
+        var jst = TimeSpan.FromHours(9);
+        async Task RecordAsync(DateTime startedAt, decimal good)
+        {
+            var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+            (await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+                new ProductionRecordRequest(good, 0m, new DateTimeOffset(startedAt, jst), null,
+                    ctx.ProductLocationId, false))).EnsureSuccessStatusCode();
+        }
+        await RecordAsync(new DateTime(2026, 9, 1, 5, 0, 0), 9m);    // 6時前なので製造日は 8/31（期間外）
+        await RecordAsync(new DateTime(2026, 9, 1, 10, 0, 0), 8m);
+        await RecordAsync(new DateTime(2026, 9, 2, 5, 0, 0), 4m);    // 製造日は 9/1
+        await RecordAsync(new DateTime(2026, 9, 3, 10, 0, 0), 6m);   // 計画の無い日
+        await RecordAsync(new DateTime(2026, 9, 4, 5, 0, 0), 1m);    // 製造日は 9/3
+        await RecordAsync(new DateTime(2026, 9, 4, 7, 0, 0), 10m);   // 製造日は 9/4（期間外）
+
+        // リワーク指図の産出は出来高に数えない（生産性と同じ規則）
+        var parent = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var reworkCreated = await admin.PostAsJsonAsync("/api/manufacturing-orders",
+            new CreateManufacturingOrderRequest(ctx.ProductId, 2m, null,
+                ManufacturingOrderType.Rework, parent.Order.Id, null));
+        reworkCreated.EnsureSuccessStatusCode();
+        var rework = (await reworkCreated.Content.ReadFromJsonAsync<ManufacturingOrderResponse>())!;
+        (await admin.PostAsync($"/api/manufacturing-orders/{rework.Id}/approve", null)).EnsureSuccessStatusCode();
+        var reworkExpanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{rework.Id}/expand", new ExpandRequest(null));
+        reworkExpanded.EnsureSuccessStatusCode();
+        var reworkDetail = (await reworkExpanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+        (await admin.PostAsJsonAsync(
+                $"/api/work-orders/{reworkDetail.WorkOrders.First().Id}/production-records",
+                new ProductionRecordRequest(2m, 0m, new DateTimeOffset(new DateTime(2026, 9, 1, 12, 0, 0), jst), null,
+                    ctx.ProductLocationId, false)))
+            .EnsureSuccessStatusCode();
+
+        var rows = (await admin.GetFromJsonAsync<List<ProductionPlanActualRow>>(
+            "/api/production-plans/plan-actual?from=2026-09-01&to=2026-09-03"))!;
+        Assert.Equal(
+            [(d1, 25m, 12m, (decimal?)48m), (d2, 0m, 0m, null), (d3, 0m, 7m, null)],
+            rows.Select(r => (r.BusinessDate, r.PlannedQuantity, r.ActualQuantity, r.AchievementRate)));
+        Assert.All(rows, r => Assert.Equal(("FG-01", "PR-01"), (r.ProductCode, r.ProcessCode)));
+
+        // 品目で絞ると該当しない行は出ない。期間の逆転は400
+        Assert.Empty((await admin.GetFromJsonAsync<List<ProductionPlanActualRow>>(
+            $"/api/production-plans/plan-actual?from=2026-09-01&to=2026-09-03&productId={ctx.MaterialId}"))!);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await admin.GetAsync("/api/production-plans/plan-actual?from=2026-09-03&to=2026-09-01")).StatusCode);
+    }
+
+    [Fact]
+    public async Task 予実を作業区で絞ると計画も実績も配下の作業区のものだけに揃う()
+    {
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["BusinessDay:TimeZone"] = "Asia/Tokyo",
+        });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 1000m, ctx.MaterialLocationId);
+        var plant = await MasterTests.CreateWorkCenterAsync(admin, "P1", "第一工場", WorkCenterLevel.Plant, null);
+        var line = await MasterTests.CreateWorkCenterAsync(admin, "L1", "組立1ライン", WorkCenterLevel.Line, plant.Id);
+        var area = await MasterTests.CreateWorkCenterAsync(admin, "A1", "組立エリア", WorkCenterLevel.Area, line.Id);
+        var wc = await MasterTests.CreateWorkCenterAsync(admin, "WC01", "組立作業区", WorkCenterLevel.WorkCenter, area.Id);
+        var otherLine = await MasterTests.CreateWorkCenterAsync(admin, "L2", "組立2ライン", WorkCenterLevel.Line, plant.Id);
+
+        var date = new DateOnly(2026, 9, 1);
+        await CreatePlanAsync(admin, new(date, ctx.ProductId, ctx.ProcessId, null, 20m, null));
+        await CreatePlanAsync(admin, new(date, ctx.ProductId, ctx.ProcessId, wc.Id, 10m, null));
+        await CreatePlanAsync(admin, new(date, ctx.ProductId, ctx.ProcessId, otherLine.Id, 7m, null));
+
+        var startedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 10, 0, 0), TimeSpan.FromHours(9));
+        async Task RecordAsync(decimal good)
+        {
+            var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+            (await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+                new ProductionRecordRequest(good, 0m, startedAt, null, ctx.ProductLocationId, false)))
+                .EnsureSuccessStatusCode();
+        }
+        await RecordAsync(5m);   // 工順に作業区が無いので、作業指示も作業区なし
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, ctx.ProcessId, 30m, 10m, null, null, null, null, null, wc.Id),
+                new(2, ctx.ProcessId, 15m, 5m, null, null, null, null, null, wc.Id),
+            })).EnsureSuccessStatusCode();
+        await RecordAsync(3m);   // 展開時点の作業区（WC01）が作業指示に固定される
+
+        async Task<ProductionPlanActualRow> GetAsync(string query) =>
+            Assert.Single((await admin.GetFromJsonAsync<List<ProductionPlanActualRow>>(
+                $"/api/production-plans/plan-actual?from=2026-09-01&to=2026-09-01{query}"))!);
+
+        var all = await GetAsync(string.Empty);
+        Assert.Equal((37m, 8m), (all.PlannedQuantity, all.ActualQuantity));
+
+        // ラインを指定したら配下の作業区だけ。作業区なしの計画も作業区なしの実績も外れる
+        var byLine = await GetAsync($"&workCenterId={line.Id}");
+        Assert.Equal((10m, 3m, (decimal?)30m), (byLine.PlannedQuantity, byLine.ActualQuantity, byLine.AchievementRate));
+        var byPlant = await GetAsync($"&workCenterId={plant.Id}");
+        Assert.Equal((17m, 3m), (byPlant.PlannedQuantity, byPlant.ActualQuantity));
+
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await admin.GetAsync("/api/production-plans/plan-actual?workCenterId=9999")).StatusCode);
+    }
+
     private static async Task<ProductionPlanResponse> CreatePlanAsync(HttpClient client, ProductionPlanRequest request)
     {
         var response = await client.PostAsJsonAsync("/api/production-plans", request);

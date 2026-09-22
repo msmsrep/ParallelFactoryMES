@@ -26,3 +26,18 @@ public record ProductionPlanResponse(
     decimal PlannedQuantity,
     string? Note,
     DateTimeOffset UpdatedAt);
+
+/// <summary>
+/// 工程別の予実の1行（製造日×品目×工程。作業区違いの計画は合算する）。
+/// 実績は工程ごとの出来高＝生産実績の良品数（開始時刻の製造日で振り分け、リワーク指図の産出は数えない）
+/// </summary>
+public record ProductionPlanActualRow(
+    DateOnly BusinessDate,
+    int ProductId, string ProductCode, string ProductName,
+    int ProcessId, string ProcessCode, string ProcessName,
+    /// <summary>計画数量（計画の無い日は 0）</summary>
+    decimal PlannedQuantity,
+    /// <summary>実績数量（実績の無い日は 0）</summary>
+    decimal ActualQuantity,
+    /// <summary>達成率（%）。計画が 0 なら null</summary>
+    decimal? AchievementRate);

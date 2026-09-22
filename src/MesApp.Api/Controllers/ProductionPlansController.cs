@@ -1,5 +1,6 @@
 using MesApp.Api.Localization;
 using MesApp.Api.Policies;
+using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Planning;
 using MesApp.Core.Entities;
@@ -18,7 +19,9 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/production-plans")]
 [Authorize]
-public class ProductionPlansController(MesAppDbContext db, IAuditLogger auditLogger) : ControllerBase
+public class ProductionPlansController(
+    MesAppDbContext db, IAuditLogger auditLogger, ProductionPlanService planService, IBusinessDateService businessDate)
+    : ControllerBase
 {
     /// <summary>
     /// 計画の一覧。期間は製造日の両端を含む。作業区に上位の段を指定したら配下へ展開して返す
@@ -71,6 +74,29 @@ public class ProductionPlansController(MesAppDbContext db, IAuditLogger auditLog
             .ThenBy(p => p.WorkCenter?.Code, StringComparer.Ordinal)
             .Select(ToResponse)
             .ToList();
+    }
+
+    /// <summary>
+    /// 工程別の予実（製造日×品目×工程で1行）。期間は製造日の from〜to（省略時は当日の製造日）。
+    /// 集計の規則は <see cref="ProductionPlanService"/>
+    /// </summary>
+    [HttpGet("plan-actual")]
+    public async Task<ActionResult<List<ProductionPlanActualRow>>> PlanActual(
+        [FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null,
+        [FromQuery] int? productId = null, [FromQuery] int? processId = null,
+        [FromQuery] int? workCenterId = null, CancellationToken ct = default)
+    {
+        var filter = new ProductionPlanService.Filter(
+            from ?? businessDate.Today, to ?? businessDate.Today, productId, processId, workCenterId);
+        if (filter.From > filter.To)
+        {
+            return this.BadRequestProblem(ApiText.T("期間の開始日が終了日より後になっています。"));
+        }
+        if (workCenterId is { } wcId && !await db.WorkCenters.AnyAsync(w => w.Id == wcId, ct))
+        {
+            return this.BadRequestProblem(ApiText.T("作業区（ID {0}）が見つかりません。", wcId));
+        }
+        return await planService.GetPlanActualAsync(filter, ct);
     }
 
     [HttpGet("{id:int}")]
