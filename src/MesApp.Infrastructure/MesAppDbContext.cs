@@ -82,6 +82,9 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<ToolUsage> ToolUsages => Set<ToolUsage>();
     public DbSet<ToolIssue> ToolIssues => Set<ToolIssue>();
 
+    // 生産計画系（Spec.md 5.2 ProductionPlan。A-30-10-01）
+    public DbSet<ProductionPlan> ProductionPlans => Set<ProductionPlan>();
+
     public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)

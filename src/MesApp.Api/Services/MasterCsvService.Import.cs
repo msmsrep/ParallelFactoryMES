@@ -101,6 +101,9 @@ public sealed partial class MasterCsvService
             case MasterCsvKinds.UserSkills:
                 await ImportUserSkillsAsync(table, errors, counter, ct);
                 break;
+            case MasterCsvKinds.ProductionPlans:
+                await ImportProductionPlansAsync(table, errors, counter, ct);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
         }
@@ -1515,6 +1518,127 @@ public sealed partial class MasterCsvService
             {
                 counter.Created++;
             }
+        }
+    }
+
+    // ---- 生産計画（Spec.md 3.8・5.2 ProductionPlan。A-30-10-01） ----
+
+    /// <summary>
+    /// 製造日・品目・工程・作業区をキーに、同じキーの計画は計画数量を上書きし、無ければ追加する。
+    /// 作業区の空欄も1つのキーとして扱い、作業区なしの計画を二重に作らない。
+    /// 数量とキーの判定は単票APIと同じ <see cref="ProductionPlanPolicy"/> を使う
+    /// </summary>
+    private async Task ImportProductionPlansAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var productIds = await ProductIdsAsync(ct);
+        var processIds = await db.Processes.AsNoTracking()
+            .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
+        var workCenters = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
+        var workCenterIds = workCenters.ToDictionary(w => w.Code, w => w.Id, StringComparer.Ordinal);
+        var hasNote = table.HasColumn("Note");
+        var seen = new HashSet<ProductionPlanPolicy.PlanKey>();
+        var staged = new List<(CsvRecord Row, string ProductCode, string ProcessCode,
+            ProductionPlanPolicy.PlanKey Key, decimal Quantity, string? Note)>();
+
+        // 1周目：行を読んでキーを決める
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            reader.RequiredText("BusinessDate");
+            var businessDate = reader.DateOrNull("BusinessDate", null);
+            var productCode = reader.RequiredText("ProductCode", 50);
+            var productId = reader.Reference("ProductCode", null, productIds, "品目");
+            var processCode = reader.RequiredText("ProcessCode", 50);
+            var processId = reader.Reference("ProcessCode", null, processIds, "工程");
+            var workCenterId = reader.Reference("WorkCenterCode", null, workCenterIds, "作業区");
+            reader.RequiredText("PlannedQuantity");
+            var quantity = reader.NumberOrNull("PlannedQuantity", null);
+            var note = reader.Text("Note", null, 500);
+            if (reader.Failed || businessDate is not { } date || productId is not { } pid
+                || processId is not { } prid || quantity is not { } qty)
+            {
+                continue;
+            }
+            if (ProductionPlanPolicy.CheckQuantity(qty) is { } quantityError)
+            {
+                reader.Fail(quantityError);
+                continue;
+            }
+
+            var key = new ProductionPlanPolicy.PlanKey(date, pid, prid, workCenterId);
+            if (!seen.Add(key))
+            {
+                reader.Fail(ApiText.T("製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}'・作業区 '{3}' の計画が複数行にあります。",
+                    date, productCode, processCode, table.Value(row, "WorkCenterCode") ?? "-"));
+                continue;
+            }
+            staged.Add((row, productCode!, processCode!, key, qty, note));
+        }
+        if (staged.Count == 0)
+        {
+            return;
+        }
+
+        // 2周目：既存の計画（ファイルに出てくる製造日の範囲だけ）と突き合わせて上書き・追加する
+        var from = staged.Min(s => s.Key.BusinessDate);
+        var to = staged.Max(s => s.Key.BusinessDate);
+        var byKey = (await db.ProductionPlans
+                .Where(p => p.BusinessDate >= from && p.BusinessDate <= to)
+                .ToListAsync(ct))
+            .GroupBy(ProductionPlanPolicy.KeyOf)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // 取り込んだ後に同じ製造日・品目・工程で並ぶ作業区（既存＋ファイル。上書きではキーは変わらない）の範囲が
+        // 重なれば、その行を拒否する（単票APIと同じ規則。予実で二重に数えないため）
+        var afterImport = byKey.Keys.Concat(staged.Select(s => s.Key)).Distinct()
+            .GroupBy(k => (k.BusinessDate, k.ProductId, k.ProcessId))
+            .ToDictionary(g => g.Key, g => g.Select(k => k.WorkCenterId).ToList());
+        var codeById = workCenters.ToDictionary(w => w.Id, w => w.Code);
+        foreach (var s in staged)
+        {
+            var others = afterImport[(s.Key.BusinessDate, s.Key.ProductId, s.Key.ProcessId)]
+                .Where(other => other != s.Key.WorkCenterId);
+            foreach (var other in others.Where(other => ProductionPlanPolicy.Overlaps(s.Key.WorkCenterId, other, workCenters)))
+            {
+                new CsvRowReader(table, s.Row, errors).Fail(ProductionPlanPolicy.Overlapped(
+                    s.Key.BusinessDate, s.ProductCode, s.ProcessCode,
+                    s.Key.WorkCenterId is { } id ? codeById[id] : null,
+                    other is { } otherId ? codeById[otherId] : null));
+                break;
+            }
+        }
+        if (errors.Count > 0)
+        {
+            return;
+        }
+
+        foreach (var (_, _, _, key, quantity, note) in staged)
+        {
+            if (byKey.TryGetValue(key, out var plan))
+            {
+                var newNote = hasNote ? note : plan.Note;
+                // 取り込み直しただけの行は更新日時を動かさない（出力→取込の往復で差分を出さない）
+                if (plan.PlannedQuantity != quantity || plan.Note != newNote)
+                {
+                    plan.PlannedQuantity = quantity;
+                    plan.Note = newNote;
+                    plan.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+                counter.Updated++;
+                continue;
+            }
+
+            db.ProductionPlans.Add(new ProductionPlan
+            {
+                BusinessDate = key.BusinessDate,
+                ProductId = key.ProductId,
+                ProcessId = key.ProcessId,
+                WorkCenterId = key.WorkCenterId,
+                PlannedQuantity = quantity,
+                Note = note,
+            });
+            counter.Created++;
         }
     }
 

@@ -140,6 +140,12 @@
     /// <summary>CSV入出力APIの基点（マスタは api/masters/csv、実績は api/actuals/csv）</summary>
     [Parameter] public string BaseUrl { get; set; } = "api/masters/csv";
 
+    /// <summary>
+    /// エクスポートの取得先（省略時は {BaseUrl}/{Kind}?includeInactive=true の全件）。
+    /// 生産計画のように日々増えるデータは、画面の絞り込みに合わせたURLを渡す
+    /// </summary>
+    [Parameter] public string? ExportUrl { get; set; }
+
     /// <summary>エクスポートを出すか（実績CSVは取込のみ）</summary>
     [Parameter] public bool CanExport { get; set; } = true;
 
@@ -196,7 +202,7 @@
         _error = null;
     }
 
-    private Task ExportAsync() => DownloadAsync($"{BaseUrl}/{Kind}?includeInactive=true", $"{Kind}.csv");
+    private Task ExportAsync() => DownloadAsync(ExportUrl ?? $"{BaseUrl}/{Kind}?includeInactive=true", $"{Kind}.csv");
 
     private Task TemplateAsync() => DownloadAsync($"{BaseUrl}/{Kind}/template", $"{Kind}_template.csv");
 

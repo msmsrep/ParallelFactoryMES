@@ -2071,6 +2071,54 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.ToTable("ProductionDefects");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.ProductionPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("PlannedQuantity")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<int>("ProcessId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("WorkCenterId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("WorkCenterId");
+
+                    b.HasIndex("BusinessDate", "ProductId", "ProcessId", "WorkCenterId")
+                        .IsUnique();
+
+                    b.ToTable("ProductionPlans");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.ProductionRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -4208,6 +4256,32 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.Navigation("DefectReason");
 
                     b.Navigation("ProductionRecord");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.ProductionPlan", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.ProcessMaster", "Process")
+                        .WithMany()
+                        .HasForeignKey("ProcessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
+                        .WithMany()
+                        .HasForeignKey("WorkCenterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Process");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("WorkCenter");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.ProductionRecord", b =>

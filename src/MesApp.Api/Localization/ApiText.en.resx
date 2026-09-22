@@ -1086,6 +1086,9 @@
   <data name="実績のCSVが含まれています：{0}。実績は実績CSV取込で別のZIPとして取り込んでください。" xml:space="preserve">
     <value>The ZIP contains actuals CSV files: {0}. Import actuals as a separate ZIP in Actuals CSV Import.</value>
   </data>
+  <data name="マスタでないCSVが含まれています：{0}。生産計画は生産計画・予実画面の計画登録タブから取り込んでください。" xml:space="preserve">
+    <value>The ZIP contains CSV files that are not master data: {0}. Import production plans from the Plan entry tab of Production Plan vs. Actual.</value>
+  </data>
   <data name="取込に対応していないマスタのCSVが含まれています：{0}（ファイル名は「番号_種別.csv」。例 01_work-centers.csv）。" xml:space="preserve">
     <value>The ZIP contains CSV files for masters that cannot be imported: {0} (file names must be "number_kind.csv", e.g. 01_work-centers.csv).</value>
   </data>
@@ -1862,5 +1865,35 @@
   </data>
   <data name="、" xml:space="preserve">
     <value>, </value>
+  </data>
+  <data name="製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}' の計画は、同じ作業区で既に登録されています。" xml:space="preserve">
+    <value>A plan for product '{1}' and process '{2}' on production date {0:yyyy-MM-dd} is already registered for the same work center.</value>
+  </data>
+  <data name="生産計画" xml:space="preserve">
+    <value>Production plans</value>
+  </data>
+  <data name="製造日" xml:space="preserve">
+    <value>Production date</value>
+  </data>
+  <data name="計画数量" xml:space="preserve">
+    <value>Planned quantity</value>
+  </data>
+  <data name="yyyy-MM-dd。製造日・品目・工程・作業区が同じなら計画数量を上書き、無ければ新規登録" xml:space="preserve">
+    <value>yyyy-MM-dd. If the production date, product, process and work center match an existing plan, its planned quantity is overwritten; otherwise a new plan is registered</value>
+  </data>
+  <data name="登録済みの作業区コード（段は問わない）。空欄も1つのキーとして扱う" xml:space="preserve">
+    <value>Registered work center code (any level). A blank value is also treated as a key</value>
+  </data>
+  <data name="0以上。0は計画上の休止" xml:space="preserve">
+    <value>0 or more. 0 means a planned stop</value>
+  </data>
+  <data name="計画数量は0以上で指定してください（{0}）。" xml:space="preserve">
+    <value>Planned quantity must be 0 or more ({0}).</value>
+  </data>
+  <data name="製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}'・作業区 '{3}' の計画が複数行にあります。" xml:space="preserve">
+    <value>The plan for product '{1}', process '{2}' and work center '{3}' on production date {0:yyyy-MM-dd} appears on more than one row.</value>
+  </data>
+  <data name="製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}' には作業区 '{3}' の計画があり、作業区 '{4}' の計画と範囲が重なります（作業区なしと作業区あり、上位の段と配下の段の計画は、予実で二重に数えるため同時に登録できません）。" xml:space="preserve">
+    <value>Product '{1}', process '{2}' on production date {0:yyyy-MM-dd} already has a plan for work center '{3}', which overlaps with work center '{4}'. Plans with and without a work center, or for a parent and its child work center, cannot coexist because the plan-vs-actual view would count them twice.</value>
   </data>
 </root>

@@ -105,6 +105,9 @@
     /// <summary>棒の値が件数なら true（目盛りを整数にする）</summary>
     [Parameter] public bool BarInteger { get; set; }
 
+    /// <summary>左軸の上限の下限（計画と実績のように左右が同じ単位のとき、LineMinTop と同じ値を渡して目盛りをそろえる）</summary>
+    [Parameter] public decimal BarMinTop { get; set; }
+
     /// <summary>右軸の上限の下限（不良率の数%の変化が潰れないよう最大値に合わせるが、0なら1にする等）</summary>
     [Parameter] public decimal LineMinTop { get; set; } = 1m;
 
@@ -134,6 +137,7 @@
         var barMax = Enumerable.Range(0, Labels.Count)
             .Select(i => Bars.Sum(s => Math.Max(s.Values[i] ?? 0, 0)))
             .DefaultIfEmpty(0).Max();
+        barMax = Math.Max(barMax, BarMinTop);
         _barTicks = ChartScale.Ticks(barMax, integer: BarInteger);
 
         var lineMax = Lines.SelectMany(s => s.Values).Select(v => v ?? 0).DefaultIfEmpty(0).Max();

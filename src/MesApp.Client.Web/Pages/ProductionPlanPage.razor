@@ -1,0 +1,29 @@
+@page "/production-plans"
+@attribute [Authorize]
+
+<PageTitle>@L["生産計画・予実 - Parallel Factory MES"]</PageTitle>
+
+<h1>@L["生産計画・予実"]</h1>
+<p class="text-muted">@L["製造日×品目×工程の計画数量を登録し、工程ごとの出来高と突き合わせる（A-30-10-01）。MESは計画を立てず、外から来た計画を受け取る。"]</p>
+
+<div class="tabs">
+    <button class="@TabClass("entry")" @onclick='() => _tab = "entry"'>@L["計画登録"]</button>
+    <button class="@TabClass("actual")" @onclick='() => _tab = "actual"'>@L["予実"]</button>
+</div>
+
+@* タブの中身はそれぞれが自分で読み込む（MastersPage と同じ形） *@
+@switch (_tab)
+{
+    case "entry":
+        <PlanEntryTab />
+        break;
+    case "actual":
+        <PlanActualTab />
+        break;
+}
+
+@code {
+    private string _tab = "entry";
+
+    private string TabClass(string tab) => _tab == tab ? "active" : string.Empty;
+}

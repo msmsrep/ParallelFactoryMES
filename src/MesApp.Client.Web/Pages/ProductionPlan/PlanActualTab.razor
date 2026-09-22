@@ -1,0 +1,193 @@
+@inject HttpClient Http
+
+@* 工程別の予実（Spec.md 3.1。A-30-10-01）。製造日×品目×工程で計画と出来高を突き合わせる。
+   集計（開始時刻の製造日での振り分け・リワーク除外・作業区の揃え方）はすべて API が行い、画面では数えない *@
+<Notice Error="@_error" />
+
+<div class="card">
+    <PeriodPicker OnChanged="OnRangeChangedAsync" />
+    <div class="form-grid">
+        <div class="form-field">
+            <label>@L["品目"]</label>
+            <select value="@_productId" @onchange="e => OnFilterChangedAsync(() => _productId = ToId(e))">
+                <option value="0">@L["（すべて）"]</option>
+                @foreach (var product in _products)
+                {
+                    <option value="@product.Id">@product.Code @product.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>@L["工程"]</label>
+            <select value="@_processId" @onchange="e => OnFilterChangedAsync(() => _processId = ToId(e))">
+                <option value="0">@L["（すべて）"]</option>
+                @foreach (var process in _processes)
+                {
+                    <option value="@process.Id">@process.Code @process.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>@L["作業区（配下を含む）"]</label>
+            <select value="@_workCenterId" @onchange="e => OnFilterChangedAsync(() => _workCenterId = ToId(e))">
+                <option value="0">@L["（すべて）"]</option>
+                @foreach (var workCenter in _workCenters)
+                {
+                    <option value="@workCenter.Id">@workCenter.Code @workCenter.Name（@EnumLabels.Of(workCenter.Level)）</option>
+                }
+            </select>
+        </div>
+    </div>
+    <p class="text-muted">@L["実績は工程ごとの良品数（開始した製造日に集計し、リワーク指図の産出は数えない）。作業区で絞ると、計画・実績とも作業区が配下にあるものだけになる。"]</p>
+</div>
+
+@if (_rows is null)
+{
+    <p class="text-muted">@L["読み込み中..."]</p>
+}
+else
+{
+    <div class="card">
+        @if (_shown is not { ProductId: not 0, ProcessId: not 0 } shown)
+        {
+            @* 品目や工程をまたいで数量を足しても意味が無い（単位が違い、工程ごとの出来高を重ねて数えることになる）ので、グラフは1品目・1工程に絞ったときだけ出す *@
+            <p class="text-muted">@L["品目と工程を1つずつ選ぶと、日ごとの計画（棒）と実績（折れ線）をグラフで表示する。"]</p>
+        }
+        else
+        {
+            var days = Days(shown.Range);
+            var byDate = _rows.ToDictionary(r => r.BusinessDate);
+            var unit = _products.FirstOrDefault(p => p.Id == shown.ProductId)?.Unit;
+            var planned = days.Select(d => byDate.TryGetValue(d, out var r) ? r.PlannedQuantity : (decimal?)null).ToList();
+            var actual = days.Select(d => byDate.TryGetValue(d, out var r) ? r.ActualQuantity : (decimal?)null).ToList();
+            // 計画と実績は同じ単位なので、左右の軸の目盛りをそろえる（ずれると実績が計画を超えたように見える）
+            var top = planned.Concat(actual).Select(v => v ?? 0).DefaultIfEmpty(0).Max();
+            <ComboChart Labels="@([.. days.Select(d => d.ToString("MM-dd"))])" AriaLabel="@L["製造日ごとの計画数量と実績数量"]"
+                        Bars="@([new ChartSeries(L["計画数量"], "var(--primary)", planned)])"
+                        Lines="@([new ChartSeries(L["実績数量"], "var(--success)", actual)])"
+                        BarUnit="@unit" LineUnit="@unit" BarMinTop="@top" LineMinTop="@Math.Max(top, 1m)" />
+        }
+    </div>
+
+    <div class="card">
+        @if (_rows.Count == 0)
+        {
+            <p class="text-muted">@L["この期間の計画・実績はありません。"]</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr><th>@L["製造日"]</th><th>@L["品目"]</th><th>@L["工程"]</th><th>@L["計画数量"]</th><th>@L["実績数量"]</th><th>@L["達成率"]</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _rows)
+                    {
+                        <tr>
+                            <td>@row.BusinessDate.ToString("yyyy-MM-dd")</td>
+                            <td>@row.ProductCode @row.ProductName</td>
+                            <td>@row.ProcessCode @row.ProcessName</td>
+                            <td>@row.PlannedQuantity.ToString("0.###")</td>
+                            <td>@row.ActualQuantity.ToString("0.###")</td>
+                            <td>@(row.AchievementRate is { } rate ? $"{rate:0.0}%" : "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+@code {
+    private List<ProductResponse> _products = [];
+    private List<ProcessResponse> _processes = [];
+    private List<WorkCenterResponse> _workCenters = [];
+    private List<ProductionPlanActualRow>? _rows;
+
+    /// <summary>いま表示している _rows を取ったときの条件（グラフは選択中の値ではなくこちらで描く）</summary>
+    private sealed record Shown(PeriodPicker.Range Range, int ProductId, int ProcessId);
+    private Shown? _shown;
+    private int _requestNo;
+
+    private PeriodPicker.Range? _range;
+    private int _productId;
+    private int _processId;
+    private int _workCenterId;
+
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _products = [.. (await Http.GetFromJsonAsync<List<ProductResponse>>("api/products") ?? []).Where(p => p.IsActive)];
+        _processes = [.. (await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? []).Where(p => p.IsActive)];
+        _workCenters = [.. (await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers") ?? []).Where(w => w.IsActive)];
+    }
+
+    private Task OnRangeChangedAsync(PeriodPicker.Range range)
+    {
+        _range = range;
+        return LoadAsync();
+    }
+
+    private Task OnFilterChangedAsync(Action apply)
+    {
+        apply();
+        return LoadAsync();
+    }
+
+    private static int ToId(ChangeEventArgs e) => int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+
+    private async Task LoadAsync()
+    {
+        if (_range is null)
+        {
+            return;
+        }
+        var query = $"api/production-plans/plan-actual?from={_range.From:yyyy-MM-dd}&to={_range.To:yyyy-MM-dd}";
+        if (_productId != 0)
+        {
+            query += $"&productId={_productId}";
+        }
+        if (_processId != 0)
+        {
+            query += $"&processId={_processId}";
+        }
+        if (_workCenterId != 0)
+        {
+            query += $"&workCenterId={_workCenterId}";
+        }
+        _error = null;
+        var shown = new Shown(_range, _productId, _processId);
+        // 期間・条件を続けて変えると応答の順が入れ替わることがある。最後に出した要求の結果だけを使う
+        var requestNo = ++_requestNo;
+        var response = await Http.GetAsync(query);
+        if (requestNo != _requestNo)
+        {
+            return;
+        }
+        if (await response.ReadErrorAsync(L["予実を取得できませんでした。"]) is { } error)
+        {
+            _error = error;
+            _rows = [];
+            _shown = null;
+            return;
+        }
+        var rows = await response.Content.ReadFromJsonAsync<List<ProductionPlanActualRow>>() ?? [];
+        if (requestNo == _requestNo)
+        {
+            _rows = rows;
+            _shown = shown;
+        }
+    }
+
+    /// <summary>グラフの横軸（期間の製造日を1日ずつ。計画も実績も無い日は空けて並べる）</summary>
+    private static List<DateOnly> Days(PeriodPicker.Range range)
+    {
+        var days = new List<DateOnly>();
+        for (var d = range.From; d <= range.To; d = d.AddDays(1))
+        {
+            days.Add(d);
+        }
+        return days;
+    }
+}

@@ -4062,4 +4062,97 @@
   <data name="セットアップに失敗しました。パスワード要件（8文字以上・英小文字・数字）を確認してください。" xml:space="preserve">
     <value>Setup failed. Check the password requirements (8+ characters, lowercase letters and digits).</value>
   </data>
+  <data name="生産計画・予実" xml:space="preserve">
+    <value>Production Plan vs. Actual</value>
+  </data>
+  <data name="（すべて）" xml:space="preserve">
+    <value>(All)</value>
+  </data>
+  <data name="作業区（配下を含む）" xml:space="preserve">
+    <value>Work center (including subordinates)</value>
+  </data>
+  <data name="実績は工程ごとの良品数（開始した製造日に集計し、リワーク指図の産出は数えない）。作業区で絞ると、計画・実績とも作業区が配下にあるものだけになる。" xml:space="preserve">
+    <value>Actual is the good quantity per process (counted on the production date it started; output of rework orders is excluded). When filtered by work center, both plan and actual include only records whose work center is under it.</value>
+  </data>
+  <data name="品目と工程を1つずつ選ぶと、日ごとの計画（棒）と実績（折れ線）をグラフで表示する。" xml:space="preserve">
+    <value>Select one product and one process to chart the daily plan (bars) and actual (line).</value>
+  </data>
+  <data name="製造日ごとの計画数量と実績数量" xml:space="preserve">
+    <value>Planned and actual quantity by production date</value>
+  </data>
+  <data name="実績数量" xml:space="preserve">
+    <value>Actual Quantity</value>
+  </data>
+  <data name="この期間の計画・実績はありません。" xml:space="preserve">
+    <value>No plan or actual in this period.</value>
+  </data>
+  <data name="製造日" xml:space="preserve">
+    <value>Production date</value>
+  </data>
+  <data name="達成率" xml:space="preserve">
+    <value>Achievement rate</value>
+  </data>
+  <data name="予実を取得できませんでした。" xml:space="preserve">
+    <value>Could not load plan vs. actual.</value>
+  </data>
+  <data name="計画の登録" xml:space="preserve">
+    <value>Register plan</value>
+  </data>
+  <data name="計画の変更" xml:space="preserve">
+    <value>Edit plan</value>
+  </data>
+  <data name="作業区（任意）" xml:space="preserve">
+    <value>Work center (optional)</value>
+  </data>
+  <data name="（指定なし）" xml:space="preserve">
+    <value>(None)</value>
+  </data>
+  <data name="計画数量 0 は計画上の休止を表す。同じ製造日・品目・工程・作業区の計画は二重に登録できない（変更は一覧の「編集」から行う）。" xml:space="preserve">
+    <value>A planned quantity of 0 means a planned stop. A plan with the same production date, product, process and work center cannot be registered twice (use Edit in the list to change it).</value>
+  </data>
+  <data name="製造日（から）" xml:space="preserve">
+    <value>Production date (from)</value>
+  </data>
+  <data name="製造日（まで）" xml:space="preserve">
+    <value>Production date (to)</value>
+  </data>
+  <data name="条件に合う生産計画はありません。" xml:space="preserve">
+    <value>No production plans match the conditions.</value>
+  </data>
+  <data name="生産計画を取得できませんでした。" xml:space="preserve">
+    <value>Could not load production plans.</value>
+  </data>
+  <data name="品目と工程を選択してください。" xml:space="preserve">
+    <value>Select a product and a process.</value>
+  </data>
+  <data name="生産計画を登録しました。" xml:space="preserve">
+    <value>Production plan registered.</value>
+  </data>
+  <data name="生産計画を更新しました。" xml:space="preserve">
+    <value>Production plan updated.</value>
+  </data>
+  <data name="削除に失敗しました。" xml:space="preserve">
+    <value>Failed to delete.</value>
+  </data>
+  <data name="生産計画を削除しました。" xml:space="preserve">
+    <value>Production plan deleted.</value>
+  </data>
+  <data name="生産計画・予実 - Parallel Factory MES" xml:space="preserve">
+    <value>Production Plan vs. Actual - Parallel Factory MES</value>
+  </data>
+  <data name="製造日×品目×工程の計画数量を登録し、工程ごとの出来高と突き合わせる（A-30-10-01）。MESは計画を立てず、外から来た計画を受け取る。" xml:space="preserve">
+    <value>Register planned quantities by production date × product × process and compare them with the output of each process (A-30-10-01). The MES does not create plans; it receives plans from outside.</value>
+  </data>
+  <data name="計画登録" xml:space="preserve">
+    <value>Plan entry</value>
+  </data>
+  <data name="予実" xml:space="preserve">
+    <value>Plan vs. actual</value>
+  </data>
+  <data name="生産計画" xml:space="preserve">
+    <value>Production plans</value>
+  </data>
+  <data name="製造日＋品目コード＋工程コード＋作業区コード" xml:space="preserve">
+    <value>production date + product code + process code + work center code</value>
+  </data>
 </root>

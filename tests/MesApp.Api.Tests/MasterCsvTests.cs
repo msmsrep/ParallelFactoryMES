@@ -5,6 +5,7 @@ using System.Text;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Dashboard;
 using MesApp.Core.Contracts.Masters;
+using MesApp.Core.Contracts.Planning;
 using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
 
@@ -1089,6 +1090,91 @@ public class MasterCsvTests
         Assert.True(kept.Succeeded, string.Join(" / ", kept.Errors.Select(e => e.Message)));
     }
 
+    [Fact]
+    public async Task 生産計画はキーで上書きし作業区なしも1つのキーとして扱う()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(admin, "processes", "Code,Name\nPR-01,組立\nPR-02,検査\n")).Succeeded);
+        Assert.True((await ImportAsync(admin, "products", "Code,Name,Unit\nFG-1,製品1,個\n")).Succeeded);
+        Assert.True((await ImportAsync(admin, "work-centers", "Code,Name,Level\nPL,工場,Plant\n")).Succeeded);
+
+        var first = await ImportAsync(admin, "production-plans", """
+            BusinessDate,ProductCode,ProcessCode,WorkCenterCode,PlannedQuantity,Note
+            2026-10-01,FG-1,PR-01,,100,
+            2026-10-02,FG-1,PR-01,PL,50,工場分
+            2026-10-02,FG-1,PR-02,,0,休止
+            """);
+        Assert.True(first.Succeeded, string.Join(" / ", first.Errors.Select(e => e.Message)));
+        Assert.Equal(3, first.Created);
+
+        // 作業区が空欄の行は、同じ製造日・品目・工程の作業区なしの計画を上書きする（二重に追加しない）
+        var revised = await ImportAsync(admin, "production-plans", """
+            BusinessDate,ProductCode,ProcessCode,WorkCenterCode,PlannedQuantity
+            2026-10-01,FG-1,PR-01,,120
+            2026-10-03,FG-1,PR-01,,10
+            """);
+        Assert.True(revised.Succeeded, string.Join(" / ", revised.Errors.Select(e => e.Message)));
+        Assert.Equal((1, 1), (revised.Created, revised.Updated));
+        var plans = (await admin.GetFromJsonAsync<List<ProductionPlanResponse>>("/api/production-plans"))!;
+        Assert.Equal(4, plans.Count);
+        Assert.Equal(120m, plans.Single(p => p.BusinessDate == new DateOnly(2026, 10, 1) && p.WorkCenterId is null).PlannedQuantity);
+        Assert.Equal(50m, plans.Single(p => p.WorkCenterCode == "PL").PlannedQuantity);
+        // Note 列が無いファイルでは備考を保つ
+        Assert.Equal("休止", plans.Single(p => p.ProcessCode == "PR-02").Note);
+
+        // CSVで入れた作業区なしの計画は、単票APIでも同じキーとして重複になる（判定が共通）
+        var nullKey = plans.Single(p => p.BusinessDate == new DateOnly(2026, 10, 3));
+        var conflict = await admin.PostAsJsonAsync("/api/production-plans", new ProductionPlanRequest(
+            nullKey.BusinessDate, nullKey.ProductId, nullKey.ProcessId, null, 5m, null));
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+
+        // 存在しないコード・負の数量・ファイル内のキー重複、作業区なしと作業区ありの混在（既存との間・ファイル内とも）は
+        // エラーで、正しい行も含めて全体を取り消す
+        var invalid = await ImportAsync(admin, "production-plans", """
+            BusinessDate,ProductCode,ProcessCode,WorkCenterCode,PlannedQuantity
+            2026-10-04,FG-1,PR-01,,10
+            2026-10-05,FG-X,PR-01,,10
+            2026-10-05,FG-1,PR-01,WC-X,10
+            2026-10-05,FG-1,PR-01,,-1
+            2026-10-06,FG-1,PR-01,,5
+            2026-10-06,FG-1,PR-01,,6
+            2026-10-01,FG-1,PR-01,PL,10
+            2026-10-07,FG-1,PR-01,,1
+            2026-10-07,FG-1,PR-01,PL,1
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Equal([3, 4, 5, 7, 8, 9, 10], invalid.Errors.Select(e => e.Line).Order());
+        Assert.Equal(4, (await admin.GetFromJsonAsync<List<ProductionPlanResponse>>("/api/production-plans"))!.Count);
+
+        // 画面の出力（api/production-plans/csv）は一覧と同じ条件で絞れる。列は取込と同じ
+        var oneDay = await admin.GetStringAsync("/api/production-plans/csv?from=2026-10-02&to=2026-10-02");
+        Assert.Equal(3, oneDay.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
+        var underPlant = await admin.GetStringAsync(
+            $"/api/production-plans/csv?workCenterId={plans.Single(p => p.WorkCenterCode == "PL").WorkCenterId}");
+        Assert.Equal(2, underPlant.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await admin.GetAsync("/api/production-plans/csv?from=2026-10-02&to=2026-10-01")).StatusCode);
+
+        // 出力したCSVをそのまま取り込み直しても差分が出ない
+        var exported = await admin.GetStringAsync("/api/production-plans/csv");
+        Assert.Equal(exported, await admin.GetStringAsync("/api/masters/csv/production-plans"));
+        var roundTrip = await ImportAsync(admin, "production-plans", exported);
+        Assert.True(roundTrip.Succeeded, string.Join(" / ", roundTrip.Errors.Select(e => e.Message)));
+        Assert.Equal((0, 4), (roundTrip.Created, roundTrip.Updated));
+        Assert.Equal(exported, await admin.GetStringAsync("/api/production-plans/csv"));
+        var after = (await admin.GetFromJsonAsync<List<ProductionPlanResponse>>("/api/production-plans"))!;
+        Assert.Equal(plans.Select(p => p.UpdatedAt), after.Select(p => p.UpdatedAt));
+
+        // 取込の権限は単票の登録と同じ（ProductionManage）。作業者は出力できるが取り込めない
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "op1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.OK, (await operator_.GetAsync("/api/production-plans/csv")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostCsvAsync(operator_, "production-plans", exported)).StatusCode);
+        var kind = (await admin.GetFromJsonAsync<List<CsvKindInfo>>("/api/masters/csv/kinds"))!
+            .Single(k => k.Kind == "production-plans");
+        Assert.Equal(MesRoleGroups.ProductionManage, kind.WriteRoles);
+    }
+
     private static async Task<CsvImportResult> ImportAsync(
         HttpClient client, string kind, string csv, bool dryRun = false)
     {
@@ -1137,6 +1223,10 @@ public class MasterCsvTests
         using var client = await TestAuth.CreateAdminClientAsync(factory);
         var masters = await PostBundleAsync(client, "masters", ZipDirectory(FindSampleDirectory()));
         Assert.True(masters.Succeeded, Describe(masters));
+        // 同じ期間の生産計画（マスタでも実績でもないので、別フォルダから計画登録タブと同じ口で取り込む）
+        var plans = await ImportAsync(client, "production-plans",
+            await File.ReadAllTextAsync(Path.Combine(FindSampleDirectory("production-plans"), "production-plans.csv")));
+        Assert.True(plans.Succeeded, string.Join(" / ", plans.Errors.Select(e => $"{e.Line}行目 {e.Message}")));
 
         // 指図・生産実績・設備稼働記録（equipment-logs）の3ファイル
         var bulk = await PostBundleAsync(client, "actuals", ZipDirectory(FindSampleDirectory("actual-csv-bulk")));
@@ -1170,6 +1260,24 @@ public class MasterCsvTests
         var byLine = await client.GetFromJsonAsync<DashboardSummaryResponse>(
             "/api/dashboard/breakdown?from=2026-06-29&to=2026-09-20&axis=Line");
         Assert.Contains(byLine!.Rows, r => r.Key == "LN-MC" && r.UtilizationRate is not null);
+
+        // 予実：生産計画のサンプル（samples/production-plans）は同じ期間なので、計画の無い生産は無く、達成率はおおむね100%前後
+        var planActual = (await client.GetFromJsonAsync<List<ProductionPlanActualRow>>(
+            "/api/production-plans/plan-actual?from=2026-06-29&to=2026-09-20"))!;
+        Assert.All(planActual, r => Assert.True(r.PlannedQuantity > 0 || r.ActualQuantity == 0, $"{r.BusinessDate} {r.ProcessCode}"));
+        Assert.All(planActual.GroupBy(r => r.ProcessCode), g =>
+        {
+            var rate = g.Sum(r => r.ActualQuantity) / g.Sum(r => r.PlannedQuantity);
+            Assert.InRange(rate, 0.9m, 1.1m);
+        });
+        // お盆休みは計画0（計画上の休止）で、達成率を出さない
+        var obonPlan = planActual.Single(r => r.BusinessDate == new DateOnly(2026, 8, 12) && r.ProcessCode == "PR-10");
+        Assert.Equal((0m, 0m, (decimal?)null), (obonPlan.PlannedQuantity, obonPlan.ActualQuantity, obonPlan.AchievementRate));
+        // 工具摩耗の週（8/24〜）は、前の週より加工の達成率が下がる
+        decimal MachiningRate(DateOnly from) => planActual
+            .Where(r => r.ProcessCode == "PR-10" && r.BusinessDate >= from && r.BusinessDate < from.AddDays(7))
+            .Aggregate((a: 0m, p: 0m), (s, r) => (s.a + r.ActualQuantity, s.p + r.PlannedQuantity), s => s.a / s.p);
+        Assert.True(MachiningRate(new DateOnly(2026, 8, 24)) < MachiningRate(new DateOnly(2026, 8, 17)));
 
         // 設備稼働記録CSVも単票APIと同じ判定を通る（停止には原因が要る、設備は資産番号で指す）
         var invalid = await Phase3TestData.ImportActualCsvAsync(client, "equipment-logs",
@@ -1279,16 +1387,18 @@ public class MasterCsvTests
     [Fact]
     public async Task 全マスタを番号付きZIPで出力しそのまま別のDBへ取り込める()
     {
-        // 番号の順は全種別を網羅している（種別を追加したら ImportOrder にも入れる）
+        // 番号の順はマスタでない種別（生産計画）を除く全種別を網羅している（種別を追加したら ImportOrder か Standalone に入れる）
         Assert.Equal(
             MesApp.Api.Services.MasterCsvKinds.All.Select(k => k.Kind).Order(),
-            MesApp.Api.Services.MasterCsvKinds.ImportOrder.Order());
+            MesApp.Api.Services.MasterCsvKinds.ImportOrder.Concat(MesApp.Api.Services.MasterCsvKinds.Standalone).Order());
 
         byte[] exported;
         using (var source = new ApiFactory())
         {
             using var admin = await TestAuth.CreateAdminClientAsync(source);
             Assert.True((await PostBundleAsync(admin, "masters", ZipDirectory(FindSampleDirectory()))).Succeeded);
+            Assert.True((await ImportAsync(admin, "production-plans",
+                "BusinessDate,ProductCode,ProcessCode,WorkCenterCode,PlannedQuantity\n2026-10-01,FG-1000,PR-10,LN-MC,80\n")).Succeeded);
             var response = await admin.GetAsync("/api/masters/csv/bundle");
             response.EnsureSuccessStatusCode();
             Assert.Equal("application/zip", response.Content.Headers.ContentType!.MediaType);
@@ -1302,8 +1412,10 @@ public class MasterCsvTests
             Assert.Contains("04_products.csv", managerNames);
         }
         var names = EntryNames(exported);
+        // 生産計画はマスタではないので、計画があっても一括出力には入らない
         Assert.Equal(19, names.Count);
         Assert.Equal("01_work-centers.csv", names[0]);
+        Assert.Equal("19_user-skills.csv", names[^1]);
 
         // パスワードは出力しないため、ユーザー系を除けば空のDBへそのまま取り込める
         using var target = new ApiFactory();
@@ -1313,6 +1425,15 @@ public class MasterCsvTests
         var products = (await targetAdmin.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!;
         Assert.Equal(12, products.Count);
         Assert.Equal("WH-P01", products.Single(p => p.Code == "FG-1000").DefaultLocationCode);
+        Assert.Empty((await targetAdmin.GetFromJsonAsync<List<ProductionPlanResponse>>("/api/production-plans"))!);
+
+        // 生産計画のCSVを入れたZIPは、マスタの一括取込で受け付けない（計画登録タブから取り込む）
+        var withPlan = await PostBundleRawAsync(targetAdmin, "masters", ZipFiles(
+            ("01_processes.csv", "Code,Name\nPR-99,検査\n"),
+            ("02_production-plans.csv", "BusinessDate,ProductCode,ProcessCode,PlannedQuantity\n2026-10-01,FG-1000,PR-99,1\n")));
+        Assert.Equal(HttpStatusCode.BadRequest, withPlan.StatusCode);
+        Assert.Contains("02_production-plans.csv", await withPlan.Content.ReadAsStringAsync());
+        Assert.DoesNotContain((await targetAdmin.GetFromJsonAsync<List<ProcessResponse>>("/api/processes"))!, p => p.Code == "PR-99");
     }
 
     private static string Describe(CsvBundleImportResult result) =>
