@@ -1863,4 +1863,7 @@
   <data name="、" xml:space="preserve">
     <value>, </value>
   </data>
+  <data name="製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}' の計画は、同じ作業区で既に登録されています。" xml:space="preserve">
+    <value>A plan for item '{1}' and process '{2}' on business date {0:yyyy-MM-dd} is already registered for the same work center.</value>
+  </data>
 </root>

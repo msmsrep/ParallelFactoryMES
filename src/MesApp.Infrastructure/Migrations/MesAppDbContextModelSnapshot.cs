@@ -1960,6 +1960,51 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("ProductionDefects");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.ProductionPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("PlannedQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProcessId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("WorkCenterId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("WorkCenterId");
+
+                    b.HasIndex("BusinessDate", "ProductId", "ProcessId", "WorkCenterId")
+                        .IsUnique();
+
+                    b.ToTable("ProductionPlans");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.ProductionRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -4014,6 +4059,32 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("DefectReason");
 
                     b.Navigation("ProductionRecord");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.ProductionPlan", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.ProcessMaster", "Process")
+                        .WithMany()
+                        .HasForeignKey("ProcessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
+                        .WithMany()
+                        .HasForeignKey("WorkCenterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Process");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("WorkCenter");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.ProductionRecord", b =>
