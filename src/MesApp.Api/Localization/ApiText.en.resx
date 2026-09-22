@@ -1380,8 +1380,8 @@
   <data name="代替部品" xml:space="preserve">
     <value>Substitute part</value>
   </data>
-  <data name="true / false。trueの行を投入するには理由の記録が必要" xml:space="preserve">
-    <value>true / false. Consuming a true row requires recording a reason</value>
+  <data name="true / false。trueの行はAlternativeGroupが必須で、投入するには理由の記録が必要" xml:space="preserve">
+    <value>true / false. A true row requires AlternativeGroup, and consuming it requires recording a reason</value>
   </data>
   <data name="工順（BOP）" xml:space="preserve">
     <value>Routing (BOP)</value>
@@ -1704,8 +1704,8 @@
   <data name="バックフラッシュ" xml:space="preserve">
     <value>Backflush</value>
   </data>
-  <data name="true で予定材料×(良品+不良)を先入れ先出しで自動消費" xml:space="preserve">
-    <value>true consumes planned materials × (good + defect) automatically by FIFO</value>
+  <data name="true でこの工程で使う予定材料を 原単位×(良品+不良) だけ先入れ先出しで自動消費（代替部品は引かない）" xml:space="preserve">
+    <value>true consumes the planned materials used at this step (quantity per × (good + defect)) first-in first-out (substitutes are not consumed)</value>
   </data>
   <data name="不良理由別の内訳" xml:space="preserve">
     <value>Defects by reason</value>
@@ -2012,5 +2012,8 @@
   </data>
   <data name="親品目 '{0}'：{1}" xml:space="preserve">
     <value>Parent item '{0}': {1}</value>
+  </data>
+  <data name="グループの主材料（IsAlternative=false）はちょうど1つ" xml:space="preserve">
+    <value>Exactly one primary material (IsAlternative=false) per group</value>
   </data>
 </root>
