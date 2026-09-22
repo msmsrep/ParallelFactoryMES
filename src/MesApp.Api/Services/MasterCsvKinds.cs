@@ -29,6 +29,7 @@ public static class MasterCsvKinds
     public const string InspectionDevices = "inspection-devices";
     public const string Users = "users";
     public const string UserSkills = "user-skills";
+    public const string ProductionPlans = "production-plans";
 
     public static readonly List<CsvKindInfo> All =
     [
@@ -227,6 +228,21 @@ public static class MasterCsvKinds
             new("AcquiredOn", "取得日", false, "yyyy-MM-dd"),
             new("ExpiresOn", "有効期限", false, "yyyy-MM-dd"),
         ]),
+        // 生産計画は業務データだが、改訂のたびに同じキーを上書きしたいので実績CSV（常に新規登録）でなく
+        // マスタCSV（キーでupsert）に乗せる（Spec.md 3.8・5.2 ProductionPlan。A-30-10-01）
+        new(ProductionPlans, "生産計画", false,
+        [
+            new("BusinessDate", "製造日", true, "yyyy-MM-dd。製造日・品目・工程・作業区が同じなら計画数量を上書き、無ければ新規登録"),
+            new("ProductCode", "品目コード", true, "登録済みの品目コード"),
+            new("ProcessCode", "工程コード", true, "登録済みの工程コード"),
+            new("WorkCenterCode", "作業区コード", false, "登録済みの作業区コード（段は問わない）。空欄も1つのキーとして扱う"),
+            new("PlannedQuantity", "計画数量", true, "0以上。0は計画上の休止"),
+            new("Note", "備考", false, null),
+        ])
+        {
+            // 単票の api/production-plans と同じ権限（ProductionPlansController）
+            WriteRoles = MesRoleGroups.ProductionManage,
+        },
     ];
 
     /// <summary>
@@ -238,7 +254,7 @@ public static class MasterCsvKinds
     [
         WorkCenters, Processes, Locations, Products, Skills, Shifts, Equipments, EquipmentParts, Tools,
         Checklists, DefectReasons, InspectionItems, ControlItems, InspectionDevices, Bom, WorkProcedures,
-        Routing, Users, UserSkills,
+        Routing, Users, UserSkills, ProductionPlans,
     ];
 
     public static CsvKindInfo? Find(string kind) =>

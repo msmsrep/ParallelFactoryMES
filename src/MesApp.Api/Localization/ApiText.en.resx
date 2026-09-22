@@ -1864,6 +1864,30 @@
     <value>, </value>
   </data>
   <data name="製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}' の計画は、同じ作業区で既に登録されています。" xml:space="preserve">
-    <value>A plan for item '{1}' and process '{2}' on business date {0:yyyy-MM-dd} is already registered for the same work center.</value>
+    <value>A plan for product '{1}' and process '{2}' on production date {0:yyyy-MM-dd} is already registered for the same work center.</value>
+  </data>
+  <data name="生産計画" xml:space="preserve">
+    <value>Production plans</value>
+  </data>
+  <data name="製造日" xml:space="preserve">
+    <value>Production date</value>
+  </data>
+  <data name="計画数量" xml:space="preserve">
+    <value>Planned quantity</value>
+  </data>
+  <data name="yyyy-MM-dd。製造日・品目・工程・作業区が同じなら計画数量を上書き、無ければ新規登録" xml:space="preserve">
+    <value>yyyy-MM-dd. If the production date, product, process and work center match an existing plan, its planned quantity is overwritten; otherwise a new plan is registered</value>
+  </data>
+  <data name="登録済みの作業区コード（段は問わない）。空欄も1つのキーとして扱う" xml:space="preserve">
+    <value>Registered work center code (any level). A blank value is also treated as a key</value>
+  </data>
+  <data name="0以上。0は計画上の休止" xml:space="preserve">
+    <value>0 or more. 0 means a planned stop</value>
+  </data>
+  <data name="計画数量は0以上で指定してください（{0}）。" xml:space="preserve">
+    <value>Planned quantity must be 0 or more ({0}).</value>
+  </data>
+  <data name="製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}'・作業区 '{3}' の計画が複数行にあります。" xml:space="preserve">
+    <value>The plan for product '{1}', process '{2}' and work center '{3}' on production date {0:yyyy-MM-dd} appears on more than one row.</value>
   </data>
 </root>

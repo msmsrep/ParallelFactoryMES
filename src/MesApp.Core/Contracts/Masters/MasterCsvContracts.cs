@@ -42,7 +42,8 @@ public record CsvKindInfo(
     public bool UserAdminWrite { get; init; }
 
     /// <summary>
-    /// 取込に必要なロールグループ（実績CSVのみ。種別ごとに単票APIと同じ定数を返す）。
+    /// 取込に必要なロールグループ（実績CSVと、マスタ更新権限以外で絞るマスタCSV（生産計画）。
+    /// 種別ごとに単票APIと同じ定数を返す）。
     /// 画面は取込欄の表示制御にこの値を使い、APIと画面で別々にロールを書かない
     /// </summary>
     public string? WriteRoles { get; init; }

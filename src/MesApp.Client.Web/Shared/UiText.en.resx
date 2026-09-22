@@ -4149,4 +4149,10 @@
   <data name="予実" xml:space="preserve">
     <value>Plan vs. actual</value>
   </data>
+  <data name="生産計画" xml:space="preserve">
+    <value>Production plans</value>
+  </data>
+  <data name="製造日＋品目コード＋工程コード＋作業区コード" xml:space="preserve">
+    <value>production date + product code + process code + work center code</value>
+  </data>
 </root>

@@ -180,38 +180,17 @@ public class ProductionPlansController(
         return NoContent();
     }
 
-    /// <summary>参照先の存在と、キー（製造日・品目・工程・作業区）の重複を確かめる</summary>
+    /// <summary>判定は CSV取込と共通（<see cref="ProductionPlanPolicy"/>）。ここでは結果を ProblemDetails にするだけ</summary>
     private async Task<ActionResult?> ValidateAsync(ProductionPlanRequest request, int? excludeId, CancellationToken ct)
     {
-        var product = await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == request.ProductId, ct);
-        if (product is null)
+        var key = new ProductionPlanPolicy.PlanKey(
+            request.BusinessDate, request.ProductId, request.ProcessId, request.WorkCenterId);
+        return await ProductionPlanPolicy.CheckAsync(db, key, request.PlannedQuantity, excludeId, ct) switch
         {
-            return this.BadRequestProblem(ApiText.T("対象品目（ID {0}）が見つかりません。", request.ProductId));
-        }
-        var process = await db.Processes.AsNoTracking().FirstOrDefaultAsync(p => p.Id == request.ProcessId, ct);
-        if (process is null)
-        {
-            return this.BadRequestProblem(ApiText.T("対象工程（ID {0}）が見つかりません。", request.ProcessId));
-        }
-        if (request.WorkCenterId is { } wcId && !await db.WorkCenters.AnyAsync(w => w.Id == wcId, ct))
-        {
-            return this.BadRequestProblem(ApiText.T("作業区（ID {0}）が見つかりません。", wcId));
-        }
-
-        // 作業区なし（NULL）どうしも同じキーとみなす。DBの一意索引は NULL の行を止められない（PlanningConfigurations）
-        var duplicated = await db.ProductionPlans.AnyAsync(p =>
-            p.BusinessDate == request.BusinessDate
-            && p.ProductId == request.ProductId
-            && p.ProcessId == request.ProcessId
-            && (request.WorkCenterId == null ? p.WorkCenterId == null : p.WorkCenterId == request.WorkCenterId)
-            && (excludeId == null || p.Id != excludeId), ct);
-        if (duplicated)
-        {
-            return this.ConflictProblem(ApiText.T(
-                "製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}' の計画は、同じ作業区で既に登録されています。",
-                request.BusinessDate, product.Code, process.Code));
-        }
-        return null;
+            null => null,
+            { Conflict: true } v => this.ConflictProblem(v.Message),
+            var v => this.BadRequestProblem(v.Message),
+        };
     }
 
     private IQueryable<ProductionPlan> BaseQuery() =>

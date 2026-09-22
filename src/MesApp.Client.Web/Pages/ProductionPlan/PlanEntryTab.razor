@@ -62,6 +62,10 @@
     </div>
 </AuthorizeView>
 
+@* CSVはマスタCSVの仕組み（キーで上書き）に乗せる。取込の権限は単票の登録と同じ ProductionManage（Spec.md 3.8） *@
+<CsvIoPanel Kind="production-plans" Label="@L["生産計画"]" KeyLabel="@L["製造日＋品目コード＋工程コード＋作業区コード"]"
+            Roles="@MesRoleGroups.ProductionManage" OnImported="LoadAsync" />
+
 <div class="card">
     <div class="form-grid">
         <div class="form-field">
