@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using MesApp.Api.Localization;
+using System.Security.Claims;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
@@ -83,7 +84,7 @@ public class InspectionDevicesController(
     {
         if (await db.InspectionDevices.AnyAsync(d => d.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"検査機コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("検査機コード '{0}' は既に存在します。", request.Code));
         }
 
         var device = new InspectionDevice();
@@ -107,7 +108,7 @@ public class InspectionDevicesController(
         }
         if (await db.InspectionDevices.AnyAsync(d => d.Code == request.Code && d.Id != id, ct))
         {
-            return this.ConflictProblem($"検査機コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("検査機コード '{0}' は既に存在します。", request.Code));
         }
 
         Apply(device, request);

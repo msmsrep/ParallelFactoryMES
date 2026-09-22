@@ -3,34 +3,34 @@
 @inject HttpClient Http
 
 @* 出荷伝票（D-40-30-07） *@
-<PageTitle>出荷伝票 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["出荷伝票 - Parallel Factory MES"]</PageTitle>
 
 @if (_order is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
-    <PrintButton Label="出荷伝票を印刷 / PDF出力" />
+    <PrintButton Label="@L["出荷伝票を印刷 / PDF出力"]" />
 
     <div class="print-sheet">
-        <h1>出 荷 伝 票</h1>
+        <h1>@L["出 荷 伝 票"]</h1>
         <table class="table">
             <tbody>
                 <tr>
-                    <th>出荷番号</th><td>@_order.ShippingNo</td>
-                    <th>出荷先</th><td>@_order.Destination</td>
+                    <th>@L["出荷番号"]</th><td>@_order.ShippingNo</td>
+                    <th>@L["出荷先"]</th><td>@_order.Destination</td>
                 </tr>
                 <tr>
-                    <th>出荷予定日</th><td>@(_order.PlannedDate?.ToString("yyyy-MM-dd") ?? "-")</td>
-                    <th>出荷完了日</th><td>@(_order.ShippedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
+                    <th>@L["出荷予定日"]</th><td>@(_order.PlannedDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                    <th>@L["出荷完了日"]</th><td>@(_order.ShippedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
                 </tr>
             </tbody>
         </table>
 
-        <h2>出荷明細</h2>
+        <h2>@L["出荷明細"]</h2>
         <table class="table">
-            <thead><tr><th>品目コード</th><th>品目名</th><th>指示数量</th><th>出荷数量</th></tr></thead>
+            <thead><tr><th>@L["品目コード"]</th><th>@L["品目名"]</th><th>@L["指示数量"]</th><th>@L["出荷数量"]</th></tr></thead>
             <tbody>
                 @foreach (var line in _order.Lines)
                 {
@@ -44,9 +44,9 @@ else
             </tbody>
         </table>
 
-        <h2>受領確認欄</h2>
+        <h2>@L["受領確認欄"]</h2>
         <table class="table">
-            <thead><tr><th>受領日</th><th>受領者署名</th></tr></thead>
+            <thead><tr><th>@L["受領日"]</th><th>@L["受領者署名"]</th></tr></thead>
             <tbody><tr><td>　</td><td>　</td></tr></tbody>
         </table>
 

@@ -1,4 +1,5 @@
-﻿using MesApp.Api.Policies;
+﻿using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -51,7 +52,7 @@ public class ShiftsController(
     {
         if (await db.Shifts.AnyAsync(s => s.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"シフトコード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("シフトコード '{0}' は既に存在します。", request.Code));
         }
         if (await CheckScheduleAsync(request, null, ct) is { } error)
         {
@@ -83,7 +84,7 @@ public class ShiftsController(
         }
         if (await db.Shifts.AnyAsync(s => s.Code == request.Code && s.Id != id, ct))
         {
-            return this.ConflictProblem($"シフトコード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("シフトコード '{0}' は既に存在します。", request.Code));
         }
         if (await CheckScheduleAsync(request, id, ct) is { } error)
         {

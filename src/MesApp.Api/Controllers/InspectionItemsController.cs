@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -53,7 +54,7 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
     {
         if (await db.InspectionItems.AnyAsync(i => i.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"検査項目コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("検査項目コード '{0}' は既に存在します。", request.Code));
         }
         var error = await ValidateTargetsAsync(request, ct);
         if (error is not null)
@@ -93,7 +94,7 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
         }
         if (await db.InspectionItems.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return this.ConflictProblem($"検査項目コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("検査項目コード '{0}' は既に存在します。", request.Code));
         }
         var error = await ValidateTargetsAsync(request, ct);
         if (error is not null)
@@ -127,15 +128,15 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
     {
         if (request.TargetProductId is int productId && !await db.Products.AnyAsync(p => p.Id == productId, ct))
         {
-            return "存在しない対象品目IDです。";
+            return ApiText.T("存在しない対象品目IDです。");
         }
         if (request.TargetProcessId is int processId && !await db.Processes.AnyAsync(p => p.Id == processId, ct))
         {
-            return "存在しない対象工程IDです。";
+            return ApiText.T("存在しない対象工程IDです。");
         }
         if (request.LowerLimit is not null && request.UpperLimit is not null && request.LowerLimit > request.UpperLimit)
         {
-            return "規格値の下限が上限を超えています。";
+            return ApiText.T("規格値の下限が上限を超えています。");
         }
         return null;
     }

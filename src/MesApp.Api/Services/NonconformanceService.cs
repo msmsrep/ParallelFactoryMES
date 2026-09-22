@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
@@ -24,17 +25,17 @@ public sealed class NonconformanceService(
     {
         if (request.LotId is int lotId && !await db.Lots.AnyAsync(l => l.Id == lotId, ct))
         {
-            return Outcome<NonconformanceReport>.Invalid("存在しないロットIDです。");
+            return Outcome<NonconformanceReport>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
         if (request.WorkOrderId is int workOrderId
             && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
         {
-            return Outcome<NonconformanceReport>.Invalid("存在しない作業指示IDです。");
+            return Outcome<NonconformanceReport>.Invalid(ApiText.T("存在しない作業指示IDです。"));
         }
         if (request.InspectionOrderId is int inspectionOrderId
             && !await db.InspectionOrders.AnyAsync(i => i.Id == inspectionOrderId, ct))
         {
-            return Outcome<NonconformanceReport>.Invalid("存在しない検査指示IDです。");
+            return Outcome<NonconformanceReport>.Invalid(ApiText.T("存在しない検査指示IDです。"));
         }
 
         var report = new NonconformanceReport
@@ -68,11 +69,11 @@ public sealed class NonconformanceService(
             .FirstOrDefaultAsync(n => n.Id == id, ct);
         if (report is null)
         {
-            return Outcome<NonconformanceReport>.NotFound("存在しない不適合IDです。");
+            return Outcome<NonconformanceReport>.NotFound(ApiText.T("存在しない不適合IDです。"));
         }
         if (report.Status is NonconformanceStatus.Closed)
         {
-            return Outcome<NonconformanceReport>.Conflict("クローズ済みの不適合には対応指示できません。");
+            return Outcome<NonconformanceReport>.Conflict(ApiText.T("クローズ済みの不適合には対応指示できません。"));
         }
 
         report.Action = request.Action;
@@ -114,11 +115,11 @@ public sealed class NonconformanceService(
         var report = await db.NonconformanceReports.FirstOrDefaultAsync(n => n.Id == id, ct);
         if (report is null)
         {
-            return Outcome<NonconformanceReport>.NotFound("存在しない不適合IDです。");
+            return Outcome<NonconformanceReport>.NotFound(ApiText.T("存在しない不適合IDです。"));
         }
         if (report.Status != NonconformanceStatus.ActionInstructed)
         {
-            return Outcome<NonconformanceReport>.Conflict("対応指示済みの不適合のみ対応実績を記録できます。");
+            return Outcome<NonconformanceReport>.Conflict(ApiText.T("対応指示済みの不適合のみ対応実績を記録できます。"));
         }
 
         report.ActionRecord = request.Record;
@@ -141,15 +142,15 @@ public sealed class NonconformanceService(
             .FirstOrDefaultAsync(n => n.Id == id, ct);
         if (report is null)
         {
-            return Outcome<NonconformanceReport>.NotFound("存在しない不適合IDです。");
+            return Outcome<NonconformanceReport>.NotFound(ApiText.T("存在しない不適合IDです。"));
         }
         if (report.Status is NonconformanceStatus.Open)
         {
-            return Outcome<NonconformanceReport>.Conflict("対応指示前の不適合は承認できません。");
+            return Outcome<NonconformanceReport>.Conflict(ApiText.T("対応指示前の不適合は承認できません。"));
         }
         if (report.Status is NonconformanceStatus.Closed)
         {
-            return Outcome<NonconformanceReport>.Conflict("既にクローズ済みです。");
+            return Outcome<NonconformanceReport>.Conflict(ApiText.T("既にクローズ済みです。"));
         }
 
         report.ApprovedByUserId = userId;

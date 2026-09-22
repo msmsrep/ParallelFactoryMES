@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -42,7 +43,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
     {
         if (await db.Skills.AnyAsync(s => s.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"スキル・資格コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("スキル・資格コード '{0}' は既に存在します。", request.Code));
         }
         var s = new SkillMaster
         {
@@ -70,7 +71,7 @@ public class SkillsController(MesAppDbContext db, IAuditLogger auditLogger) : Co
         }
         if (await db.Skills.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return this.ConflictProblem($"スキル・資格コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("スキル・資格コード '{0}' は既に存在します。", request.Code));
         }
         s.Code = request.Code;
         s.Name = request.Name;

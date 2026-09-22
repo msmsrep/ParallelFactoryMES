@@ -7,24 +7,24 @@
 
 <div class="form-grid">
     <div class="form-field">
-        <label>内訳の軸</label>
+        <label>@L["内訳の軸"]</label>
         <select @bind="_axis" @bind:after="LoadAsync">
             @foreach (var axis in Enum.GetValues<DashboardAxis>())
             {
-                <option value="@axis">@(DashboardPeriods.AxisLabel(axis))別</option>
+                <option value="@axis">@L["{0}別", EnumLabels.Of(axis)]</option>
             }
         </select>
     </div>
     <div class="form-field">
-        <label>作業区で絞り込む</label>
+        <label>@L["作業区で絞り込む"]</label>
         <select @bind="_workCenterId" @bind:after="LoadAsync">
-            <option value="0">全作業区</option>
+            <option value="0">@L["全作業区"]</option>
             @foreach (var wc in _workCenters)
             {
                 <option value="@wc.Id">@wc.Code @wc.Name</option>
             }
         </select>
-        <span class="text-muted">上位（工場・ライン・エリア）を選ぶと配下をまとめて集計する</span>
+        <span class="text-muted">@L["上位（工場・ライン・エリア）を選ぶと配下をまとめて集計する"]</span>
     </div>
 </div>
 
@@ -32,37 +32,37 @@
 
 @if (_data is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
     @if (!_data.ProductionAvailable)
     {
-        <p class="text-muted">設備別では生産数・不良率を出していません（設備は差立で決まり作業指示に固定されないため、生産実績を設備へ分けられない）。</p>
+        <p class="text-muted">@L["設備別では生産数・不良率を出していません（設備は差立で決まり作業指示に固定されないため、生産実績を設備へ分けられない）。"]</p>
     }
     @if (!_data.UtilizationAvailable)
     {
-        <p class="text-muted">@(DashboardPeriods.AxisLabel(_dataAxis))別では稼働率を出していません（稼働記録は設備単位で、作業指示との紐付けが任意のため）。稼働率はライン・作業区・設備別で見る。</p>
+        <p class="text-muted">@L["{0}別では稼働率を出していません（稼働記録は設備単位で、作業指示との紐付けが任意のため）。稼働率はライン・作業区・設備別で見る。", EnumLabels.Of(_dataAxis)]</p>
     }
     @if (_data.Rows.Count == 0)
     {
-        <p class="text-muted">この期間の実績はありません。</p>
+        <p class="text-muted">@L["この期間の実績はありません。"]</p>
     }
     else
     {
-        var axisLabel = DashboardPeriods.AxisLabel(_dataAxis);
+        var axisLabel = EnumLabels.Of(_dataAxis);
         @if (_data.ProductionAvailable)
         {
             var production = _data.Rows
                 .Where(r => r.GoodQuantity is not null)
                 .OrderByDescending(r => (r.GoodQuantity ?? 0) + (r.DefectQuantity ?? 0))
                 .ToList();
-            <h2>@(axisLabel)別の生産数@(TopNote(production.Count))</h2>
-            <HBarChart AriaLabel="@($"{axisLabel}別の良品数・不良数")"
+            <h2>@L["{0}別の生産数", axisLabel]@(TopNote(production.Count))</h2>
+            <HBarChart AriaLabel="@L["{0}別の良品数・不良数", axisLabel]"
                        Items="@([.. production.Take(TopCount).Select(r => new HBarItem(r.Label,
                            [r.GoodQuantity ?? 0, r.DefectQuantity ?? 0],
-                           r.DefectRate is { } rate ? $"不良率 {rate:0.##}%" : null))])"
-                       Legend="@([new ChartLegendItem("良品数", "var(--primary)"), new ChartLegendItem("不良数", "var(--danger)")])" />
+                           r.DefectRate is { } rate ? L["不良率 {0:0.##}%", rate].Value : null))])"
+                       Legend="@([new ChartLegendItem(L["良品数"], "var(--primary)"), new ChartLegendItem(L["不良数"], "var(--danger)")])" />
         }
         @if (_data.UtilizationAvailable)
         {
@@ -70,29 +70,29 @@ else
                 .Where(r => r.UtilizationRate is not null)
                 .OrderByDescending(r => r.UtilizationRate)
                 .ToList();
-            <h2>@(axisLabel)別の設備稼働率@(TopNote(utilization.Count))</h2>
-            <HBarChart AriaLabel="@($"{axisLabel}別の設備稼働率")" Unit="%" MaxValue="100" LevelHighIsBad="false"
+            <h2>@L["{0}別の設備稼働率", axisLabel]@(TopNote(utilization.Count))</h2>
+            <HBarChart AriaLabel="@L["{0}別の設備稼働率", axisLabel]" Unit="%" MaxValue="100" LevelHighIsBad="false"
                        Items="@([.. utilization.Take(TopCount).Select(r => new HBarItem(r.Label,
                            [r.UtilizationRate ?? 0],
-                           $"故障 {r.FailureCount} 件"))])"
-                       Legend="@([new ChartLegendItem("設備稼働率", "var(--primary)")])" />
+                           L["故障 {0} 件", r.FailureCount ?? 0]))])"
+                       Legend="@([new ChartLegendItem(L["設備稼働率"], "var(--primary)")])" />
         }
 
         <table class="table">
             <thead>
                 <tr>
-                    <th>@DashboardPeriods.AxisLabel(_dataAxis)</th>
+                    <th>@EnumLabels.Of(_dataAxis)</th>
                     @if (_data.ProductionAvailable)
                     {
-                        <th>良品数</th>
-                        <th>不良数</th>
-                        <th>不良率</th>
+                        <th>@L["良品数"]</th>
+                        <th>@L["不良数"]</th>
+                        <th>@L["不良率"]</th>
                     }
                     @if (_data.UtilizationAvailable)
                     {
-                        <th>稼働時間 / 記録時間</th>
-                        <th>設備稼働率</th>
-                        <th>故障件数</th>
+                        <th>@L["稼働時間 / 記録時間"]</th>
+                        <th>@L["設備稼働率"]</th>
+                        <th>@L["故障件数"]</th>
                     }
                 </tr>
             </thead>
@@ -113,7 +113,7 @@ else
                                 }
                                 else
                                 {
-                                    <span class="text-muted">実績なし</span>
+                                    <span class="text-muted">@L["実績なし"]</span>
                                 }
                             </td>
                         }
@@ -128,7 +128,7 @@ else
                                 }
                                 else
                                 {
-                                    <span class="text-muted">記録なし</span>
+                                    <span class="text-muted">@L["記録なし"]</span>
                                 }
                             </td>
                             <td>@row.FailureCount</td>
@@ -153,7 +153,7 @@ else
     /// <summary>グラフに出す件数の上限（品目などは数が多く、全部並べると読めない。全件は表で見る）</summary>
     private const int TopCount = 10;
 
-    private static string TopNote(int count) => count > TopCount ? $"（上位{TopCount}件。全{count}件は下の表）" : "";
+    private string TopNote(int count) => count > TopCount ? L["（上位{0}件。全{1}件は下の表）", TopCount, count] : "";
     private int _requestNo;
 
     protected override async Task OnInitializedAsync()
@@ -184,7 +184,7 @@ else
         {
             return;
         }
-        if (await response.ReadErrorAsync("内訳の集計を取得できませんでした。") is { } error)
+        if (await response.ReadErrorAsync(L["内訳の集計を取得できませんでした。"]) is { } error)
         {
             _error = error;
             return;

@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using MesApp.Api.Localization;
+using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Common;
@@ -284,10 +285,10 @@ public class InventoryController(
 
         List<WarehouseProgressRow> rows =
         [
-            Row("出庫ピッキング", picking.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
-            Row("出荷", shipping.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
-            Row("在庫移動", transfer.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
-            Row("棚卸", stocktake.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
+            Row(ApiText.T("出庫ピッキング"), picking.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
+            Row(ApiText.T("出荷"), shipping.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
+            Row(ApiText.T("在庫移動"), transfer.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
+            Row(ApiText.T("棚卸"), stocktake.Select(x => (x.CreatedAt, x.Open, x.Canceled))),
         ];
         return new WarehouseProgressResponse(fromDate, toDate, rows);
 

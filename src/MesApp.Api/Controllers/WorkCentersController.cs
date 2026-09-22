@@ -1,4 +1,5 @@
-﻿using MesApp.Api.Policies;
+﻿using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
@@ -59,14 +60,14 @@ public class WorkCentersController(MesAppDbContext db, IAuditLogger auditLogger)
     {
         if (await db.WorkCenters.AnyAsync(w => w.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"作業区コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("作業区コード '{0}' は既に存在します。", request.Code));
         }
 
         var all = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
         var parent = request.ParentId is { } pid ? all.FirstOrDefault(x => x.Id == pid) : null;
         if (request.ParentId is { } missing && parent is null)
         {
-            return this.BadRequestProblem($"上位の資源（ID {missing}）が見つかりません。");
+            return this.BadRequestProblem(ApiText.T("上位の資源（ID {0}）が見つかりません。", missing));
         }
         if (WorkCenterHierarchyPolicy.Check(request.Code, request.Level, parent, null, all) is { } reason)
         {
@@ -100,14 +101,14 @@ public class WorkCentersController(MesAppDbContext db, IAuditLogger auditLogger)
         }
         if (await db.WorkCenters.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return this.ConflictProblem($"作業区コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("作業区コード '{0}' は既に存在します。", request.Code));
         }
 
         var all = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
         var parent = request.ParentId is { } pid ? all.FirstOrDefault(x => x.Id == pid) : null;
         if (request.ParentId is { } missing && parent is null)
         {
-            return this.BadRequestProblem($"上位の資源（ID {missing}）が見つかりません。");
+            return this.BadRequestProblem(ApiText.T("上位の資源（ID {0}）が見つかりません。", missing));
         }
         if (WorkCenterHierarchyPolicy.Check(request.Code, request.Level, parent, id, all) is { } reason)
         {
@@ -117,8 +118,7 @@ public class WorkCentersController(MesAppDbContext db, IAuditLogger auditLogger)
         if (w.Level != request.Level && all.Any(x => x.ParentId == id))
         {
             return this.BadRequestProblem(
-                $"'{w.Code}' には下位の資源があるため、段を変更できません" +
-                "（下位の資源を付け替えてから変更してください）。");
+                ApiText.T("'{0}' には下位の資源があるため、段を変更できません（下位の資源を付け替えてから変更してください）。", w.Code));
         }
 
         w.Code = request.Code;
@@ -139,7 +139,6 @@ public class WorkCentersController(MesAppDbContext db, IAuditLogger auditLogger)
             // 有効な下位が残ったまま上位を無効化すると、階層を辿れない資源ができる
             precheck: async w =>
                 await db.WorkCenters.AnyAsync(x => x.ParentId == id && x.IsActive, ct)
-                    ? $"'{w.Code}' には有効な下位の資源があるため、無効化できません" +
-                      "（下位の資源を先に無効化するか、付け替えてください）。"
+                    ? ApiText.T("'{0}' には有効な下位の資源があるため、無効化できません（下位の資源を先に無効化するか、付け替えてください）。", w.Code)
                     : null);
 }

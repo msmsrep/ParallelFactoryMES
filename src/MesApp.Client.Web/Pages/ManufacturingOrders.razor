@@ -2,78 +2,78 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>製造指図 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["製造指図 - Parallel Factory MES"]</PageTitle>
 
-<h1>製造指図管理</h1>
+<h1>@L["製造指図管理"]</h1>
 
 <AuthorizeView Roles="@MesRoleGroups.ProductionManage">
     <div class="card">
-        <h2 style="margin-top:0;">指図登録（A-20-10-01）</h2>
+        <h2 style="margin-top:0;">@L["指図登録（A-20-10-01）"]</h2>
         @if (_error is not null)
         {
             <div class="alert alert-danger">@_error</div>
         }
         <div class="form-grid">
             <div class="form-field">
-                <label>品目</label>
+                <label>@L["品目"]</label>
                 <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
                               @bind-Value="_form.ProductId"
-                              EmptyLabel="選択してください"
+                              EmptyLabel="@L["選択してください"]"
                               ValueOf="p => p.Id"
                               LabelOf='@(p => $"{p.Code} {p.Name}")' />
             </div>
             <div class="form-field">
-                <label>数量</label>
+                <label>@L["数量"]</label>
                 <input type="number" @bind="_form.Quantity" min="0" />
             </div>
             <div class="form-field">
-                <label>納期</label>
+                <label>@L["納期"]</label>
                 <input type="date" @bind="_form.DueDate" />
             </div>
             <div class="form-field">
-                <label>指図区分</label>
+                <label>@L["指図区分"]</label>
                 <select @bind="_form.OrderType">
-                    <option value="@ManufacturingOrderType.Normal">通常</option>
-                    <option value="@ManufacturingOrderType.Spot">突発</option>
+                    <option value="@ManufacturingOrderType.Normal">@EnumLabels.Of(ManufacturingOrderType.Normal)</option>
+                    <option value="@ManufacturingOrderType.Spot">@EnumLabels.Of(ManufacturingOrderType.Spot)</option>
                 </select>
             </div>
             <div class="form-field">
-                <label>備考</label>
+                <label>@L["備考"]</label>
                 <input @bind="_form.Note" />
             </div>
         </div>
-        <button class="btn" disabled="@_busy" @onclick="CreateAsync">登録</button>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">@L["登録"]</button>
     </div>
 </AuthorizeView>
 
 <div class="card">
     <div class="actions" style="margin-bottom:8px;">
         <select @bind="_statusFilter" @bind:after="LoadAsync">
-            <option value="">全状態</option>
-            <option value="Draft">未承認</option>
-            <option value="Approved">承認済</option>
-            <option value="Released">展開済</option>
-            <option value="Completed">完了</option>
-            <option value="Canceled">取消</option>
+            <option value="">@L["全状態"]</option>
+            <option value="Draft">@L["未承認"]</option>
+            <option value="Approved">@L["承認済"]</option>
+            <option value="Released">@L["展開済"]</option>
+            <option value="Completed">@L["完了"]</option>
+            <option value="Canceled">@EnumLabels.Of(ManufacturingOrderStatus.Canceled)</option>
         </select>
     </div>
 
     @if (_orders is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else
     {
         <table class="table">
             <thead>
                 <tr>
-                    <th>指図番号</th>
-                    <th>品目</th>
-                    <th>数量</th>
-                    <th>納期</th>
-                    <th>区分</th>
-                    <th>状態</th>
-                    <th>産出ロット</th>
+                    <th>@L["指図番号"]</th>
+                    <th>@L["品目"]</th>
+                    <th>@L["数量"]</th>
+                    <th>@L["納期"]</th>
+                    <th>@L["区分"]</th>
+                    <th>@L["状態"]</th>
+                    <th>@L["産出ロット"]</th>
                     <th></th>
                 </tr>
             </thead>
@@ -85,10 +85,10 @@
                         <td>@order.ProductCode @order.ProductName</td>
                         <td>@order.Quantity</td>
                         <td>@(order.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
-                        <td>@OrderTypeLabel(order.OrderType)</td>
+                        <td>@EnumLabels.Of(order.OrderType)</td>
                         <td><StatusBadge Status="@order.Status.ToString()" /></td>
                         <td>@(order.OutputLotNumber ?? "-")</td>
-                        <td><a class="btn btn-secondary btn-sm" href="manufacturing-orders/@order.Id">詳細</a></td>
+                        <td><a class="btn btn-secondary btn-sm" href="manufacturing-orders/@order.Id">@L["詳細"]</a></td>
                     </tr>
                 }
             </tbody>
@@ -138,7 +138,7 @@
         }
         if (_form.ProductId == 0 || _form.Quantity <= 0)
         {
-            _error = "品目と数量（0より大きい値）を指定してください。";
+            _error = L["品目と数量（0より大きい値）を指定してください。"];
             return;
         }
         _busy = true;
@@ -150,7 +150,7 @@
                     _form.ProductId, _form.Quantity,
                     _form.DueDate is null ? null : DateOnly.FromDateTime(_form.DueDate.Value),
                     _form.OrderType, null, _form.Note));
-            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["登録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
@@ -167,11 +167,4 @@
         }
     }
 
-    private static string OrderTypeLabel(ManufacturingOrderType type) => type switch
-    {
-        ManufacturingOrderType.Normal => "通常",
-        ManufacturingOrderType.Rework => "リワーク",
-        ManufacturingOrderType.Spot => "突発",
-        _ => type.ToString(),
-    };
 }

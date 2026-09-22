@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Quality;
@@ -34,17 +36,17 @@ public sealed class InspectionService(
         {
             if (request.TargetWorkOrderId is null)
             {
-                return Outcome<InspectionOrder>.Invalid("工程内検査には対象作業指示ID（targetWorkOrderId）が必要です。");
+                return Outcome<InspectionOrder>.Invalid(ApiText.T("工程内検査には対象作業指示ID（targetWorkOrderId）が必要です。"));
             }
             workOrder = await db.WorkOrders.FirstOrDefaultAsync(w => w.Id == request.TargetWorkOrderId, ct);
             if (workOrder is null)
             {
-                return Outcome<InspectionOrder>.Invalid("存在しない作業指示IDです。");
+                return Outcome<InspectionOrder>.Invalid(ApiText.T("存在しない作業指示IDです。"));
             }
         }
         else if (request.TargetLotId is null)
         {
-            return Outcome<InspectionOrder>.Invalid("対象ロットID（targetLotId）が必要です。");
+            return Outcome<InspectionOrder>.Invalid(ApiText.T("対象ロットID（targetLotId）が必要です。"));
         }
 
         if (request.TargetLotId is not null)
@@ -52,7 +54,7 @@ public sealed class InspectionService(
             lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.TargetLotId, ct);
             if (lot is null)
             {
-                return Outcome<InspectionOrder>.Invalid("存在しないロットIDです。");
+                return Outcome<InspectionOrder>.Invalid(ApiText.T("存在しないロットIDです。"));
             }
         }
 
@@ -66,7 +68,7 @@ public sealed class InspectionService(
                 .ToListAsync(ct);
             if (items.Count != itemIds.Count)
             {
-                return Outcome<InspectionOrder>.Invalid("存在しない検査項目IDが含まれています。");
+                return Outcome<InspectionOrder>.Invalid(ApiText.T("存在しない検査項目IDが含まれています。"));
             }
         }
         else
@@ -89,7 +91,7 @@ public sealed class InspectionService(
             if (items.Count == 0)
             {
                 return Outcome<InspectionOrder>.Invalid(
-                    "対象に合致する検査基準がありません。検査項目マスタを登録するか itemIds を指定してください。");
+                    ApiText.T("対象に合致する検査基準がありません。検査項目マスタを登録するか itemIds を指定してください。"));
             }
         }
 
@@ -139,15 +141,15 @@ public sealed class InspectionService(
             .FirstOrDefaultAsync(o => o.Id == orderId, ct);
         if (order is null)
         {
-            return Outcome<InspectionOrder>.NotFound("検査指示が存在しません。");
+            return Outcome<InspectionOrder>.NotFound(ApiText.T("検査指示が存在しません。"));
         }
         if (order.Status is not (InspectionOrderStatus.Instructed or InspectionOrderStatus.InProgress))
         {
-            return Outcome<InspectionOrder>.Conflict($"状態 '{order.Status}' の検査指示には実績を登録できません。");
+            return Outcome<InspectionOrder>.Conflict(ApiText.T("状態 '{0}' の検査指示には実績を登録できません。", EnumLabels.Of(order.Status)));
         }
         if (requests.Count == 0)
         {
-            return Outcome<InspectionOrder>.Invalid("登録する実績がありません。");
+            return Outcome<InspectionOrder>.Invalid(ApiText.T("登録する実績がありません。"));
         }
 
         var itemById = order.Items.ToDictionary(i => i.InspectionItemId);
@@ -163,7 +165,7 @@ public sealed class InspectionService(
         {
             if (!devices.TryGetValue(deviceId, out var device))
             {
-                return Outcome<InspectionOrder>.Invalid($"検査機ID {deviceId} は登録されていません。");
+                return Outcome<InspectionOrder>.Invalid(ApiText.T("検査機ID {0} は登録されていません。", deviceId));
             }
             if (InspectionDeviceCalibrationPolicy.CheckUsable(device, businessDate.Today) is { } reason)
             {
@@ -175,14 +177,14 @@ public sealed class InspectionService(
         {
             if (!itemById.TryGetValue(request.InspectionItemId, out var item))
             {
-                return Outcome<InspectionOrder>.Invalid($"検査項目ID {request.InspectionItemId} はこの検査指示の対象ではありません。");
+                return Outcome<InspectionOrder>.Invalid(ApiText.T("検査項目ID {0} はこの検査指示の対象ではありません。", request.InspectionItemId));
             }
             // 判定は指示発行時点の規格値（スナップショット）で行う
             var judgment = Judge(item, request.MeasuredValue, request.Judgment);
             if (judgment is null)
             {
                 return Outcome<InspectionOrder>.Invalid(
-                    $"検査項目 '{item.ItemCode}' は規格値による自動判定ができません。judgmentを指定してください。");
+                    ApiText.T("検査項目 '{0}' は規格値による自動判定ができません。judgmentを指定してください。", item.ItemCode));
             }
             db.InspectionResults.Add(new InspectionResult
             {
@@ -217,11 +219,11 @@ public sealed class InspectionService(
             .FirstOrDefaultAsync(o => o.Id == orderId, ct);
         if (order is null)
         {
-            return Outcome<InspectionOrder>.NotFound("検査指示が存在しません。");
+            return Outcome<InspectionOrder>.NotFound(ApiText.T("検査指示が存在しません。"));
         }
         if (order.Status is not (InspectionOrderStatus.Instructed or InspectionOrderStatus.InProgress))
         {
-            return Outcome<InspectionOrder>.Conflict($"状態 '{order.Status}' の検査指示は判定できません。");
+            return Outcome<InspectionOrder>.Conflict(ApiText.T("状態 '{0}' の検査指示は判定できません。", EnumLabels.Of(order.Status)));
         }
 
         var itemsWithoutResult = order.Items
@@ -230,7 +232,7 @@ public sealed class InspectionService(
         if (itemsWithoutResult.Count > 0)
         {
             return Outcome<InspectionOrder>.Invalid(
-                $"実績未登録の検査項目が {itemsWithoutResult.Count} 件あります。全項目の実績登録後に判定してください。");
+                ApiText.T("実績未登録の検査項目が {0} 件あります。全項目の実績登録後に判定してください。", itemsWithoutResult.Count));
         }
 
         var pass = order.Results.All(r => r.Judgment == InspectionJudgment.Pass);
@@ -283,17 +285,17 @@ public sealed class InspectionService(
             .FirstOrDefaultAsync(o => o.Id == orderId, ct);
         if (order is null)
         {
-            return Outcome<InspectionOrder>.NotFound("検査指示が存在しません。");
+            return Outcome<InspectionOrder>.NotFound(ApiText.T("検査指示が存在しません。"));
         }
         if (order.Status == InspectionOrderStatus.Approved)
         {
-            return Outcome<InspectionOrder>.Conflict("承認済みの検査は訂正できません。");
+            return Outcome<InspectionOrder>.Conflict(ApiText.T("承認済みの検査は訂正できません。"));
         }
         var result = await db.InspectionResults
             .FirstOrDefaultAsync(r => r.Id == resultId && r.InspectionOrderId == orderId, ct);
         if (result is null)
         {
-            return Outcome<InspectionOrder>.NotFound("検査実績が存在しません。");
+            return Outcome<InspectionOrder>.NotFound(ApiText.T("検査実績が存在しません。"));
         }
 
         var before = new { value = result.MeasuredValue, text = result.TextValue, judgment = result.Judgment };
@@ -358,11 +360,11 @@ public sealed class InspectionService(
         var order = await db.InspectionOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
         if (order is null)
         {
-            return Outcome<InspectionOrder>.NotFound("検査指示が存在しません。");
+            return Outcome<InspectionOrder>.NotFound(ApiText.T("検査指示が存在しません。"));
         }
         if (order.Status != InspectionOrderStatus.Judged)
         {
-            return Outcome<InspectionOrder>.Conflict($"状態 '{order.Status}' の検査指示は承認できません（判定済みのみ）。");
+            return Outcome<InspectionOrder>.Conflict(ApiText.T("状態 '{0}' の検査指示は承認できません（判定済みのみ）。", EnumLabels.Of(order.Status)));
         }
         order.Status = InspectionOrderStatus.Approved;
         order.ApprovedByUserId = userId;
@@ -380,11 +382,11 @@ public sealed class InspectionService(
             .FirstOrDefaultAsync(o => o.Id == orderId, ct);
         if (order is null)
         {
-            return Outcome<InspectionOrder>.NotFound("検査指示が存在しません。");
+            return Outcome<InspectionOrder>.NotFound(ApiText.T("検査指示が存在しません。"));
         }
         if (order.Status is InspectionOrderStatus.Approved or InspectionOrderStatus.Canceled)
         {
-            return Outcome<InspectionOrder>.Conflict($"状態 '{order.Status}' の検査指示は取消できません。");
+            return Outcome<InspectionOrder>.Conflict(ApiText.T("状態 '{0}' の検査指示は取消できません。", EnumLabels.Of(order.Status)));
         }
         order.Status = InspectionOrderStatus.Canceled;
         // 検査待ちで拘束していたロットを解放する

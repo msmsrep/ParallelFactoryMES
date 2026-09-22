@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -41,7 +42,7 @@ public class DefectReasonsController(MesAppDbContext db, IAuditLogger auditLogge
     {
         if (await db.DefectReasons.AnyAsync(r => r.Code == request.Code, ct))
         {
-            return this.ConflictProblem($"不良理由コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("不良理由コード '{0}' は既に存在します。", request.Code));
         }
         var r = new DefectReason { Code = request.Code, Name = request.Name, Category = request.Category };
         db.DefectReasons.Add(r);
@@ -64,7 +65,7 @@ public class DefectReasonsController(MesAppDbContext db, IAuditLogger auditLogge
         }
         if (await db.DefectReasons.AnyAsync(x => x.Code == request.Code && x.Id != id, ct))
         {
-            return this.ConflictProblem($"不良理由コード '{request.Code}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("不良理由コード '{0}' は既に存在します。", request.Code));
         }
         r.Code = request.Code;
         r.Name = request.Name;

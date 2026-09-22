@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -24,11 +25,11 @@ public sealed class LotOperationService(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
         if (!await db.Locations.AnyAsync(l => l.Id == toLocationId && l.IsActive, ct))
         {
-            return Outcome<Lot>.Invalid("存在しない（または無効な）移動先ロケーションです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しない（または無効な）移動先ロケーションです。"));
         }
         try
         {
@@ -52,7 +53,7 @@ public sealed class LotOperationService(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
         var stock = await db.InventoryStocks.FirstOrDefaultAsync(
             s => s.LotId == lotId && s.LocationId == locationId, ct);
@@ -60,7 +61,7 @@ public sealed class LotOperationService(
         var delta = newQuantity - current;
         if (delta == 0)
         {
-            return Outcome<Lot>.Invalid("現在数量と同じため調整は不要です。");
+            return Outcome<Lot>.Invalid(ApiText.T("現在数量と同じため調整は不要です。"));
         }
 
         try
@@ -100,7 +101,7 @@ public sealed class LotOperationService(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
         var before = lot.StockStatus;
         lotStatus.ChangeStatus(lot, status, LotStatusChangeSource.Manual, reason, userId);
@@ -135,11 +136,11 @@ public sealed class LotOperationService(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
         if (!await db.Locations.AnyAsync(l => l.Id == locationId && l.IsActive, ct))
         {
-            return Outcome<Lot>.Invalid("存在しない（または無効な）ロケーションIDです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しない（または無効な）ロケーションIDです。"));
         }
         await inventory.AddAsync(lot, locationId, quantity,
             InventoryTransactionType.IssueReturn, userId, workOrderId: workOrderId, ct: ct);
@@ -158,7 +159,7 @@ public sealed class LotOperationService(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
         try
         {
@@ -181,7 +182,7 @@ public sealed class LotOperationService(
         var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
 
         return await DeriveAsync(lot, lot.Product!, locationId, quantity, newLotNumber,
@@ -199,22 +200,22 @@ public sealed class LotOperationService(
         var target = await db.Lots.FirstOrDefaultAsync(l => l.Id == targetLotId, ct);
         if (source is null || target is null)
         {
-            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
         if (source.Id == target.Id)
         {
-            return Outcome<Lot>.Invalid("統合元と統合先が同一ロットです。");
+            return Outcome<Lot>.Invalid(ApiText.T("統合元と統合先が同一ロットです。"));
         }
         if (source.ProductId != target.ProductId)
         {
-            return Outcome<Lot>.Invalid("品目が異なるロットは統合できません。");
+            return Outcome<Lot>.Invalid(ApiText.T("品目が異なるロットは統合できません。"));
         }
 
         var stock = await db.InventoryStocks.FirstOrDefaultAsync(
             s => s.LotId == source.Id && s.LocationId == locationId, ct);
         if (stock is null || stock.Quantity <= 0)
         {
-            return Outcome<Lot>.Invalid("統合元の在庫がありません。");
+            return Outcome<Lot>.Invalid(ApiText.T("統合元の在庫がありません。"));
         }
         var quantity = stock.Quantity;
 
@@ -244,12 +245,12 @@ public sealed class LotOperationService(
     {
         if (newProductId is null && string.IsNullOrWhiteSpace(newLotNumber))
         {
-            return Outcome<Lot>.Invalid("新品目ID（品目振替）または新ロット番号（ロット振替）を指定してください。");
+            return Outcome<Lot>.Invalid(ApiText.T("新品目ID（品目振替）または新ロット番号（ロット振替）を指定してください。"));
         }
         var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == lotId, ct);
         if (lot is null)
         {
-            return Outcome<Lot>.Invalid("存在しないロットIDです。");
+            return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
 
         var newProduct = lot.Product!;
@@ -258,7 +259,7 @@ public sealed class LotOperationService(
             var found = await db.Products.FirstOrDefaultAsync(p => p.Id == productId && p.IsActive, ct);
             if (found is null)
             {
-                return Outcome<Lot>.Invalid("存在しない（または無効な）振替先品目IDです。");
+                return Outcome<Lot>.Invalid(ApiText.T("存在しない（または無効な）振替先品目IDです。"));
             }
             newProduct = found;
         }
@@ -290,7 +291,7 @@ public sealed class LotOperationService(
         }
         else if (await db.Lots.AnyAsync(l => l.LotNumber == newLotNumber, ct))
         {
-            return Outcome<Lot>.Conflict($"ロット番号 '{newLotNumber}' は既に存在します。");
+            return Outcome<Lot>.Conflict(ApiText.T("ロット番号 '{0}' は既に存在します。", newLotNumber));
         }
 
         var newLot = new Lot

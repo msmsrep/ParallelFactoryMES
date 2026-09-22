@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using System.Linq.Expressions;
 using MesApp.Core.Entities;
 
@@ -27,5 +28,5 @@ public static class ShipmentGatePolicy
     public static string? CheckJudgment(bool hasApprovedJudgment) =>
         hasApprovedJudgment
             ? null
-            : "承認済みの出荷判定（可または特採）がないため出荷できません（H-10-10）。";
+            : ApiText.T("承認済みの出荷判定（可または特採）がないため出荷できません（H-10-10）。");
 }

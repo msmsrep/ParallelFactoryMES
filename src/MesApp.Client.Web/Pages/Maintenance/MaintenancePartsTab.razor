@@ -2,37 +2,37 @@
 
 @* 消耗材モニタリング（Spec.md 3.1。E-20-10-04）。保全実績で引き落とした部材と現在庫を並べる *@
 <div class="card">
-    <h2 style="margin-top:0;">消耗材の消費実績（E-20-10-04）</h2>
-    <p class="text-muted">保全実績で在庫から引き落とした部材の集計。現在庫と見比べて補充の要否を判断する。</p>
+    <h2 style="margin-top:0;">@L["消耗材の消費実績（E-20-10-04）"]</h2>
+    <p class="text-muted">@L["保全実績で在庫から引き落とした部材の集計。現在庫と見比べて補充の要否を判断する。"]</p>
     <div class="form-grid">
         <div class="form-field">
-            <label>開始日</label>
+            <label>@L["開始日"]</label>
             <input type="date" @bind="_partsFrom" />
         </div>
         <div class="form-field">
-            <label>終了日</label>
+            <label>@L["終了日"]</label>
             <input type="date" @bind="_partsTo" />
         </div>
     </div>
     <div class="actions">
-        <button class="btn" disabled="@_busy" @onclick="LoadPartsConsumptionAsync">集計</button>
+        <button class="btn" disabled="@_busy" @onclick="LoadPartsConsumptionAsync">@L["集計"]</button>
     </div>
 </div>
 
 <div class="card">
     @if (_partsConsumption is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_partsConsumption.Count == 0)
     {
-        <p class="text-muted">該当期間の消費実績はありません。</p>
+        <p class="text-muted">@L["該当期間の消費実績はありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>品目</th><th>名称</th><th>消費数量</th><th>保全件数</th><th>現在庫</th></tr>
+                <tr><th>@L["品目"]</th><th>@L["名称"]</th><th>@L["消費数量"]</th><th>@L["保全件数"]</th><th>@L["現在庫"]</th></tr>
             </thead>
             <tbody>
                 @foreach (var row in _partsConsumption)

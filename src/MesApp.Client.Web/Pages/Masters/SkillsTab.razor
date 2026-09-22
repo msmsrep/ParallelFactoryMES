@@ -5,69 +5,69 @@
 
 <AuthorizeView Roles="@MesRoleGroups.UserAdmin">
     <div class="card">
-        <h2 style="margin-top:0;">@(_editingId is null ? "スキル・資格の登録" : $"編集（{_code}）")</h2>
+        <h2 style="margin-top:0;">@(_editingId is null ? L["スキル・資格の登録"] : L["編集（{0}）", _code])</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>コード</label>
+                <label>@L["コード"]</label>
                 <input @bind="_code" />
             </div>
             <div class="form-field">
-                <label>名称</label>
+                <label>@L["名称"]</label>
                 <input @bind="_name" />
             </div>
             <div class="form-field">
-                <label>種別</label>
+                <label>@L["種別"]</label>
                 <select @bind="_type">
-                    <option value="@SkillType.Skill">スキル</option>
-                    <option value="@SkillType.Certification">資格</option>
+                    <option value="@SkillType.Skill">@EnumLabels.Of(SkillType.Skill)</option>
+                    <option value="@SkillType.Certification">@EnumLabels.Of(SkillType.Certification)</option>
                 </select>
             </div>
             <div class="form-field">
                 <label>
                     <input type="checkbox" style="width:auto;" @bind="_requiresExpiry" />
-                    有効期限管理が必要（期限切れは差立で不合格）
+                    @L["有効期限管理が必要（期限切れは差立で不合格）"]
                 </label>
             </div>
         </div>
         <div class="actions">
-            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
             @if (_editingId is not null)
             {
-                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+                <button class="btn btn-secondary" @onclick="ResetForm">@L["キャンセル"]</button>
             }
         </div>
     </div>
 </AuthorizeView>
 
 @* 取込はAPIと同じシステム管理者権限（api/skills と api/masters/csv/skills） *@
-<CsvIoPanel Kind="skills" Label="スキル・資格" KeyLabel="スキル・資格コード"
+<CsvIoPanel Kind="skills" Label="@L["スキル・資格"]" KeyLabel="@L["スキル・資格コード"]"
             Roles="@MesRoleGroups.UserAdmin" OnImported="LoadAsync" />
 
 <div class="card">
     @if (_items is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else
     {
         <table class="table">
-            <thead><tr><th>コード</th><th>名称</th><th>種別</th><th>期限管理</th><th>状態</th><th></th></tr></thead>
+            <thead><tr><th>@L["コード"]</th><th>@L["名称"]</th><th>@L["種別"]</th><th>@L["期限管理"]</th><th>@L["状態"]</th><th></th></tr></thead>
             <tbody>
                 @foreach (var item in _items)
                 {
                     <tr>
                         <td>@item.Code</td>
                         <td>@item.Name</td>
-                        <td>@(item.Type == SkillType.Skill ? "スキル" : "資格")</td>
-                        <td>@(item.RequiresExpiry ? "要" : "不要")</td>
-                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td>@EnumLabels.Of(item.Type)</td>
+                        <td>@(item.RequiresExpiry ? L["要"] : L["不要"])</td>
+                        <td>@(item.IsActive ? L["有効"] : L["無効"])</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.UserAdmin" Context="admin">
-                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">@L["編集"]</button>
                                 @if (item.IsActive)
                                 {
                                     <button class="btn btn-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                            @onclick="() => DeactivateAsync(item.Id)">@L["無効化"]</button>
                                 }
                             </AuthorizeView>
                         </td>
@@ -116,7 +116,7 @@
     {
         if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
         {
-            _error = "コードと名称を入力してください。";
+            _error = L["コードと名称を入力してください。"];
             return;
         }
         _busy = true;
@@ -128,12 +128,12 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/skills", request)
                 : await Http.PutAsJsonAsync($"api/skills/{_editingId}", request);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保存しました。";
+            _message = L["保存しました。"];
             ResetForm();
             await LoadAsync();
         }
@@ -150,12 +150,12 @@
         try
         {
             var response = await Http.DeleteAsync($"api/skills/{id}");
-            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["無効化に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "無効化しました。";
+            _message = L["無効化しました。"];
             await LoadAsync();
         }
         finally

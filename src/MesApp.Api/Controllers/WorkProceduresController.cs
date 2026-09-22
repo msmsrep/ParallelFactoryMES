@@ -1,4 +1,5 @@
-﻿using MesApp.Api.Policies;
+﻿using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -45,7 +46,7 @@ public class WorkProceduresController(MesAppDbContext db, IAuditLogger auditLogg
     {
         if (await db.WorkProcedures.AnyAsync(p => p.ProcedureNo == request.ProcedureNo, ct))
         {
-            return this.ConflictProblem($"手順書番号 '{request.ProcedureNo}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("手順書番号 '{0}' は既に存在します。", request.ProcedureNo));
         }
         if (Validate(request) is { } error)
         {
@@ -78,7 +79,7 @@ public class WorkProceduresController(MesAppDbContext db, IAuditLogger auditLogg
         }
         if (await db.WorkProcedures.AnyAsync(p => p.ProcedureNo == request.ProcedureNo && p.Id != id, ct))
         {
-            return this.ConflictProblem($"手順書番号 '{request.ProcedureNo}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("手順書番号 '{0}' は既に存在します。", request.ProcedureNo));
         }
         if (Validate(request) is { } error)
         {
@@ -118,7 +119,7 @@ public class WorkProceduresController(MesAppDbContext db, IAuditLogger auditLogg
         // どちらも無いと「番号と表題だけの手順書」になり、作業者が何も参照できない
         if (string.IsNullOrWhiteSpace(request.Steps) && string.IsNullOrWhiteSpace(request.Reference))
         {
-            return "手順ステップか、手順書の所在のどちらかを入力してください。";
+            return ApiText.T("手順ステップか、手順書の所在のどちらかを入力してください。");
         }
         return null;
     }

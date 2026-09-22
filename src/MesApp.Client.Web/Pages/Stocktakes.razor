@@ -2,21 +2,21 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>棚卸 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["棚卸 - Parallel Factory MES"]</PageTitle>
 
-<h1>棚卸</h1>
-<p class="text-muted">棚卸指示作成（D-50-10-01）、実棚数登録（-02）、差異一覧（-03）、差異調整・確定（-04〜05）。</p>
+<h1>@L["棚卸"]</h1>
+<p class="text-muted">@L["棚卸指示作成（D-50-10-01）、実棚数登録（-02）、差異一覧（-03）、差異調整・確定（-04〜05）。"]</p>
 
 <Notice Error="@_error" Message="@_message" />
 
 <AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
-    <h2 style="margin-top:0;">棚卸指示の作成</h2>
+    <h2 style="margin-top:0;">@L["棚卸指示の作成"]</h2>
     <div class="form-grid">
         <div class="form-field">
-            <label>対象ロケーション（未選択で全ロケーション）</label>
+            <label>@L["対象ロケーション（未選択で全ロケーション）"]</label>
             <select @bind="_targetLocationId">
-                <option value="0">全ロケーション</option>
+                <option value="0">@L["全ロケーション"]</option>
                 @foreach (var location in _locations)
                 {
                     <option value="@location.Id">@location.Code</option>
@@ -24,39 +24,39 @@
             </select>
         </div>
     </div>
-    <button class="btn" disabled="@_busy" @onclick="CreateAsync">棚卸指示を作成（現在庫をスナップショット）</button>
+    <button class="btn" disabled="@_busy" @onclick="CreateAsync">@L["棚卸指示を作成（現在庫をスナップショット）"]</button>
 </div>
 </AuthorizeView>
 
 <div class="card">
-    <h2 style="margin-top:0;">棚卸一覧</h2>
+    <h2 style="margin-top:0;">@L["棚卸一覧"]</h2>
     @if (_stocktakes is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_stocktakes.Total == 0)
     {
-        <p class="text-muted">棚卸はありません。</p>
+        <p class="text-muted">@L["棚卸はありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>棚卸番号</th><th>対象</th><th>状態</th><th>作成日</th><th>確定日</th><th>明細</th><th></th></tr>
+                <tr><th>@L["棚卸番号"]</th><th>@L["対象"]</th><th>@L["状態"]</th><th>@L["作成日"]</th><th>@L["確定日"]</th><th>@L["明細"]</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var stocktake in _stocktakes.Items)
                 {
                     <tr>
                         <td>@stocktake.StocktakeNo</td>
-                        <td>@(_locations.FirstOrDefault(l => l.Id == stocktake.TargetLocationId)?.Code ?? "全ロケーション")</td>
-                        <td><span class="badge @StatusClass(stocktake.Status)">@StocktakeStatusLabel(stocktake.Status)</span></td>
+                        <td>@(_locations.FirstOrDefault(l => l.Id == stocktake.TargetLocationId)?.Code ?? L["全ロケーション"])</td>
+                        <td><span class="badge @StatusClass(stocktake.Status)">@EnumLabels.Of(stocktake.Status)</span></td>
                         <td>@stocktake.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
                         <td>@(stocktake.FinalizedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
-                        <td>@stocktake.Lines.Count 件</td>
+                        <td>@L["{0} 件", stocktake.Lines.Count]</td>
                         <td class="actions">
-                            <button class="btn btn-secondary btn-sm" @onclick="() => Select(stocktake)">開く</button>
-                            <a class="btn btn-secondary btn-sm" href="print/stocktake/@stocktake.Id" target="_blank">棚卸表</a>
+                            <button class="btn btn-secondary btn-sm" @onclick="() => Select(stocktake)">@L["開く"]</button>
+                            <a class="btn btn-secondary btn-sm" href="print/stocktake/@stocktake.Id" target="_blank">@L["棚卸表"]</a>
                         </td>
                     </tr>
                 }
@@ -69,10 +69,10 @@
 @if (_selected is not null)
 {
     <div class="card">
-        <h2 style="margin-top:0;">@_selected.StocktakeNo の明細（実棚入力・差異）</h2>
+        <h2 style="margin-top:0;">@L["{0} の明細（実棚入力・差異）", _selected.StocktakeNo]</h2>
         <table class="table">
             <thead>
-                <tr><th>ロット</th><th>品目</th><th>ロケーション</th><th>理論数量</th><th>実棚数量</th><th>差異</th><th>調整</th></tr>
+                <tr><th>@L["ロット"]</th><th>@L["品目"]</th><th>@L["ロケーション"]</th><th>@L["理論数量"]</th><th>@L["実棚数量"]</th><th>@L["差異"]</th><th>@L["調整"]</th></tr>
             </thead>
             <tbody>
                 @foreach (var line in _selected.Lines)
@@ -96,7 +96,7 @@
                         <td class="@(line.Difference is not null and not 0 ? "text-danger" : "")">
                             @(line.Difference?.ToString() ?? "-")
                         </td>
-                        <td>@(line.IsAdjusted ? "調整済" : "-")</td>
+                        <td>@(line.IsAdjusted ? L["調整済"] : "-")</td>
                     </tr>
                 }
             </tbody>
@@ -106,9 +106,9 @@
         {
             <AuthorizeView Roles="@MesRoleGroups.InventoryManage">
                 <div class="actions mt-2">
-                    <button class="btn" disabled="@_busy" @onclick="SaveCountsAsync">実棚数を登録</button>
-                    <button class="btn" disabled="@_busy" @onclick="FinalizeAsync">確定（差異を棚卸調整）</button>
-                    <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">取消</button>
+                    <button class="btn" disabled="@_busy" @onclick="SaveCountsAsync">@L["実棚数を登録"]</button>
+                    <button class="btn" disabled="@_busy" @onclick="FinalizeAsync">@L["確定（差異を棚卸調整）"]</button>
+                    <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">@L["取消"]</button>
                 </div>
             </AuthorizeView>
         }
@@ -176,12 +176,12 @@
         {
             var response = await Http.PostAsJsonAsync("api/stocktakes",
                 new StocktakeCreateRequest(_targetLocationId == 0 ? null : _targetLocationId));
-            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["作成に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "棚卸指示を作成しました。";
+            _message = L["棚卸指示を作成しました。"];
             await LoadAsync();
         }
         finally
@@ -194,7 +194,7 @@
     {
         if (_selected is null || _counts.Count == 0)
         {
-            _error = "実棚数を入力してください。";
+            _error = L["実棚数を入力してください。"];
             return;
         }
         _busy = true;
@@ -205,13 +205,13 @@
             var counts = _counts.Select(c => new StocktakeCountLine(c.Key, c.Value)).ToList();
             var response = await Http.PutAsJsonAsync($"api/stocktakes/{_selected.Id}/counts",
                 new StocktakeCountRequest(counts));
-            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["登録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
             _selected = await response.Content.ReadFromJsonAsync<StocktakeResponse>();
-            _message = "実棚数を登録しました。差異を確認して確定してください。";
+            _message = L["実棚数を登録しました。差異を確認して確定してください。"];
             await LoadAsync();
         }
         finally
@@ -221,10 +221,10 @@
     }
 
     private async Task FinalizeAsync() =>
-        await PostAsync($"api/stocktakes/{_selected!.Id}/finalize", "棚卸を確定し、差異を調整しました。");
+        await PostAsync($"api/stocktakes/{_selected!.Id}/finalize", L["棚卸を確定し、差異を調整しました。"]);
 
     private async Task CancelAsync() =>
-        await PostAsync($"api/stocktakes/{_selected!.Id}/cancel", "棚卸を取消しました。");
+        await PostAsync($"api/stocktakes/{_selected!.Id}/cancel", L["棚卸を取消しました。"]);
 
     private async Task PostAsync(string url, string successMessage)
     {
@@ -234,7 +234,7 @@
         try
         {
             var response = await Http.PostAsync(url, null);
-            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["操作に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
@@ -249,13 +249,6 @@
         }
     }
 
-    private static string StocktakeStatusLabel(StocktakeStatus status) => status switch
-    {
-        StocktakeStatus.Instructed => "指示",
-        StocktakeStatus.Finalized => "確定",
-        StocktakeStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 
     private static string StatusClass(StocktakeStatus status) => status switch
     {

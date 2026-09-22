@@ -5,12 +5,12 @@
 
 <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage">
     <div class="card">
-        <h2 style="margin-top:0;">保全計画の作成（E-30-10）</h2>
+        <h2 style="margin-top:0;">@L["保全計画の作成（E-30-10）"]</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>設備</label>
+                <label>@L["設備"]</label>
                 <select @bind="_plan.EquipmentId">
-                    <option value="0">選択してください</option>
+                    <option value="0">@L["選択してください"]</option>
                     @foreach (var equipment in _equipments)
                     {
                         <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
@@ -18,64 +18,64 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>保全種別</label>
+                <label>@L["保全種別"]</label>
                 <select @bind="_plan.Category">
-                    <option value="@MaintenanceCategory.Periodic">定期</option>
-                    <option value="@MaintenanceCategory.Unplanned">計画外</option>
+                    <option value="@MaintenanceCategory.Periodic">@EnumLabels.Of(MaintenanceCategory.Periodic)</option>
+                    <option value="@MaintenanceCategory.Unplanned">@EnumLabels.Of(MaintenanceCategory.Unplanned)</option>
                 </select>
             </div>
             <div class="form-field">
-                <label>計画年度</label>
+                <label>@L["計画年度"]</label>
                 <input type="number" @bind="_plan.PlanYear" />
             </div>
             <div class="form-field">
-                <label>予定日</label>
+                <label>@L["予定日"]</label>
                 <input type="date" @bind="_plan.ScheduledDate" />
             </div>
             <div class="form-field">
-                <label>周期（日数）</label>
+                <label>@L["周期（日数）"]</label>
                 <input type="number" @bind="_plan.CycleDays" />
             </div>
             <div class="form-field">
-                <label>備考</label>
+                <label>@L["備考"]</label>
                 <input @bind="_plan.Note" />
             </div>
         </div>
-        <button class="btn" disabled="@_busy" @onclick="CreatePlanAsync">計画を作成</button>
+        <button class="btn" disabled="@_busy" @onclick="CreatePlanAsync">@L["計画を作成"]</button>
     </div>
 </AuthorizeView>
 
 <div class="card">
     @if (_plans is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_plans.Count == 0)
     {
-        <p class="text-muted">保全計画はありません。</p>
+        <p class="text-muted">@L["保全計画はありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>設備</th><th>種別</th><th>年度</th><th>予定日</th><th>周期</th><th>状態</th><th></th></tr>
+                <tr><th>@L["設備"]</th><th>@L["種別"]</th><th>@L["年度"]</th><th>@L["予定日"]</th><th>@L["周期"]</th><th>@L["状態"]</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var plan in _plans)
                 {
                     <tr>
                         <td>@plan.AssetNo @plan.EquipmentName</td>
-                        <td>@(plan.Category == MaintenanceCategory.Periodic ? "定期" : "計画外")</td>
+                        <td>@EnumLabels.Of(plan.Category)</td>
                         <td>@plan.PlanYear</td>
                         <td>@(plan.ScheduledDate?.ToString("yyyy-MM-dd") ?? "-")</td>
-                        <td>@(plan.CycleDays is null ? "-" : $"{plan.CycleDays}日")</td>
-                        <td>@PlanStatusLabel(plan.Status)</td>
+                        <td>@(plan.CycleDays is null ? "-" : L["{0}日", plan.CycleDays])</td>
+                        <td>@EnumLabels.Of(plan.Status)</td>
                         <td>
                             <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage" Context="mt">
                                 @if (plan.Status == MaintenancePlanStatus.Planned)
                                 {
                                     <button class="btn btn-sm" disabled="@_busy"
-                                            @onclick="() => CreateOrderFromPlanAsync(plan)">保全指示を発行</button>
+                                            @onclick="() => CreateOrderFromPlanAsync(plan)">@L["保全指示を発行"]</button>
                                 }
                             </AuthorizeView>
                         </td>
@@ -119,7 +119,7 @@
     {
         if (_plan.EquipmentId == 0)
         {
-            _error = "設備を選択してください。";
+            _error = L["設備を選択してください。"];
             return;
         }
         _busy = true;
@@ -131,12 +131,12 @@
                 new MaintenancePlanRequest(_plan.EquipmentId, _plan.Category, _plan.PlanYear,
                     _plan.ScheduledDate is null ? null : DateOnly.FromDateTime(_plan.ScheduledDate.Value),
                     _plan.CycleDays, _plan.Note));
-            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["作成に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保全計画を作成しました。";
+            _message = L["保全計画を作成しました。"];
             await LoadPlansAsync();
         }
         finally
@@ -156,12 +156,12 @@
             var response = await Http.PostAsJsonAsync("api/maintenance-orders",
                 new MaintenanceOrderCreateRequest(plan.EquipmentId, null, plan.Id, null,
                     plan.ScheduledDate, MaintenanceRequestType.Planned, plan.Note));
-            if (await response.ReadErrorAsync("発行に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["発行に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保全指示を発行しました。";
+            _message = L["保全指示を発行しました。"];
             await LoadPlansAsync();
         }
         finally
@@ -170,12 +170,4 @@
         }
     }
 
-    private static string PlanStatusLabel(MaintenancePlanStatus status) => status switch
-    {
-        MaintenancePlanStatus.Planned => "計画",
-        MaintenancePlanStatus.Ordered => "指示発行済",
-        MaintenancePlanStatus.Completed => "完了",
-        MaintenancePlanStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 }

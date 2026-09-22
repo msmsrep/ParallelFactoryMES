@@ -1,9 +1,12 @@
-﻿using MesApp.Api.Services;
+﻿using System.Globalization;
+using MesApp.Api.Services;
+using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -133,6 +136,17 @@ public static class MesAppHost
         // 想定外の例外のフォールバック（開発環境では先に開発者例外ページが処理する）
         app.UseExceptionHandler();
 
+        // 表示言語（UICulture）だけを Accept-Language で切り替える（応答の文言は ApiText.T が訳す）。数値・日付の書式（Culture）は
+        // サーバーの既定のまま変えない（言語によって CSV やログの書式が変わらないようにする。Spec.md 7.9）
+        var formatCulture = CultureInfo.CurrentCulture;
+        app.UseRequestLocalization(options =>
+        {
+            options.DefaultRequestCulture = new RequestCulture(formatCulture, new CultureInfo(MesCultures.Default));
+            options.SupportedCultures = [formatCulture];
+            options.SupportedUICultures = [.. MesCultures.All.Select(c => new CultureInfo(c))];
+            options.RequestCultureProviders = [new AcceptLanguageHeaderRequestCultureProvider()];
+        });
+
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
@@ -150,7 +164,7 @@ public static class MesAppHost
         // 打ち間違い・未実装のAPIパスがindex.htmlの200になって、
         // 呼び出し側は404ではなくJSONパース失敗という無関係なエラーを受け取る
         app.MapFallback("api/{**rest}", () => Results.Problem(
-            title: "指定されたAPIは存在しません。", statusCode: StatusCodes.Status404NotFound));
+            title: ApiText.T("指定されたAPIは存在しません。"), statusCode: StatusCodes.Status404NotFound));
         app.MapFallbackToFile("index.html");
 
         return app;

@@ -4,12 +4,12 @@
 <Notice Error="@_error" Message="@_message" />
 
 <div class="card">
-    <h2 style="margin-top:0;">保全指示の作成（計画保全は保全担当、突発依頼は全ユーザー可。E-30-30-01）</h2>
+    <h2 style="margin-top:0;">@L["保全指示の作成（計画保全は保全担当、突発依頼は全ユーザー可。E-30-30-01）"]</h2>
     <div class="form-grid">
         <div class="form-field">
-            <label>対象設備</label>
+            <label>@L["対象設備"]</label>
             <select @bind="_order.EquipmentId">
-                <option value="0">なし</option>
+                <option value="0">@L["なし"]</option>
                 @foreach (var equipment in _equipments)
                 {
                     <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
@@ -17,9 +17,9 @@
             </select>
         </div>
         <div class="form-field">
-            <label>対象治工具（E-60-30）</label>
+            <label>@L["対象治工具（E-60-30）"]</label>
             <select @bind="_order.ToolId">
-                <option value="0">なし</option>
+                <option value="0">@L["なし"]</option>
                 @foreach (var tool in _tools)
                 {
                     <option value="@tool.Id">@tool.Code @tool.Name</option>
@@ -27,16 +27,16 @@
             </select>
         </div>
         <div class="form-field">
-            <label>依頼区分</label>
+            <label>@L["依頼区分"]</label>
             <select @bind="_order.RequestType">
-                <option value="@MaintenanceRequestType.Spot">突発依頼</option>
-                <option value="@MaintenanceRequestType.Planned">計画</option>
+                <option value="@MaintenanceRequestType.Spot">@EnumLabels.Of(MaintenanceRequestType.Spot)</option>
+                <option value="@MaintenanceRequestType.Planned">@EnumLabels.Of(MaintenanceRequestType.Planned)</option>
             </select>
         </div>
         <div class="form-field">
-            <label>手順書</label>
+            <label>@L["手順書"]</label>
             <select @bind="_order.ProcedureId">
-                <option value="0">なし</option>
+                <option value="0">@L["なし"]</option>
                 @foreach (var procedure in _procedures)
                 {
                     <option value="@procedure.Id">@procedure.ProcedureNo @procedure.Title</option>
@@ -44,26 +44,26 @@
             </select>
         </div>
         <div class="form-field">
-            <label>予定日</label>
+            <label>@L["予定日"]</label>
             <input type="date" @bind="_order.ScheduledDate" />
         </div>
         <div class="form-field">
-            <label>依頼内容</label>
+            <label>@L["依頼内容"]</label>
             <input @bind="_order.Note" />
         </div>
     </div>
-    <button class="btn" disabled="@_busy" @onclick="CreateOrderAsync">保全指示を作成</button>
+    <button class="btn" disabled="@_busy" @onclick="CreateOrderAsync">@L["保全指示を作成"]</button>
 </div>
 
 <div class="card">
-    <h2 style="margin-top:0;">保全指示・実績一覧（E-20-30-01〜02）</h2>
+    <h2 style="margin-top:0;">@L["保全指示・実績一覧（E-20-30-01〜02）"]</h2>
     @if (_orders is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_orders.Total == 0)
     {
-        <p class="text-muted">保全指示はありません。</p>
+        <p class="text-muted">@L["保全指示はありません。"]</p>
     }
     else
     {
@@ -72,14 +72,14 @@
             <div class="card">
                 <div>
                     <strong>@order.OrderNo</strong>
-                    <span class="badge">@(order.RequestType == MaintenanceRequestType.Planned ? "計画" : "突発依頼")</span>
-                    <span class="badge @OrderStatusClass(order.Status)">@OrderStatusLabel(order.Status)</span>
-                    <span class="text-muted">対象：@(order.EquipmentName ?? order.ToolName ?? "-")</span>
+                    <span class="badge">@EnumLabels.Of(order.RequestType)</span>
+                    <span class="badge @OrderStatusClass(order.Status)">@EnumLabels.Of(order.Status)</span>
+                    <span class="text-muted">@L["対象：{0}", order.EquipmentName ?? order.ToolName ?? "-"]</span>
                     @if (order.ProcedureNo is not null)
                     {
-                        <span class="text-muted">／手順書 @order.ProcedureNo</span>
+                        <span class="text-muted">@L["／手順書 {0}", order.ProcedureNo]</span>
                     }
-                    <span class="text-muted">／予定日 @(order.ScheduledDate?.ToString("yyyy-MM-dd") ?? "-")</span>
+                    <span class="text-muted">@L["／予定日 {0}", order.ScheduledDate?.ToString("yyyy-MM-dd") ?? "-"]</span>
                 </div>
                 @if (order.Note is not null)
                 {
@@ -89,7 +89,7 @@
                 @if (order.Records.Count > 0)
                 {
                     <table class="table mt-2">
-                        <thead><tr><th>実施者</th><th>開始</th><th>終了</th><th>消費部材</th><th>結果</th></tr></thead>
+                        <thead><tr><th>@L["実施者"]</th><th>@L["開始"]</th><th>@L["終了"]</th><th>@L["消費部材"]</th><th>@L["結果"]</th></tr></thead>
                         <tbody>
                             @foreach (var record in order.Records)
                             {
@@ -101,7 +101,7 @@
                                         @foreach (var part in record.Parts)
                                         {
                                             <div>@part.ProductCode @part.ProductName @part.Quantity@part.Unit
-                                                <span class="text-muted">（@part.LotNumber / @part.LocationCode）</span>
+                                                <span class="text-muted">(@part.LotNumber / @part.LocationCode)</span>
                                             </div>
                                         }
                                         @if (record.PartsUsed is not null)
@@ -125,21 +125,21 @@
                 {
                     <div class="form-grid mt-2">
                         <div class="form-field">
-                            <label>開始時刻</label>
+                            <label>@L["開始時刻"]</label>
                             <input type="datetime-local" value="@GetRecord(order.Id).StartedAt.ToString("yyyy-MM-ddTHH:mm")"
                                    @onchange="e => GetRecord(order.Id).StartedAt = ToDateTime(e.Value)" />
                         </div>
                         <div class="form-field">
-                            <label>終了時刻</label>
+                            <label>@L["終了時刻"]</label>
                             <input type="datetime-local" @onchange="e => GetRecord(order.Id).EndedAt = ToDateTime(e.Value)" />
                         </div>
                         <div class="form-field">
-                            <label>消費部材・交換部品</label>
+                            <label>@L["消費部材・交換部品"]</label>
                             <input value="@GetRecord(order.Id).PartsUsed"
                                    @onchange="e => GetRecord(order.Id).PartsUsed = e.Value?.ToString()" />
                         </div>
                         <div class="form-field">
-                            <label>結果</label>
+                            <label>@L["結果"]</label>
                             <input value="@GetRecord(order.Id).Result"
                                    @onchange="e => GetRecord(order.Id).Result = e.Value?.ToString()" />
                         </div>
@@ -149,43 +149,43 @@
                                 <label>
                                     <input type="checkbox" style="width:auto;" checked="@GetRecord(order.Id).ResetLife"
                                            @onchange="e => GetRecord(order.Id).ResetLife = (bool)(e.Value ?? false)" />
-                                    寿命カウンタをリセット（E-60-30）
+                                    @L["寿命カウンタをリセット（E-60-30）"]
                                 </label>
                             </div>
                         }
                     </div>
                     @* 在庫を引き落とす消費部材（E-40-30-01）。自由記述の欄は補足として残している *@
-                    <h3>消費部材（在庫から引き落とす）</h3>
+                    <h3>@L["消費部材（在庫から引き落とす）"]</h3>
                     @foreach (var line in GetRecord(order.Id).Parts)
                     {
                         <div class="form-grid">
                             <div class="form-field">
-                                <label>消費ロット（スキャン可）</label>
+                                <label>@L["消費ロット（スキャン可）"]</label>
                                 <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
                                               @bind-Value="line.LotId"
                                               SelectedItemChanged="stock => OnPartStockSelected(line, stock)"
                                               ValueOf="stock => stock.LotId"
-                                              LabelOf='@(stock => $"{stock.LotNumber}（{stock.ProductCode} / {stock.LocationCode} 残{stock.Quantity}）")' />
+                                              LabelOf='@(stock => L["{0}（{1} / {2} 残{3}）", stock.LotNumber, stock.ProductCode, stock.LocationCode, stock.Quantity])' />
                             </div>
                             <div class="form-field">
-                                <label>数量</label>
+                                <label>@L["数量"]</label>
                                 <input type="number" step="any" min="0" value="@line.Quantity"
                                        @onchange="e => line.Quantity = ToDecimal(e.Value)" />
                             </div>
                             <div class="form-field">
                                 <label>&nbsp;</label>
-                                <button class="btn btn-secondary" @onclick="() => RemovePartLine(order.Id, line)">この行を削除</button>
+                                <button class="btn btn-secondary" @onclick="() => RemovePartLine(order.Id, line)">@L["この行を削除"]</button>
                             </div>
                         </div>
                     }
                     <div class="actions">
-                        <button class="btn btn-secondary" @onclick="() => AddPartLine(order.Id)">消費部材の行を追加</button>
+                        <button class="btn btn-secondary" @onclick="() => AddPartLine(order.Id)">@L["消費部材の行を追加"]</button>
                     </div>
 
                     <div class="actions">
-                        <button class="btn" disabled="@_busy" @onclick="() => AddRecordAsync(order)">保全実績を登録</button>
+                        <button class="btn" disabled="@_busy" @onclick="() => AddRecordAsync(order)">@L["保全実績を登録"]</button>
                         <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage" Context="mtCancel">
-                            <button class="btn btn-danger" disabled="@_busy" @onclick="() => CancelOrderAsync(order.Id)">取消</button>
+                            <button class="btn btn-danger" disabled="@_busy" @onclick="() => CancelOrderAsync(order.Id)">@L["取消"]</button>
                         </AuthorizeView>
                     </div>
                 }
@@ -288,12 +288,12 @@
                     _order.ProcedureId == 0 ? null : _order.ProcedureId,
                     _order.ScheduledDate is null ? null : DateOnly.FromDateTime(_order.ScheduledDate.Value),
                     _order.RequestType, _order.Note));
-            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["作成に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保全指示を作成しました。";
+            _message = L["保全指示を作成しました。"];
             _order.Note = null;
             await LoadMaintenanceOrdersAsync(1);
         }
@@ -319,12 +319,12 @@
                         .Select(line => new MaintenanceRecordPartRequest(
                             line.LotId, line.LocationId, line.Quantity, null))
                         .ToList()));
-            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["登録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保全実績を登録しました（指示は完了になります）。";
+            _message = L["保全実績を登録しました（指示は完了になります）。"];
             _records.Remove(order.Id);
             await LoadMaintenanceOrdersAsync(1);
         }
@@ -341,12 +341,12 @@
         try
         {
             var response = await Http.PostAsync($"api/maintenance-orders/{id}/cancel", null);
-            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["取消に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保全指示を取消しました。";
+            _message = L["保全指示を取消しました。"];
             await LoadMaintenanceOrdersAsync(1);
         }
         finally
@@ -355,13 +355,6 @@
         }
     }
 
-    private static string OrderStatusLabel(MaintenanceOrderStatus status) => status switch
-    {
-        MaintenanceOrderStatus.Instructed => "指示",
-        MaintenanceOrderStatus.Completed => "完了",
-        MaintenanceOrderStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 
     private static string OrderStatusClass(MaintenanceOrderStatus status) => status switch
     {

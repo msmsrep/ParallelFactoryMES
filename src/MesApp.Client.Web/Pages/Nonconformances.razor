@@ -2,70 +2,70 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>不適合管理 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["不適合管理 - Parallel Factory MES"]</PageTitle>
 
-<h1>不適合・逸脱管理</h1>
-<p class="text-muted">逸脱/不具合の一覧（C-30-10-01）、対応指示（C-30-20-01）、対応実行記録（-02）、逸脱承認・特別採用（-03）。</p>
+<h1>@L["不適合・逸脱管理"]</h1>
+<p class="text-muted">@L["逸脱/不具合の一覧（C-30-10-01）、対応指示（C-30-20-01）、対応実行記録（-02）、逸脱承認・特別採用（-03）。"]</p>
 
 <Notice Error="@_error" Message="@_message" />
 
 <div class="card">
-    <h2 style="margin-top:0;">逸脱・品質不具合の記録（B-40-30）</h2>
+    <h2 style="margin-top:0;">@L["逸脱・品質不具合の記録（B-40-30）"]</h2>
     <div class="form-grid">
         <div class="form-field">
-            <label>発生元</label>
+            <label>@L["発生元"]</label>
             <select @bind="_form.Source">
-                <option value="@NonconformanceSource.Production">生産実績</option>
-                <option value="@NonconformanceSource.Inspection">検査</option>
-                <option value="@NonconformanceSource.Receiving">受入</option>
+                <option value="@NonconformanceSource.Production">@EnumLabels.Of(NonconformanceSource.Production)</option>
+                <option value="@NonconformanceSource.Inspection">@EnumLabels.Of(NonconformanceSource.Inspection)</option>
+                <option value="@NonconformanceSource.Receiving">@EnumLabels.Of(NonconformanceSource.Receiving)</option>
             </select>
         </div>
         <div class="form-field">
-            <label>対象ロット</label>
+            <label>@L["対象ロット"]</label>
             <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
-                          @bind-Value="_form.LotId" EmptyLabel="なし"
+                          @bind-Value="_form.LotId" EmptyLabel="@L["なし"]"
                           ValueOf="s => s.LotId"
-                          LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode}）")' />
+                          LabelOf='@(s => L["{0}（{1}）", s.LotNumber, s.ProductCode])' />
         </div>
         <div class="form-field">
-            <label>対象作業指示</label>
+            <label>@L["対象作業指示"]</label>
             <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
-                          @bind-Value="_form.WorkOrderId" EmptyLabel="なし"
+                          @bind-Value="_form.WorkOrderId" EmptyLabel="@L["なし"]"
                           ValueOf="w => w.Id" LabelOf="w => w.WorkOrderNo" />
         </div>
         <div class="form-field">
-            <label>原因区分（B-40-30-02）</label>
-            <input @bind="_form.CauseCategory" placeholder="例：設備不調／作業ミス／部材不良" />
+            <label>@L["原因区分（B-40-30-02）"]</label>
+            <input @bind="_form.CauseCategory" placeholder="@L["例：設備不調／作業ミス／部材不良"]" />
         </div>
     </div>
     <div class="form-field">
-        <label>内容</label>
+        <label>@L["内容"]</label>
         <textarea rows="2" @bind="_form.Content"></textarea>
     </div>
     <div class="form-field mt-2">
-        <label>原因詳細</label>
+        <label>@L["原因詳細"]</label>
         <textarea rows="2" @bind="_form.CauseDetail"></textarea>
     </div>
-    <button class="btn mt-2" disabled="@_busy" @onclick="CreateAsync">不適合を起票</button>
+    <button class="btn mt-2" disabled="@_busy" @onclick="CreateAsync">@L["不適合を起票"]</button>
 </div>
 
 <div class="card">
-    <h2 style="margin-top:0;">不適合一覧</h2>
+    <h2 style="margin-top:0;">@L["不適合一覧"]</h2>
     <select @bind="_statusFilter" @bind:after="LoadAsync" style="margin-bottom:8px;">
-        <option value="">全状態</option>
-        <option value="Open">発生（未対応）</option>
-        <option value="ActionInstructed">対応指示済</option>
-        <option value="ActionCompleted">対応完了</option>
-        <option value="Closed">承認済（クローズ）</option>
+        <option value="">@L["全状態"]</option>
+        <option value="Open">@L["発生（未対応）"]</option>
+        <option value="ActionInstructed">@L["対応指示済"]</option>
+        <option value="ActionCompleted">@L["対応完了"]</option>
+        <option value="Closed">@L["承認済（クローズ）"]</option>
     </select>
 
     @if (_reports is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_reports.Total == 0)
     {
-        <p class="text-muted">不適合はありません。</p>
+        <p class="text-muted">@L["不適合はありません。"]</p>
     }
     else
     {
@@ -74,26 +74,26 @@
             <div class="card">
                 <div>
                     <strong>@report.ReportNo</strong>
-                    <span class="badge">@SourceLabel(report.Source)</span>
-                    <span class="badge @StatusClass(report.Status)">@StatusLabel(report.Status)</span>
+                    <span class="badge">@EnumLabels.Of(report.Source)</span>
+                    <span class="badge @StatusClass(report.Status)">@EnumLabels.Of(report.Status)</span>
                     @if (report.LotNumber is not null)
                     {
-                        <span class="text-muted">ロット：@report.LotNumber</span>
+                        <span class="text-muted">@L["ロット：{0}", report.LotNumber]</span>
                     }
                     @if (report.ReworkOrderNo is not null)
                     {
-                        <span class="badge badge-warning">リワーク指図 @report.ReworkOrderNo</span>
+                        <span class="badge badge-warning">@L["リワーク指図 {0}", report.ReworkOrderNo]</span>
                     }
                 </div>
                 <table class="table mt-2">
                     <tbody>
-                        <tr><th style="width:120px;">内容</th><td style="white-space:normal;">@report.Content</td></tr>
-                        <tr><th>原因</th><td>@(report.CauseCategory ?? "-") @(report.CauseDetail)</td></tr>
+                        <tr><th style="width:120px;">@L["内容"]</th><td style="white-space:normal;">@report.Content</td></tr>
+                        <tr><th>@L["原因"]</th><td>@(report.CauseCategory ?? "-") @(report.CauseDetail)</td></tr>
                         <tr>
-                            <th>対応指示</th>
-                            <td>@(report.Action is null ? "-" : $"{ActionLabel(report.Action.Value)}：{report.ActionInstruction}")</td>
+                            <th>@L["対応指示"]</th>
+                            <td>@(report.Action is null ? "-" : L["{0}：{1}", EnumLabels.Of(report.Action.Value), report.ActionInstruction ?? ""])</td>
                         </tr>
-                        <tr><th>対応実績</th><td style="white-space:normal;">@(report.ActionRecord ?? "-")</td></tr>
+                        <tr><th>@L["対応実績"]</th><td style="white-space:normal;">@(report.ActionRecord ?? "-")</td></tr>
                     </tbody>
                 </table>
                 <Pager TItem="NonconformanceResponse" Result="_reports" OnPageChanged="LoadPageAsync" />
@@ -104,30 +104,30 @@
                         {
                             <select value="@GetForm(report.Id).Action"
                                     @onchange="e => GetForm(report.Id).Action = e.Value?.ToString()">
-                                <option value="@NonconformanceAction.Rework">リワーク</option>
-                                <option value="@NonconformanceAction.Hold">保留</option>
-                                <option value="@NonconformanceAction.Discard">廃棄</option>
-                                <option value="@NonconformanceAction.SpecialAcceptance">特別採用</option>
+                                <option value="@NonconformanceAction.Rework">@EnumLabels.Of(NonconformanceAction.Rework)</option>
+                                <option value="@NonconformanceAction.Hold">@EnumLabels.Of(NonconformanceAction.Hold)</option>
+                                <option value="@NonconformanceAction.Discard">@EnumLabels.Of(NonconformanceAction.Discard)</option>
+                                <option value="@NonconformanceAction.SpecialAcceptance">@EnumLabels.Of(NonconformanceAction.SpecialAcceptance)</option>
                             </select>
-                            <input placeholder="指示内容" value="@GetForm(report.Id).Instruction"
+                            <input placeholder="@L["指示内容"]" value="@GetForm(report.Id).Instruction"
                                    @onchange="e => GetForm(report.Id).Instruction = e.Value?.ToString()" />
-                            <button class="btn btn-sm" disabled="@_busy" @onclick="() => InstructAsync(report)">対応指示</button>
+                            <button class="btn btn-sm" disabled="@_busy" @onclick="() => InstructAsync(report)">@L["対応指示"]</button>
                         }
                     </AuthorizeView>
 
                     @if (report.Status == NonconformanceStatus.ActionInstructed)
                     {
-                        <input placeholder="対応実績" value="@GetForm(report.Id).Record"
+                        <input placeholder="@L["対応実績"]" value="@GetForm(report.Id).Record"
                                @onchange="e => GetForm(report.Id).Record = e.Value?.ToString()" />
                         <button class="btn btn-sm btn-secondary" disabled="@_busy"
-                                @onclick="() => RecordActionAsync(report)">対応記録</button>
+                                @onclick="() => RecordActionAsync(report)">@L["対応記録"]</button>
                     }
 
                     <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="qcApprove">
                         @if (report.Status is NonconformanceStatus.ActionInstructed or NonconformanceStatus.ActionCompleted)
                         {
                             <button class="btn btn-sm" disabled="@_busy" @onclick="() => ApproveAsync(report)">
-                                承認（特採時はロット解放）
+                                @L["承認（特採時はロット解放）"]
                             </button>
                         }
                     </AuthorizeView>
@@ -194,7 +194,7 @@
     {
         if (string.IsNullOrWhiteSpace(_form.Content))
         {
-            _error = "内容を入力してください。";
+            _error = L["内容を入力してください。"];
             return;
         }
         _busy = true;
@@ -207,12 +207,12 @@
                     _form.LotId == 0 ? null : _form.LotId,
                     _form.WorkOrderId == 0 ? null : _form.WorkOrderId,
                     null, _form.Content, _form.CauseCategory, _form.CauseDetail));
-            if (await response.ReadErrorAsync("起票に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["起票に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "不適合を起票しました。";
+            _message = L["不適合を起票しました。"];
             _form.Content = string.Empty;
             _form.CauseDetail = null;
             await LoadAsync();
@@ -228,12 +228,12 @@
         var form = GetForm(report.Id);
         if (!Enum.TryParse<NonconformanceAction>(form.Action, out var action))
         {
-            _error = "対応区分を選択してください。";
+            _error = L["対応区分を選択してください。"];
             return;
         }
         await PostAsync($"api/nonconformances/{report.Id}/instruct",
             new NonconformanceActionRequest(action, form.Instruction),
-            "対応を指示しました（保留・廃棄はロットへ、リワークは指図へ連動）。");
+            L["対応を指示しました（保留・廃棄はロットへ、リワークは指図へ連動）。"]);
     }
 
     private async Task RecordActionAsync(NonconformanceResponse report)
@@ -241,11 +241,11 @@
         var record = GetForm(report.Id).Record;
         if (string.IsNullOrWhiteSpace(record))
         {
-            _error = "対応実績を入力してください。";
+            _error = L["対応実績を入力してください。"];
             return;
         }
         await PostAsync($"api/nonconformances/{report.Id}/record-action",
-            new NonconformanceActionRecordRequest(record), "対応実績を記録しました。");
+            new NonconformanceActionRecordRequest(record), L["対応実績を記録しました。"]);
     }
 
     private async Task ApproveAsync(NonconformanceResponse report)
@@ -256,12 +256,12 @@
         try
         {
             var response = await Http.PostAsync($"api/nonconformances/{report.Id}/approve", null);
-            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["承認に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "承認しました（クローズ）。";
+            _message = L["承認しました（クローズ）。"];
             await LoadAsync();
         }
         finally
@@ -278,7 +278,7 @@
         try
         {
             var response = await Http.PostAsJsonAsync(url, body);
-            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["操作に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
@@ -292,31 +292,8 @@
         }
     }
 
-    private static string SourceLabel(NonconformanceSource source) => source switch
-    {
-        NonconformanceSource.Production => "生産実績",
-        NonconformanceSource.Inspection => "検査",
-        NonconformanceSource.Receiving => "受入",
-        _ => source.ToString(),
-    };
 
-    private static string ActionLabel(NonconformanceAction action) => action switch
-    {
-        NonconformanceAction.Rework => "リワーク",
-        NonconformanceAction.Hold => "保留",
-        NonconformanceAction.Discard => "廃棄",
-        NonconformanceAction.SpecialAcceptance => "特別採用",
-        _ => action.ToString(),
-    };
 
-    private static string StatusLabel(NonconformanceStatus status) => status switch
-    {
-        NonconformanceStatus.Open => "発生",
-        NonconformanceStatus.ActionInstructed => "対応指示済",
-        NonconformanceStatus.ActionCompleted => "対応完了",
-        NonconformanceStatus.Closed => "クローズ",
-        _ => status.ToString(),
-    };
 
     private static string StatusClass(NonconformanceStatus status) => status switch
     {

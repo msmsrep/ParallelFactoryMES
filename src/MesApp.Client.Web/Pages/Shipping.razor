@@ -2,27 +2,27 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>出荷管理 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["出荷管理 - Parallel Factory MES"]</PageTitle>
 
-<h1>出荷管理</h1>
-<p class="text-muted">出荷指示（D-40-20-01）、出荷実行・完了報告（D-40-30）、出荷伝票発行（D-40-30-07）。出荷には承認済みの出荷判定（可／特採）が必要です（H-10-10）。</p>
+<h1>@L["出荷管理"]</h1>
+<p class="text-muted">@L["出荷指示（D-40-20-01）、出荷実行・完了報告（D-40-30）、出荷伝票発行（D-40-30-07）。出荷には承認済みの出荷判定（可／特採）が必要です（H-10-10）。"]</p>
 
 <Notice Error="@_error" Message="@_message" />
 
 <AuthorizeView Roles="@MesRoleGroups.InventoryManage">
 <div class="card">
-    <h2 style="margin-top:0;">出荷指示の作成</h2>
+    <h2 style="margin-top:0;">@L["出荷指示の作成"]</h2>
     <div class="form-grid">
         <div class="form-field">
-            <label>出荷先</label>
+            <label>@L["出荷先"]</label>
             <input @bind="_destination" />
         </div>
         <div class="form-field">
-            <label>出荷予定日</label>
+            <label>@L["出荷予定日"]</label>
             <input type="date" @bind="_plannedDate" />
         </div>
         <div class="form-field">
-            <label>品目</label>
+            <label>@L["品目"]</label>
             <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
                           @bind-Value="_lineProductId"
                           SelectedItemChanged="RememberProduct"
@@ -30,25 +30,25 @@
                           LabelOf='@(p => $"{p.Code} {p.Name}")' />
         </div>
         <div class="form-field">
-            <label>数量</label>
+            <label>@L["数量"]</label>
             <input type="number" @bind="_lineQuantity" />
         </div>
     </div>
     <div class="actions">
-        <button class="btn btn-secondary" @onclick="AddLine">明細に追加</button>
-        <button class="btn" disabled="@_busy" @onclick="CreateAsync">出荷指示を作成</button>
+        <button class="btn btn-secondary" @onclick="AddLine">@L["明細に追加"]</button>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">@L["出荷指示を作成"]</button>
     </div>
     @if (_lines.Count > 0)
     {
         <table class="table mt-2">
-            <thead><tr><th>品目</th><th>数量</th><th></th></tr></thead>
+            <thead><tr><th>@L["品目"]</th><th>@L["数量"]</th><th></th></tr></thead>
             <tbody>
                 @foreach (var line in _lines)
                 {
                     <tr>
                         <td>@_productCodes.GetValueOrDefault(line.ProductId, "-")</td>
                         <td>@line.Quantity</td>
-                        <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">削除</button></td>
+                        <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">@L["削除"]</button></td>
                     </tr>
                 }
             </tbody>
@@ -58,14 +58,14 @@
 </AuthorizeView>
 
 <div class="card">
-    <h2 style="margin-top:0;">出荷指示一覧</h2>
+    <h2 style="margin-top:0;">@L["出荷指示一覧"]</h2>
     @if (_orders is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_orders.Total == 0)
     {
-        <p class="text-muted">出荷指示はありません。</p>
+        <p class="text-muted">@L["出荷指示はありません。"]</p>
     }
     else
     {
@@ -76,22 +76,22 @@
                     <div>
                         <strong>@order.ShippingNo</strong>
                         <span class="text-muted">@order.Destination</span>
-                        <span class="badge @StatusClass(order.Status)">@ShippingStatusLabel(order.Status)</span>
-                        <span class="text-muted">予定日 @(order.PlannedDate?.ToString("yyyy-MM-dd") ?? "-")</span>
+                        <span class="badge @StatusClass(order.Status)">@EnumLabels.Of(order.Status)</span>
+                        <span class="text-muted">@L["予定日 {0}", order.PlannedDate?.ToString("yyyy-MM-dd") ?? "-"]</span>
                     </div>
                     <div class="actions">
-                        <a class="btn btn-secondary btn-sm" href="print/shipping/@order.Id" target="_blank">出荷伝票</a>
+                        <a class="btn btn-secondary btn-sm" href="print/shipping/@order.Id" target="_blank">@L["出荷伝票"]</a>
                         @if (order.Status == ShippingOrderStatus.Instructed)
                         {
                             <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="inventoryWrite">
-                                <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">取消</button>
+                                <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(order.Id)">@L["取消"]</button>
                             </AuthorizeView>
                         }
                     </div>
                 </div>
 
                 <table class="table mt-2">
-                    <thead><tr><th>品目</th><th>指示数</th><th>出荷済</th></tr></thead>
+                    <thead><tr><th>@L["品目"]</th><th>@L["指示数"]</th><th>@L["出荷済"]</th></tr></thead>
                     <tbody>
                         @foreach (var line in order.Lines)
                         {
@@ -108,25 +108,25 @@
                 <AuthorizeView Roles="@MesRoleGroups.InventoryManage" Context="shipWrite">
                 @if (order.Status == ShippingOrderStatus.Instructed)
                 {
-                    <h2>出荷実行（ロット指定）</h2>
+                    <h2>@L["出荷実行（ロット指定）"]</h2>
                     <div class="form-grid">
                         <div class="form-field">
-                            <label>出荷ロット</label>
+                            <label>@L["出荷ロット"]</label>
                             @* 指図の品目に該当するロットだけを出す。件数が増えたら検索で絞る *@
                             <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
                                           Value="GetShip(order.Id).LotId"
                                           SelectedItemChanged="stock => SetShipLot(order.Id, stock)"
                                           Filter="@(s => order.Lines.Any(l => l.ProductId == s.ProductId))"
                                           ValueOf="s => s.LotId"
-                                          LabelOf='@(s => $"{s.LotNumber}（{s.ProductCode} / {s.LocationCode} / 在庫{s.Quantity}）")' />
+                                          LabelOf='@(s => L["{0}（{1} / {2} / 在庫{3}）", s.LotNumber, s.ProductCode, s.LocationCode, s.Quantity])' />
                         </div>
                         <div class="form-field">
-                            <label>数量</label>
+                            <label>@L["数量"]</label>
                             <input type="number" value="@GetShip(order.Id).Quantity"
                                    @onchange="e => GetShip(order.Id).Quantity = ToDecimal(e.Value)" />
                         </div>
                     </div>
-                    <button class="btn" disabled="@_busy" @onclick="() => ShipAsync(order)">出荷実行・完了報告</button>
+                    <button class="btn" disabled="@_busy" @onclick="() => ShipAsync(order)">@L["出荷実行・完了報告"]</button>
                 }
                 </AuthorizeView>
             </div>
@@ -200,7 +200,7 @@
     {
         if (_lineProductId == 0 || _lineQuantity <= 0)
         {
-            _error = "品目と数量を指定してください。";
+            _error = L["品目と数量を指定してください。"];
             return;
         }
         _error = null;
@@ -212,7 +212,7 @@
     {
         if (string.IsNullOrWhiteSpace(_destination) || _lines.Count == 0)
         {
-            _error = "出荷先と明細を指定してください。";
+            _error = L["出荷先と明細を指定してください。"];
             return;
         }
         _busy = true;
@@ -224,12 +224,12 @@
                 new ShippingOrderCreateRequest(_destination,
                     _plannedDate is null ? null : DateOnly.FromDateTime(_plannedDate.Value),
                     [.. _lines]));
-            if (await response.ReadErrorAsync("作成に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["作成に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "出荷指示を作成しました。出荷前に出荷判定（可／特採）の承認が必要です。";
+            _message = L["出荷指示を作成しました。出荷前に出荷判定（可／特採）の承認が必要です。"];
             _lines.Clear();
             _destination = string.Empty;
             await LoadAsync();
@@ -245,7 +245,7 @@
         var form = GetShip(order.Id);
         if (form.LotId == 0 || form.Quantity <= 0)
         {
-            _error = "出荷ロットと数量を指定してください。";
+            _error = L["出荷ロットと数量を指定してください。"];
             return;
         }
         _busy = true;
@@ -256,12 +256,12 @@
             var response = await Http.PostAsJsonAsync($"api/shipping-orders/{order.Id}/ship",
                 new ShipExecuteRequest([new ShipLineRequest(form.LotId, form.LocationId, form.Quantity)]));
             // 出荷判定未承認の場合もここで通知される（H-10-10ゲート）
-            if (await response.ReadErrorAsync("出荷に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["出荷に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "出荷を実行しました。";
+            _message = L["出荷を実行しました。"];
             _shipForms.Remove(order.Id);
             await LoadAsync();
         }
@@ -278,12 +278,12 @@
         try
         {
             var response = await Http.PostAsync($"api/shipping-orders/{id}/cancel", null);
-            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["取消に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "出荷指示を取消しました。";
+            _message = L["出荷指示を取消しました。"];
             await LoadAsync();
         }
         finally
@@ -292,13 +292,6 @@
         }
     }
 
-    private static string ShippingStatusLabel(ShippingOrderStatus status) => status switch
-    {
-        ShippingOrderStatus.Instructed => "指示",
-        ShippingOrderStatus.Completed => "完了",
-        ShippingOrderStatus.Canceled => "取消",
-        _ => status.ToString(),
-    };
 
     private static string StatusClass(ShippingOrderStatus status) => status switch
     {

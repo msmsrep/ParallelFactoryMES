@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -61,7 +63,7 @@ public class MaintenancePlansController(
         var equipment = await db.Equipments.FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
         if (equipment is null || !equipment.IsActive)
         {
-            return this.BadRequestProblem("存在しない（または無効な）設備IDです。");
+            return this.BadRequestProblem(ApiText.T("存在しない（または無効な）設備IDです。"));
         }
 
         var plan = new MaintenancePlan
@@ -94,11 +96,11 @@ public class MaintenancePlansController(
         }
         if (plan.Status is not MaintenancePlanStatus.Planned)
         {
-            return this.ConflictProblem($"状態 '{plan.Status}' の保全計画は変更できません。");
+            return this.ConflictProblem(ApiText.T("状態 '{0}' の保全計画は変更できません。", EnumLabels.Of(plan.Status)));
         }
         if (!await db.Equipments.AnyAsync(e => e.Id == request.EquipmentId && e.IsActive, ct))
         {
-            return this.BadRequestProblem("存在しない（または無効な）設備IDです。");
+            return this.BadRequestProblem(ApiText.T("存在しない（または無効な）設備IDです。"));
         }
 
         plan.EquipmentId = request.EquipmentId;

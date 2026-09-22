@@ -13,6 +13,29 @@ namespace MesApp.Api.Tests;
 
 public class ExecutionTests
 {
+    [Theory]
+    [InlineData(null, "状態 '着手' の作業指示は着手できません。")]
+    [InlineData("en", "A work order with status 'Started' cannot be started.")]
+    public async Task 状態のエラーは状態の表示名を表示言語で返す(string? language, string expected)
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrder = order.WorkOrders[0];
+        (await admin.PostAsync($"/api/work-orders/{workOrder.Id}/start", null)).EnsureSuccessStatusCode();
+        if (language is not null)
+        {
+            admin.DefaultRequestHeaders.AcceptLanguage.ParseAdd(language);
+        }
+
+        var again = await admin.PostAsync($"/api/work-orders/{workOrder.Id}/start", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        var problem = await again.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Equal(expected, problem?.Title);
+    }
+
     [Fact]
     public async Task 着手から実績入力承認まで通しで動作し最終工程で在庫計上される()
     {

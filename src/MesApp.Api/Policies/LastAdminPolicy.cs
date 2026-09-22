@@ -1,3 +1,4 @@
+﻿using MesApp.Api.Localization;
 using MesApp.Core.Constants;
 using MesApp.Core.Entities;
 using Microsoft.AspNetCore.Identity;
@@ -17,9 +18,8 @@ namespace MesApp.Api.Policies;
 public static class LastAdminPolicy
 {
     /// <summary>禁止する理由（日本語のProblemDetails・CSVエラーの双方で使う）</summary>
-    public const string NoAdminRemains =
-        "有効なシステム管理者がいなくなるため、この変更はできません。"
-        + "先に別のユーザーへシステム管理者ロールを割り当ててください。";
+    public static string NoAdminRemains =>
+        ApiText.T("有効なシステム管理者がいなくなるため、この変更はできません。先に別のユーザーへシステム管理者ロールを割り当ててください。");
 
     /// <summary>
     /// 1人分の変更で最後の管理者が失われないかを確認する。変更できない場合は理由を返す（可ならnull）。

@@ -1,10 +1,11 @@
-﻿@using System.Net.Http
+@using System.Net.Http
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Localization
 @using Microsoft.JSInterop
 @using MesApp.Client.Web
 @using MesApp.Client.Web.Auth
@@ -17,6 +18,7 @@
 @using MesApp.Client.Web.Pages.Dashboard
 @using MesApp.Client.Web.Pages.ProductionRecord
 @using MesApp.Core.Constants
+@using MesApp.Core.Localization
 @using MesApp.Core.Entities
 @using MesApp.Core.Contracts.Common
 @using MesApp.Core.Contracts.Auth
@@ -30,3 +32,5 @@
 @using MesApp.Core.Contracts.Setup
 @using MesApp.Core.Contracts.Audit
 @using MesApp.Core.Contracts.Dashboard
+@* 画面の文言は日本語の原文をキーに L で訳す（Spec.md 7.9。Shared/UiText.cs） *@
+@inject IStringLocalizer<UiText> L

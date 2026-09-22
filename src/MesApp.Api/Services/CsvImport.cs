@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Contracts.Masters;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Contracts.Masters;
 
 namespace MesApp.Api.Services;
 
@@ -18,6 +19,20 @@ public static class CsvImport
     private const int MaxReportedErrors = 200;
 
     /// <summary>
+    /// 種別・列の表示名と説明を表示言語に訳した写しを返す（Spec.md 7.9）。
+    /// 定義（<see cref="MasterCsvKinds"/>・<see cref="ActualCsvKinds"/>）は原文のまま持ち、画面に返すときだけ訳す。列キーは訳さない
+    /// </summary>
+    public static CsvKindInfo Localize(CsvKindInfo kind) => kind with
+    {
+        Label = ApiText.T(kind.Label),
+        Columns = [.. kind.Columns.Select(c => c with
+        {
+            Label = ApiText.T(c.Label),
+            Note = c.Note is null ? null : ApiText.T(c.Note),
+        })],
+    };
+
+    /// <summary>
     /// CSVを表に読み込み、必須列・データ行の有無・行数上限を検証する。
     /// 取り込める状態でなければエラーを積んで null を返す。
     /// </summary>
@@ -26,7 +41,7 @@ public static class CsvImport
         var table = CsvTable.Create(CsvFile.Parse(csvText));
         if (table is null)
         {
-            errors.Add(new CsvImportError(1, "CSVが空です。1行目にヘッダー行が必要です。"));
+            errors.Add(new CsvImportError(1, ApiText.T("CSVが空です。1行目にヘッダー行が必要です。")));
             return null;
         }
 
@@ -34,18 +49,18 @@ public static class CsvImport
         if (missing.Count > 0)
         {
             errors.Add(new CsvImportError(table.Header.Line,
-                $"必須の列がありません：{string.Join(", ", missing)}。テンプレートCSVの1行目をそのまま使ってください。"));
+                ApiText.T("必須の列がありません：{0}。テンプレートCSVの1行目をそのまま使ってください。", string.Join(", ", missing))));
             return null;
         }
         if (table.Rows.Count == 0)
         {
-            errors.Add(new CsvImportError(table.Header.Line, "データ行がありません。"));
+            errors.Add(new CsvImportError(table.Header.Line, ApiText.T("データ行がありません。")));
             return null;
         }
         if (table.Rows.Count > MaxRows)
         {
             errors.Add(new CsvImportError(table.Header.Line,
-                $"1回に取り込めるのは{MaxRows}行までです（{table.Rows.Count}行）。ファイルを分割してください。"));
+                ApiText.T("1回に取り込めるのは{0}行までです（{1}行）。ファイルを分割してください。", MaxRows, table.Rows.Count)));
             return null;
         }
         return table;
@@ -64,7 +79,7 @@ public static class CsvImport
         if (errors.Count > MaxReportedErrors)
         {
             var omitted = errors.Count - MaxReportedErrors;
-            errors = [.. errors.Take(MaxReportedErrors), new CsvImportError(0, $"他 {omitted} 件のエラーは省略しました。")];
+            errors = [.. errors.Take(MaxReportedErrors), new CsvImportError(0, ApiText.T("他 {0} 件のエラーは省略しました。", omitted))];
         }
         return new CsvImportResult(
             kind.Kind, dataRows,

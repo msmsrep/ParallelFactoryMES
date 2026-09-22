@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using System.Globalization;
 using MesApp.Core.Contracts.Masters;
 
@@ -67,7 +68,7 @@ public sealed class CsvRowReader(CsvTable table, CsvRecord row, List<CsvImportEr
         var value = table.Value(row, column);
         if (value is null)
         {
-            Fail($"{column} は必須です。");
+            Fail(ApiText.T("{0} は必須です。", column));
             return string.Empty;
         }
         return CheckLength(column, value, maxLength);
@@ -100,17 +101,17 @@ public sealed class CsvRowReader(CsvTable table, CsvRecord row, List<CsvImportEr
         }
         if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
         {
-            Fail($"{column} は数値で指定してください（'{value}'）。");
+            Fail(ApiText.T("{0} は数値で指定してください（'{1}'）。", column, value));
             return current;
         }
         if (min is not null && parsed < min)
         {
-            Fail($"{column} は {min} 以上で指定してください（'{value}'）。");
+            Fail(ApiText.T("{0} は {1} 以上で指定してください（'{2}'）。", column, min, value));
             return current;
         }
         if (max is not null && parsed > max)
         {
-            Fail($"{column} は {max} 以下で指定してください（'{value}'）。");
+            Fail(ApiText.T("{0} は {1} 以下で指定してください（'{2}'）。", column, max, value));
             return current;
         }
         return parsed;
@@ -132,12 +133,12 @@ public sealed class CsvRowReader(CsvTable table, CsvRecord row, List<CsvImportEr
         }
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
         {
-            Fail($"{column} は整数で指定してください（'{value}'）。");
+            Fail(ApiText.T("{0} は整数で指定してください（'{1}'）。", column, value));
             return current;
         }
         if (min is not null && parsed < min)
         {
-            Fail($"{column} は {min} 以上で指定してください（'{value}'）。");
+            Fail(ApiText.T("{0} は {1} 以上で指定してください（'{2}'）。", column, min, value));
             return current;
         }
         return parsed;
@@ -178,7 +179,7 @@ public sealed class CsvRowReader(CsvTable table, CsvRecord row, List<CsvImportEr
         {
             return parsed;
         }
-        Fail($"{column} の値 '{value}' は不正です（指定可能：{string.Join(" / ", System.Enum.GetNames<TEnum>())}）。");
+        Fail(ApiText.T("{0} の値 '{1}' は不正です（指定可能：{2}）。", column, value, string.Join(" / ", System.Enum.GetNames<TEnum>())));
         return current;
     }
 
@@ -198,7 +199,7 @@ public sealed class CsvRowReader(CsvTable table, CsvRecord row, List<CsvImportEr
         {
             return parsed;
         }
-        Fail($"{column} は日付（yyyy-MM-dd）で指定してください（'{value}'）。");
+        Fail(ApiText.T("{0} は日付（yyyy-MM-dd）で指定してください（'{1}'）。", column, value));
         return current;
     }
 
@@ -227,7 +228,7 @@ public sealed class CsvRowReader(CsvTable table, CsvRecord row, List<CsvImportEr
         {
             return new DateTimeOffset(local, localOffset);
         }
-        Fail($"{column} は日時（yyyy-MM-dd HH:mm）で指定してください（'{value}'）。");
+        Fail(ApiText.T("{0} は日時（yyyy-MM-dd HH:mm）で指定してください（'{1}'）。", column, value));
         return null;
     }
 
@@ -247,13 +248,13 @@ public sealed class CsvRowReader(CsvTable table, CsvRecord row, List<CsvImportEr
         {
             return id;
         }
-        Fail($"{label} '{value}' は登録されていません（{column}）。");
+        Fail(ApiText.T("{0} '{1}' は登録されていません（{2}）。", ApiText.T(label), value, column));
         return current;
     }
 
     private bool FailBool(string column, string value, bool current)
     {
-        Fail($"{column} は true / false で指定してください（'{value}'）。");
+        Fail(ApiText.T("{0} は true / false で指定してください（'{1}'）。", column, value));
         return current;
     }
 
@@ -261,7 +262,7 @@ public sealed class CsvRowReader(CsvTable table, CsvRecord row, List<CsvImportEr
     {
         if (maxLength > 0 && value.Length > maxLength)
         {
-            Fail($"{column} は{maxLength}文字以内で指定してください（{value.Length}文字）。");
+            Fail(ApiText.T("{0} は{1}文字以内で指定してください（{2}文字）。", column, maxLength, value.Length));
         }
         return value;
     }

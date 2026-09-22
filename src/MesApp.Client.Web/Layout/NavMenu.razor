@@ -1,40 +1,40 @@
 ﻿<nav>
-    <NavLink href="" Match="NavLinkMatch.All">ダッシュボード</NavLink>
+    <NavLink href="" Match="NavLinkMatch.All">@L["ダッシュボード"]</NavLink>
 
-    <div class="nav-group">生産・製造実行</div>
-    <NavLink href="manufacturing-orders">製造指図</NavLink>
-    <NavLink href="dispatch">差立</NavLink>
-    <NavLink href="work-orders">作業指示</NavLink>
-    <NavLink href="process-progress">工程進捗・トラブル</NavLink>
-    <NavLink href="productivity">生産性モニタリング</NavLink>
-    <NavLink href="work-time">作業時間</NavLink>
+    <div class="nav-group">@L["生産・製造実行"]</div>
+    <NavLink href="manufacturing-orders">@L["製造指図"]</NavLink>
+    <NavLink href="dispatch">@L["差立"]</NavLink>
+    <NavLink href="work-orders">@L["作業指示"]</NavLink>
+    <NavLink href="process-progress">@L["工程進捗・トラブル"]</NavLink>
+    <NavLink href="productivity">@L["生産性モニタリング"]</NavLink>
+    <NavLink href="work-time">@L["作業時間"]</NavLink>
 
-    <div class="nav-group">物流・在庫</div>
-    <NavLink href="receiving">受入</NavLink>
-    <NavLink href="inventory">在庫照会・操作</NavLink>
-    <NavLink href="picking">出庫・払出</NavLink>
-    <NavLink href="shipping">出荷管理</NavLink>
-    <NavLink href="transfer-orders">搬送指示</NavLink>
-    <NavLink href="stocktakes">棚卸</NavLink>
-    <NavLink href="warehouse-operations">倉庫業務</NavLink>
+    <div class="nav-group">@L["物流・在庫"]</div>
+    <NavLink href="receiving">@L["受入"]</NavLink>
+    <NavLink href="inventory">@L["在庫照会・操作"]</NavLink>
+    <NavLink href="picking">@L["出庫・払出"]</NavLink>
+    <NavLink href="shipping">@L["出荷管理"]</NavLink>
+    <NavLink href="transfer-orders">@L["搬送指示"]</NavLink>
+    <NavLink href="stocktakes">@L["棚卸"]</NavLink>
+    <NavLink href="warehouse-operations">@L["倉庫業務"]</NavLink>
 
-    <div class="nav-group">品質</div>
-    <NavLink href="inspections">検査管理</NavLink>
-    <NavLink href="nonconformances">不適合管理</NavLink>
-    <NavLink href="quality-analysis">品質分析</NavLink>
-    <NavLink href="shipment-judgments">出荷判定</NavLink>
-    <NavLink href="traceability">トレーサビリティ</NavLink>
+    <div class="nav-group">@L["品質"]</div>
+    <NavLink href="inspections">@L["検査管理"]</NavLink>
+    <NavLink href="nonconformances">@L["不適合管理"]</NavLink>
+    <NavLink href="quality-analysis">@L["品質分析"]</NavLink>
+    <NavLink href="shipment-judgments">@L["出荷判定"]</NavLink>
+    <NavLink href="traceability">@L["トレーサビリティ"]</NavLink>
 
-    <div class="nav-group">設備・保全</div>
-    <NavLink href="maintenance">設備保全</NavLink>
-    <NavLink href="tool-management">治工具管理</NavLink>
+    <div class="nav-group">@L["設備・保全"]</div>
+    <NavLink href="maintenance">@L["設備保全"]</NavLink>
+    <NavLink href="tool-management">@L["治工具管理"]</NavLink>
 
-    <div class="nav-group">管理</div>
-    <NavLink href="masters">マスタ管理</NavLink>
-    <NavLink href="actual-csv">実績CSV取込</NavLink>
+    <div class="nav-group">@L["管理"]</div>
+    <NavLink href="masters">@L["マスタ管理"]</NavLink>
+    <NavLink href="actual-csv">@L["実績CSV取込"]</NavLink>
     @* 監査ログはシステム管理者専用（Spec.md 7.4・7.6）。他ロールは開いても403になるので出さない *@
     <AuthorizeView Roles="@MesRoleGroups.UserAdmin">
-        <NavLink href="audit-logs">監査ログ</NavLink>
+        <NavLink href="audit-logs">@L["監査ログ"]</NavLink>
     </AuthorizeView>
-    <NavLink href="about">このアプリについて</NavLink>
+    <NavLink href="about">@L["このアプリについて"]</NavLink>
 </nav>

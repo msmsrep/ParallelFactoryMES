@@ -6,40 +6,40 @@
 
 <AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
-        <h2 style="margin-top:0;">@(_editingId is null ? "品目の登録" : $"品目の編集（{_code}）")</h2>
+        <h2 style="margin-top:0;">@(_editingId is null ? L["品目の登録"] : L["品目の編集（{0}）", _code])</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>品目コード</label>
+                <label>@L["品目コード"]</label>
                 <input @bind="_code" />
             </div>
             <div class="form-field">
-                <label>品目名</label>
+                <label>@L["品目名"]</label>
                 <input @bind="_name" />
             </div>
             <div class="form-field">
-                <label>単位</label>
+                <label>@L["単位"]</label>
                 <input @bind="_unit" />
             </div>
             <div class="form-field">
-                <label>品目区分</label>
+                <label>@L["品目区分"]</label>
                 <select @bind="_type">
-                    <option value="@ProductType.Product">製品</option>
-                    <option value="@ProductType.SemiFinished">半製品・中間品</option>
-                    <option value="@ProductType.Material">部材</option>
+                    <option value="@ProductType.Product">@EnumLabels.Of(ProductType.Product)</option>
+                    <option value="@ProductType.SemiFinished">@EnumLabels.Of(ProductType.SemiFinished)</option>
+                    <option value="@ProductType.Material">@EnumLabels.Of(ProductType.Material)</option>
                 </select>
             </div>
             <div class="form-field">
-                <label>規格</label>
+                <label>@L["規格"]</label>
                 <input @bind="_specification" />
             </div>
             <div class="form-field">
-                <label>標準不良率(%)</label>
+                <label>@L["標準不良率(%)"]</label>
                 <input type="number" step="any" @bind="_defectRate" />
             </div>
             <div class="form-field">
-                <label>既定ロケーション（入庫先の推奨。D-10-30-03）</label>
+                <label>@L["既定ロケーション（入庫先の推奨。D-10-30-03）"]</label>
                 <select @bind="_defaultLocationId">
-                    <option value="0">指定しない</option>
+                    <option value="0">@L["指定しない"]</option>
                     @foreach (var location in _locations)
                     {
                         <option value="@location.Id">@location.Code</option>
@@ -48,50 +48,50 @@
             </div>
         </div>
         <p class="text-muted">
-            既定ロケーションを決めておくと、受入・完成品入庫でそこを第一候補として推奨する。
-            未指定でも、同じ品目の在庫がある場所と品目区分の既定エリアから推奨を出す。
+            @L["既定ロケーションを決めておくと、受入・完成品入庫でそこを第一候補として推奨する。"]
+            @L["未指定でも、同じ品目の在庫がある場所と品目区分の既定エリアから推奨を出す。"]
         </p>
         <div class="actions">
-            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
             @if (_editingId is not null)
             {
-                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+                <button class="btn btn-secondary" @onclick="ResetForm">@L["キャンセル"]</button>
             }
         </div>
     </div>
 </AuthorizeView>
 
-<CsvIoPanel Kind="products" Label="品目" KeyLabel="品目コード" OnImported="LoadAsync" />
-<CsvIoPanel Kind="bom" Label="MBOM" KeyLabel="親品目コード＋子品目コード" OnImported="ReloadSelectedAsync" />
-<CsvIoPanel Kind="routing" Label="工順（BOP）" KeyLabel="品目コード＋工程順序" OnImported="ReloadSelectedAsync" />
+<CsvIoPanel Kind="products" Label="@L["品目"]" KeyLabel="@L["品目コード"]" OnImported="LoadAsync" />
+<CsvIoPanel Kind="bom" Label="MBOM" KeyLabel="@L["親品目コード＋子品目コード"]" OnImported="ReloadSelectedAsync" />
+<CsvIoPanel Kind="routing" Label="@L["工順（BOP）"]" KeyLabel="@L["品目コード＋工程順序"]" OnImported="ReloadSelectedAsync" />
 
 <div class="card">
     @if (_products is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else
     {
         <table class="table">
-            <thead><tr><th>コード</th><th>品目名</th><th>区分</th><th>単位</th><th>標準不良率</th><th>状態</th><th></th></tr></thead>
+            <thead><tr><th>@L["コード"]</th><th>@L["品目名"]</th><th>@L["区分"]</th><th>@L["単位"]</th><th>@L["標準不良率"]</th><th>@L["状態"]</th><th></th></tr></thead>
             <tbody>
                 @foreach (var product in _products)
                 {
                     <tr>
                         <td>@product.Code</td>
                         <td>@product.Name</td>
-                        <td>@TypeLabel(product.Type)</td>
+                        <td>@EnumLabels.Of(product.Type)</td>
                         <td>@product.Unit</td>
                         <td>@product.StandardDefectRate %</td>
-                        <td>@(product.IsActive ? "有効" : "無効")</td>
+                        <td>@(product.IsActive ? L["有効"] : L["無効"])</td>
                         <td class="actions">
-                            <button class="btn btn-secondary btn-sm" @onclick="() => SelectAsync(product)">MBOM・工順</button>
+                            <button class="btn btn-secondary btn-sm" @onclick="() => SelectAsync(product)">@L["MBOM・工順"]</button>
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
-                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(product)">編集</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(product)">@L["編集"]</button>
                                 @if (product.IsActive)
                                 {
                                     <button class="btn btn-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => DeactivateAsync(product.Id)">無効化</button>
+                                            @onclick="() => DeactivateAsync(product.Id)">@L["無効化"]</button>
                                 }
                             </AuthorizeView>
                         </td>
@@ -129,7 +129,7 @@
     private int? _editingId;
     private string _code = string.Empty;
     private string _name = string.Empty;
-    private string _unit = "個";
+    private string _unit = "個"; // 保存される値なので訳さない（Spec.md 7.9）
     private string? _specification;
     private ProductType _type = ProductType.Product;
     private decimal _defectRate;
@@ -165,7 +165,7 @@
         _editingId = null;
         _code = string.Empty;
         _name = string.Empty;
-        _unit = "個";
+        _unit = "個"; // 保存される値なので訳さない
         _specification = null;
         _type = ProductType.Product;
         _defectRate = 0;
@@ -176,7 +176,7 @@
     {
         if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))
         {
-            _error = "品目コードと品目名を入力してください。";
+            _error = L["品目コードと品目名を入力してください。"];
             return;
         }
         _busy = true;
@@ -189,12 +189,12 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/products", request)
                 : await Http.PutAsJsonAsync($"api/products/{_editingId}", request);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保存しました。";
+            _message = L["保存しました。"];
             ResetForm();
             await LoadAsync();
         }
@@ -211,12 +211,12 @@
         try
         {
             var response = await Http.DeleteAsync($"api/products/{id}");
-            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["無効化に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "無効化しました。";
+            _message = L["無効化しました。"];
             await LoadAsync();
         }
         finally
@@ -261,11 +261,4 @@
             $"api/products/{_selected.Id}/change-impact");
     }
 
-    private static string TypeLabel(ProductType type) => type switch
-    {
-        ProductType.Product => "製品",
-        ProductType.SemiFinished => "半製品",
-        ProductType.Material => "部材",
-        _ => type.ToString(),
-    };
 }

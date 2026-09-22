@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -54,16 +55,16 @@ public class ShipmentJudgmentsController(
     {
         if (request.LotId is null && request.ShippingOrderId is null)
         {
-            return this.BadRequestProblem("対象ロットIDまたは出荷指示IDを指定してください。");
+            return this.BadRequestProblem(ApiText.T("対象ロットIDまたは出荷指示IDを指定してください。"));
         }
         if (request.LotId is int lotId && !await db.Lots.AnyAsync(l => l.Id == lotId, ct))
         {
-            return this.BadRequestProblem("存在しないロットIDです。");
+            return this.BadRequestProblem(ApiText.T("存在しないロットIDです。"));
         }
         if (request.ShippingOrderId is int shippingOrderId
             && !await db.ShippingOrders.AnyAsync(s => s.Id == shippingOrderId, ct))
         {
-            return this.BadRequestProblem("存在しない出荷指示IDです。");
+            return this.BadRequestProblem(ApiText.T("存在しない出荷指示IDです。"));
         }
 
         var judgment = new ShipmentJudgment
@@ -95,7 +96,7 @@ public class ShipmentJudgmentsController(
         }
         if (judgment.ApprovedAt is not null)
         {
-            return this.ConflictProblem("既に承認済みです。");
+            return this.ConflictProblem(ApiText.T("既に承認済みです。"));
         }
         judgment.ApprovedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         judgment.ApprovedAt = DateTimeOffset.UtcNow;

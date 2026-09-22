@@ -1,4 +1,5 @@
-﻿using MesApp.Api.Policies;
+﻿using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -298,7 +299,7 @@ public sealed partial class MasterCsvService
             var assetNo = groupReader.RequiredText("EquipmentAssetNo");
             if (!equipmentIds.TryGetValue(assetNo, out var equipmentId))
             {
-                groupReader.Fail($"設備 '{assetNo}' は登録されていません。先に設備マスタを取り込んでください。");
+                groupReader.Fail(ApiText.T("設備 '{0}' は登録されていません。先に設備マスタを取り込んでください。", assetNo));
                 continue;
             }
 
@@ -315,11 +316,11 @@ public sealed partial class MasterCsvService
                 var note = reader.Text("Note", null, 500);
                 if (productId is null && !reader.Failed)
                 {
-                    reader.Fail("ProductCode（部品の品目コード）は必須です。");
+                    reader.Fail(ApiText.T("ProductCode（部品の品目コード）は必須です。"));
                 }
                 if (productId is { } id && !seenProducts.Add(id))
                 {
-                    reader.Fail($"設備 '{assetNo}' に同じ品目が複数行あります。");
+                    reader.Fail(ApiText.T("設備 '{0}' に同じ品目が複数行あります。", assetNo));
                 }
                 if (reader.Failed)
                 {
@@ -486,7 +487,7 @@ public sealed partial class MasterCsvService
         {
             return found;
         }
-        reader.Fail($"作業区 '{code}' は登録されていません（{column}）。");
+        reader.Fail(ApiText.T("作業区 '{0}' は登録されていません（{1}）。", code, column));
         return null;
     }
 
@@ -520,7 +521,7 @@ public sealed partial class MasterCsvService
             }
             if (string.IsNullOrWhiteSpace(name))
             {
-                reader.Fail("Name は必須です。");
+                reader.Fail(ApiText.T("Name は必須です。"));
                 continue;
             }
 
@@ -545,7 +546,7 @@ public sealed partial class MasterCsvService
             {
                 if (!byCode.TryGetValue(parentCode, out parent))
                 {
-                    reader.Fail($"上位の作業区 '{parentCode}' は登録されていません（ParentCode）。");
+                    reader.Fail(ApiText.T("上位の作業区 '{0}' は登録されていません（ParentCode）。", parentCode));
                     continue;
                 }
             }
@@ -668,7 +669,7 @@ public sealed partial class MasterCsvService
             var isActive = reader.Bool("IsActive", item.IsActive);
             if (lower is not null && upper is not null && lower > upper)
             {
-                reader.Fail("規格値の下限が上限を超えています。");
+                reader.Fail(ApiText.T("規格値の下限が上限を超えています。"));
             }
             if (reader.Failed)
             {
@@ -792,12 +793,12 @@ public sealed partial class MasterCsvService
             // 判定条件は単票APIと同じにする（片方だけ通る状態を作らない。Spec.md 7.4）
             if (lower is { } l && upper is { } u && l > u)
             {
-                reader.Fail("許容下限は許容上限以下で指定してください。");
+                reader.Fail(ApiText.T("許容下限は許容上限以下で指定してください。"));
                 continue;
             }
             if (target is { } tv && ((lower is { } lo && tv < lo) || (upper is { } up && tv > up)))
             {
-                reader.Fail("指示値が許容範囲の外にあります。");
+                reader.Fail(ApiText.T("指示値が許容範囲の外にあります。"));
                 continue;
             }
 
@@ -859,11 +860,11 @@ public sealed partial class MasterCsvService
                 var isRequired = reader.Bool("IsRequired", true);
                 if (sequence is null)
                 {
-                    reader.Fail("Sequence（項目の表示順）は1以上の整数で指定してください。");
+                    reader.Fail(ApiText.T("Sequence（項目の表示順）は1以上の整数で指定してください。"));
                 }
                 else if (!sequences.Add(sequence.Value))
                 {
-                    reader.Fail($"チェックリスト '{code}' の項目の表示順 {sequence} が重複しています。");
+                    reader.Fail(ApiText.T("チェックリスト '{0}' の項目の表示順 {1} が重複しています。", code, sequence));
                 }
                 if (reader.Failed)
                 {
@@ -908,7 +909,7 @@ public sealed partial class MasterCsvService
             var parentCode = parentReader.RequiredText("ParentProductCode");
             if (!productIds.TryGetValue(parentCode, out var parentId))
             {
-                parentReader.Fail($"親品目 '{parentCode}' は登録されていません。先に品目マスタを取り込んでください。");
+                parentReader.Fail(ApiText.T("親品目 '{0}' は登録されていません。先に品目マスタを取り込んでください。", parentCode));
                 continue;
             }
 
@@ -926,15 +927,15 @@ public sealed partial class MasterCsvService
                 var isAlternative = reader.Bool("IsAlternative", false);
                 if (quantity is null && !reader.Failed)
                 {
-                    reader.Fail("QuantityPer（必要数量）は必須です。");
+                    reader.Fail(ApiText.T("QuantityPer（必要数量）は必須です。"));
                 }
                 if (childId == parentId)
                 {
-                    reader.Fail($"品目 '{childCode}' 自身をMBOMの子品目にはできません。");
+                    reader.Fail(ApiText.T("品目 '{0}' 自身をMBOMの子品目にはできません。", childCode));
                 }
                 else if (childId is not null && !children.Add(childId.Value))
                 {
-                    reader.Fail($"親品目 '{parentCode}' に子品目 '{childCode}' が重複しています。");
+                    reader.Fail(ApiText.T("親品目 '{0}' に子品目 '{1}' が重複しています。", parentCode, childCode));
                 }
                 if (reader.Failed)
                 {
@@ -1005,7 +1006,7 @@ public sealed partial class MasterCsvService
             var isActive = reader.Bool("IsActive", procedure.IsActive);
             if (!reader.Failed && string.IsNullOrWhiteSpace(steps) && string.IsNullOrWhiteSpace(reference))
             {
-                reader.Fail("Steps（手順ステップ）かReference（手順書の所在）のどちらかを指定してください。");
+                reader.Fail(ApiText.T("Steps（手順ステップ）かReference（手順書の所在）のどちらかを指定してください。"));
             }
             if (!isNew && procedure.IsActive && !isActive
                 && MasterDeactivationPolicy.CheckWorkProcedure(
@@ -1066,7 +1067,7 @@ public sealed partial class MasterCsvService
             var productCode = productReader.RequiredText("ProductCode");
             if (!productIds.TryGetValue(productCode, out var productId))
             {
-                productReader.Fail($"品目 '{productCode}' は登録されていません。先に品目マスタを取り込んでください。");
+                productReader.Fail(ApiText.T("品目 '{0}' は登録されていません。先に品目マスタを取り込んでください。", productCode));
                 continue;
             }
 
@@ -1090,15 +1091,15 @@ public sealed partial class MasterCsvService
                 var workProcedureId = reader.Reference("WorkProcedureNo", null, workProcedureIds, "作業手順書");
                 if (sequence is null && !reader.Failed)
                 {
-                    reader.Fail("Sequence（工程順序）は1以上の整数で指定してください。");
+                    reader.Fail(ApiText.T("Sequence（工程順序）は1以上の整数で指定してください。"));
                 }
                 if (processId is null && !reader.Failed)
                 {
-                    reader.Fail("ProcessCode（工程コード）は必須です。");
+                    reader.Fail(ApiText.T("ProcessCode（工程コード）は必須です。"));
                 }
                 if (sequence is not null && !sequences.Add(sequence.Value))
                 {
-                    reader.Fail($"品目 '{productCode}' の工程順序 {sequence} が重複しています。");
+                    reader.Fail(ApiText.T("品目 '{0}' の工程順序 {1} が重複しています。", productCode, sequence));
                 }
                 if (reader.Failed)
                 {
@@ -1169,7 +1170,7 @@ public sealed partial class MasterCsvService
             }
             else
             {
-                reader.Fail($"候補設備 '{code}' は登録されていません（EquipmentAssetNos）。");
+                reader.Fail(ApiText.T("候補設備 '{0}' は登録されていません（EquipmentAssetNos）。", code));
             }
         }
         return result;
@@ -1261,7 +1262,7 @@ public sealed partial class MasterCsvService
             {
                 if (!reader.Failed)
                 {
-                    reader.Fail("StartTime（開始時刻）とEndTime（終了時刻）は HH:mm で指定してください。");
+                    reader.Fail(ApiText.T("StartTime（開始時刻）とEndTime（終了時刻）は HH:mm で指定してください。"));
                 }
                 continue;
             }
@@ -1286,7 +1287,7 @@ public sealed partial class MasterCsvService
                     startTime, endTime, businessDate.BoundaryHour) is { } boundaryWarning)
             {
                 counter.Warnings.Add(new CsvImportError(
-                    reader.Line, $"直 '{code}'：{boundaryWarning}"));
+                    reader.Line, ApiText.T("直 '{0}'：{1}", code, boundaryWarning)));
             }
 
             shift.Name = name;
@@ -1319,7 +1320,7 @@ public sealed partial class MasterCsvService
         {
             return parsed;
         }
-        reader.Fail($"{column} は HH:mm 形式で指定してください（'{text}'）。");
+        reader.Fail(ApiText.T("{0} は HH:mm 形式で指定してください（'{1}'）。", column, text));
         return null;
     }
 
@@ -1373,7 +1374,7 @@ public sealed partial class MasterCsvService
             {
                 if (password is null)
                 {
-                    reader.Fail($"新規ユーザー '{userName}' には InitialPassword（初期パスワード）が必要です。");
+                    reader.Fail(ApiText.T("新規ユーザー '{0}' には InitialPassword（初期パスワード）が必要です。", userName));
                     continue;
                 }
                 user = new AppUser
@@ -1467,7 +1468,7 @@ public sealed partial class MasterCsvService
             var userName = userReader.RequiredText("UserName");
             if (!userIds.TryGetValue(userName, out var userId))
             {
-                userReader.Fail($"ユーザー '{userName}' は登録されていません。先にユーザーを取り込んでください。");
+                userReader.Fail(ApiText.T("ユーザー '{0}' は登録されていません。先にユーザーを取り込んでください。", userName));
                 continue;
             }
 
@@ -1483,7 +1484,7 @@ public sealed partial class MasterCsvService
                 var expiresOn = reader.DateOrNull("ExpiresOn", null);
                 if (skillId is not null && !skills.Add(skillId.Value))
                 {
-                    reader.Fail($"ユーザー '{userName}' にスキル '{skillCode}' が重複しています。");
+                    reader.Fail(ApiText.T("ユーザー '{0}' にスキル '{1}' が重複しています。", userName, skillCode));
                 }
                 if (reader.Failed)
                 {
@@ -1532,7 +1533,7 @@ public sealed partial class MasterCsvService
             var key = table.Value(row, keyColumn);
             if (key is null)
             {
-                errors.Add(new CsvImportError(row.Line, $"{keyColumn} は必須です。"));
+                errors.Add(new CsvImportError(row.Line, ApiText.T("{0} は必須です。", keyColumn)));
                 continue;
             }
             if (!index.TryGetValue(key, out var position))
@@ -1552,7 +1553,7 @@ public sealed partial class MasterCsvService
         {
             return true;
         }
-        reader.Fail($"{label} '{key}' が複数行にあります。");
+        reader.Fail(ApiText.T("{0} '{1}' が複数行にあります。", ApiText.T(label), key));
         return false;
     }
 
@@ -1569,8 +1570,8 @@ public sealed partial class MasterCsvService
         var unknown = roles.Except(MesRoles.All, StringComparer.Ordinal).ToList();
         if (unknown.Count > 0)
         {
-            reader.Fail($"不明なロールが含まれています：{string.Join(", ", unknown)}"
-                + $"（指定可能：{string.Join(" / ", MesRoles.All)}）");
+            reader.Fail(ApiText.T("不明なロールが含まれています：{0}（指定可能：{1}）",
+                string.Join(", ", unknown), string.Join(" / ", MesRoles.All)));
         }
         return roles;
     }
@@ -1584,7 +1585,7 @@ public sealed partial class MasterCsvService
         }
         foreach (var error in result.Errors)
         {
-            reader.Fail($"ユーザー '{userName}'：{error.Description}");
+            reader.Fail(ApiText.T("ユーザー '{0}'：{1}", userName, error.Description));
         }
         return false;
     }

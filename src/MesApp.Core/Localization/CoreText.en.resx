@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="HSE" xml:space="preserve">
+    <value>HSE</value>
+  </data>
+  <data name="その他" xml:space="preserve">
+    <value>Other</value>
+  </data>
+  <data name="アイドル" xml:space="preserve">
+    <value>Idle</value>
+  </data>
+  <data name="エリア" xml:space="preserve">
+    <value>Area</value>
+  </data>
+  <data name="カレンダ" xml:space="preserve">
+    <value>Calendar</value>
+  </data>
+  <data name="クローズ" xml:space="preserve">
+    <value>Closed</value>
+  </data>
+  <data name="コスト" xml:space="preserve">
+    <value>Cost</value>
+  </data>
+  <data name="サンプル" xml:space="preserve">
+    <value>Sample</value>
+  </data>
+  <data name="サンプル保管" xml:space="preserve">
+    <value>Sample retention</value>
+  </data>
+  <data name="システム管理者" xml:space="preserve">
+    <value>System administrator</value>
+  </data>
+  <data name="スキル" xml:space="preserve">
+    <value>Skill</value>
+  </data>
+  <data name="バックフラッシュ" xml:space="preserve">
+    <value>Backflush</value>
+  </data>
+  <data name="メンテナンス中" xml:space="preserve">
+    <value>Under maintenance</value>
+  </data>
+  <data name="ライン" xml:space="preserve">
+    <value>Line</value>
+  </data>
+  <data name="リワーク" xml:space="preserve">
+    <value>Rework</value>
+  </data>
+  <data name="不合格" xml:space="preserve">
+    <value>Fail</value>
+  </data>
+  <data name="不良" xml:space="preserve">
+    <value>Defective</value>
+  </data>
+  <data name="不適合" xml:space="preserve">
+    <value>Nonconformance</value>
+  </data>
+  <data name="人的要因" xml:space="preserve">
+    <value>Human factor</value>
+  </data>
+  <data name="作業区" xml:space="preserve">
+    <value>Work center</value>
+  </data>
+  <data name="使用中" xml:space="preserve">
+    <value>In use</value>
+  </data>
+  <data name="使用可能" xml:space="preserve">
+    <value>Available</value>
+  </data>
+  <data name="使用回数" xml:space="preserve">
+    <value>Usage count</value>
+  </data>
+  <data name="保全" xml:space="preserve">
+    <value>Maintenance</value>
+  </data>
+  <data name="保全中" xml:space="preserve">
+    <value>Under maintenance</value>
+  </data>
+  <data name="保全消費" xml:space="preserve">
+    <value>Maintenance consumption</value>
+  </data>
+  <data name="保留" xml:space="preserve">
+    <value>On hold</value>
+  </data>
+  <data name="保管中" xml:space="preserve">
+    <value>Stored</value>
+  </data>
+  <data name="停止" xml:space="preserve">
+    <value>Stopped</value>
+  </data>
+  <data name="停止中" xml:space="preserve">
+    <value>Stopped</value>
+  </data>
+  <data name="入庫" xml:space="preserve">
+    <value>Put-away</value>
+  </data>
+  <data name="共通" xml:space="preserve">
+    <value>Common</value>
+  </data>
+  <data name="内製" xml:space="preserve">
+    <value>In-house</value>
+  </data>
+  <data name="再検査" xml:space="preserve">
+    <value>Reinspection</value>
+  </data>
+  <data name="出庫" xml:space="preserve">
+    <value>Issue</value>
+  </data>
+  <data name="出荷" xml:space="preserve">
+    <value>Shipping</value>
+  </data>
+  <data name="出荷場" xml:space="preserve">
+    <value>Shipping area</value>
+  </data>
+  <data name="分割" xml:space="preserve">
+    <value>Split</value>
+  </data>
+  <data name="判定済" xml:space="preserve">
+    <value>Judged</value>
+  </data>
+  <data name="前段取り" xml:space="preserve">
+    <value>Pre-setup</value>
+  </data>
+  <data name="加工・作業" xml:space="preserve">
+    <value>Process / work</value>
+  </data>
+  <data name="半製品・中間品" xml:space="preserve">
+    <value>Semi-finished / intermediate</value>
+  </data>
+  <data name="取消" xml:space="preserve">
+    <value>Canceled</value>
+  </data>
+  <data name="受入" xml:space="preserve">
+    <value>Receiving</value>
+  </data>
+  <data name="可" xml:space="preserve">
+    <value>Approved</value>
+  </data>
+  <data name="合格" xml:space="preserve">
+    <value>Pass</value>
+  </data>
+  <data name="品目" xml:space="preserve">
+    <value>Item</value>
+  </data>
+  <data name="品質" xml:space="preserve">
+    <value>Quality</value>
+  </data>
+  <data name="品質保証" xml:space="preserve">
+    <value>Quality assurance</value>
+  </data>
+  <data name="品質管理" xml:space="preserve">
+    <value>Quality control</value>
+  </data>
+  <data name="在庫操作" xml:space="preserve">
+    <value>Inventory operation</value>
+  </data>
+  <data name="外注" xml:space="preserve">
+    <value>Outsourced</value>
+  </data>
+  <data name="安全" xml:space="preserve">
+    <value>Safety</value>
+  </data>
+  <data name="完了" xml:space="preserve">
+    <value>Completed</value>
+  </data>
+  <data name="完成品" xml:space="preserve">
+    <value>Final product</value>
+  </data>
+  <data name="定期" xml:space="preserve">
+    <value>Periodic</value>
+  </data>
+  <data name="実施中" xml:space="preserve">
+    <value>In progress</value>
+  </data>
+  <data name="実績入力" xml:space="preserve">
+    <value>Production record</value>
+  </data>
+  <data name="対応中" xml:space="preserve">
+    <value>In progress</value>
+  </data>
+  <data name="対応完了" xml:space="preserve">
+    <value>Action completed</value>
+  </data>
+  <data name="対応指示済" xml:space="preserve">
+    <value>Action instructed</value>
+  </data>
+  <data name="対象外" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="展開済" xml:space="preserve">
+    <value>Released</value>
+  </data>
+  <data name="工場" xml:space="preserve">
+    <value>Plant</value>
+  </data>
+  <data name="工程" xml:space="preserve">
+    <value>Process</value>
+  </data>
+  <data name="工程内" xml:space="preserve">
+    <value>In-process</value>
+  </data>
+  <data name="工程払出" xml:space="preserve">
+    <value>Process issue</value>
+  </data>
+  <data name="差立" xml:space="preserve">
+    <value>Dispatch</value>
+  </data>
+  <data name="廃棄" xml:space="preserve">
+    <value>Scrap</value>
+  </data>
+  <data name="廃棄・除却" xml:space="preserve">
+    <value>Retired</value>
+  </data>
+  <data name="廃棄予定" xml:space="preserve">
+    <value>To be scrapped</value>
+  </data>
+  <data name="廃棄済" xml:space="preserve">
+    <value>Disposed</value>
+  </data>
+  <data name="引当済" xml:space="preserve">
+    <value>Allocated</value>
+  </data>
+  <data name="後段取り" xml:space="preserve">
+    <value>Post-setup</value>
+  </data>
+  <data name="手動" xml:space="preserve">
+    <value>Manual</value>
+  </data>
+  <data name="払出戻し" xml:space="preserve">
+    <value>Issue return</value>
+  </data>
+  <data name="払出済" xml:space="preserve">
+    <value>Issued</value>
+  </data>
+  <data name="承認" xml:space="preserve">
+    <value>Approval</value>
+  </data>
+  <data name="承認済" xml:space="preserve">
+    <value>Approved</value>
+  </data>
+  <data name="指図取消" xml:space="preserve">
+    <value>Order canceled</value>
+  </data>
+  <data name="指示" xml:space="preserve">
+    <value>Instructed</value>
+  </data>
+  <data name="指示中" xml:space="preserve">
+    <value>Instructed</value>
+  </data>
+  <data name="指示発行済" xml:space="preserve">
+    <value>Order issued</value>
+  </data>
+  <data name="振替" xml:space="preserve">
+    <value>Transfer</value>
+  </data>
+  <data name="故障" xml:space="preserve">
+    <value>Failure</value>
+  </data>
+  <data name="日次" xml:space="preserve">
+    <value>Daily</value>
+  </data>
+  <data name="月次" xml:space="preserve">
+    <value>Monthly</value>
+  </data>
+  <data name="未承認" xml:space="preserve">
+    <value>Draft</value>
+  </data>
+  <data name="未配布" xml:space="preserve">
+    <value>Not dispatched</value>
+  </data>
+  <data name="材質・部材" xml:space="preserve">
+    <value>Material</value>
+  </data>
+  <data name="棚卸調整" xml:space="preserve">
+    <value>Stocktake adjustment</value>
+  </data>
+  <data name="検査" xml:space="preserve">
+    <value>Inspection</value>
+  </data>
+  <data name="検査待ち" xml:space="preserve">
+    <value>Awaiting inspection</value>
+  </data>
+  <data name="標準時間超過" xml:space="preserve">
+    <value>Over standard time</value>
+  </data>
+  <data name="正常" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="段取り" xml:space="preserve">
+    <value>Setup</value>
+  </data>
+  <data name="消耗品" xml:space="preserve">
+    <value>Consumable</value>
+  </data>
+  <data name="物流・倉庫" xml:space="preserve">
+    <value>Logistics / warehouse</value>
+  </data>
+  <data name="特別採用" xml:space="preserve">
+    <value>Special acceptance</value>
+  </data>
+  <data name="現場作業者" xml:space="preserve">
+    <value>Operator</value>
+  </data>
+  <data name="生産" xml:space="preserve">
+    <value>Production</value>
+  </data>
+  <data name="生産実績" xml:space="preserve">
+    <value>Production record</value>
+  </data>
+  <data name="生産管理" xml:space="preserve">
+    <value>Production management</value>
+  </data>
+  <data name="発生" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="直" xml:space="preserve">
+    <value>Shift</value>
+  </data>
+  <data name="直接" xml:space="preserve">
+    <value>Direct</value>
+  </data>
+  <data name="着手" xml:space="preserve">
+    <value>Started</value>
+  </data>
+  <data name="確定" xml:space="preserve">
+    <value>Finalized</value>
+  </data>
+  <data name="移動" xml:space="preserve">
+    <value>Move</value>
+  </data>
+  <data name="稼働" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="稼働可能" xml:space="preserve">
+    <value>Available</value>
+  </data>
+  <data name="稼働時間" xml:space="preserve">
+    <value>Run time</value>
+  </data>
+  <data name="突発" xml:space="preserve">
+    <value>Unplanned</value>
+  </data>
+  <data name="突発依頼" xml:space="preserve">
+    <value>Unplanned request</value>
+  </data>
+  <data name="納期" xml:space="preserve">
+    <value>Delivery</value>
+  </data>
+  <data name="納期超過" xml:space="preserve">
+    <value>Past due date</value>
+  </data>
+  <data name="統合" xml:space="preserve">
+    <value>Merge</value>
+  </data>
+  <data name="製品" xml:space="preserve">
+    <value>Product</value>
+  </data>
+  <data name="製品倉庫" xml:space="preserve">
+    <value>Product warehouse</value>
+  </data>
+  <data name="計画" xml:space="preserve">
+    <value>Planned</value>
+  </data>
+  <data name="計画外" xml:space="preserve">
+    <value>Unplanned</value>
+  </data>
+  <data name="設備" xml:space="preserve">
+    <value>Equipment</value>
+  </data>
+  <data name="設備保全" xml:space="preserve">
+    <value>Equipment maintenance</value>
+  </data>
+  <data name="調整" xml:space="preserve">
+    <value>Adjustment</value>
+  </data>
+  <data name="資格" xml:space="preserve">
+    <value>Certification</value>
+  </data>
+  <data name="資産管理部品" xml:space="preserve">
+    <value>Asset-managed part</value>
+  </data>
+  <data name="返却済" xml:space="preserve">
+    <value>Returned</value>
+  </data>
+  <data name="返品" xml:space="preserve">
+    <value>Return</value>
+  </data>
+  <data name="通常" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="週次" xml:space="preserve">
+    <value>Weekly</value>
+  </data>
+  <data name="部材" xml:space="preserve">
+    <value>Material</value>
+  </data>
+  <data name="部材倉庫" xml:space="preserve">
+    <value>Material warehouse</value>
+  </data>
+  <data name="配布済" xml:space="preserve">
+    <value>Dispatched</value>
+  </data>
+  <data name="間接" xml:space="preserve">
+    <value>Indirect</value>
+  </data>
+</root>

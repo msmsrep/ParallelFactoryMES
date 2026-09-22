@@ -1,4 +1,5 @@
-﻿using MesApp.Api.Policies;
+﻿using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
@@ -83,7 +84,7 @@ public class UsersController(
         var invalidRoles = request.Roles.Except(MesRoles.All).ToList();
         if (invalidRoles.Count > 0)
         {
-            return this.BadRequestProblem($"不明なロールが含まれています: {string.Join(", ", invalidRoles)}");
+            return this.BadRequestProblem(ApiText.T("不明なロールが含まれています: {0}", string.Join(", ", invalidRoles)));
         }
 
         // 検証はユーザーを作る前に通す（作成後に弾くと、所属だけ入っていないユーザーが残る）
@@ -131,7 +132,7 @@ public class UsersController(
         var invalidRoles = request.Roles.Except(MesRoles.All).ToList();
         if (invalidRoles.Count > 0)
         {
-            return this.BadRequestProblem($"不明なロールが含まれています: {string.Join(", ", invalidRoles)}");
+            return this.BadRequestProblem(ApiText.T("不明なロールが含まれています: {0}", string.Join(", ", invalidRoles)));
         }
 
         // 最後のシステム管理者を無効化・降格すると誰も権限操作できなくなる（復旧はDB操作のみ）
@@ -180,7 +181,7 @@ public class UsersController(
             : null;
         if (workCenterId is { } missingWc && workCenter is null)
         {
-            return $"作業区（ID {missingWc}）が見つかりません。";
+            return ApiText.T("作業区（ID {0}）が見つかりません。", missingWc);
         }
         if (WorkCenterHierarchyPolicy.CheckLocationPlacement(workCenter) is { } wcReason)
         {
@@ -188,7 +189,7 @@ public class UsersController(
         }
         if (shiftId is { } sid && !await db.Shifts.AnyAsync(s => s.Id == sid && s.IsActive, ct))
         {
-            return $"直（ID {sid}）が見つからないか無効です。";
+            return ApiText.T("直（ID {0}）が見つからないか無効です。", sid);
         }
         return null;
     }
@@ -253,13 +254,13 @@ public class UsersController(
         }
         if (skills.GroupBy(s => s.SkillId).Any(g => g.Count() > 1))
         {
-            return this.BadRequestProblem("同一スキルが重複しています。");
+            return this.BadRequestProblem(ApiText.T("同一スキルが重複しています。"));
         }
         var skillIds = skills.Select(s => s.SkillId).ToList();
         var found = await db.Skills.CountAsync(s => skillIds.Contains(s.Id), ct);
         if (found != skillIds.Count)
         {
-            return this.BadRequestProblem("存在しないスキルIDが含まれています。");
+            return this.BadRequestProblem(ApiText.T("存在しないスキルIDが含まれています。"));
         }
 
         var existing = await db.UserSkills.Where(s => s.UserId == id).ToListAsync(ct);

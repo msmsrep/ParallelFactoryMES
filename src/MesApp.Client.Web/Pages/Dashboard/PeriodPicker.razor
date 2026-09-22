@@ -5,22 +5,22 @@
 
 <Notice Error="@_error" />
 <div class="actions">
-    <select value="@_unit" @onchange="OnUnitChangedAsync" aria-label="集計単位">
+    <select value="@_unit" @onchange="OnUnitChangedAsync" aria-label="@L["集計単位"]">
         @foreach (var unit in Enum.GetValues<DashboardPeriodUnit>())
         {
-            <option value="@unit">@DashboardPeriods.UnitLabel(unit)</option>
+            <option value="@unit">@EnumLabels.Of(unit)</option>
         }
     </select>
-    <button class="btn btn-secondary btn-sm" @onclick="() => MoveAsync(-1)">◀ 前へ</button>
-    <input type="date" value="@_anchor.ToString("yyyy-MM-dd")" @onchange="OnAnchorChangedAsync" aria-label="基準日" />
-    <button class="btn btn-secondary btn-sm" @onclick="() => MoveAsync(1)">次へ ▶</button>
-    <button class="btn btn-secondary btn-sm" @onclick="TodayAsync">今日</button>
+    <button class="btn btn-secondary btn-sm" @onclick="() => MoveAsync(-1)">@L["◀ 前へ"]</button>
+    <input type="date" value="@_anchor.ToString("yyyy-MM-dd")" @onchange="OnAnchorChangedAsync" aria-label="@L["基準日"]" />
+    <button class="btn btn-secondary btn-sm" @onclick="() => MoveAsync(1)">@L["次へ ▶"]</button>
+    <button class="btn btn-secondary btn-sm" @onclick="TodayAsync">@L["今日"]</button>
     <span><strong>@From.ToString("yyyy-MM-dd")〜@To.ToString("yyyy-MM-dd")</strong></span>
 </div>
 @if (_businessDate is not null)
 {
     <p class="text-muted">
-        今日＝製造日 @_businessDate.Today.ToString("yyyy-MM-dd")（@(_businessDate.BoundaryHour)時境界。夜勤の日跨ぎ実績も開始した製造日に集計する。週は月曜始まり）
+        @L["今日＝製造日 {0}（{1}時境界。夜勤の日跨ぎ実績も開始した製造日に集計する。週は月曜始まり）", _businessDate.Today.ToString("yyyy-MM-dd"), _businessDate.BoundaryHour]
     </p>
 }
 
@@ -58,7 +58,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "製造日を取得できなかったため、端末の日付で表示しています。";
+            _error = L["製造日を取得できなかったため、端末の日付で表示しています。"];
         }
         await NotifyAsync();
     }

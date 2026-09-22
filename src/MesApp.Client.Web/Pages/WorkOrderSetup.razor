@@ -2,60 +2,60 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>段取り・チェックリスト - Parallel Factory MES</PageTitle>
+<PageTitle>@L["段取り・チェックリスト - Parallel Factory MES"]</PageTitle>
 
 @if (_workOrder is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
-    <h1>段取り・チェックリスト：@_workOrder.WorkOrderNo</h1>
+    <h1>@L["段取り・チェックリスト：{0}", _workOrder.WorkOrderNo]</h1>
     <p class="text-muted">
-        @_workOrder.ProductCode @_workOrder.ProductName ／ 工程 @_workOrder.ProcessCode @_workOrder.ProcessName
-        <a class="btn btn-secondary btn-sm" href="work-orders/@Id/record">実績入力へ</a>
+        @_workOrder.ProductCode @_workOrder.ProductName ／ @L["工程"] @_workOrder.ProcessCode @_workOrder.ProcessName
+        <a class="btn btn-secondary btn-sm" href="work-orders/@Id/record">@L["実績入力へ"]</a>
     </p>
 
     <Notice Error="@_error" Message="@_message" />
 
     <div class="card">
-        <h2 style="margin-top:0;">段取り実績（B-20-50 前段取り／B-40-40 後段取り）</h2>
+        <h2 style="margin-top:0;">@L["段取り実績（B-20-50 前段取り／B-40-40 後段取り）"]</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>区分</label>
+                <label>@L["区分"]</label>
                 <select @bind="_setupType">
-                    <option value="@SetupType.Pre">前段取り</option>
-                    <option value="@SetupType.Post">後段取り</option>
+                    <option value="@SetupType.Pre">@EnumLabels.Of(SetupType.Pre)</option>
+                    <option value="@SetupType.Post">@EnumLabels.Of(SetupType.Post)</option>
                 </select>
             </div>
             <div class="form-field">
-                <label>開始時刻</label>
+                <label>@L["開始時刻"]</label>
                 <input type="datetime-local" @bind="_startedAt" />
             </div>
             <div class="form-field">
-                <label>終了時刻</label>
+                <label>@L["終了時刻"]</label>
                 <input type="datetime-local" @bind="_endedAt" />
             </div>
             <div class="form-field">
-                <label>異常報告（B-20-50-05）</label>
-                <input @bind="_abnormality" placeholder="異常があれば記入" />
+                <label>@L["異常報告（B-20-50-05）"]</label>
+                <input @bind="_abnormality" placeholder="@L["異常があれば記入"]" />
             </div>
         </div>
         <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord">
-            <button class="btn" disabled="@_busy" @onclick="AddSetupAsync">段取り実績を記録</button>
+            <button class="btn" disabled="@_busy" @onclick="AddSetupAsync">@L["段取り実績を記録"]</button>
         </AuthorizeView>
 
         @if (_setupRecords.Count > 0)
         {
             <table class="table mt-2">
                 <thead>
-                    <tr><th>区分</th><th>開始</th><th>終了</th><th>実施者</th><th>異常報告</th></tr>
+                    <tr><th>@L["区分"]</th><th>@L["開始"]</th><th>@L["終了"]</th><th>@L["実施者"]</th><th>@L["異常報告"]</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var record in _setupRecords)
                     {
                         <tr>
-                            <td>@(record.Type == SetupType.Pre ? "前段取り" : "後段取り")</td>
+                            <td>@EnumLabels.Of(record.Type)</td>
                             <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                             <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
                             <td>@record.PerformedByName</td>
@@ -69,13 +69,13 @@ else
 
     @* 治工具の引当・払出・受領確認（B-20-30-01〜03）。現物の所在を追う。寿命の累計は治工具管理で記録する *@
     <div class="card">
-        <h2 style="margin-top:0;">治工具の引当・払出（B-20-30）</h2>
+        <h2 style="margin-top:0;">@L["治工具の引当・払出（B-20-30）"]</h2>
         <AuthorizeView Roles="@MesRoleGroups.ProductionManage" Context="toolAllocate">
             <div class="form-grid">
                 <div class="form-field">
-                    <label>治工具</label>
+                    <label>@L["治工具"]</label>
                     <select @bind="_allocateToolId">
-                        <option value="0">選択してください</option>
+                        <option value="0">@L["選択してください"]</option>
                         @foreach (var tool in _tools)
                         {
                             <option value="@tool.Id">@tool.Code @tool.Name</option>
@@ -83,25 +83,25 @@ else
                     </select>
                 </div>
                 <div class="form-field">
-                    <label>備考</label>
+                    <label>@L["備考"]</label>
                     <input @bind="_allocateNote" />
                 </div>
             </div>
-            <button class="btn" disabled="@_busy" @onclick="AllocateToolAsync">引き当てる</button>
+            <button class="btn" disabled="@_busy" @onclick="AllocateToolAsync">@L["引き当てる"]</button>
             <p class="text-muted">
-                メンテナンス中・廃棄済み・寿命に達した治工具、他の作業指示に引当中の治工具は引き当てられない。
+                @L["メンテナンス中・廃棄済み・寿命に達した治工具、他の作業指示に引当中の治工具は引き当てられない。"]
             </p>
         </AuthorizeView>
 
         @if (_toolIssues.Count == 0)
         {
-            <p class="text-muted">この作業指示への治工具の引当はありません。</p>
+            <p class="text-muted">@L["この作業指示への治工具の引当はありません。"]</p>
         }
         else
         {
             <table class="table">
                 <thead>
-                    <tr><th>治工具</th><th>状態</th><th>引当日時</th><th>払出日時</th><th>受領者</th><th>返却日時</th><th></th></tr>
+                    <tr><th>@L["治工具"]</th><th>@L["状態"]</th><th>@L["引当日時"]</th><th>@L["払出日時"]</th><th>@L["受領者"]</th><th>@L["返却日時"]</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (var issue in _toolIssues)
@@ -118,18 +118,18 @@ else
                                 {
                                     <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="toolIssue">
                                         <button class="btn btn-sm" disabled="@_busy"
-                                                @onclick="() => IssueToolAsync(issue.Id)">受領（払出）</button>
+                                                @onclick="() => IssueToolAsync(issue.Id)">@L["受領（払出）"]</button>
                                     </AuthorizeView>
                                     <AuthorizeView Roles="@MesRoleGroups.ProductionManage" Context="toolCancel">
                                         <button class="btn btn-secondary btn-sm" disabled="@_busy"
-                                                @onclick="() => CancelToolIssueAsync(issue.Id)">引当取消</button>
+                                                @onclick="() => CancelToolIssueAsync(issue.Id)">@L["引当取消"]</button>
                                     </AuthorizeView>
                                 }
                                 else if (issue.Status == ToolIssueStatus.Issued)
                                 {
                                     <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="toolReturn">
                                         <button class="btn btn-secondary btn-sm" disabled="@_busy"
-                                                @onclick="() => ReturnToolAsync(issue.Id)">返却</button>
+                                                @onclick="() => ReturnToolAsync(issue.Id)">@L["返却"]</button>
                                     </AuthorizeView>
                                 }
                             </td>
@@ -141,14 +141,14 @@ else
     </div>
 
     <div class="card">
-        <h2 style="margin-top:0;">チェックリスト実施（B-30-10。HSE項目含む）</h2>
+        <h2 style="margin-top:0;">@L["チェックリスト実施（B-30-10。HSE項目含む）"]</h2>
         <div class="form-field" style="max-width:360px;">
-            <label>チェックリスト</label>
+            <label>@L["チェックリスト"]</label>
             <select @bind="_selectedChecklistId" @bind:after="OnChecklistChanged">
-                <option value="0">選択してください</option>
+                <option value="0">@L["選択してください"]</option>
                 @foreach (var checklist in _checklists)
                 {
-                    <option value="@checklist.Id">@checklist.Code @checklist.Name（@ChecklistCategoryLabel(checklist.Category)）</option>
+                    <option value="@checklist.Id">@checklist.Code @checklist.Name (@EnumLabels.Of(checklist.Category))</option>
                 }
             </select>
         </div>
@@ -157,7 +157,7 @@ else
         {
             <table class="table mt-2">
                 <thead>
-                    <tr><th style="width:60px;">確認</th><th>項目</th><th>必須</th><th>備考</th></tr>
+                    <tr><th style="width:60px;">@L["確認"]</th><th>@L["項目"]</th><th>@L["必須"]</th><th>@L["備考"]</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var item in _selectedChecklist.Items)
@@ -168,7 +168,7 @@ else
                                        @onchange="e => _checks[item.Id].Checked = (bool)(e.Value ?? false)" />
                             </td>
                             <td>@item.Text</td>
-                            <td>@(item.IsRequired ? "必須" : "-")</td>
+                            <td>@(item.IsRequired ? L["必須"] : "-")</td>
                             <td>
                                 <input value="@_checks[item.Id].Note"
                                        @onchange="e => _checks[item.Id].Note = e.Value?.ToString()" />
@@ -178,16 +178,16 @@ else
                 </tbody>
             </table>
             <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord" Context="checklistWrite">
-                <button class="btn mt-2" disabled="@_busy" @onclick="SubmitChecklistAsync">チェックリストを記録</button>
+                <button class="btn mt-2" disabled="@_busy" @onclick="SubmitChecklistAsync">@L["チェックリストを記録"]</button>
             </AuthorizeView>
         }
 
         @if (_checklistRecords.Count > 0)
         {
-            <h2>実施履歴</h2>
+            <h2>@L["実施履歴"]</h2>
             <table class="table">
                 <thead>
-                    <tr><th>チェックリスト</th><th>実施者</th><th>実施日時</th><th>結果</th></tr>
+                    <tr><th>@L["チェックリスト"]</th><th>@L["実施者"]</th><th>@L["実施日時"]</th><th>@L["結果"]</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var record in _checklistRecords)
@@ -196,7 +196,7 @@ else
                             <td>@record.ChecklistCode @record.ChecklistName</td>
                             <td>@record.PerformedByName</td>
                             <td>@record.PerformedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                            <td>@record.Results.Count(r => r.IsChecked) / @record.Results.Count 項目</td>
+                            <td>@L["{0} / {1} 項目", record.Results.Count(r => r.IsChecked), record.Results.Count]</td>
                         </tr>
                     }
                 </tbody>
@@ -273,12 +273,12 @@ else
             var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/setup-records",
                 new SetupRecordRequest(_setupType, new DateTimeOffset(_startedAt),
                     _endedAt is null ? null : new DateTimeOffset(_endedAt.Value), _abnormality));
-            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["記録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "段取り実績を記録しました。";
+            _message = L["段取り実績を記録しました。"];
             _abnormality = null;
             await LoadAsync();
         }
@@ -305,12 +305,12 @@ else
             var response = await Http.PostAsJsonAsync($"api/work-orders/{Id}/checklist-records",
                 new ChecklistRecordRequest(_selectedChecklist.Id, results));
             // 必須項目が未チェックの場合はここでエラーになる
-            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["記録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "チェックリストを記録しました。";
+            _message = L["チェックリストを記録しました。"];
             OnChecklistChanged();
             await LoadAsync();
         }
@@ -320,28 +320,18 @@ else
         }
     }
 
-    private static string ChecklistCategoryLabel(ChecklistCategory category) => category switch
-    {
-        ChecklistCategory.Common => "共通",
-        ChecklistCategory.Process => "工程",
-        ChecklistCategory.Product => "品目",
-        ChecklistCategory.Setup => "段取り",
-        ChecklistCategory.Maintenance => "保全",
-        ChecklistCategory.Hse => "HSE",
-        _ => category.ToString(),
-    };
 
     private async Task AllocateToolAsync()
     {
         if (_allocateToolId == 0)
         {
-            _error = "治工具を選択してください。";
+            _error = L["治工具を選択してください。"];
             return;
         }
         await RunToolActionAsync(
             () => Http.PostAsJsonAsync("api/tool-issues",
                 new ToolAllocateRequest(_allocateToolId, Id, _allocateNote)),
-            "引き当てました。",
+            L["引き当てました。"],
             () =>
             {
                 _allocateToolId = 0;
@@ -351,15 +341,15 @@ else
 
     private Task IssueToolAsync(int issueId) => RunToolActionAsync(
         () => Http.PostAsJsonAsync($"api/tool-issues/{issueId}/issue", new ToolIssueReceiveRequest(null)),
-        "受領（払出）を記録しました。");
+        L["受領（払出）を記録しました。"]);
 
     private Task ReturnToolAsync(int issueId) => RunToolActionAsync(
         () => Http.PostAsJsonAsync($"api/tool-issues/{issueId}/return", new ToolIssueCloseRequest(null)),
-        "返却を記録しました。");
+        L["返却を記録しました。"]);
 
     private Task CancelToolIssueAsync(int issueId) => RunToolActionAsync(
         () => Http.PostAsJsonAsync($"api/tool-issues/{issueId}/cancel", new ToolIssueCloseRequest(null)),
-        "引当を取り消しました。");
+        L["引当を取り消しました。"]);
 
     /// <summary>治工具の操作は成否の見せ方が同じなのでまとめる（各画面の _error / _message の作法に合わせる）</summary>
     private async Task RunToolActionAsync(
@@ -371,7 +361,7 @@ else
         try
         {
             var response = await action();
-            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["操作に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;

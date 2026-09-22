@@ -3,27 +3,27 @@
 @* 作業手順書（B-10-30-03）。本文はマスタの現在値で、版数だけが展開時点のスナップショット *@
 @if (_procedure is { } procedure)
 {
-    <h2>作業手順書（@procedure.ProcedureNo @procedure.Title）</h2>
+    <h2>@L["作業手順書（{0} {1}）", procedure.ProcedureNo, procedure.Title]</h2>
     <div class="card">
         <p class="text-muted">
-            版数 v@(procedure.CurrentVersion)
+            @L["版数 v{0}", procedure.CurrentVersion]
             @if (procedure.PlannedVersion is { } planned)
             {
-                <span>／計画時 v@(planned)</span>
+                <span>@L["／計画時 v{0}", planned]</span>
             }
         </p>
         @if (procedure.IsRevised)
         {
             <p class="text-muted">
-                <span class="badge badge-danger">改訂あり</span>
-                この作業指示を展開した時点から手順書が改訂されています。最新の手順で作業してください。
+                <span class="badge badge-danger">@L["改訂あり"]</span>
+                @L["この作業指示を展開した時点から手順書が改訂されています。最新の手順で作業してください。"]
             </p>
         }
         @if (!procedure.IsActive)
         {
             <p class="text-muted">
-                <span class="badge badge-danger">無効</span>
-                この手順書は無効化されています。作業前に手順を確認してください。
+                <span class="badge badge-danger">@L["無効"]</span>
+                @L["この手順書は無効化されています。作業前に手順を確認してください。"]
             </p>
         }
         @if (!string.IsNullOrWhiteSpace(procedure.Steps))
@@ -32,7 +32,7 @@
         }
         @if (procedure.Reference is { } reference)
         {
-            <p class="text-muted">手順書の所在：@reference</p>
+            <p class="text-muted">@L["手順書の所在：{0}", reference]</p>
         }
     </div>
 }

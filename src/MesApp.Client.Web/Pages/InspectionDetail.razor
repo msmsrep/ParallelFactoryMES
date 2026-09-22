@@ -2,25 +2,24 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>検査詳細 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["検査詳細 - Parallel Factory MES"]</PageTitle>
 
 @if (_order is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
-    <h1>検査指示 @_order.OrderNo</h1>
+    <h1>@L["検査指示 {0}", _order.OrderNo]</h1>
     <p class="text-muted">
-        @Inspections.TypeLabel(_order.Type) ／ 対象：@(_order.TargetLotNumber ?? _order.TargetWorkOrderNo ?? "-")
-        ／ 状態：@Inspections.StatusLabel(_order.Status)
+        @L["{0} ／ 対象：{1} ／ 状態：{2}", EnumLabels.Of(_order.Type), _order.TargetLotNumber ?? _order.TargetWorkOrderNo ?? "-", EnumLabels.Of(_order.Status)]
         @if (_order.OverallJudgment is InspectionJudgment judgment)
         {
             <span class="badge @(judgment == InspectionJudgment.Pass ? "badge-success" : "badge-danger")">
-                @(judgment == InspectionJudgment.Pass ? "合格" : "不合格")
+                @EnumLabels.Of(judgment)
             </span>
         }
-        <a class="btn btn-secondary btn-sm" href="print/inspection/@Id" target="_blank">検査成績書</a>
+        <a class="btn btn-secondary btn-sm" href="print/inspection/@Id" target="_blank">@L["検査成績書"]</a>
     </p>
 
     <Notice Error="@_error" Message="@_message" />
@@ -29,10 +28,10 @@ else
         @if (_order.Status is InspectionOrderStatus.Instructed or InspectionOrderStatus.InProgress)
         {
             <div class="card">
-                <h2 style="margin-top:0;">検査実績の入力（C-20-10-03。規格値から自動判定）</h2>
+                <h2 style="margin-top:0;">@L["検査実績の入力（C-20-10-03。規格値から自動判定）"]</h2>
                 <table class="table">
                     <thead>
-                        <tr><th>検査項目</th><th>規格値</th><th>検査方法</th><th>測定値</th><th>定性記録</th><th>判定（手動）</th></tr>
+                        <tr><th>@L["検査項目"]</th><th>@L["規格値"]</th><th>@L["検査方法"]</th><th>@L["測定値"]</th><th>@L["定性記録"]</th><th>@L["判定（手動）"]</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var item in _order.Items)
@@ -43,7 +42,7 @@ else
                                     @(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")
                                     @if (item.StandardValue is not null)
                                     {
-                                        <span class="text-muted">（基準 @item.StandardValue）</span>
+                                        <span class="text-muted">@L["（基準 {0}）", item.StandardValue]</span>
                                     }
                                 </td>
                                 <td>@(item.Method ?? "-")</td>
@@ -59,9 +58,9 @@ else
                                 <td>
                                     <select value="@GetEntry(item.InspectionItemId).Judgment"
                                             @onchange="e => GetEntry(item.InspectionItemId).Judgment = e.Value?.ToString()">
-                                        <option value="">自動判定</option>
-                                        <option value="Pass">合格</option>
-                                        <option value="Fail">不合格</option>
+                                        <option value="">@L["自動判定"]</option>
+                                        <option value="Pass">@L["合格"]</option>
+                                        <option value="Fail">@L["不合格"]</option>
                                     </select>
                                 </td>
                             </tr>
@@ -71,9 +70,9 @@ else
                 @* 使用した検査機（C-20-50-03）。校正期限切れの機器はAPIが拒否するので、選択肢から外しておく *@
                 <div class="form-grid">
                     <div class="form-field">
-                        <label>使用した検査機（任意）</label>
+                        <label>@L["使用した検査機（任意）"]</label>
                         <select @bind="_deviceId">
-                            <option value="0">選択しない</option>
+                            <option value="0">@L["選択しない"]</option>
                             @foreach (var device in _devices)
                             {
                                 <option value="@device.Id">@device.Code @device.Name</option>
@@ -84,30 +83,30 @@ else
                 @if (_expiredDevices.Count > 0)
                 {
                     <p class="text-muted">
-                        校正期限切れのため選べない検査機：@string.Join("、", _expiredDevices.Select(d => $"{d.Code} {d.Name}"))。
-                        マスタ管理の検査機・測定器で校正を記録してください。
+                        @L["校正期限切れのため選べない検査機：{0}。", string.Join(L["、"], _expiredDevices.Select(d => $"{d.Code} {d.Name}")).ToString()]
+                        @L["マスタ管理の検査機・測定器で校正を記録してください。"]
                     </p>
                 }
-                <button class="btn mt-2" disabled="@_busy" @onclick="SubmitResultsAsync">検査実績を登録</button>
+                <button class="btn mt-2" disabled="@_busy" @onclick="SubmitResultsAsync">@L["検査実績を登録"]</button>
             </div>
 
             <div class="card">
-                <h2 style="margin-top:0;">総合判定（C-20-10-04）</h2>
+                <h2 style="margin-top:0;">@L["総合判定（C-20-10-04）"]</h2>
                 <div class="form-grid">
                     <div class="form-field">
-                        <label>グレード（任意。C-60-10-01）</label>
-                        <input @bind="_grade" placeholder="例：A" />
+                        <label>@L["グレード（任意。C-60-10-01）"]</label>
+                        <input @bind="_grade" placeholder="@L["例：A"]" />
                     </div>
                 </div>
-                <p class="text-muted">全検査項目の実績が合格なら合格。判定結果は対象ロットの在庫ステータスへ反映され、不合格時は不適合が自動起票されます。</p>
-                <button class="btn" disabled="@_busy" @onclick="JudgeAsync">判定する</button>
+                <p class="text-muted">@L["全検査項目の実績が合格なら合格。判定結果は対象ロットの在庫ステータスへ反映され、不合格時は不適合が自動起票されます。"]</p>
+                <button class="btn" disabled="@_busy" @onclick="JudgeAsync">@L["判定する"]</button>
             </div>
         }
 
         @if (_order.Status == InspectionOrderStatus.Judged)
         {
             <div class="card">
-                <button class="btn" disabled="@_busy" @onclick="ApproveAsync">検査承認（C-20-10-06）</button>
+                <button class="btn" disabled="@_busy" @onclick="ApproveAsync">@L["検査承認（C-20-10-06）"]</button>
             </div>
         }
 
@@ -116,23 +115,23 @@ else
         {
             <div class="card">
                 <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">
-                    検査指示を取消（対象ロットの検査待ちを解除）
+                    @L["検査指示を取消（対象ロットの検査待ちを解除）"]
                 </button>
             </div>
         }
     </AuthorizeView>
 
     <div class="card">
-        <h2 style="margin-top:0;">検査実績</h2>
+        <h2 style="margin-top:0;">@L["検査実績"]</h2>
         @if (_order.Results.Count == 0)
         {
-            <p class="text-muted">実績はまだありません。</p>
+            <p class="text-muted">@L["実績はまだありません。"]</p>
         }
         else
         {
             <table class="table">
                 <thead>
-                    <tr><th>検査項目</th><th>サンプルNo</th><th>測定値</th><th>記録</th><th>判定</th><th>検査機</th><th>検査者</th><th>検査日時</th><th>訂正</th></tr>
+                    <tr><th>@L["検査項目"]</th><th>@L["サンプルNo"]</th><th>@L["測定値"]</th><th>@L["記録"]</th><th>@L["判定"]</th><th>@L["検査機"]</th><th>@L["検査者"]</th><th>@L["検査日時"]</th><th>@L["訂正"]</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var result in _order.Results)
@@ -144,7 +143,7 @@ else
                             <td>@(result.TextValue ?? "-")</td>
                             <td>
                                 <span class="badge @(result.Judgment == InspectionJudgment.Pass ? "badge-success" : "badge-danger")">
-                                    @(result.Judgment == InspectionJudgment.Pass ? "合格" : "不合格")
+                                    @EnumLabels.Of(result.Judgment)
                                 </span>
                             </td>
                             <td>@(result.InspectionDeviceCode ?? "-")</td>
@@ -155,7 +154,7 @@ else
                                 <AuthorizeView Roles="@MesRoleGroups.QualityManage" Context="correct">
                                     @if (_order.Status != InspectionOrderStatus.Approved)
                                     {
-                                        <button class="btn btn-secondary btn-sm" @onclick="() => StartCorrection(result)">訂正</button>
+                                        <button class="btn btn-secondary btn-sm" @onclick="() => StartCorrection(result)">@L["訂正"]</button>
                                     }
                                 </AuthorizeView>
                                 @if (result.CorrectionNote is { Length: > 0 })
@@ -172,10 +171,10 @@ else
         @* 訂正履歴（C-20-50-07）：元の記録を残したまま、誰がいつ何を根拠に直したかを示す *@
         @if (_order.Corrections.Count > 0)
         {
-            <h2>訂正履歴</h2>
+            <h2>@L["訂正履歴"]</h2>
             <table class="table">
                 <thead>
-                    <tr><th>日時</th><th>検査項目</th><th>サンプルNo</th><th>訂正前</th><th>訂正後</th><th>理由</th><th>訂正者</th></tr>
+                    <tr><th>@L["日時"]</th><th>@L["検査項目"]</th><th>@L["サンプルNo"]</th><th>@L["訂正前"]</th><th>@L["訂正後"]</th><th>@L["理由"]</th><th>@L["訂正者"]</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var correction in _order.Corrections)
@@ -199,27 +198,27 @@ else
     @if (_correcting is not null)
     {
         <div class="card">
-            <h2 style="margin-top:0;">検査実績の訂正（C-20-50-07。理由必須・監査ログ記録）</h2>
+            <h2 style="margin-top:0;">@L["検査実績の訂正（C-20-50-07。理由必須・監査ログ記録）"]</h2>
             <div class="form-grid">
                 <div class="form-field">
-                    <label>測定値</label>
+                    <label>@L["測定値"]</label>
                     <input type="number" step="any" @bind="_correctMeasured" />
                 </div>
                 <div class="form-field">
-                    <label>判定</label>
+                    <label>@L["判定"]</label>
                     <select @bind="_correctJudgment">
-                        <option value="@InspectionJudgment.Pass">合格</option>
-                        <option value="@InspectionJudgment.Fail">不合格</option>
+                        <option value="@InspectionJudgment.Pass">@EnumLabels.Of(InspectionJudgment.Pass)</option>
+                        <option value="@InspectionJudgment.Fail">@EnumLabels.Of(InspectionJudgment.Fail)</option>
                     </select>
                 </div>
                 <div class="form-field">
-                    <label>訂正理由</label>
+                    <label>@L["訂正理由"]</label>
                     <input @bind="_correctReason" />
                 </div>
             </div>
             <div class="actions">
-                <button class="btn" disabled="@_busy" @onclick="SubmitCorrectionAsync">訂正を登録</button>
-                <button class="btn btn-secondary" @onclick="() => _correcting = null">キャンセル</button>
+                <button class="btn" disabled="@_busy" @onclick="SubmitCorrectionAsync">@L["訂正を登録"]</button>
+                <button class="btn btn-secondary" @onclick="() => _correcting = null">@L["キャンセル"]</button>
             </div>
         </div>
     }
@@ -227,10 +226,10 @@ else
 }
 
 @code {
-    private static string FormatValue(decimal? measured, string? text, InspectionJudgment judgment)
+    private string FormatValue(decimal? measured, string? text, InspectionJudgment judgment)
     {
         var value = measured?.ToString() ?? text ?? "-";
-        return $"{value}（{(judgment == InspectionJudgment.Pass ? "合格" : "不合格")}）";
+        return L["{0}（{1}）", value, EnumLabels.Of(judgment)];
     }
 
     private sealed class ResultEntry
@@ -301,7 +300,7 @@ else
         }
         if (requests.Count == 0)
         {
-            _error = "検査結果を入力してください。";
+            _error = L["検査結果を入力してください。"];
             return;
         }
 
@@ -311,14 +310,14 @@ else
         try
         {
             var response = await Http.PostAsJsonAsync($"api/inspection-orders/{Id}/results", requests);
-            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["登録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
             _entries.Clear();
-            _message = "検査実績を登録しました。";
+            _message = L["検査実績を登録しました。"];
         }
         finally
         {
@@ -335,15 +334,15 @@ else
         {
             var response = await Http.PostAsJsonAsync($"api/inspection-orders/{Id}/judge",
                 new InspectionJudgeRequest(string.IsNullOrWhiteSpace(_grade) ? null : _grade));
-            if (await response.ReadErrorAsync("判定に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["判定に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
             _message = _order?.OverallJudgment == InspectionJudgment.Fail
-                ? "不合格と判定しました。ロットは不良となり、不適合が自動起票されました。"
-                : "合格と判定しました。ロットは正常になりました。";
+                ? L["不合格と判定しました。ロットは不良となり、不適合が自動起票されました。"]
+                : L["合格と判定しました。ロットは正常になりました。"];
         }
         finally
         {
@@ -364,13 +363,13 @@ else
         try
         {
             var response = await Http.PostAsync($"api/inspection-orders/{Id}/cancel", null);
-            if (await response.ReadErrorAsync("取消に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["取消に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
-            _message = "検査指示を取消しました。";
+            _message = L["検査指示を取消しました。"];
         }
         finally
         {
@@ -385,13 +384,13 @@ else
         try
         {
             var response = await Http.PostAsync($"api/inspection-orders/{Id}/approve", null);
-            if (await response.ReadErrorAsync("承認に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["承認に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
-            _message = "検査を承認しました。";
+            _message = L["検査を承認しました。"];
         }
         finally
         {
@@ -411,7 +410,7 @@ else
     {
         if (_correcting is null || string.IsNullOrWhiteSpace(_correctReason))
         {
-            _error = "訂正理由を入力してください。";
+            _error = L["訂正理由を入力してください。"];
             return;
         }
         _busy = true;
@@ -423,14 +422,14 @@ else
                 $"api/inspection-orders/{Id}/results/{_correcting.Id}",
                 new InspectionResultCorrectionRequest(_correctMeasured, _correcting.TextValue,
                     _correctJudgment, _correctReason));
-            if (await response.ReadErrorAsync("訂正に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["訂正に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
             _order = await response.Content.ReadFromJsonAsync<InspectionOrderResponse>();
             _correcting = null;
-            _message = "検査実績を訂正しました（判定済みの場合は再判定が必要です）。";
+            _message = L["検査実績を訂正しました（判定済みの場合は再判定が必要です）。"];
         }
         finally
         {

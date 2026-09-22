@@ -5,6 +5,7 @@ namespace MesApp.Api;
 /// <summary>
 /// 日本語メッセージを Title に載せた ProblemDetails 応答を返す。
 /// 応答の形（Title のみ・Status は出力時に補完）を全コントローラで揃えるための窓口。
+/// Title は <see cref="Localization.ApiText.T"/> で表示言語に訳したものを渡す（Spec.md 7.9）。
 /// </summary>
 public static class ProblemResultExtensions
 {

@@ -2,44 +2,44 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>品質分析 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["品質分析 - Parallel Factory MES"]</PageTitle>
 
-<h1>品質分析</h1>
-<p class="text-muted">不良項目別・工程別・直別・期間別の集計（C-40-10-03）、不適合・逸脱発生状況のモニタリング（C-40-10-05）。期間は製造日（業務日付）基準。</p>
+<h1>@L["品質分析"]</h1>
+<p class="text-muted">@L["不良項目別・工程別・直別・期間別の集計（C-40-10-03）、不適合・逸脱発生状況のモニタリング（C-40-10-05）。期間は製造日（業務日付）基準。"]</p>
 
 <div class="card">
     <div class="form-grid">
         <div class="form-field">
-            <label>開始日（製造日）</label>
+            <label>@L["開始日（製造日）"]</label>
             <input type="date" @bind="_from" />
         </div>
         <div class="form-field">
-            <label>終了日（製造日）</label>
+            <label>@L["終了日（製造日）"]</label>
             <input type="date" @bind="_to" />
         </div>
     </div>
-    <button class="btn" @onclick="LoadAsync">集計</button>
+    <button class="btn" @onclick="LoadAsync">@L["集計"]</button>
 </div>
 
 @if (_summary is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
     <div class="card">
-        <h2 style="margin-top:0;">サマリ</h2>
+        <h2 style="margin-top:0;">@L["サマリ"]</h2>
         <table class="table">
             <tbody>
                 <tr>
-                    <th>検査 合格 / 不合格</th>
-                    <td>@_summary.InspectionPassCount 件 / @_summary.InspectionFailCount 件</td>
-                    <th>未クローズの不適合</th>
+                    <th>@L["検査 合格 / 不合格"]</th>
+                    <td>@L["{0} 件 / {1} 件", _summary.InspectionPassCount, _summary.InspectionFailCount]</td>
+                    <th>@L["未クローズの不適合"]</th>
                     <td>
-                        @_summary.OpenNonconformanceCount 件
+                        @L["{0} 件", _summary.OpenNonconformanceCount]
                         @if (_summary.OpenNonconformanceCount > 0)
                         {
-                            <span class="badge badge-warning">要対応</span>
+                            <span class="badge badge-warning">@L["要対応"]</span>
                         }
                     </td>
                 </tr>
@@ -48,15 +48,15 @@ else
     </div>
 
     <div class="card">
-        <h2 style="margin-top:0;">品目別の不良集計</h2>
+        <h2 style="margin-top:0;">@L["品目別の不良集計"]</h2>
         @if (_summary.ByProduct.Count == 0)
         {
-            <p class="text-muted">対象期間の生産実績はありません。</p>
+            <p class="text-muted">@L["対象期間の生産実績はありません。"]</p>
         }
         else
         {
             <table class="table">
-                <thead><tr><th>品目</th><th>良品数</th><th>不良数</th><th>うち廃棄</th><th>うち再作業待ち</th><th>不良率</th><th>構成</th></tr></thead>
+                <thead><tr><th>@L["品目"]</th><th>@L["良品数"]</th><th>@L["不良数"]</th><th>@L["うち廃棄"]</th><th>@L["うち再作業待ち"]</th><th>@L["不良率"]</th><th>@L["構成"]</th></tr></thead>
                 <tbody>
                     @foreach (var row in _summary.ByProduct)
                     {
@@ -76,15 +76,15 @@ else
     </div>
 
     <div class="card">
-        <h2 style="margin-top:0;">工程別の不良集計</h2>
+        <h2 style="margin-top:0;">@L["工程別の不良集計"]</h2>
         @if (_summary.ByProcess.Count == 0)
         {
-            <p class="text-muted">対象期間の生産実績はありません。</p>
+            <p class="text-muted">@L["対象期間の生産実績はありません。"]</p>
         }
         else
         {
             <table class="table">
-                <thead><tr><th>工程</th><th>良品数</th><th>不良数</th><th>うち廃棄</th><th>うち再作業待ち</th><th>不良率</th><th>構成</th></tr></thead>
+                <thead><tr><th>@L["工程"]</th><th>@L["良品数"]</th><th>@L["不良数"]</th><th>@L["うち廃棄"]</th><th>@L["うち再作業待ち"]</th><th>@L["不良率"]</th><th>@L["構成"]</th></tr></thead>
                 <tbody>
                     @foreach (var row in _summary.ByProcess)
                     {
@@ -105,20 +105,20 @@ else
 
     @* 直別の不良集計（C-40-10-03）。3.9節の製造日が夜勤を前提にしているので昼勤と比べられるようにする *@
     <div class="card">
-        <h2 style="margin-top:0;">直別の不良集計</h2>
+        <h2 style="margin-top:0;">@L["直別の不良集計"]</h2>
         @if (_summary.ByShift.Count == 0)
         {
-            <p class="text-muted">対象期間の生産実績はありません。</p>
+            <p class="text-muted">@L["対象期間の生産実績はありません。"]</p>
         }
         else
         {
             <table class="table">
-                <thead><tr><th>直</th><th>良品数</th><th>不良数</th><th>うち廃棄</th><th>うち再作業待ち</th><th>不良率</th><th>構成</th></tr></thead>
+                <thead><tr><th>@L["直"]</th><th>@L["良品数"]</th><th>@L["不良数"]</th><th>@L["うち廃棄"]</th><th>@L["うち再作業待ち"]</th><th>@L["不良率"]</th><th>@L["構成"]</th></tr></thead>
                 <tbody>
                     @foreach (var row in _summary.ByShift)
                     {
                         <tr>
-                            <td>@row.Key</td>
+                            <td>@(row.Key == ShiftLabels.NoShift ? L[ShiftLabels.NoShift] : row.Key)</td>
                             <td>@row.GoodQuantity</td>
                             <td>@row.DefectQuantity</td>
                             <td>@row.ScrapQuantity</td>
@@ -133,9 +133,7 @@ else
             {
                 @* 直を運用していないと全実績がここへ落ちる。無言だと表の意味が伝わらない *@
                 <p class="text-muted">
-                    実績に直が付いていません。マスタ管理の勤務シフトで直を定義すると、
-                    以降の実績が直別に分かれて比べられます
-                    （直は実績の記録時に固定するため、それ以前の実績は「@ShiftLabels.NoShift」のままです）。
+                    @L["実績に直が付いていません。マスタ管理の勤務シフトで直を定義すると、以降の実績が直別に分かれて比べられます（直は実績の記録時に固定するため、それ以前の実績は「{0}」のままです）。", L[ShiftLabels.NoShift]]
                 </p>
             }
         }
@@ -143,24 +141,24 @@ else
 
     @* 不良理由別の集計（C-40-10-01）。改善の対象を選ぶための構成比つき *@
     <div class="card">
-        <h2 style="margin-top:0;">不良理由別の不良数（パレート）</h2>
+        <h2 style="margin-top:0;">@L["不良理由別の不良数（パレート）"]</h2>
         <p class="text-muted">
-            不良数の多い順に並べ、累積構成比を添える。上位いくつで全体の何割を占めるかが分かると、改善の対象を選べる。
+            @L["不良数の多い順に並べ、累積構成比を添える。上位いくつで全体の何割を占めるかが分かると、改善の対象を選べる。"]
         </p>
         @if (_summary.ByDefectReason.Count == 0)
         {
-            <p class="text-muted">対象期間の不良理由内訳はありません（実績入力で不良理由別の内訳を登録すると集計されます）。</p>
+            <p class="text-muted">@L["対象期間の不良理由内訳はありません（実績入力で不良理由別の内訳を登録すると集計されます）。"]</p>
         }
         else
         {
             <table class="table">
-                <thead><tr><th>不良理由</th><th>区分</th><th>不良数</th><th>構成比</th><th>累積構成比</th><th></th></tr></thead>
+                <thead><tr><th>@L["不良理由"]</th><th>@L["区分"]</th><th>@L["不良数"]</th><th>@L["構成比"]</th><th>@L["累積構成比"]</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var row in _summary.ByDefectReason)
                     {
                         <tr>
                             <td>@row.Code @row.Name</td>
-                            <td>@Labels.DefectCategory(row.Category)</td>
+                            <td>@EnumLabels.Of(row.Category)</td>
                             <td>@row.Quantity</td>
                             <td>@row.Share %</td>
                             <td>@row.CumulativeShare %</td>
@@ -174,21 +172,21 @@ else
     </div>
 
     <div class="card">
-        <h2 style="margin-top:0;">不適合の原因区分別 発生件数</h2>
+        <h2 style="margin-top:0;">@L["不適合の原因区分別 発生件数"]</h2>
         @if (_summary.NonconformanceByCause.Count == 0)
         {
-            <p class="text-muted">対象期間の不適合はありません。</p>
+            <p class="text-muted">@L["対象期間の不適合はありません。"]</p>
         }
         else
         {
             <table class="table">
-                <thead><tr><th>原因区分</th><th>件数</th><th>構成</th></tr></thead>
+                <thead><tr><th>@L["原因区分"]</th><th>@L["件数"]</th><th>@L["構成"]</th></tr></thead>
                 <tbody>
                     @foreach (var pair in _summary.NonconformanceByCause)
                     {
                         <tr>
                             <td>@pair.Key</td>
-                            <td>@pair.Value 件</td>
+                            <td>@L["{0} 件", pair.Value]</td>
                             <td><BarMeter Value="@(MaxCause == 0 ? 0 : (decimal)pair.Value / MaxCause * 100)" /></td>
                         </tr>
                     }

@@ -3,17 +3,17 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
-<PageTitle>トレーサビリティ - Parallel Factory MES</PageTitle>
+<PageTitle>@L["トレーサビリティ - Parallel Factory MES"]</PageTitle>
 
-<h1>ロットトレーサビリティ</h1>
-<p class="text-muted">ロット番号によるトレースバック（製造元特定。H-30-10-01）／トレースフォワード（使用先特定。-02）、製造・検査・在庫履歴の閲覧（-03〜05）。</p>
+<h1>@L["ロットトレーサビリティ"]</h1>
+<p class="text-muted">@L["ロット番号によるトレースバック（製造元特定。H-30-10-01）／トレースフォワード（使用先特定。-02）、製造・検査・在庫履歴の閲覧（-03〜05）。"]</p>
 
 <Notice Error="@_error" Message="@null" />
 
 <div class="card">
     <div class="form-field">
-        <label>ロット番号（バーコード/QRスキャン可）</label>
-        <ScanInput @bind-Value="_lotNumber" OnScan="SearchAsync" SubmitLabel="追跡" />
+        <label>@L["ロット番号（バーコード/QRスキャン可）"]</label>
+        <ScanInput @bind-Value="_lotNumber" OnScan="SearchAsync" SubmitLabel="@L["追跡"]" />
     </div>
 </div>
 
@@ -23,38 +23,38 @@
         <table class="table">
             <tbody>
                 <tr>
-                    <th>ロット番号</th><td>@_lot.LotNumber</td>
-                    <th>品目</th><td>@_lot.ProductCode @_lot.ProductName</td>
+                    <th>@L["ロット番号"]</th><td>@_lot.LotNumber</td>
+                    <th>@L["品目"]</th><td>@_lot.ProductCode @_lot.ProductName</td>
                 </tr>
                 <tr>
-                    <th>在庫ステータス</th><td>@Labels.LotStatus(_lot.StockStatus)</td>
-                    <th>由来</th><td>@(_lot.OriginType == LotOriginType.Production ? "生産" : "受入")</td>
+                    <th>@L["在庫ステータス"]</th><td>@EnumLabels.Of(_lot.StockStatus)</td>
+                    <th>@L["由来"]</th><td>@EnumLabels.Of(_lot.OriginType)</td>
                 </tr>
                 <tr>
-                    <th>製造日/受入日</th><td>@(_lot.ManufacturedOn?.ToString("yyyy-MM-dd") ?? "-")</td>
-                    <th>有効期限</th><td>@(_lot.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                    <th>@L["製造日/受入日"]</th><td>@(_lot.ManufacturedOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                    <th>@L["有効期限"]</th><td>@(_lot.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
                 </tr>
                 <tr>
-                    <th>グレード</th><td>@(_lot.Grade ?? "-")</td>
-                    <th>現品票</th><td><a class="btn btn-secondary btn-sm" href="print/lot/@_lot.Id" target="_blank">発行</a></td>
+                    <th>@L["グレード"]</th><td>@(_lot.Grade ?? "-")</td>
+                    <th>@L["現品票"]</th><td><a class="btn btn-secondary btn-sm" href="print/lot/@_lot.Id" target="_blank">@L["発行"]</a></td>
                 </tr>
             </tbody>
         </table>
     </div>
 
     <div class="tabs">
-        <button class="@TabClass("back")" @onclick='() => SetTab("back")'>トレースバック</button>
-        <button class="@TabClass("forward")" @onclick='() => SetTab("forward")'>トレースフォワード</button>
-        <button class="@TabClass("history")" @onclick='() => SetTab("history")'>履歴</button>
+        <button class="@TabClass("back")" @onclick='() => SetTab("back")'>@L["トレースバック"]</button>
+        <button class="@TabClass("forward")" @onclick='() => SetTab("forward")'>@L["トレースフォワード"]</button>
+        <button class="@TabClass("history")" @onclick='() => SetTab("history")'>@L["履歴"]</button>
     </div>
 
     @if (_tab == "back")
     {
         <div class="card">
-            <h2 style="margin-top:0;">トレースバック（この製品に使われた部材ロット）</h2>
+            <h2 style="margin-top:0;">@L["トレースバック（この製品に使われた部材ロット）"]</h2>
             @if (_back is null || _back.Nodes.Count == 0)
             {
-                <p class="text-muted">投入部材の記録はありません。</p>
+                <p class="text-muted">@L["投入部材の記録はありません。"]</p>
             }
             else
             {
@@ -65,10 +65,10 @@
     else if (_tab == "forward")
     {
         <div class="card">
-            <h2 style="margin-top:0;">トレースフォワード（このロットの使用先）</h2>
+            <h2 style="margin-top:0;">@L["トレースフォワード（このロットの使用先）"]</h2>
             @if (_forward is null || _forward.Nodes.Count == 0)
             {
-                <p class="text-muted">使用先の記録はありません。</p>
+                <p class="text-muted">@L["使用先の記録はありません。"]</p>
             }
             else
             {
@@ -79,73 +79,73 @@
     else if (_history is not null)
     {
         <div class="card">
-            <h2 style="margin-top:0;">製造履歴（H-30-10-03）</h2>
+            <h2 style="margin-top:0;">@L["製造履歴（H-30-10-03）"]</h2>
             @if (_history.ProductionHistory.Count == 0)
             {
-                <p class="text-muted">記録はありません。</p>
+                <p class="text-muted">@L["記録はありません。"]</p>
             }
             else
             {
                 <ul>@foreach (var line in _history.ProductionHistory) { <li>@line</li> }</ul>
             }
 
-            <h2>検査履歴（H-30-10-05）</h2>
+            <h2>@L["検査履歴（H-30-10-05）"]</h2>
             @if (_history.InspectionHistory.Count == 0)
             {
-                <p class="text-muted">記録はありません。</p>
+                <p class="text-muted">@L["記録はありません。"]</p>
             }
             else
             {
                 <ul>@foreach (var line in _history.InspectionHistory) { <li>@line</li> }</ul>
             }
 
-            <h2>製造条件の逸脱（B-30-30-04）</h2>
+            <h2>@L["製造条件の逸脱（B-30-30-04）"]</h2>
             @* 許容範囲から外れた記録だけを出す。範囲内まで並べると見るべきものが埋もれる *@
             @if (_history.ControlItemDeviations.Count == 0)
             {
-                <p class="text-muted">逸脱はありません。</p>
+                <p class="text-muted">@L["逸脱はありません。"]</p>
             }
             else
             {
                 <ul>@foreach (var line in _history.ControlItemDeviations) { <li>@line</li> }</ul>
             }
 
-            <h2>設備稼働履歴（H-30-10-04）</h2>
+            <h2>@L["設備稼働履歴（H-30-10-04）"]</h2>
             @* このロットを産出した作業指示に紐づく稼働区間。品質不良の原因を設備の状態から追う *@
             @if (_history.EquipmentHistory.Count == 0)
             {
-                <p class="text-muted">記録はありません（稼働実績が作業指示に紐付いていません）。</p>
+                <p class="text-muted">@L["記録はありません（稼働実績が作業指示に紐付いていません）。"]</p>
             }
             else
             {
                 <ul>@foreach (var line in _history.EquipmentHistory) { <li>@line</li> }</ul>
             }
 
-            <h2>在庫履歴</h2>
+            <h2>@L["在庫履歴"]</h2>
             @if (_history.InventoryHistory.Count == 0)
             {
-                <p class="text-muted">記録はありません。</p>
+                <p class="text-muted">@L["記録はありません。"]</p>
             }
             else
             {
                 <ul>@foreach (var line in _history.InventoryHistory) { <li>@line</li> }</ul>
             }
 
-            <h2>状態履歴（H-30-10-04）</h2>
+            <h2>@L["状態履歴（H-30-10-04）"]</h2>
             @if (_history.StatusHistory.Count == 0)
             {
-                <p class="text-muted">記録はありません。</p>
+                <p class="text-muted">@L["記録はありません。"]</p>
             }
             else
             {
                 <table>
                     <thead>
                         <tr>
-                            <th>日時</th>
-                            <th>遷移</th>
-                            <th>契機</th>
-                            <th>理由</th>
-                            <th>変更者</th>
+                            <th>@L["日時"]</th>
+                            <th>@L["遷移"]</th>
+                            <th>@L["契機"]</th>
+                            <th>@L["理由"]</th>
+                            <th>@L["変更者"]</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -153,8 +153,8 @@
                         {
                             <tr>
                                 <td>@entry.ChangedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</td>
-                                <td>@Labels.LotStatus(entry.FromStatus) → @Labels.LotStatus(entry.ToStatus)</td>
-                                <td>@Labels.LotStatusSource(entry.Source)</td>
+                                <td>@EnumLabels.Of(entry.FromStatus) → @EnumLabels.Of(entry.ToStatus)</td>
+                                <td>@EnumLabels.Of(entry.Source)</td>
                                 <td>@(entry.Reason ?? "-")</td>
                                 <td>@(entry.ChangedByName ?? "-")</td>
                             </tr>
@@ -163,22 +163,22 @@
                 </table>
             }
 
-            <h2>実績訂正履歴（B-70-30-01）</h2>
+            <h2>@L["実績訂正履歴（B-70-30-01）"]</h2>
             @if (_history.CorrectionHistory.Count == 0)
             {
-                <p class="text-muted">記録はありません。</p>
+                <p class="text-muted">@L["記録はありません。"]</p>
             }
             else
             {
                 <table>
                     <thead>
                         <tr>
-                            <th>日時</th>
-                            <th>作業指示</th>
-                            <th>訂正前（良品/不良/廃棄/再作業）</th>
-                            <th>訂正後（良品/不良/廃棄/再作業）</th>
-                            <th>理由</th>
-                            <th>訂正者</th>
+                            <th>@L["日時"]</th>
+                            <th>@L["作業指示"]</th>
+                            <th>@L["訂正前（良品/不良/廃棄/再作業）"]</th>
+                            <th>@L["訂正後（良品/不良/廃棄/再作業）"]</th>
+                            <th>@L["理由"]</th>
+                            <th>@L["訂正者"]</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -259,7 +259,7 @@
             string.Equals(s.LotNumber, keyword, StringComparison.OrdinalIgnoreCase));
         if (match is null)
         {
-            _error = $"ロット '{lotNumber}' が見つかりません。";
+            _error = L["ロット '{0}' が見つかりません。", lotNumber];
             return;
         }
 

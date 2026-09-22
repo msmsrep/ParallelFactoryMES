@@ -5,38 +5,38 @@
 
 <AuthorizeView Roles="@MesRoleGroups.MasterWrite">
     <div class="card">
-        <h2 style="margin-top:0;">@(_editingId is null ? "作業区の登録" : $"作業区の編集（{_code}）")</h2>
+        <h2 style="margin-top:0;">@(_editingId is null ? L["作業区の登録"] : L["作業区の編集（{0}）", _code])</h2>
         <p class="text-muted">
-            工場 → ライン → エリア → 作業区 の順に登録する。上位には1つ上の段だけを指定できる。
+            @L["工場 → ライン → エリア → 作業区 の順に登録する。上位には1つ上の段だけを指定できる。"]
         </p>
         <div class="form-grid">
             <div class="form-field">
-                <label>作業区コード</label>
+                <label>@L["作業区コード"]</label>
                 <input @bind="_code" />
             </div>
             <div class="form-field">
-                <label>名称</label>
+                <label>@L["名称"]</label>
                 <input @bind="_name" />
             </div>
             <div class="form-field">
-                <label>段</label>
+                <label>@L["段"]</label>
                 <select @bind="_level">
-                    <option value="@WorkCenterLevel.Plant">工場</option>
-                    <option value="@WorkCenterLevel.Line">ライン</option>
-                    <option value="@WorkCenterLevel.Area">エリア</option>
-                    <option value="@WorkCenterLevel.WorkCenter">作業区</option>
+                    <option value="@WorkCenterLevel.Plant">@EnumLabels.Of(WorkCenterLevel.Plant)</option>
+                    <option value="@WorkCenterLevel.Line">@EnumLabels.Of(WorkCenterLevel.Line)</option>
+                    <option value="@WorkCenterLevel.Area">@EnumLabels.Of(WorkCenterLevel.Area)</option>
+                    <option value="@WorkCenterLevel.WorkCenter">@EnumLabels.Of(WorkCenterLevel.WorkCenter)</option>
                 </select>
             </div>
             <div class="form-field">
-                <label>上位の資源@(RequiredParentLabel is null ? "" : $"（{RequiredParentLabel}）")</label>
+                <label>@L["上位の資源"]@(RequiredParentLabel is null ? "" : L["（{0}）", RequiredParentLabel])</label>
                 @if (_level == WorkCenterLevel.Plant)
                 {
-                    <span class="text-muted">工場は上位を持たない</span>
+                    <span class="text-muted">@L["工場は上位を持たない"]</span>
                 }
                 else
                 {
                     <select @bind="_parentId">
-                        <option value="0">（選択してください）</option>
+                        <option value="0">@L["（選択してください）"]</option>
                         @foreach (var p in ParentCandidates)
                         {
                             <option value="@p.Id">@p.Code @p.Name</option>
@@ -46,42 +46,42 @@
             </div>
         </div>
         <div class="actions">
-            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? "登録" : "更新")</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
             @if (_editingId is not null)
             {
-                <button class="btn btn-secondary" @onclick="ResetForm">キャンセル</button>
+                <button class="btn btn-secondary" @onclick="ResetForm">@L["キャンセル"]</button>
             }
         </div>
     </div>
 </AuthorizeView>
 
-<CsvIoPanel Kind="work-centers" Label="作業区" KeyLabel="作業区コード" OnImported="LoadAsync" />
+<CsvIoPanel Kind="work-centers" Label="@L["作業区"]" KeyLabel="@L["作業区コード"]" OnImported="LoadAsync" />
 
 <div class="card">
     @if (_items is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else
     {
         <table class="table">
-            <thead><tr><th>コード</th><th>名称</th><th>段</th><th>上位</th><th>状態</th><th></th></tr></thead>
+            <thead><tr><th>@L["コード"]</th><th>@L["名称"]</th><th>@L["段"]</th><th>@L["上位"]</th><th>@L["状態"]</th><th></th></tr></thead>
             <tbody>
                 @foreach (var item in _items)
                 {
                     <tr>
                         <td>@item.Code</td>
                         <td>@item.Name</td>
-                        <td>@LevelLabel(item.Level)</td>
+                        <td>@EnumLabels.Of(item.Level)</td>
                         <td>@(item.ParentCode is null ? "-" : $"{item.ParentCode} {item.ParentName}")</td>
-                        <td>@(item.IsActive ? "有効" : "無効")</td>
+                        <td>@(item.IsActive ? L["有効"] : L["無効"])</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
-                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">編集</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">@L["編集"]</button>
                                 @if (item.IsActive)
                                 {
                                     <button class="btn btn-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => DeactivateAsync(item.Id)">無効化</button>
+                                            @onclick="() => DeactivateAsync(item.Id)">@L["無効化"]</button>
                                 }
                             </AuthorizeView>
                         </td>
@@ -112,7 +112,7 @@
         _ => WorkCenterLevel.Area,
     };
 
-    private string? RequiredParentLabel => RequiredParent is { } l ? LevelLabel(l) : null;
+    private string? RequiredParentLabel => RequiredParent is { } l ? EnumLabels.Of(l) : null;
 
     /// <summary>上位に選べる候補。段を1つ上のものに絞り、自分自身は除く</summary>
     private IEnumerable<WorkCenterResponse> ParentCandidates =>
@@ -147,12 +147,12 @@
     {
         if (string.IsNullOrWhiteSpace(_code))
         {
-            _error = "作業区コードを入力してください。";
+            _error = L["作業区コードを入力してください。"];
             return;
         }
         if (string.IsNullOrWhiteSpace(_name))
         {
-            _error = "名称を入力してください。";
+            _error = L["名称を入力してください。"];
             return;
         }
         _busy = true;
@@ -166,12 +166,12 @@
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/work-centers", request)
                 : await Http.PutAsJsonAsync($"api/work-centers/{_editingId}", request);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保存しました。";
+            _message = L["保存しました。"];
             ResetForm();
             await LoadAsync();
         }
@@ -188,12 +188,12 @@
         try
         {
             var response = await Http.DeleteAsync($"api/work-centers/{id}");
-            if (await response.ReadErrorAsync("無効化に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["無効化に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "無効化しました。";
+            _message = L["無効化しました。"];
             await LoadAsync();
         }
         finally
@@ -202,12 +202,4 @@
         }
     }
 
-    private static string LevelLabel(WorkCenterLevel level) => level switch
-    {
-        WorkCenterLevel.Plant => "工場",
-        WorkCenterLevel.Line => "ライン",
-        WorkCenterLevel.Area => "エリア",
-        WorkCenterLevel.WorkCenter => "作業区",
-        _ => level.ToString(),
-    };
 }

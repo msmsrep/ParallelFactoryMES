@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Entities;
@@ -23,7 +25,7 @@ public sealed class StocktakeService(
         if (request.TargetLocationId is int locationId
             && !await db.Locations.AnyAsync(l => l.Id == locationId, ct))
         {
-            return Outcome<Stocktake>.Invalid("存在しないロケーションIDです。");
+            return Outcome<Stocktake>.Invalid(ApiText.T("存在しないロケーションIDです。"));
         }
 
         var stocksQuery = db.InventoryStocks.AsNoTracking().Where(s => s.Quantity > 0);
@@ -34,7 +36,7 @@ public sealed class StocktakeService(
         var stocks = await stocksQuery.ToListAsync(ct);
         if (stocks.Count == 0)
         {
-            return Outcome<Stocktake>.Invalid("対象在庫がありません。");
+            return Outcome<Stocktake>.Invalid(ApiText.T("対象在庫がありません。"));
         }
 
         var stocktake = new Stocktake
@@ -65,11 +67,11 @@ public sealed class StocktakeService(
             .FirstOrDefaultAsync(s => s.Id == id, ct);
         if (stocktake is null)
         {
-            return Outcome<Stocktake>.NotFound("存在しない棚卸IDです。");
+            return Outcome<Stocktake>.NotFound(ApiText.T("存在しない棚卸IDです。"));
         }
         if (stocktake.Status != StocktakeStatus.Instructed)
         {
-            return Outcome<Stocktake>.Conflict($"状態 '{stocktake.Status}' の棚卸には登録できません。");
+            return Outcome<Stocktake>.Conflict(ApiText.T("状態 '{0}' の棚卸には登録できません。", EnumLabels.Of(stocktake.Status)));
         }
 
         var lineById = stocktake.Lines.ToDictionary(l => l.Id);
@@ -79,7 +81,7 @@ public sealed class StocktakeService(
         {
             if (!lineById.TryGetValue(count.LineId, out var line))
             {
-                return Outcome<Stocktake>.Invalid($"存在しない明細ID {count.LineId} が含まれています。");
+                return Outcome<Stocktake>.Invalid(ApiText.T("存在しない明細ID {0} が含まれています。", count.LineId));
             }
             changes.Add(new
             {
@@ -106,15 +108,15 @@ public sealed class StocktakeService(
             .FirstOrDefaultAsync(s => s.Id == id, ct);
         if (stocktake is null)
         {
-            return Outcome<Stocktake>.NotFound("存在しない棚卸IDです。");
+            return Outcome<Stocktake>.NotFound(ApiText.T("存在しない棚卸IDです。"));
         }
         if (stocktake.Status != StocktakeStatus.Instructed)
         {
-            return Outcome<Stocktake>.Conflict($"状態 '{stocktake.Status}' の棚卸は確定できません。");
+            return Outcome<Stocktake>.Conflict(ApiText.T("状態 '{0}' の棚卸は確定できません。", EnumLabels.Of(stocktake.Status)));
         }
         if (stocktake.Lines.All(l => l.CountedQuantity is null))
         {
-            return Outcome<Stocktake>.Invalid("実棚数が1件も登録されていません。");
+            return Outcome<Stocktake>.Invalid(ApiText.T("実棚数が1件も登録されていません。"));
         }
 
         foreach (var line in stocktake.Lines.Where(l => l.CountedQuantity is not null))
@@ -159,11 +161,11 @@ public sealed class StocktakeService(
         var stocktake = await db.Stocktakes.FindAsync([id], ct);
         if (stocktake is null)
         {
-            return Outcome<Stocktake>.NotFound("存在しない棚卸IDです。");
+            return Outcome<Stocktake>.NotFound(ApiText.T("存在しない棚卸IDです。"));
         }
         if (stocktake.Status != StocktakeStatus.Instructed)
         {
-            return Outcome<Stocktake>.Conflict($"状態 '{stocktake.Status}' の棚卸は取消できません。");
+            return Outcome<Stocktake>.Conflict(ApiText.T("状態 '{0}' の棚卸は取消できません。", EnumLabels.Of(stocktake.Status)));
         }
         var before = stocktake.Status;
         stocktake.Status = StocktakeStatus.Canceled;

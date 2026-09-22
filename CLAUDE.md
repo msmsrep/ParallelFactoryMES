@@ -32,6 +32,11 @@ $env:MESAPP_TEST_PROVIDER=$null; $env:MESAPP_TEST_CONNECTION=$null
 dotnet test tests/MesApp.Api.Tests --filter FullyQualifiedName~MasterCsvTests -v n
 ```
 
+多言語対応の取りこぼし（画面・APIの文言を足したり書き換えたりしたとき。`en.resx` に訳の無いキーと、`L[...]` を通っていない画面の日本語を一覧にする。あれば終了コード 1）:
+```powershell
+./scripts/I18nCheck.ps1
+```
+
 マイグレーション（EF ツールは `dotnet-tools.json` で固定）。**スキーマを変えたら3プロバイダーすべてで同じ名前で追加する**ので、手で3回打たずスクリプトを使う（最後に `DatabaseProviderTests` で同期を確認する。DBには接続しない）。**マイグレーションに生SQLを書かない**（3方言になる。データの手当ては C# の起動時処理かサービス側で行う）:
 ```powershell
 ./scripts/Migrations.ps1 -Add <Name>      # 3プロバイダーに追加して検査（/add-migration でも可）
@@ -76,7 +81,8 @@ DB は既定 SQLite（`mesapp.db`）、`Database:Provider` で PostgreSQL / SQL 
 - 書き込み系アクションに `[Authorize(Roles = MesRoleGroups.Xxx)]`。ロール定数は `MesRoles`、組み合わせは `MesRoleGroups`（新しい組み合わせが要るときだけ `Core/Constants/MesRoleGroups.cs` に追加）。**API と画面で同じ定数を使う**（別々に書くと片方だけ直したときに表示と権限がずれる）
 - 参照系は `AsNoTracking()`、全アクションに `CancellationToken ct`
 - DTO は `MesApp.Core/Contracts/<領域>/` の `record`。エンティティを直接返さない
-- エラーは `ProblemDetails` + **日本語のメッセージ**。`new ProblemDetails` を直接書かず `ProblemResultExtensions` を使う（例: `return this.ConflictProblem($"ロケーションコード '{request.Code}' は既に存在します。");`）。重複は `ConflictProblem`、未存在は `NotFoundProblem`、入力不正は `BadRequestProblem`
+- エラーは `ProblemDetails` + **日本語のメッセージ**。`new ProblemDetails` を直接書かず `ProblemResultExtensions` を使う（例は次項）。重複は `ConflictProblem`、未存在は `NotFoundProblem`、入力不正は `BadRequestProblem`
+- **利用者に返す文言は `ApiText.T("原文", 値…)` で包む**（Spec.md 7.9 多言語対応。英訳は `Api/Localization/ApiText.en.resx` に原文をキーにして足す）。値は補間せず `{0}` で渡す：`this.ConflictProblem(ApiText.T("ロケーションコード '{0}' は既に存在します。", request.Code))`。状態・区分は `EnumLabels.Of(x)` で表示名にして渡す。**保存される文字列（在庫トランザクションの備考・状態履歴の理由・監査ログ）とサーバーのログは包まない**
 - 作成・更新・削除の後に `auditLogger.LogAsync(...)` を呼ぶ。**変更前後を追跡する操作（訂正・調整・ステータス変更）は `detail:` に匿名オブジェクト `new { before, after, reason }` を渡す**（JSONで保存される）。要約で足りる操作は文字列でよい
 - **複数の経路で必要になる業務判定は Controller に書かない**。`Api/Policies/` に置き、Controller はそれを呼んで結果を `ProblemDetails` に変換するだけにする（`LotUsabilityPolicy` / `MaterialIssuePolicy` / `ShipmentGatePolicy`）
 - **ロット・作業指示のステータスを直接代入しない**。`LotStatusService` / `WorkOrderStatusService` 経由で変更し、遷移を状態履歴に残す（Spec.md 5.2・5.3）。製造指図・検査指示の状態も Controller で代入せず、`ManufacturingOrderService` / `InspectionService` に集める（状態履歴は持たず監査ログで追う）
@@ -84,6 +90,7 @@ DB は既定 SQLite（`mesapp.db`）、`Database:Provider` で PostgreSQL / SQL 
 ## クライアント側の規約
 
 - `@inject HttpClient Http`。認証ヘッダは `Auth/AuthMessageHandler` が付与する
+- **画面の文言は `L["原文"]` で包む**（Spec.md 7.9。`L` は `_Imports.razor` で注入済み）。英訳は `Shared/UiText.en.resx` に原文をキーにして足す。値は補間せず `L["{0} 件", n]`、区分値は `EnumLabels.Of(x)`。三項演算子で `null` と並べるときは `.Value` を付ける。文を太字やタグで区切らない（語順が変わると訳せない。1文にまとめる）。共通部品に渡す文言は呼び出し側で訳す。**保存される値（単位の既定値「個」など）や言語名は訳さず、その行に「訳さない」と書く**（`scripts/I18nCheck.ps1` が飛ばす）
 - 冒頭に根拠コメント：`@* ロケーションマスタ（Spec.md 5.1 Location。D-50-20-01） *@`
 - API の失敗応答は `Shared/ApiErrors.ReadErrorAsync` で読む（`IsSuccessStatusCode` と ProblemDetails の読み取りを各画面に書かない）：`if (await response.ReadErrorAsync("登録に失敗しました。") is { } error) { _error = error; return; }`
 - メッセージ表示は `<Notice Error="@_error" Message="@_message" />`、権限制御は `<AuthorizeView Roles="@MesRoleGroups.Xxx">`（APIと同じ定数を使う。書き込みの操作要素だけを隠し、画面自体は開けたままにする）

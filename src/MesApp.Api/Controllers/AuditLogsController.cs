@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Entities;
@@ -107,7 +108,7 @@ public class AuditLogsController(
         if (request.To > cutoff)
         {
             return this.BadRequestProblem(
-                $"保持期間内の監査ログは削除できません（{cutoff:yyyy-MM-dd} 以前が対象です）。");
+                ApiText.T("保持期間内の監査ログは削除できません（{0:yyyy-MM-dd} 以前が対象です）。", cutoff));
         }
 
         var target = db.AuditLogs.Where(a => a.RecordedOn <= request.To);

@@ -1,3 +1,5 @@
+﻿using System.Globalization;
+using MesApp.Api.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
@@ -26,7 +28,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
     /// <summary>1回に返す区切りの上限（日次で約1年）</summary>
     public const int MaxPeriods = 400;
 
-    public const string NoWorkCenter = "（作業区なし）";
+    public static string NoWorkCenter => ApiText.T("（作業区なし）");
 
     /// <summary>集計の絞り込み条件</summary>
     public record Filter(DateOnly From, DateOnly To, int? ProcessId, int? ProductId, int? WorkCenterId);
@@ -66,7 +68,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
             {
                 DashboardPeriodUnit.Month => $"{start:yyyy-MM}",
                 DashboardPeriodUnit.Week => $"{from:MM/dd}〜{to:MM/dd}",
-                _ => $"{start:MM/dd}({"日月火水木金土"[(int)start.DayOfWeek]})",
+                _ => $"{start:MM/dd}({start.ToString("ddd", CultureInfo.CurrentUICulture)})", // 曜日は表示言語に合わせる（ja は「月」、en は「Mon」）
             };
             rows.Add(Aggregate($"{start:yyyy-MM-dd}", label, from, to,
                 production.Where(p => p.Date >= from && p.Date <= to),
@@ -75,7 +77,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
         }
 
         return new DashboardSummaryResponse(filter.From, filter.To,
-            Aggregate("total", "合計", filter.From, filter.To, production, logs, productionAvailable, utilizationAvailable),
+            Aggregate("total", ApiText.T("合計"), filter.From, filter.To, production, logs, productionAvailable, utilizationAvailable),
             rows, productionAvailable, utilizationAvailable);
     }
 
@@ -116,7 +118,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
         {
             DashboardAxis.Process => (p.ProcessKey, p.ProcessLabel),
             DashboardAxis.Product => (p.ProductKey, p.ProductLabel),
-            DashboardAxis.Shift => (p.ShiftKey ?? ShiftLabels.NoShift, p.ShiftKey ?? ShiftLabels.NoShift),
+            DashboardAxis.Shift => (p.ShiftKey ?? ShiftLabels.NoShift, p.ShiftKey ?? ApiText.T(ShiftLabels.NoShift)), // キーは並び順の判定に使うので訳さない
             DashboardAxis.Line => WorkCenterKey(p.WorkCenterId, toLine: true),
             _ => WorkCenterKey(p.WorkCenterId, toLine: false),
         };
@@ -145,7 +147,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
             .ToList();
 
         return new DashboardSummaryResponse(filter.From, filter.To,
-            Aggregate("total", "合計", filter.From, filter.To, production, logs, productionAvailable, utilizationAvailable),
+            Aggregate("total", ApiText.T("合計"), filter.From, filter.To, production, logs, productionAvailable, utilizationAvailable),
             rows, productionAvailable, utilizationAvailable);
     }
 

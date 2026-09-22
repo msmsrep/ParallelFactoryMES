@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using System.Linq.Expressions;
 using System.Security.Claims;
 using MesApp.Api.Services;
@@ -77,16 +78,16 @@ public class SampleStoragesController(
         var lot = await db.Lots.FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
-            return this.NotFoundProblem($"ロットID {request.LotId} は登録されていません。");
+            return this.NotFoundProblem(ApiText.T("ロットID {0} は登録されていません。", request.LotId));
         }
         if (!await db.Locations.AnyAsync(l => l.Id == request.StorageLocationId && l.IsActive, ct))
         {
-            return this.BadRequestProblem("保管場所が見つからないか無効です。");
+            return this.BadRequestProblem(ApiText.T("保管場所が見つからないか無効です。"));
         }
         if (request.InspectionOrderId is { } inspectionId
             && !await db.InspectionOrders.AnyAsync(i => i.Id == inspectionId, ct))
         {
-            return this.BadRequestProblem($"検査指示ID {inspectionId} は登録されていません。");
+            return this.BadRequestProblem(ApiText.T("検査指示ID {0} は登録されていません。", inspectionId));
         }
 
         // 採取元の在庫は、サンプルの保管場所ではなく現物があった場所から抜く
@@ -98,7 +99,7 @@ public class SampleStoragesController(
         if (from is null)
         {
             return this.BadRequestProblem(
-                $"ロット {lot.LotNumber} の在庫がありません。");
+                ApiText.T("ロット {0} の在庫がありません。", lot.LotNumber));
         }
 
         var sample = new SampleStorage
@@ -153,11 +154,11 @@ public class SampleStoragesController(
         if (sample.Status != SampleStorageStatus.Stored)
         {
             return this.ConflictProblem(
-                $"サンプル {sample.SampleNo} は既に保管を終えています。");
+                ApiText.T("サンプル {0} は既に保管を終えています。", sample.SampleNo));
         }
         if (request.Status is not (SampleStorageStatus.Consumed or SampleStorageStatus.Disposed))
         {
-            return this.BadRequestProblem("払出済か廃棄済かを指定してください。");
+            return this.BadRequestProblem(ApiText.T("払出済か廃棄済かを指定してください。"));
         }
 
         var before = sample.Status;

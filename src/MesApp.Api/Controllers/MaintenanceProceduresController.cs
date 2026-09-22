@@ -1,4 +1,5 @@
-﻿using MesApp.Core.Abstractions;
+﻿using MesApp.Api.Localization;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -54,7 +55,7 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
     {
         if (await db.MaintenanceProcedures.AnyAsync(p => p.ProcedureNo == request.ProcedureNo, ct))
         {
-            return this.ConflictProblem($"手順書番号 '{request.ProcedureNo}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("手順書番号 '{0}' は既に存在します。", request.ProcedureNo));
         }
         var error = await ValidateTargetsAsync(request, ct);
         if (error is not null)
@@ -89,7 +90,7 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
         }
         if (await db.MaintenanceProcedures.AnyAsync(p => p.ProcedureNo == request.ProcedureNo && p.Id != id, ct))
         {
-            return this.ConflictProblem($"手順書番号 '{request.ProcedureNo}' は既に存在します。");
+            return this.ConflictProblem(ApiText.T("手順書番号 '{0}' は既に存在します。", request.ProcedureNo));
         }
         var error = await ValidateTargetsAsync(request, ct);
         if (error is not null)
@@ -121,11 +122,11 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
         if (request.TargetEquipmentId is int equipmentId
             && !await db.Equipments.AnyAsync(e => e.Id == equipmentId, ct))
         {
-            return "存在しない対象設備IDです。";
+            return ApiText.T("存在しない対象設備IDです。");
         }
         if (request.TargetToolId is int toolId && !await db.Tools.AnyAsync(t => t.Id == toolId, ct))
         {
-            return "存在しない対象治工具IDです。";
+            return ApiText.T("存在しない対象治工具IDです。");
         }
         return null;
     }

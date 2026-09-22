@@ -1,3 +1,5 @@
+using MesApp.Api.Localization;
+using MesApp.Core.Localization;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Policies;
@@ -43,18 +45,17 @@ public static class WorkCenterHierarchyPolicy
         {
             return parent is null
                 ? null
-                : $"'{code}' は工場のため、上位の資源を指定できません。";
+                : ApiText.T("'{0}' は工場のため、上位の資源を指定できません。", code);
         }
 
         if (parent is null)
         {
-            return $"'{code}' には上位の資源（{LevelName(required.Value)}）の指定が必要です。";
+            return ApiText.T("'{0}' には上位の資源（{1}）の指定が必要です。", code, EnumLabels.Of(required.Value));
         }
 
         if (parent.Level != required.Value)
         {
-            return $"'{code}'（{LevelName(level)}）の上位には{LevelName(required.Value)}を指定してください" +
-                   $"（'{parent.Code}' は{LevelName(parent.Level)}です）。";
+            return ApiText.T("'{0}'（{1}）の上位には{2}を指定してください（'{3}' は{4}です）。", code, EnumLabels.Of(level), EnumLabels.Of(required.Value), parent.Code, EnumLabels.Of(parent.Level));
         }
 
         // 循環：自分自身、または自分の配下を親にすると木が閉じる
@@ -62,11 +63,11 @@ public static class WorkCenterHierarchyPolicy
         {
             if (parent.Id == id)
             {
-                return $"'{code}' の上位に自分自身は指定できません。";
+                return ApiText.T("'{0}' の上位に自分自身は指定できません。", code);
             }
             if (IsDescendantOf(parent, id, all))
             {
-                return $"'{parent.Code}' は '{code}' の配下にあるため、上位に指定できません（循環します）。";
+                return ApiText.T("'{0}' は '{1}' の配下にあるため、上位に指定できません（循環します）。", parent.Code, code);
             }
         }
 
@@ -89,11 +90,11 @@ public static class WorkCenterHierarchyPolicy
         }
         if (workCenter.Level != WorkCenterLevel.WorkCenter)
         {
-            return $"設備の設置場所には作業区を指定してください（'{workCenter.Code}' は{LevelName(workCenter.Level)}です）。";
+            return ApiText.T("設備の設置場所には作業区を指定してください（'{0}' は{1}です）。", workCenter.Code, EnumLabels.Of(workCenter.Level));
         }
         return workCenter.IsActive
             ? null
-            : $"作業区 '{workCenter.Code}' は無効のため、設置場所に指定できません。";
+            : ApiText.T("作業区 '{0}' は無効のため、設置場所に指定できません。", workCenter.Code);
     }
 
     /// <summary>
@@ -110,7 +111,7 @@ public static class WorkCenterHierarchyPolicy
         }
         return workCenter.IsActive
             ? null
-            : $"作業区 '{workCenter.Code}' は無効のため、所属先に指定できません。";
+            : ApiText.T("作業区 '{0}' は無効のため、所属先に指定できません。", workCenter.Code);
     }
 
     /// <summary>
@@ -169,11 +170,4 @@ public static class WorkCenterHierarchyPolicy
     }
 
     /// <summary>エラーメッセージ用の段の日本語名</summary>
-    public static string LevelName(WorkCenterLevel level) => level switch
-    {
-        WorkCenterLevel.Plant => "工場",
-        WorkCenterLevel.Line => "ライン",
-        WorkCenterLevel.Area => "エリア",
-        _ => "作業区",
-    };
 }

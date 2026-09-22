@@ -7,7 +7,7 @@
         <div>
             @if (Value is null)
             {
-                <div class="text-muted" style="font-size:18px; margin:6px 0;">@EmptyText</div>
+                <div class="text-muted" style="font-size:18px; margin:6px 0;">@(EmptyText ?? L["実績なし"])</div>
             }
             else
             {
@@ -18,7 +18,7 @@
             @if (Delta is { } delta)
             {
                 <div style="font-size:12px; color:@DeltaColor(delta);">
-                    @DeltaLabel @(delta > 0 ? "▲" : delta < 0 ? "▼" : "±") @ChartScale.Number(Math.Abs(delta))@DeltaUnit
+                    @(DeltaLabel ?? L["前期間比"]) @(delta > 0 ? "▲" : delta < 0 ? "▼" : "±") @ChartScale.Number(Math.Abs(delta))@DeltaUnit
                 </div>
             }
         </div>
@@ -34,7 +34,7 @@
 
     [Parameter] public string? Unit { get; set; }
 
-    [Parameter] public string EmptyText { get; set; } = "実績なし";
+    [Parameter] public string? EmptyText { get; set; }
 
     /// <summary>前の期間との差。どちらかの期間で求められなければ null（差を出さない）</summary>
     [Parameter] public decimal? Delta { get; set; }
@@ -43,7 +43,7 @@
     [Parameter] public string? DeltaUnit { get; set; }
 
     /// <summary>「前日比」など</summary>
-    [Parameter] public string DeltaLabel { get; set; } = "前期間比";
+    [Parameter] public string? DeltaLabel { get; set; }
 
     /// <summary>増えると悪い指標なら true、良い指標なら false、どちらでもなければ null（色を付けない）</summary>
     [Parameter] public bool? HighIsBad { get; set; }

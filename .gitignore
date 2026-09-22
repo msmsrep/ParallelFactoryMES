@@ -34,3 +34,4 @@ samples/*.zip
 
 # ストア掲載画像の素材（アプリの実画面。build/Capture-AppScreens.js でいつでも撮り直せる）
 build/store/raw/
+scripts/keys.txt

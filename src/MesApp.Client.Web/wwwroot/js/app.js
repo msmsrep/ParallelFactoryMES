@@ -1,5 +1,16 @@
 // Parallel Factory MES クライアント用JS（帳票印刷・バーコード/QRスキャン・CSVダウンロード。Spec.md 3.8）
 window.mesApp = {
+    // 表示言語（Spec.md 7.9）。ブラウザごとに保存する。保存領域が使えなければ既定の言語で動く
+    culture: {
+        get: () => {
+            try { return localStorage.getItem('mesapp.culture'); } catch { return null; }
+        },
+        set: (name) => {
+            try { localStorage.setItem('mesapp.culture', name); } catch { /* 保存できなくても切替自体は続ける */ }
+        },
+        setDocumentLang: (name) => { document.documentElement.lang = name; },
+    },
+
     // 帳票・ラベル出力（ブラウザの印刷ダイアログ経由でPDF保存も可能）
     print: () => window.print(),
 

@@ -4,12 +4,12 @@
 <Notice Error="@_error" Message="@_message" />
 
 <div class="card">
-    <h2 style="margin-top:0;">稼働実績の記録（手入力。センサー自動収集は将来拡張）</h2>
+    <h2 style="margin-top:0;">@L["稼働実績の記録（手入力。センサー自動収集は将来拡張）"]</h2>
     <div class="form-grid">
         <div class="form-field">
-            <label>設備</label>
+            <label>@L["設備"]</label>
             <select @bind="_log.EquipmentId">
-                <option value="0">選択してください</option>
+                <option value="0">@L["選択してください"]</option>
                 @foreach (var equipment in _equipments)
                 {
                     <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
@@ -17,54 +17,54 @@
             </select>
         </div>
         <div class="form-field">
-            <label>状態</label>
+            <label>@L["状態"]</label>
             <select @bind="_log.Status">
-                <option value="@EquipmentLogStatus.Running">稼働</option>
-                <option value="@EquipmentLogStatus.Stopped">停止</option>
-                <option value="@EquipmentLogStatus.Setup">段取り</option>
-                <option value="@EquipmentLogStatus.Failure">故障</option>
-                <option value="@EquipmentLogStatus.Idle">アイドル</option>
+                <option value="@EquipmentLogStatus.Running">@EnumLabels.Of(EquipmentLogStatus.Running)</option>
+                <option value="@EquipmentLogStatus.Stopped">@EnumLabels.Of(EquipmentLogStatus.Stopped)</option>
+                <option value="@EquipmentLogStatus.Setup">@EnumLabels.Of(EquipmentLogStatus.Setup)</option>
+                <option value="@EquipmentLogStatus.Failure">@EnumLabels.Of(EquipmentLogStatus.Failure)</option>
+                <option value="@EquipmentLogStatus.Idle">@EnumLabels.Of(EquipmentLogStatus.Idle)</option>
             </select>
         </div>
         <div class="form-field">
-            <label>対象作業指示（任意）</label>
+            <label>@L["対象作業指示（任意）"]</label>
             @* 作業指示に紐づけると、そのロットの品質と設備の状態を突き合わせられる（Spec.md 5.7） *@
             <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
-                          @bind-Value="_log.WorkOrderId" EmptyLabel="（なし）"
+                          @bind-Value="_log.WorkOrderId" EmptyLabel="@L["（なし）"]"
                           ValueOf="w => w.Id"
-                          LabelOf='@(w => $"{w.WorkOrderNo}（{w.ProductCode}）")' />
+                          LabelOf='@(w => L["{0}（{1}）", w.WorkOrderNo, w.ProductCode])' />
         </div>
         <div class="form-field">
-            <label>開始時刻</label>
+            <label>@L["開始時刻"]</label>
             <input type="datetime-local" @bind="_log.StartedAt" />
         </div>
         <div class="form-field">
-            <label>終了時刻</label>
+            <label>@L["終了時刻"]</label>
             <input type="datetime-local" @bind="_log.EndedAt" />
         </div>
         <div class="form-field">
-            <label>停止原因（停止・故障時は必須）</label>
+            <label>@L["停止原因（停止・故障時は必須）"]</label>
             <input @bind="_log.StopCause" />
         </div>
     </div>
-    <button class="btn" disabled="@_busy" @onclick="AddLogAsync">稼働実績を記録</button>
+    <button class="btn" disabled="@_busy" @onclick="AddLogAsync">@L["稼働実績を記録"]</button>
 </div>
 
 <div class="card">
-    <h2 style="margin-top:0;">設備別 稼働サマリ（E-20-10-03）</h2>
+    <h2 style="margin-top:0;">@L["設備別 稼働サマリ（E-20-10-03）"]</h2>
     @if (_utilization is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_utilization.Count == 0)
     {
-        <p class="text-muted">終了時刻まで記録された稼働実績がありません。</p>
+        <p class="text-muted">@L["終了時刻まで記録された稼働実績がありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>設備</th><th>稼働(h)</th><th>停止(h)</th><th>段取り(h)</th><th>故障(h)</th><th>アイドル(h)</th><th>故障回数</th><th>時間稼働率</th></tr>
+                <tr><th>@L["設備"]</th><th>@L["稼働(h)"]</th><th>@L["停止(h)"]</th><th>@L["段取り(h)"]</th><th>@L["故障(h)"]</th><th>@L["アイドル(h)"]</th><th>@L["故障回数"]</th><th>@L["時間稼働率"]</th></tr>
             </thead>
             <tbody>
                 @foreach (var row in _utilization)
@@ -90,22 +90,22 @@
 
 @* 設備総合効率（E-20-30-03）。稼働サマリの素の時間区分に対し、こちらは製造実績と突き合わせた評価指標 *@
 <div class="card">
-    <h2 style="margin-top:0;">設備総合効率 OEE（E-20-30-03）</h2>
+    <h2 style="margin-top:0;">@L["設備総合効率 OEE（E-20-30-03）"]</h2>
     @if (_oee is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_oee.Count == 0)
     {
-        <p class="text-muted">終了時刻まで記録された稼働実績がありません。</p>
+        <p class="text-muted">@L["終了時刻まで記録された稼働実績がありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
                 <tr>
-                    <th>設備</th><th>負荷(h)</th><th>稼働(h)</th><th>時間稼働率</th>
-                    <th>産出数</th><th>性能稼働率</th><th>良品率</th><th>OEE</th><th>カバー率</th>
+                    <th>@L["設備"]</th><th>@L["負荷(h)"]</th><th>@L["稼働(h)"]</th><th>@L["時間稼働率"]</th>
+                    <th>@L["産出数"]</th><th>@L["性能稼働率"]</th><th>@L["良品率"]</th><th>OEE</th><th>@L["カバー率"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -132,26 +132,26 @@
             </tbody>
         </table>
         <p class="text-muted">
-            OEE＝時間稼働率×性能稼働率×良品率。性能稼働率と良品率は<b>作業指示に紐づけて記録した稼働</b>からしか出せないため、
-            紐付けのない稼働は対象外にしています（どれだけを見られているかがカバー率）。
-            算出できない項目は「-」で、0%としては扱いません。
-            理論サイクルタイムは指図展開時に固定した標準作業時間（1個あたり）で、標準より速ければ性能稼働率は100%を超えます。
+            @L["OEE＝時間稼働率×性能稼働率×良品率。"]
+            @L["性能稼働率と良品率は作業指示に紐づけて記録した稼働からしか出せないため、紐付けのない稼働は対象外にしています（どれだけを見られているかがカバー率）。"]
+            @L["算出できない項目は「-」で、0%としては扱いません。"]
+            @L["理論サイクルタイムは指図展開時に固定した標準作業時間（1個あたり）で、標準より速ければ性能稼働率は100%を超えます。"]
         </p>
     }
 </div>
 
 <div class="card">
-    <h2 style="margin-top:0;">稼働履歴</h2>
+    <h2 style="margin-top:0;">@L["稼働履歴"]</h2>
     @if (_logs is not null && _logs.Total > 0)
     {
         <table class="table">
-            <thead><tr><th>設備</th><th>状態</th><th>作業指示</th><th>開始</th><th>終了</th><th>停止原因</th></tr></thead>
+            <thead><tr><th>@L["設備"]</th><th>@L["状態"]</th><th>@L["作業指示"]</th><th>@L["開始"]</th><th>@L["終了"]</th><th>@L["停止原因"]</th></tr></thead>
             <tbody>
                 @foreach (var log in _logs.Items)
                 {
                     <tr>
                         <td>@log.EquipmentName</td>
-                        <td>@LogStatusLabel(log.Status)</td>
+                        <td>@EnumLabels.Of(log.Status)</td>
                         <td>@(log.WorkOrderNo ?? "-")</td>
                         <td>@log.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(log.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
@@ -165,7 +165,7 @@
     }
     else
     {
-        <p class="text-muted">稼働履歴はありません。</p>
+        <p class="text-muted">@L["稼働履歴はありません。"]</p>
     }
 </div>
 
@@ -214,7 +214,7 @@
     {
         if (_log.EquipmentId == 0)
         {
-            _error = "設備を選択してください。";
+            _error = L["設備を選択してください。"];
             return;
         }
         _busy = true;
@@ -226,12 +226,12 @@
                 new EquipmentLogRequest(_log.EquipmentId, _log.Status, new DateTimeOffset(_log.StartedAt),
                     _log.EndedAt is null ? null : new DateTimeOffset(_log.EndedAt.Value),
                     _log.StopCause, null, _log.WorkOrderId == 0 ? null : _log.WorkOrderId));
-            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["記録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "稼働実績を記録しました。";
+            _message = L["稼働実績を記録しました。"];
             _log.StopCause = null;
             await LoadLogsAsync();
         }
@@ -241,13 +241,4 @@
         }
     }
 
-    private static string LogStatusLabel(EquipmentLogStatus status) => status switch
-    {
-        EquipmentLogStatus.Running => "稼働",
-        EquipmentLogStatus.Stopped => "停止",
-        EquipmentLogStatus.Setup => "段取り",
-        EquipmentLogStatus.Failure => "故障",
-        EquipmentLogStatus.Idle => "アイドル",
-        _ => status.ToString(),
-    };
 }

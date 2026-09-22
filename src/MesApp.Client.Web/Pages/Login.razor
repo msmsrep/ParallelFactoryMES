@@ -4,16 +4,17 @@
 @inject NavigationManager Navigation
 @inject HttpClient Http
 
-<PageTitle>ログイン - Parallel Factory MES</PageTitle>
+<PageTitle>@L["ログイン"] - Parallel Factory MES</PageTitle>
 
 <div class="login-page">
     <div class="login-box">
         <h1>Parallel Factory MES</h1>
+        <div class="actions"><CultureSelector /></div>
 
         @if (_setupRequired)
         {
             <div class="alert alert-success">
-                初期セットアップが必要です。<a href="setup">初期管理者アカウントを作成</a>してください。
+                @L["初期セットアップが必要です。"] <a href="setup">@L["初期管理者アカウントを作成する"]</a>
             </div>
         }
 
@@ -23,15 +24,15 @@
         }
 
         <div class="form-field">
-            <label>ユーザー名</label>
+            <label>@L["ユーザー名"]</label>
             <input @bind="_userName" @bind:event="oninput" @onkeyup="OnKeyUp" autocomplete="username" />
         </div>
         <div class="form-field">
-            <label>パスワード</label>
+            <label>@L["パスワード"]</label>
             <input type="password" @bind="_password" @bind:event="oninput" @onkeyup="OnKeyUp"
                    autocomplete="current-password" />
         </div>
-        <button class="btn" disabled="@_busy" @onclick="LoginAsync">ログイン</button>
+        <button class="btn" disabled="@_busy" @onclick="LoginAsync">@L["ログイン"]</button>
     </div>
 </div>
 
@@ -73,7 +74,7 @@
         _error = null;
         try
         {
-            _error = await Auth.LoginAsync(_userName, _password);
+            _error = await Auth.LoginAsync(_userName, _password, L["ログインに失敗しました。"]);
             if (_error is null)
             {
                 Navigation.NavigateTo("");

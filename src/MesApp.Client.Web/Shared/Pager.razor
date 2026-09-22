@@ -5,12 +5,12 @@
 {
     <div class="actions">
         <span class="text-muted">
-            全 @Result.Total 件中 @FirstIndex〜@LastIndex 件（@Result.Page / @Result.PageCount ページ）
+            @L["全 {0} 件中 {1}〜{2} 件（{3} / {4} ページ）", Result.Total, FirstIndex, LastIndex, Result.Page, Result.PageCount]
         </span>
         <button class="btn btn-secondary" disabled="@(!Result.HasPrevious || Busy)"
-                @onclick="() => GoAsync(Result.Page - 1)">前へ</button>
+                @onclick="() => GoAsync(Result.Page - 1)">@L["前へ"]</button>
         <button class="btn btn-secondary" disabled="@(!Result.HasNext || Busy)"
-                @onclick="() => GoAsync(Result.Page + 1)">次へ</button>
+                @onclick="() => GoAsync(Result.Page + 1)">@L["次へ"]</button>
     </div>
 }
 

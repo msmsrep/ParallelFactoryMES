@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Maintenance;
@@ -22,12 +23,12 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
     {
         if (request.Type == WorkTimeType.Direct && request.WorkOrderId is null)
         {
-            return Outcome<WorkTimeRecord>.Invalid("直接作業には作業指示ID（workOrderId）が必要です。");
+            return Outcome<WorkTimeRecord>.Invalid(ApiText.T("直接作業には作業指示ID（workOrderId）が必要です。"));
         }
         if (request.WorkOrderId is int workOrderId
             && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
         {
-            return Outcome<WorkTimeRecord>.Invalid("存在しない作業指示IDです。");
+            return Outcome<WorkTimeRecord>.Invalid(ApiText.T("存在しない作業指示IDです。"));
         }
 
         var record = new WorkTimeRecord
@@ -54,12 +55,12 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
         if (request.WorkOrderId is int workOrderId
             && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
         {
-            return Outcome<TroubleReport>.Invalid("存在しない作業指示IDです。");
+            return Outcome<TroubleReport>.Invalid(ApiText.T("存在しない作業指示IDです。"));
         }
         if (request.EquipmentId is int equipmentId
             && !await db.Equipments.AnyAsync(e => e.Id == equipmentId, ct))
         {
-            return Outcome<TroubleReport>.Invalid("存在しない設備IDです。");
+            return Outcome<TroubleReport>.Invalid(ApiText.T("存在しない設備IDです。"));
         }
 
         var report = new TroubleReport
@@ -88,22 +89,22 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
         var equipment = await db.Equipments.AsNoTracking().FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
         if (equipment is null || !equipment.IsActive)
         {
-            return Outcome<EquipmentLog>.Invalid("存在しない（または無効な）設備IDです。");
+            return Outcome<EquipmentLog>.Invalid(ApiText.T("存在しない（または無効な）設備IDです。"));
         }
         if (request.EndedAt is not null && request.EndedAt <= request.StartedAt)
         {
-            return Outcome<EquipmentLog>.Invalid("終了時刻は開始時刻より後である必要があります。");
+            return Outcome<EquipmentLog>.Invalid(ApiText.T("終了時刻は開始時刻より後である必要があります。"));
         }
         if (request.Status is EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure
             && string.IsNullOrWhiteSpace(request.StopCause))
         {
-            return Outcome<EquipmentLog>.Invalid("停止・故障の記録には停止原因（stopCause）が必要です（B-40-20-02）。");
+            return Outcome<EquipmentLog>.Invalid(ApiText.T("停止・故障の記録には停止原因（stopCause）が必要です（B-40-20-02）。"));
         }
         // 作業指示に紐づけると、その指示で作ったロットの品質と設備の状態を突き合わせられる（PQC×EQC。Spec.md 5.7）
         if (request.WorkOrderId is { } workOrderId
             && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
         {
-            return Outcome<EquipmentLog>.Invalid($"作業指示（ID {workOrderId}）が見つかりません。");
+            return Outcome<EquipmentLog>.Invalid(ApiText.T("作業指示（ID {0}）が見つかりません。", workOrderId));
         }
 
         var log = new EquipmentLog

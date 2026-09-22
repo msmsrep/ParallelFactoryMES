@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
@@ -59,13 +60,13 @@ public class ReceivingController(
         }
         if (lot.OriginType != LotOriginType.Receiving)
         {
-            return this.BadRequestProblem("受入由来のロットではありません。");
+            return this.BadRequestProblem(ApiText.T("受入由来のロットではありません。"));
         }
 
         var transactions = await db.InventoryTransactions.Where(t => t.LotId == lotId).ToListAsync(ct);
         if (transactions.Count != 1 || transactions[0].Type != InventoryTransactionType.Receipt)
         {
-            return this.ConflictProblem("受入後に在庫が変動しているため取消できません（数量調整で対応してください）。");
+            return this.ConflictProblem(ApiText.T("受入後に在庫が変動しているため取消できません（数量調整で対応してください）。"));
         }
 
         var receipt = transactions[0];

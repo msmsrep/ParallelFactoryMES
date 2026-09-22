@@ -4,78 +4,78 @@
 
 @* 作業時間記録（MES.md B-30-30-02 直接／F-30-20-02 間接）。本人が自分の時間を記録する *@
 
-<PageTitle>作業時間 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["作業時間 - Parallel Factory MES"]</PageTitle>
 
-<h1>作業時間の記録</h1>
+<h1>@L["作業時間の記録"]</h1>
 <p class="text-muted">
-    作業指示に紐づく<strong>直接作業</strong>と、段取り・部材準備・設備対応などの<strong>間接作業</strong>を記録します
-    （B-30-30-02／F-30-20-02）。一覧には自分の記録が表示されます（生産管理・システム管理者は全員分）。
+    @L["作業指示に紐づく直接作業と、段取り・部材準備・設備対応などの間接作業を記録します"]
+    @L["（B-30-30-02／F-30-20-02）。一覧には自分の記録が表示されます（生産管理・システム管理者は全員分）。"]
 </p>
 
 <Notice Error="@_error" Message="@_message" />
 
 <AuthorizeView Roles="@MesRoleGroups.ShopFloorRecord">
     <div class="card">
-        <h2 style="margin-top:0;">作業時間を記録する</h2>
+        <h2 style="margin-top:0;">@L["作業時間を記録する"]</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>区分</label>
+                <label>@L["区分"]</label>
                 <select @bind="_type">
-                    <option value="@WorkTimeType.Direct">直接作業（作業指示に紐づく）</option>
-                    <option value="@WorkTimeType.Indirect">間接作業</option>
+                    <option value="@WorkTimeType.Direct">@L["直接作業（作業指示に紐づく）"]</option>
+                    <option value="@WorkTimeType.Indirect">@L["間接作業"]</option>
                 </select>
             </div>
             @if (_type == WorkTimeType.Direct)
             {
                 <div class="form-field">
-                    <label>作業指示</label>
+                    <label>@L["作業指示"]</label>
                     <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
                                   @bind-Value="_workOrderId"
                                   ValueOf="workOrder => workOrder.Id"
-                                  LabelOf='@(workOrder => $"{workOrder.WorkOrderNo}（{workOrder.ProductCode} / {workOrder.ProcessCode}）")' />
+                                  LabelOf='@(workOrder => L["{0}（{1} / {2}）", workOrder.WorkOrderNo, workOrder.ProductCode, workOrder.ProcessCode])' />
                 </div>
             }
             else
             {
                 <div class="form-field">
-                    <label>間接作業の区分（例：段取り、部材準備、清掃）</label>
+                    <label>@L["間接作業の区分（例：段取り、部材準備、清掃）"]</label>
                     <input @bind="_indirectCategory" />
                 </div>
             }
             <div class="form-field">
-                <label>開始時刻</label>
+                <label>@L["開始時刻"]</label>
                 <input type="datetime-local" @bind="_startedAt" />
             </div>
             <div class="form-field">
-                <label>終了時刻（作業中なら空欄）</label>
+                <label>@L["終了時刻（作業中なら空欄）"]</label>
                 <input type="datetime-local" @bind="_endedAt" />
             </div>
             <div class="form-field">
-                <label>備考</label>
+                <label>@L["備考"]</label>
                 <input @bind="_note" />
             </div>
         </div>
-        <button class="btn" disabled="@_busy" @onclick="CreateAsync">作業時間を記録</button>
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">@L["作業時間を記録"]</button>
     </div>
 </AuthorizeView>
 
 <div class="card">
-    <h2 style="margin-top:0;">記録一覧</h2>
+    <h2 style="margin-top:0;">@L["記録一覧"]</h2>
     @if (_records is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_records.Count == 0)
     {
-        <p class="text-muted">記録はまだありません。</p>
+        <p class="text-muted">@L["記録はまだありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
                 <tr>
-                    <th>作業者</th><th>区分</th><th>作業指示 / 間接区分</th>
-                    <th>開始</th><th>終了</th><th>時間</th><th>備考</th>
+                    <th>@L["作業者"]</th><th>@L["区分"]</th><th>@L["作業指示 / 間接区分"]</th>
+                    <th>@L["開始"]</th><th>@L["終了"]</th><th>@L["時間"]</th><th>@L["備考"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -83,10 +83,10 @@
                 {
                     <tr>
                         <td>@(record.UserName ?? "-")</td>
-                        <td>@(record.Type == WorkTimeType.Direct ? "直接" : "間接")</td>
+                        <td>@EnumLabels.Of(record.Type)</td>
                         <td>@(record.WorkOrderNo ?? record.IndirectCategory ?? "-")</td>
                         <td>@record.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                        <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "作業中")</td>
+                        <td>@(record.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? L["作業中"])</td>
                         <td>@Duration(record)</td>
                         <td>@(record.Note ?? "-")</td>
                     </tr>
@@ -110,8 +110,8 @@
     private string? _message;
     private bool _busy;
 
-    private static string Duration(WorkTimeResponse record) =>
-        record.EndedAt is null ? "-" : $"{(record.EndedAt.Value - record.StartedAt).TotalMinutes:0}分";
+    private string Duration(WorkTimeResponse record) =>
+        record.EndedAt is null ? "-" : L["{0:0}分", (record.EndedAt.Value - record.StartedAt).TotalMinutes];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -126,17 +126,17 @@
         }
         if (_type == WorkTimeType.Direct && _workOrderId == 0)
         {
-            _error = "直接作業には作業指示の選択が必要です。";
+            _error = L["直接作業には作業指示の選択が必要です。"];
             return;
         }
         if (_type == WorkTimeType.Indirect && string.IsNullOrWhiteSpace(_indirectCategory))
         {
-            _error = "間接作業には区分の入力が必要です。";
+            _error = L["間接作業には区分の入力が必要です。"];
             return;
         }
         if (_endedAt is not null && _endedAt <= _startedAt)
         {
-            _error = "終了時刻は開始時刻より後にしてください。";
+            _error = L["終了時刻は開始時刻より後にしてください。"];
             return;
         }
         _busy = true;
@@ -152,12 +152,12 @@
                     new DateTimeOffset(_startedAt),
                     _endedAt is null ? null : new DateTimeOffset(_endedAt.Value),
                     string.IsNullOrWhiteSpace(_note) ? null : _note));
-            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["記録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "作業時間を記録しました。";
+            _message = L["作業時間を記録しました。"];
             _endedAt = null;
             _note = null;
             await LoadAsync();

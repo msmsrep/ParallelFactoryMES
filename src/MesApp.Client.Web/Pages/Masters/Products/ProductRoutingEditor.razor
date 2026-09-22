@@ -2,11 +2,11 @@
 
 @* 品目の工順（BOP）（Spec.md 5.1、A-40-20）。品目マスタタブで選んだ品目に対して開く *@
 <div class="card">
-    <h2 style="margin-top:0;">@Product.Code の 工順（BOP。A-40-20）</h2>
+    <h2 style="margin-top:0;">@L["{0} の 工順（BOP。A-40-20）", Product.Code]</h2>
     <Notice Error="@_error" Message="@_message" />
     <table class="table">
         <thead>
-            <tr><th>順序</th><th>工程</th><th>標準作業(分)</th><th>標準段取(分)</th><th>必要スキル</th><th>候補設備</th><th>治工具</th><th>チェックリスト</th><th>管理項目</th><th>作業手順書</th><th></th></tr>
+            <tr><th>@L["順序"]</th><th>@L["工程"]</th><th>@L["標準作業(分)"]</th><th>@L["標準段取(分)"]</th><th>@L["必要スキル"]</th><th>@L["候補設備"]</th><th>@L["治工具"]</th><th>@L["チェックリスト"]</th><th>@L["管理項目"]</th><th>@L["作業手順書"]</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var step in _steps.OrderBy(s => s.Sequence))
@@ -22,7 +22,7 @@
                     <td>@(_checklists.FirstOrDefault(c => c.Id == step.ChecklistId)?.Code ?? "-")</td>
                     <td>@(step.ControlItems ?? "-")</td>
                     <td>@(_workProcedures.FirstOrDefault(w => w.Id == step.WorkProcedureId)?.ProcedureNo ?? "-")</td>
-                    <td><button class="btn btn-danger btn-sm" @onclick="() => _steps.Remove(step)">削除</button></td>
+                    <td><button class="btn btn-danger btn-sm" @onclick="() => _steps.Remove(step)">@L["削除"]</button></td>
                 </tr>
             }
         </tbody>
@@ -30,13 +30,13 @@
     <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="routing">
         <div class="form-grid">
             <div class="form-field">
-                <label>工程順序</label>
+                <label>@L["工程順序"]</label>
                 <input type="number" @bind="_sequence" />
             </div>
             <div class="form-field">
-                <label>工程</label>
+                <label>@L["工程"]</label>
                 <select @bind="_processId">
-                    <option value="0">選択してください</option>
+                    <option value="0">@L["選択してください"]</option>
                     @foreach (var process in _processes)
                     {
                         <option value="@process.Id">@process.Code @process.Name</option>
@@ -44,17 +44,17 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>標準作業時間(分)</label>
+                <label>@L["標準作業時間(分)"]</label>
                 <input type="number" step="any" @bind="_work" />
             </div>
             <div class="form-field">
-                <label>標準段取り時間(分)</label>
+                <label>@L["標準段取り時間(分)"]</label>
                 <input type="number" step="any" @bind="_setup" />
             </div>
             <div class="form-field">
-                <label>必要スキル・資格</label>
+                <label>@L["必要スキル・資格"]</label>
                 <select @bind="_skillId">
-                    <option value="0">なし</option>
+                    <option value="0">@L["なし"]</option>
                     @foreach (var skill in _skills)
                     {
                         <option value="@skill.Id">@skill.Code @skill.Name</option>
@@ -63,7 +63,7 @@
             </div>
             <div class="form-field">
                 @* 候補設備（B-10-20-02）。複数選ぶと差立でその中から選ばせる。空なら限定しない *@
-                <label>候補設備（Ctrl/Shiftで複数選択）</label>
+                <label>@L["候補設備（Ctrl/Shiftで複数選択）"]</label>
                 <select multiple size="4" @onchange="OnCandidatesChanged">
                     @foreach (var equipment in _equipments)
                     {
@@ -74,9 +74,9 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>作業区</label>
+                <label>@L["作業区"]</label>
                 <select @bind="_workCenterId">
-                    <option value="0">なし</option>
+                    <option value="0">@L["なし"]</option>
                     @foreach (var wc in _workCenters)
                     {
                         <option value="@wc.Id">@wc.Code @wc.Name</option>
@@ -84,9 +84,9 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>使用治工具</label>
+                <label>@L["使用治工具"]</label>
                 <select @bind="_toolId">
-                    <option value="0">なし</option>
+                    <option value="0">@L["なし"]</option>
                     @foreach (var tool in _tools)
                     {
                         <option value="@tool.Id">@tool.Code @tool.Name</option>
@@ -94,9 +94,9 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>チェックリスト</label>
+                <label>@L["チェックリスト"]</label>
                 <select @bind="_checklistId">
-                    <option value="0">なし</option>
+                    <option value="0">@L["なし"]</option>
                     @foreach (var checklist in _checklists)
                     {
                         <option value="@checklist.Id">@checklist.Code @checklist.Name</option>
@@ -104,24 +104,24 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>工程管理項目</label>
-                <input @bind="_controlItems" placeholder="例：温度、回転数" />
+                <label>@L["工程管理項目"]</label>
+                <input @bind="_controlItems" placeholder="@L["例：温度、回転数"]" />
             </div>
             <div class="form-field">
                 @* 作業手順書の紐付け（I-30-20-12）。作業者は作業指示からこれを辿る *@
-                <label>作業手順書（SOP）</label>
+                <label>@L["作業手順書（SOP）"]</label>
                 <select @bind="_workProcedureId">
-                    <option value="0">なし</option>
+                    <option value="0">@L["なし"]</option>
                     @foreach (var procedure in _workProcedures)
                     {
-                        <option value="@procedure.Id">@procedure.ProcedureNo @procedure.Title（v@(procedure.Version)）</option>
+                        <option value="@procedure.Id">@procedure.ProcedureNo @procedure.Title (v@(procedure.Version))</option>
                     }
                 </select>
             </div>
         </div>
         <div class="actions">
-            <button class="btn btn-secondary" @onclick="AddStep">工程を追加</button>
-            <button class="btn" disabled="@_busy" @onclick="SaveAsync">工順を保存（一括置換）</button>
+            <button class="btn btn-secondary" @onclick="AddStep">@L["工程を追加"]</button>
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@L["工順を保存（一括置換）"]</button>
         </div>
     </AuthorizeView>
 </div>
@@ -202,12 +202,12 @@
     {
         if (_processId == 0)
         {
-            _error = "工程を選択してください。";
+            _error = L["工程を選択してください。"];
             return;
         }
         if (_steps.Any(s => s.Sequence == _sequence))
         {
-            _error = "工程順序が重複しています。";
+            _error = L["工程順序が重複しています。"];
             return;
         }
         _error = null;
@@ -250,7 +250,7 @@
             .Select(id => _equipments.FirstOrDefault(e => e.Id == id)?.AssetNo)
             .Where(code => code is not null)
             .ToList();
-        return codes.Count <= 3 ? string.Join("、", codes) : $"{string.Join("、", codes.Take(3))} ほか{codes.Count - 3}件";
+        return codes.Count <= 3 ? string.Join(L["、"], codes) : L["{0} ほか{1}件", string.Join(L["、"], codes.Take(3)), codes.Count - 3];
     }
 
     private async Task SaveAsync()
@@ -261,12 +261,12 @@
         try
         {
             var response = await Http.PutAsJsonAsync($"api/products/{Product.Id}/routing", _steps);
-            if (await response.ReadErrorAsync("保存に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "工順（BOP）を保存しました。";
+            _message = L["工順（BOP）を保存しました。"];
             await OnSaved.InvokeAsync();
         }
         finally

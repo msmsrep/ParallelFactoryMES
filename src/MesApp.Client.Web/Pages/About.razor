@@ -1,45 +1,44 @@
 @page "/about"
 @attribute [Authorize]
 
-<PageTitle>このアプリについて - Parallel Factory MES</PageTitle>
+<PageTitle>@L["このアプリについて - Parallel Factory MES"]</PageTitle>
 
-<h1>このアプリについて</h1>
+<h1>@L["このアプリについて"]</h1>
 
 <div class="card">
     <h2 style="margin-top: 0;">Parallel Factory MES</h2>
     <p>
-        製造実績管理システム（MES）です。マスタ管理・生産管理・製造実行・物流／在庫管理・品質管理・
-        品質保証・設備保全までを1つのアプリでカバーします。
+        @L["製造実績管理システム（MES）です。マスタ管理・生産管理・製造実行・物流／在庫管理・品質管理・品質保証・設備保全までを1つのアプリでカバーします。"]
     </p>
-    <p class="text-muted">バージョン @Version</p>
+    <p class="text-muted">@L["バージョン {0}", Version]</p>
 </div>
 
 <div class="card">
-    <h2 style="margin-top: 0;">リンク</h2>
+    <h2 style="margin-top: 0;">@L["リンク"]</h2>
     <ul>
         <li>
             <a href="https://msmsrep.github.io/ParallelFactoryMES/" target="_blank" rel="noopener">
-                ユーザーガイド（操作マニュアル）
+                @L["ユーザーガイド（操作マニュアル）"]
             </a>
             <span class="text-muted">- GitHub Pages</span>
         </li>
         <li>
             <a href="https://github.com/msmsrep/ParallelFactoryMES" target="_blank" rel="noopener">
-                GitHub リポジトリ（ソースコード）
+                @L["GitHub リポジトリ（ソースコード）"]
             </a>
         </li>
         <li>
             <a href="https://github.com/msmsrep/ParallelFactoryMES/blob/main/LICENSE" target="_blank" rel="noopener">
-                ライセンス全文（LICENSE）
+                @L["ライセンス全文（LICENSE）"]
             </a>
         </li>
     </ul>
 </div>
 
 <div class="card">
-    <h2 style="margin-top: 0;">開発のサポート</h2>
+    <h2 style="margin-top: 0;">@L["開発のサポート"]</h2>
     <p class="text-muted">
-        開発を続けるための寄付を受け付けています。寄付による機能の追加や制限の解除はなく、すべての機能はこれまでどおり無償で使えます。
+        @L["開発を続けるための寄付を受け付けています。寄付による機能の追加や制限の解除はなく、すべての機能はこれまでどおり無償で使えます。"]
     </p>
     <ul>
         <li>
@@ -52,33 +51,33 @@
 </div>
 
 <div class="card">
-    <h2 style="margin-top: 0;">ライセンス</h2>
+    <h2 style="margin-top: 0;">@L["ライセンス"]</h2>
     <p>
-        本ソフトウェアは
+        @L["本ソフトウェアは"]
         <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">
             GNU Affero General Public License v3.0
-        </a>（AGPL-3.0）で提供されます。
+        </a>@L["（AGPL-3.0）で提供されます。"]
     </p>
     <p>Copyright (C) 2026 msmsrep</p>
     <p class="text-muted">
-        このプログラムはフリーソフトウェアです。フリーソフトウェア財団が公開する GNU Affero General Public License
-        バージョン3、または（任意で）それ以降のバージョンの条件に従って、再頒布および改変ができます。
-        このプログラムは有用であることを願って頒布されますが、<strong>一切の保証はありません</strong>。
-        商品性や特定目的への適合性の黙示的保証もありません。詳細は LICENSE を参照してください。
+        @L["このプログラムはフリーソフトウェアです。"]
+        @L["フリーソフトウェア財団が公開する GNU Affero General Public License バージョン3、または（任意で）それ以降のバージョンの条件に従って、再頒布および改変ができます。"]
+        @L["このプログラムは有用であることを願って頒布されますが、一切の保証はありません。"]
+        @L["商品性や特定目的への適合性の黙示的保証もありません。"]
+        @L["詳細は LICENSE を参照してください。"]
     </p>
     <p class="text-muted">
-        AGPL-3.0 では、改変版をネットワーク経由で第三者に利用させる場合、その利用者に対して改変版のソースコードを
-        提供する義務があります（第13条）。本システムはWebアプリケーションのため、この条項が適用されます。
+        @L["AGPL-3.0 では、改変版をネットワーク経由で第三者に利用させる場合、その利用者に対して改変版のソースコードを提供する義務があります（第13条）。"]
+        @L["本システムはWebアプリケーションのため、この条項が適用されます。"]
     </p>
 </div>
 
 <div class="card">
-    <h2 style="margin-top: 0;">第三者の著作物について</h2>
+    <h2 style="margin-top: 0;">@L["第三者の著作物について"]</h2>
     <p class="text-muted">
-        本システムは、機能要件の定義にあたり一般財団法人エンジニアリング協会（ENAA）の
-        『MES/MOM導入のための標準業務一覧』（2025年10月）を参照しています。
-        同一覧の著作権はENAAに帰属するため、一覧そのものは本システムおよびリポジトリに含めていません。
-        画面や仕様書に記載の業務プロセスNo（<code>A-20-10-01</code> 等）は、同一覧の項目を参照するための識別子です。
+        @L["本システムは、機能要件の定義にあたり一般財団法人エンジニアリング協会（ENAA）の『MES/MOM導入のための標準業務一覧』（2025年10月）を参照しています。"]
+        @L["同一覧の著作権はENAAに帰属するため、一覧そのものは本システムおよびリポジトリに含めていません。"]
+        @L["画面や仕様書に記載の業務プロセスNo（{0} 等）は、同一覧の項目を参照するための識別子です。", "A-20-10-01"]
     </p>
 </div>
 

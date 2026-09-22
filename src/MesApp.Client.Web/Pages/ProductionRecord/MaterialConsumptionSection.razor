@@ -1,19 +1,19 @@
 ﻿@inject HttpClient Http
 
 @* 部材投入（B-30-20-01）。指図の予定材料と照合され、代替部品には理由が要る *@
-<h2>部材投入</h2>
+<h2>@L["部材投入"]</h2>
 <Notice Error="@_error" Message="@_message" />
 @if (_consumptions.Count == 0)
 {
-    <p class="text-muted">投入の記録はまだありません。</p>
+    <p class="text-muted">@L["投入の記録はまだありません。"]</p>
 }
 else
 {
     <table class="table">
         <thead>
             <tr>
-                <th>品目</th><th>ロット</th><th>数量</th>
-                <th>投入日時</th><th>方法</th><th>代替理由</th>
+                <th>@L["品目"]</th><th>@L["ロット"]</th><th>@L["数量"]</th>
+                <th>@L["投入日時"]</th><th>@L["方法"]</th><th>@L["代替理由"]</th>
             </tr>
         </thead>
         <tbody>
@@ -24,8 +24,8 @@ else
                     <td>@consumption.LotNumber</td>
                     <td>@consumption.Quantity</td>
                     <td>@consumption.ConsumedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                    <td>@(consumption.Method == ConsumptionMethod.Backflush ? "バックフラッシュ" : "手動")</td>
-                    <td>@(consumption.IsSubstitute ? consumption.SubstituteReason ?? "（代替）" : "-")</td>
+                    <td>@EnumLabels.Of(consumption.Method)</td>
+                    <td>@(consumption.IsSubstitute ? consumption.SubstituteReason ?? L["（代替）"] : "-")</td>
                 </tr>
             }
         </tbody>
@@ -36,25 +36,25 @@ else
     @if (Editable)
     {
         <div class="card">
-            <h2 style="margin-top:0;">部材を投入する（B-30-20-01）</h2>
+            <h2 style="margin-top:0;">@L["部材を投入する（B-30-20-01）"]</h2>
             <div class="form-grid">
                 <div class="form-field">
-                    <label>投入ロット（スキャン可）</label>
+                    <label>@L["投入ロット（スキャン可）"]</label>
                     <OptionSelect TItem="StockResponse" Endpoint="api/inventory/stocks/options"
                                   @bind-Value="_consumeLotId" SelectedItemChanged="OnConsumeStockSelected"
                                   ValueOf="stock => stock.LotId"
-                                  LabelOf='@(stock => $"{stock.LotNumber}（{stock.ProductCode} / {stock.LocationCode} 残{stock.Quantity}）")' />
+                                  LabelOf='@(stock => L["{0}（{1} / {2} 残{3}）", stock.LotNumber, stock.ProductCode, stock.LocationCode, stock.Quantity])' />
                 </div>
                 <div class="form-field">
-                    <label>数量</label>
+                    <label>@L["数量"]</label>
                     <input type="number" step="any" @bind="_consumeQuantity" min="0" />
                 </div>
                 <div class="form-field">
-                    <label>代替理由（代替部品を投入するときは必須）</label>
+                    <label>@L["代替理由（代替部品を投入するときは必須）"]</label>
                     <input @bind="_substituteReason" />
                 </div>
             </div>
-            <button class="btn" disabled="@_busy" @onclick="AddConsumptionAsync">投入を記録</button>
+            <button class="btn" disabled="@_busy" @onclick="AddConsumptionAsync">@L["投入を記録"]</button>
         </div>
     }
 </AuthorizeView>
@@ -108,12 +108,12 @@ else
         }
         if (_consumeLotId == 0 || _consumeLocationId == 0)
         {
-            _error = "投入するロットを選択してください。";
+            _error = L["投入するロットを選択してください。"];
             return;
         }
         if (_consumeQuantity <= 0)
         {
-            _error = "投入数量は0より大きい必要があります。";
+            _error = L["投入数量は0より大きい必要があります。"];
             return;
         }
         _busy = true;
@@ -125,12 +125,12 @@ else
                 new ConsumptionRequest(_consumeLotId, _consumeLocationId, _consumeQuantity,
                     string.IsNullOrWhiteSpace(_substituteReason) ? null : _substituteReason));
             // 予定材料との照合エラー（代替理由の未入力を含む）もここに出る
-            if (await response.ReadErrorAsync("部材投入に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["部材投入に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "部材投入を記録しました。";
+            _message = L["部材投入を記録しました。"];
             _consumeLotId = 0;
             _consumeLocationId = 0;
             _consumeQuantity = 0;

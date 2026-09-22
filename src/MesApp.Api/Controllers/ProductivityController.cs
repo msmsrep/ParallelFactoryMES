@@ -1,3 +1,4 @@
+using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Entities;
@@ -70,7 +71,7 @@ public class ProductivityController(MesAppDbContext db, IBusinessDateService bus
         var all = records
             .Select(x => (x.OrderType, x.GoodQuantity, x.DefectQuantity))
             .ToList();
-        var total = Aggregate("合計", all);
+        var total = Aggregate(ApiText.T("合計"), all);
 
         var byProduct = records
             .GroupBy(r => r.ProductCode)

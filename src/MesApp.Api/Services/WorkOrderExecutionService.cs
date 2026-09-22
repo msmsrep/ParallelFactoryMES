@@ -1,3 +1,5 @@
+using MesApp.Core.Localization;
+using MesApp.Api.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
@@ -54,11 +56,11 @@ public sealed class WorkOrderExecutionService(
         var workOrder = await db.WorkOrders.FindAsync([workOrderId], ct);
         if (workOrder is null)
         {
-            return Outcome<WorkOrder>.NotFound("作業指示が存在しません。");
+            return Outcome<WorkOrder>.NotFound(ApiText.T("作業指示が存在しません。"));
         }
         if (workOrder.Status is not (WorkOrderStatus.Created or WorkOrderStatus.Dispatched))
         {
-            return Outcome<WorkOrder>.Conflict($"状態 '{workOrder.Status}' の作業指示は着手できません。");
+            return Outcome<WorkOrder>.Conflict(ApiText.T("状態 '{0}' の作業指示は着手できません。", EnumLabels.Of(workOrder.Status)));
         }
         workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Started,
             WorkOrderStatusChangeSource.Start, userId);
@@ -75,11 +77,11 @@ public sealed class WorkOrderExecutionService(
             .FirstOrDefaultAsync(w => w.Id == workOrderId, ct);
         if (workOrder is null)
         {
-            return Outcome<WorkOrder>.NotFound("作業指示が存在しません。");
+            return Outcome<WorkOrder>.NotFound(ApiText.T("作業指示が存在しません。"));
         }
         if (workOrder.Status != WorkOrderStatus.Completed)
         {
-            return Outcome<WorkOrder>.Conflict($"状態 '{workOrder.Status}' の作業指示は承認できません（完了済みのみ）。");
+            return Outcome<WorkOrder>.Conflict(ApiText.T("状態 '{0}' の作業指示は承認できません（完了済みのみ）。", EnumLabels.Of(workOrder.Status)));
         }
 
         workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Approved,
@@ -107,11 +109,11 @@ public sealed class WorkOrderExecutionService(
         var workOrder = await db.WorkOrders.FirstOrDefaultAsync(w => w.Id == workOrderId, ct);
         if (workOrder is null)
         {
-            return Outcome<SetupRecord>.NotFound("作業指示が存在しません。");
+            return Outcome<SetupRecord>.NotFound(ApiText.T("作業指示が存在しません。"));
         }
         if (workOrder.Status is WorkOrderStatus.Approved or WorkOrderStatus.Canceled)
         {
-            return Outcome<SetupRecord>.Conflict($"状態 '{workOrder.Status}' の作業指示には記録できません。");
+            return Outcome<SetupRecord>.Conflict(ApiText.T("状態 '{0}' の作業指示には記録できません。", EnumLabels.Of(workOrder.Status)));
         }
 
         var record = new SetupRecord
@@ -136,20 +138,20 @@ public sealed class WorkOrderExecutionService(
     {
         if (!await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
         {
-            return Outcome<ChecklistRecord>.NotFound("作業指示が存在しません。");
+            return Outcome<ChecklistRecord>.NotFound(ApiText.T("作業指示が存在しません。"));
         }
         var checklist = await db.Checklists.AsNoTracking().Include(c => c.Items)
             .FirstOrDefaultAsync(c => c.Id == request.ChecklistId, ct);
         if (checklist is null)
         {
-            return Outcome<ChecklistRecord>.Invalid("存在しないチェックリストIDです。");
+            return Outcome<ChecklistRecord>.Invalid(ApiText.T("存在しないチェックリストIDです。"));
         }
 
         var resultByItem = request.Results.ToDictionary(r => r.ChecklistItemId);
         var itemIds = checklist.Items.Select(i => i.Id).ToHashSet();
         if (request.Results.Any(r => !itemIds.Contains(r.ChecklistItemId)))
         {
-            return Outcome<ChecklistRecord>.Invalid("チェックリストに存在しない項目IDが含まれています。");
+            return Outcome<ChecklistRecord>.Invalid(ApiText.T("チェックリストに存在しない項目IDが含まれています。"));
         }
         var missingRequired = checklist.Items
             .Where(i => i.IsRequired &&
@@ -158,7 +160,7 @@ public sealed class WorkOrderExecutionService(
             .ToList();
         if (missingRequired.Count > 0)
         {
-            return Outcome<ChecklistRecord>.Invalid($"必須項目が未チェックです: {string.Join("、", missingRequired)}");
+            return Outcome<ChecklistRecord>.Invalid(ApiText.T("必須項目が未チェックです: {0}", string.Join("、", missingRequired)));
         }
 
         var record = new ChecklistRecord
@@ -188,16 +190,16 @@ public sealed class WorkOrderExecutionService(
             .FirstOrDefaultAsync(w => w.Id == workOrderId, ct);
         if (workOrder is null)
         {
-            return Outcome<MaterialConsumption>.NotFound("作業指示が存在しません。");
+            return Outcome<MaterialConsumption>.NotFound(ApiText.T("作業指示が存在しません。"));
         }
         if (workOrder.Status is WorkOrderStatus.Approved or WorkOrderStatus.Canceled)
         {
-            return Outcome<MaterialConsumption>.Conflict($"状態 '{workOrder.Status}' の作業指示には記録できません。");
+            return Outcome<MaterialConsumption>.Conflict(ApiText.T("状態 '{0}' の作業指示には記録できません。", EnumLabels.Of(workOrder.Status)));
         }
         var lot = await db.Lots.Include(l => l.Product).FirstOrDefaultAsync(l => l.Id == request.LotId, ct);
         if (lot is null)
         {
-            return Outcome<MaterialConsumption>.Invalid("存在しないロットIDです。");
+            return Outcome<MaterialConsumption>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
         // 投入可否（ステータス・有効期限）の判定は LotUsabilityPolicy に集約している
         if (LotUsabilityPolicy.CheckIssuable(lot, businessDate.Today) is string reason)
@@ -273,22 +275,21 @@ public sealed class WorkOrderExecutionService(
             .FirstOrDefaultAsync(w => w.Id == workOrderId, ct);
         if (workOrder is null)
         {
-            return Outcome<ProductionRecordResult>.NotFound("作業指示が存在しません。");
+            return Outcome<ProductionRecordResult>.NotFound(ApiText.T("作業指示が存在しません。"));
         }
         if (workOrder.Status is WorkOrderStatus.Approved or WorkOrderStatus.Canceled)
         {
-            return Outcome<ProductionRecordResult>.Conflict($"状態 '{workOrder.Status}' の作業指示には実績を記録できません。");
+            return Outcome<ProductionRecordResult>.Conflict(ApiText.T("状態 '{0}' の作業指示には実績を記録できません。", EnumLabels.Of(workOrder.Status)));
         }
         if (request.GoodQuantity + request.DefectQuantity <= 0)
         {
-            return Outcome<ProductionRecordResult>.Invalid("良品数と不良数の合計は0より大きい必要があります。");
+            return Outcome<ProductionRecordResult>.Invalid(ApiText.T("良品数と不良数の合計は0より大きい必要があります。"));
         }
         // 廃棄・再作業待ちは不良数の内訳（B-40-10-01）。残りは判定待ち・保留中の数量になる
         if (request.ScrapQuantity + request.ReworkQuantity > request.DefectQuantity)
         {
             return Outcome<ProductionRecordResult>.Invalid(
-                $"廃棄数と再作業待ち数の合計（{request.ScrapQuantity + request.ReworkQuantity}）が" +
-                $"不良数（{request.DefectQuantity}）を超えています。");
+                ApiText.T("廃棄数と再作業待ち数の合計（{0}）が不良数（{1}）を超えています。", request.ScrapQuantity + request.ReworkQuantity, request.DefectQuantity));
         }
 
         // 不良理由別の内訳（C-40-10-01）。合計は不良数を超えられない（残りは理由未分類）
@@ -298,18 +299,17 @@ public sealed class WorkOrderExecutionService(
             if (defects.Sum(d => d.Quantity) > request.DefectQuantity)
             {
                 return Outcome<ProductionRecordResult>.Invalid(
-                    $"不良理由別の内訳の合計（{defects.Sum(d => d.Quantity)}）が" +
-                    $"不良数（{request.DefectQuantity}）を超えています。");
+                    ApiText.T("不良理由別の内訳の合計（{0}）が不良数（{1}）を超えています。", defects.Sum(d => d.Quantity), request.DefectQuantity));
             }
             var reasonIds = defects.Select(d => d.DefectReasonId).ToList();
             if (reasonIds.Distinct().Count() != reasonIds.Count)
             {
-                return Outcome<ProductionRecordResult>.Invalid("同じ不良理由が重複しています。");
+                return Outcome<ProductionRecordResult>.Invalid(ApiText.T("同じ不良理由が重複しています。"));
             }
             var found = await db.DefectReasons.CountAsync(r => reasonIds.Contains(r.Id) && r.IsActive, ct);
             if (found != reasonIds.Count)
             {
-                return Outcome<ProductionRecordResult>.Invalid("存在しない（または無効な）不良理由IDが含まれています。");
+                return Outcome<ProductionRecordResult>.Invalid(ApiText.T("存在しない（または無効な）不良理由IDが含まれています。"));
             }
         }
 
@@ -323,16 +323,16 @@ public sealed class WorkOrderExecutionService(
         {
             if (request.OutputLocationId is null)
             {
-                return Outcome<ProductionRecordResult>.Invalid("最終工程の実績には入庫先ロケーション（outputLocationId）が必要です。");
+                return Outcome<ProductionRecordResult>.Invalid(ApiText.T("最終工程の実績には入庫先ロケーション（outputLocationId）が必要です。"));
             }
             if (!await db.Locations.AnyAsync(l => l.Id == request.OutputLocationId && l.IsActive, ct))
             {
-                return Outcome<ProductionRecordResult>.Invalid("存在しない（または無効な）入庫先ロケーションです。");
+                return Outcome<ProductionRecordResult>.Invalid(ApiText.T("存在しない（または無効な）入庫先ロケーションです。"));
             }
             outputLot = order.OutputLot;
             if (outputLot is null)
             {
-                return Outcome<ProductionRecordResult>.Conflict("産出ロットが未採番です（指図が正しく展開されていません）。");
+                return Outcome<ProductionRecordResult>.Conflict(ApiText.T("産出ロットが未採番です（指図が正しく展開されていません）。"));
             }
         }
 
@@ -349,7 +349,7 @@ public sealed class WorkOrderExecutionService(
                     .ToListAsync(ct);
                 if (bom.Count == 0)
                 {
-                    return Outcome<ProductionRecordResult>.Invalid("予定材料が未登録（展開時にMBOMが未登録）のためバックフラッシュできません。");
+                    return Outcome<ProductionRecordResult>.Invalid(ApiText.T("予定材料が未登録（展開時にMBOMが未登録）のためバックフラッシュできません。"));
                 }
                 var totalProduced = request.GoodQuantity + request.DefectQuantity;
                 foreach (var bomItem in bom)
@@ -439,11 +439,11 @@ public sealed class WorkOrderExecutionService(
     {
         if (!await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
         {
-            return Outcome<List<ProductionDataRecord>>.NotFound("作業指示が存在しません。");
+            return Outcome<List<ProductionDataRecord>>.NotFound(ApiText.T("作業指示が存在しません。"));
         }
         if (requests.Count == 0)
         {
-            return Outcome<List<ProductionDataRecord>>.Invalid("記録する項目がありません。");
+            return Outcome<List<ProductionDataRecord>>.Invalid(ApiText.T("記録する項目がありません。"));
         }
         // 指示に紐づく記録は、展開時点のスナップショットと照合して逸脱を判定する（Spec.md 5.7）
         var instructionIds = requests
@@ -461,12 +461,12 @@ public sealed class WorkOrderExecutionService(
             if (!instructions.ContainsKey(request.WorkOrderControlItemId!.Value))
             {
                 return Outcome<List<ProductionDataRecord>>.Invalid(
-                    $"工程管理項目の指示（ID {request.WorkOrderControlItemId}）はこの作業指示のものではありません。");
+                    ApiText.T("工程管理項目の指示（ID {0}）はこの作業指示のものではありません。", request.WorkOrderControlItemId));
             }
             if (request.NumericValue is null)
             {
                 return Outcome<List<ProductionDataRecord>>.Invalid(
-                    "工程管理項目の指示を指定した記録には、判定に使う数値（numericValue）が必要です。");
+                    ApiText.T("工程管理項目の指示を指定した記録には、判定に使う数値（numericValue）が必要です。"));
             }
         }
 

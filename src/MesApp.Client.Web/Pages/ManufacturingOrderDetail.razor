@@ -3,16 +3,16 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
-<PageTitle>製造指図詳細 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["製造指図詳細 - Parallel Factory MES"]</PageTitle>
 
 @if (_detail is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
     var order = _detail.Order;
-    <h1>製造指図 @order.OrderNo</h1>
+    <h1>@L["製造指図 {0}", order.OrderNo]</h1>
 
     @if (_error is not null)
     {
@@ -27,19 +27,19 @@ else
         <table class="table">
             <tbody>
                 <tr>
-                    <th>品目</th><td>@order.ProductCode @order.ProductName</td>
-                    <th>数量</th><td>@order.Quantity</td>
+                    <th>@L["品目"]</th><td>@order.ProductCode @order.ProductName</td>
+                    <th>@L["数量"]</th><td>@order.Quantity</td>
                 </tr>
                 <tr>
-                    <th>納期</th><td>@(order.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
-                    <th>区分</th><td>@order.OrderType</td>
+                    <th>@L["納期"]</th><td>@(order.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                    <th>@L["区分"]</th><td>@order.OrderType</td>
                 </tr>
                 <tr>
-                    <th>状態</th><td><StatusBadge Status="@order.Status.ToString()" /></td>
-                    <th>産出ロット</th><td>@(order.OutputLotNumber ?? "（展開時に採番）")</td>
+                    <th>@L["状態"]</th><td><StatusBadge Status="@order.Status.ToString()" /></td>
+                    <th>@L["産出ロット"]</th><td>@(order.OutputLotNumber ?? L["（展開時に採番）"])</td>
                 </tr>
                 <tr>
-                    <th>備考</th><td colspan="3">@(order.Note ?? "-")</td>
+                    <th>@L["備考"]</th><td colspan="3">@(order.Note ?? "-")</td>
                 </tr>
             </tbody>
         </table>
@@ -48,21 +48,21 @@ else
             <div class="actions mt-2">
                 @if (order.Status == ManufacturingOrderStatus.Draft)
                 {
-                    <button class="btn" disabled="@_busy" @onclick="ApproveAsync">承認（A-20-20-01）</button>
+                    <button class="btn" disabled="@_busy" @onclick="ApproveAsync">@L["承認（A-20-20-01）"]</button>
                 }
                 @if (order.Status == ManufacturingOrderStatus.Approved)
                 {
-                    <button class="btn" disabled="@_busy" @onclick="ExpandAsync">工程展開（B-10-10-01）</button>
+                    <button class="btn" disabled="@_busy" @onclick="ExpandAsync">@L["工程展開（B-10-10-01）"]</button>
                 }
                 @* 変更できるのは未承認・承認済のみ（展開済み以降は取消のみ。A-20-20-02） *@
                 @if (order.Status is ManufacturingOrderStatus.Draft or ManufacturingOrderStatus.Approved)
                 {
                     <button class="btn btn-secondary" disabled="@_busy"
-                            @onclick="() => StartEdit(order)">変更（A-20-20-02）</button>
+                            @onclick="() => StartEdit(order)">@L["変更（A-20-20-02）"]</button>
                 }
                 @if (order.Status is not (ManufacturingOrderStatus.Completed or ManufacturingOrderStatus.Canceled))
                 {
-                    <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">取消</button>
+                    <button class="btn btn-danger" disabled="@_busy" @onclick="CancelAsync">@L["取消"]</button>
                 }
             </div>
         </AuthorizeView>
@@ -72,28 +72,28 @@ else
         @if (_editing)
         {
             <div class="card">
-                <h2 style="margin-top:0;">指図の変更（A-20-20-02）</h2>
+                <h2 style="margin-top:0;">@L["指図の変更（A-20-20-02）"]</h2>
                 <p class="text-muted">
-                    承認済みの指図を変更すると<strong>未承認に戻り、承認をやり直します</strong>。
-                    品目は変更できません（取消して登録し直してください）。
+                    @L["承認済みの指図を変更すると"]<strong>@L["未承認に戻り、承認をやり直します"]</strong>@L["。"]
+                    @L["品目は変更できません（取消して登録し直してください）。"]
                 </p>
                 <div class="form-grid">
                     <div class="form-field">
-                        <label>数量</label>
+                        <label>@L["数量"]</label>
                         <input type="number" step="any" @bind="_editQuantity" min="0" />
                     </div>
                     <div class="form-field">
-                        <label>納期</label>
+                        <label>@L["納期"]</label>
                         <input type="date" @bind="_editDueDate" />
                     </div>
                     <div class="form-field">
-                        <label>備考</label>
+                        <label>@L["備考"]</label>
                         <input @bind="_editNote" />
                     </div>
                 </div>
                 <div class="actions">
-                    <button class="btn" disabled="@_busy" @onclick="SaveEditAsync">変更を保存</button>
-                    <button class="btn btn-secondary" @onclick="() => _editing = false">キャンセル</button>
+                    <button class="btn" disabled="@_busy" @onclick="SaveEditAsync">@L["変更を保存"]</button>
+                    <button class="btn btn-secondary" @onclick="() => _editing = false">@L["キャンセル"]</button>
                 </div>
             </div>
         }
@@ -102,10 +102,10 @@ else
     @* 予定材料は展開時にMBOMから固定される。以降のMBOM改訂はこの指図に影響しない（Spec.md 5.7） *@
     @if (_detail.Materials is { Count: > 0 })
     {
-        <h2>予定材料（展開時のMBOMで確定）</h2>
+        <h2>@L["予定材料（展開時のMBOMで確定）"]</h2>
         <table class="table">
             <thead>
-                <tr><th>品目</th><th>原単位</th><th>予定数量</th><th>代替部品グループ</th></tr>
+                <tr><th>@L["品目"]</th><th>@L["原単位"]</th><th>@L["予定数量"]</th><th>@L["代替部品グループ"]</th></tr>
             </thead>
             <tbody>
                 @foreach (var material in _detail.Materials)
@@ -121,24 +121,24 @@ else
         </table>
     }
 
-    <h2>作業指示（工程展開結果）</h2>
+    <h2>@L["作業指示（工程展開結果）"]</h2>
     @if (_detail.WorkOrders.Count == 0)
     {
-        <p class="text-muted">未展開です。承認後に工程展開すると工順に基づいて作業指示が生成されます。</p>
+        <p class="text-muted">@L["未展開です。承認後に工程展開すると工順に基づいて作業指示が生成されます。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
                 <tr>
-                    <th>指示番号</th>
-                    <th>工程</th>
-                    <th>計画数</th>
-                    <th>標準時間（作業/段取り）</th>
-                    <th>着手順</th>
-                    <th>担当者</th>
-                    <th>設備</th>
-                    <th>状態</th>
+                    <th>@L["指示番号"]</th>
+                    <th>@L["工程"]</th>
+                    <th>@L["計画数"]</th>
+                    <th>@L["標準時間（作業/段取り）"]</th>
+                    <th>@L["着手順"]</th>
+                    <th>@L["担当者"]</th>
+                    <th>@L["設備"]</th>
+                    <th>@L["状態"]</th>
                     <th></th>
                 </tr>
             </thead>
@@ -150,15 +150,15 @@ else
                         <td>@workOrder.ProcessCode @workOrder.ProcessName</td>
                         <td>@workOrder.PlannedQuantity</td>
                         @* 標準時間は展開時点の工順スナップショット（以降の改訂に影響されない） *@
-                        <td>@workOrder.StandardWorkMinutes / @workOrder.StandardSetupMinutes 分</td>
+                        <td>@L["{0} / {1} 分", workOrder.StandardWorkMinutes, workOrder.StandardSetupMinutes]</td>
                         <td>@(workOrder.DispatchOrder?.ToString() ?? "-")</td>
                         <td>@(workOrder.AssignedUserName ?? "-")</td>
                         <td>@(workOrder.AssignedEquipmentName ?? "-")</td>
                         <td><StatusBadge Status="@workOrder.Status.ToString()" /></td>
                         <td class="actions">
-                            <a class="btn btn-secondary btn-sm" href="work-orders/@workOrder.Id/setup">段取り</a>
-                            <a class="btn btn-secondary btn-sm" href="work-orders/@workOrder.Id/record">実績入力</a>
-                            <a class="btn btn-secondary btn-sm" href="print/work-order/@workOrder.Id" target="_blank">指示書</a>
+                            <a class="btn btn-secondary btn-sm" href="work-orders/@workOrder.Id/setup">@L["段取り"]</a>
+                            <a class="btn btn-secondary btn-sm" href="work-orders/@workOrder.Id/record">@L["実績入力"]</a>
+                            <a class="btn btn-secondary btn-sm" href="print/work-order/@workOrder.Id" target="_blank">@L["指示書"]</a>
                         </td>
                     </tr>
                 }
@@ -189,10 +189,10 @@ else
             $"api/manufacturing-orders/{Id}");
 
     private Task ApproveAsync() =>
-        PostActionAsync($"api/manufacturing-orders/{Id}/approve", null, "承認しました。");
+        PostActionAsync($"api/manufacturing-orders/{Id}/approve", null, L["承認しました。"]);
 
     private Task CancelAsync() =>
-        PostActionAsync($"api/manufacturing-orders/{Id}/cancel", null, "取消しました。");
+        PostActionAsync($"api/manufacturing-orders/{Id}/cancel", null, L["取消しました。"]);
 
     private void StartEdit(ManufacturingOrderResponse order)
     {
@@ -212,7 +212,7 @@ else
         }
         if (_editQuantity <= 0)
         {
-            _error = "数量は0より大きい必要があります。";
+            _error = L["数量は0より大きい必要があります。"];
             return;
         }
         _busy = true;
@@ -225,12 +225,12 @@ else
                     _editQuantity,
                     _editDueDate is null ? null : DateOnly.FromDateTime(_editDueDate.Value),
                     string.IsNullOrWhiteSpace(_editNote) ? null : _editNote));
-            if (await response.ReadErrorAsync("変更に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["変更に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "指図を変更しました（承認済みだったものは未承認に戻ります）。";
+            _message = L["指図を変更しました（承認済みだったものは未承認に戻ります）。"];
             _editing = false;
             await LoadAsync();
         }
@@ -242,7 +242,7 @@ else
 
     private Task ExpandAsync() =>
         PostActionAsync($"api/manufacturing-orders/{Id}/expand",
-            JsonContent.Create(new ExpandRequest(null)), "工程展開しました（産出ロット採番済み）。");
+            JsonContent.Create(new ExpandRequest(null)), L["工程展開しました（産出ロット採番済み）。"]);
 
     private async Task PostActionAsync(string url, HttpContent? content, string successMessage)
     {
@@ -256,7 +256,7 @@ else
         try
         {
             var response = await Http.PostAsync(url, content);
-            if (await response.ReadErrorAsync("操作に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["操作に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
