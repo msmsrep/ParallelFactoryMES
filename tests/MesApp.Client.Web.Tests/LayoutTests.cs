@@ -15,6 +15,9 @@ public class LayoutTests : BunitContext
 {
     public LayoutTests()
     {
+        // 全画面が文言の訳（L）を注入するため登録しておく（Spec.md 7.9）
+        Services.AddLocalization();
+
         var tokenStore = new TokenStore();
         Services.AddSingleton(tokenStore);
 

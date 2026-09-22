@@ -45,6 +45,44 @@ public class AuthTests
             v => v.StartsWith("mesapp_rt=") && v.Contains("httponly", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Theory]
+    [InlineData(null, "ユーザー名またはパスワードが正しくありません。")]
+    [InlineData("ja", "ユーザー名またはパスワードが正しくありません。")]
+    [InlineData("en", "The user name or password is incorrect.")]
+    [InlineData("en-US,en;q=0.9", "The user name or password is incorrect.")]
+    [InlineData("fr", "ユーザー名またはパスワードが正しくありません。")]
+    public async Task エラー文言はAcceptLanguageの言語で返り未対応なら日本語になる(string? language, string expected)
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+        await SetupAdminAsync(client);
+        if (language is not null)
+        {
+            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd(language);
+        }
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login", new LoginRequest(AdminUser, "WrongPass999"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Equal(expected, problem?.Title);
+    }
+
+    [Fact]
+    public async Task 存在しないAPIの文言も英語で返る()
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en");
+
+        var response = await client.GetAsync("/api/no-such-api");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Equal("The requested API does not exist.", problem?.Title);
+    }
+
     [Fact]
     public async Task パスワード誤りでは401が返る()
     {

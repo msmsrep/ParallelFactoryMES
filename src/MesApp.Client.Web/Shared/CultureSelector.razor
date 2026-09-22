@@ -1,0 +1,25 @@
+@* 表示言語の切替（Spec.md 7.9）。選んだ言語をブラウザに保存し、再読込して反映する *@
+@using System.Globalization
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<select aria-label="@L["表示言語"]" title="@L["表示言語"]" value="@_current" @onchange="OnChangedAsync">
+    @* 言語名は訳さず、その言語自身の表記で出す（読めない言語に切り替えても戻せるように） *@
+    <option value="@MesCultures.Japanese">日本語</option>
+    <option value="@MesCultures.English">English</option>
+</select>
+
+@code {
+    private readonly string _current = MesCultures.Resolve(CultureInfo.CurrentUICulture.Name);
+
+    private async Task OnChangedAsync(ChangeEventArgs e)
+    {
+        var selected = MesCultures.Resolve(e.Value?.ToString());
+        if (selected == _current)
+        {
+            return;
+        }
+        await AppCulture.SaveAsync(JS, selected);
+        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+    }
+}

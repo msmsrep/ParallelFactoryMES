@@ -10,10 +10,11 @@
     </aside>
     <div class="main-area">
         <header class="topbar">
+            <CultureSelector />
             <AuthorizeView>
                 <Authorized>
                     <span class="text-muted">@Tokens.User?.DisplayName</span>
-                    <button class="btn btn-secondary btn-sm" @onclick="LogoutAsync">ログアウト</button>
+                    <button class="btn btn-secondary btn-sm" @onclick="LogoutAsync">@L["ログアウト"]</button>
                 </Authorized>
             </AuthorizeView>
         </header>
@@ -24,10 +25,10 @@
                 <ErrorContent>
                     <div class="card">
                         <div class="alert alert-danger">
-                            画面の読み込みに失敗しました。通信状態を確認して再試行してください。
+                            @L["画面の読み込みに失敗しました。通信状態を確認して再試行してください。"]
                         </div>
                         <div class="actions">
-                            <button class="btn" @onclick="RetryAsync">再試行</button>
+                            <button class="btn" @onclick="RetryAsync">@L["再試行"]</button>
                         </div>
                     </div>
                 </ErrorContent>

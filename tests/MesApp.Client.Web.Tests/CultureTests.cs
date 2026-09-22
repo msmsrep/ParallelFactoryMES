@@ -1,0 +1,91 @@
+using System.Globalization;
+using Bunit;
+using Bunit.TestDoubles;
+using MesApp.Client.Web.Auth;
+using MesApp.Client.Web.Layout;
+using MesApp.Client.Web.Shared;
+using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Auth;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace MesApp.Client.Web.Tests;
+
+/// <summary>
+/// 表示言語の切替（Spec.md 7.9）。全画面の文言が UICulture と <see cref="UiText"/> の訳に従うため横断的に確認する。
+/// </summary>
+public class CultureTests : BunitContext
+{
+    public CultureTests()
+    {
+        Services.AddLocalization();
+
+        var tokenStore = new TokenStore();
+        Services.AddSingleton(tokenStore);
+        var stateProvider = new ApiAuthenticationStateProvider(tokenStore);
+        Services.AddSingleton(stateProvider);
+        Services.AddSingleton(new AuthService(
+            new HttpClient { BaseAddress = new Uri("http://localhost/") }, tokenStore, stateProvider));
+        tokenStore.Set("token", new UserInfo("id-1", "worker1", "作業者1", [MesRoles.Operator], false));
+        AddAuthorization().SetAuthorized("作業者1");
+
+        JSInterop.SetupVoid("mesApp.culture.set", _ => true).SetVoidResult();
+    }
+
+    [Theory]
+    [InlineData(null, "ja")]
+    [InlineData("", "ja")]
+    [InlineData("en", "en")]
+    [InlineData("en-US", "en")]
+    [InlineData("EN", "en")]
+    [InlineData("ja-JP", "ja")]
+    [InlineData("fr", "ja")]
+    public void 対応していない言語は既定の日本語に寄せる(string? stored, string expected)
+    {
+        Assert.Equal(expected, MesCultures.Resolve(stored));
+    }
+
+    [Fact]
+    public void 英語を選んでいると画面の文言が英語になる()
+    {
+        var component = RenderLayoutIn("en");
+
+        Assert.Contains("Log out", component.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("ログアウト", component.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 日本語では原文のまま出る()
+    {
+        var component = RenderLayoutIn("ja");
+
+        Assert.Contains("ログアウト", component.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 言語を切り替えると保存して再読込する()
+    {
+        var component = RenderLayoutIn("ja");
+        var navigation = Services.GetRequiredService<BunitNavigationManager>();
+
+        component.Find("select").Change(MesCultures.English);
+
+        Assert.Equal(MesCultures.English, JSInterop.VerifyInvoke("mesApp.culture.set").Arguments.Single());
+        // 訳のサテライトアセンブリは起動時に読まれるため、同じ画面を強制再読込して反映する
+        Assert.True(navigation.History.Single().Options.ForceLoad);
+    }
+
+    private IRenderedComponent<MainLayout> RenderLayoutIn(string culture)
+    {
+        var original = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentUICulture = new CultureInfo(culture);
+        try
+        {
+            return Render<MainLayout>(p => p.Add(l => l.Body, (RenderFragment)(b => b.AddContent(0, "本文"))));
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+}

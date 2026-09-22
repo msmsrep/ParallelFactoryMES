@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ユーザー名またはパスワードが正しくありません。" xml:space="preserve">
+    <value>The user name or password is incorrect.</value>
+  </data>
+  <data name="アカウントが一時的にロックされています。しばらく待って再試行してください。" xml:space="preserve">
+    <value>The account is temporarily locked. Please wait a while and try again.</value>
+  </data>
+  <data name="リフレッシュトークンがありません。再ログインしてください。" xml:space="preserve">
+    <value>No refresh token was found. Please sign in again.</value>
+  </data>
+  <data name="リフレッシュトークンが無効です。再ログインしてください。" xml:space="preserve">
+    <value>The refresh token is invalid. Please sign in again.</value>
+  </data>
+  <data name="指定されたAPIは存在しません。" xml:space="preserve">
+    <value>The requested API does not exist.</value>
+  </data>
+  <data name="セッションを失効させました。お手数ですが再ログインしてください。" xml:space="preserve">
+    <value>Your session has been revoked. Please sign in again.</value>
+  </data>
+</root>

@@ -18,6 +18,9 @@ public class OptionSelectTests : BunitContext
 
     public OptionSelectTests()
     {
+        // 全画面が文言の訳（L）を注入するため登録しておく（Spec.md 7.9）
+        Services.AddLocalization();
+
         Services.AddSingleton(new HttpClient(_handler) { BaseAddress = new Uri("http://localhost/") });
     }
 

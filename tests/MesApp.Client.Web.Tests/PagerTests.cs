@@ -1,6 +1,7 @@
 using Bunit;
 using MesApp.Client.Web.Shared;
 using MesApp.Core.Contracts.Common;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MesApp.Client.Web.Tests;
 
@@ -9,6 +10,12 @@ namespace MesApp.Client.Web.Tests;
 /// </summary>
 public class PagerTests : BunitContext
 {
+    public PagerTests()
+    {
+        // 全画面が文言の訳（L）を注入するため登録しておく（Spec.md 7.9）
+        Services.AddLocalization();
+    }
+
     private static PagedResult<string> Page(int page, int total, int pageSize = 2) =>
         new([.. Enumerable.Range(0, Math.Min(pageSize, Math.Max(0, total - ((page - 1) * pageSize))))
                 .Select(i => $"item{i}")],
