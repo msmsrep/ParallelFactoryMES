@@ -26,7 +26,7 @@ API の日本語リテラルが約850（うち CSV 関連が約420）、enum を
 | I18N-01 | 基盤：Localization 登録、言語切替（`MainLayout`）、`<html lang>`、`Accept-Language` の伝搬、API の RequestLocalization、bUnit テスト、Spec.md の節 | **対応済**（Spec.md 改訂100。レイアウト・ログイン画面・認証APIの文言も訳した） |
 | I18N-02 | enum の表示名を Core に集約（`Labels.cs` と各 `XxxLabel`） | **対応済**（Spec.md 改訂101。`Core/Localization/EnumLabels.cs`。補足付きの選択肢は画面の段で訳す） |
 | I18N-03 | API のエラー文言（Controller / Policy / Service）。`Accept-Language: en` のテストを領域ごとに数件 | **対応済**（Spec.md 改訂102。`ApiText.T` で包む。保存される文字列は包まない。CSV 取込のエラーは I18N-09） |
-| I18N-04 | 画面：Layout・NavMenu・Shared | 未着手 |
+| I18N-04 | 画面：Layout・NavMenu・Shared | **対応済**（Spec.md 改訂103。部品の既定の文言は `string?` の引数にして部品側で訳す。呼び出し側が渡す文言・`ReadErrorAsync` の既定文言は各画面の段で訳す） |
 | I18N-05 | 画面：マスタ | 未着手 |
 | I18N-06 | 画面：製造・実行 | 未着手 |
 | I18N-07 | 画面：在庫・品質 | 未着手 |

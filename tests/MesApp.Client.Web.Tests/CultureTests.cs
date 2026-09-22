@@ -6,6 +6,7 @@ using MesApp.Client.Web.Layout;
 using MesApp.Client.Web.Shared;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Auth;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Entities;
 using MesApp.Core.Localization;
 using Microsoft.AspNetCore.Components;
@@ -65,6 +66,30 @@ public class CultureTests : BunitContext
     }
 
     [Fact]
+    public void 英語ではレイアウトとメニューに日本語が残らない()
+    {
+        // 利用者名・本文（テストが渡す値）と、言語の選択肢（その言語自身の表記で出す）は訳さない
+        var markup = RenderLayoutIn("en").Markup
+            .Replace("作業者1", "", StringComparison.Ordinal)
+            .Replace("本文", "", StringComparison.Ordinal)
+            .Replace("日本語", "", StringComparison.Ordinal);
+
+        Assert.Contains("Master Data", markup, StringComparison.Ordinal);
+        Assert.DoesNotMatch(Japanese, markup);
+    }
+
+    [Fact]
+    public void 共通部品の文言も英語になる()
+    {
+        var pager = InCulture("en", () => Render<Pager<string>>(p => p
+            .Add(x => x.Result, new PagedResult<string>(["a", "b"], 5, 2, 2))
+            .Add(x => x.OnPageChanged, _ => { })));
+
+        Assert.Contains("3–4 of 5 (page 2 / 3)", pager.Markup, StringComparison.Ordinal);
+        Assert.Contains("Next", pager.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void 言語を切り替えると保存して再読込する()
     {
         var component = RenderLayoutIn("ja");
@@ -110,6 +135,8 @@ public class CultureTests : BunitContext
         // 訳さない用途向けの原文は言語に左右されない
         Assert.Equal("保留", InCulture("en", () => EnumLabels.OriginalOf(LotStockStatus.OnHold)));
     }
+
+    private const string Japanese = @"[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}]";
 
     private static T InCulture<T>(string culture, Func<T> action)
     {

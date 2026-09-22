@@ -4,13 +4,13 @@
 @* バーコード/QRスキャン共通コンポーネント（Spec.md 3.8）。
    USB HIDリーダー：キーボード入力＋Enterで確定。カメラ：BarcodeDetector API。 *@
 <div class="scan-input">
-    <input value="@Value" @oninput="OnInput" @onkeyup="OnKeyUpAsync" placeholder="@Placeholder" />
+    <input value="@Value" @oninput="OnInput" @onkeyup="OnKeyUpAsync" placeholder="@(Placeholder ?? L["スキャンまたは入力"])" />
     <button type="button" class="btn btn-secondary btn-sm" @onclick="ToggleCameraAsync">
-        @(_scanning ? "停止" : "📷 カメラ")
+        @(_scanning ? L["停止"] : "📷 " + L["カメラ"])
     </button>
     @if (ShowSubmit)
     {
-        <button type="button" class="btn btn-sm" @onclick="SubmitAsync">@SubmitLabel</button>
+        <button type="button" class="btn btn-sm" @onclick="SubmitAsync">@(SubmitLabel ?? L["照会"])</button>
     }
 </div>
 @if (_scanning)
@@ -34,9 +34,11 @@
     /// <summary>Enterキー・スキャン確定・確定ボタンで発火（読み取った値を渡す）</summary>
     [Parameter] public EventCallback<string> OnScan { get; set; }
 
-    [Parameter] public string Placeholder { get; set; } = "スキャンまたは入力";
+    /// <summary>入力欄の案内。省略時は「スキャンまたは入力」</summary>
+    [Parameter] public string? Placeholder { get; set; }
     [Parameter] public bool ShowSubmit { get; set; } = true;
-    [Parameter] public string SubmitLabel { get; set; } = "照会";
+    /// <summary>確定ボタンの文言。省略時は「照会」</summary>
+    [Parameter] public string? SubmitLabel { get; set; }
 
     private async Task OnInput(ChangeEventArgs e)
     {
@@ -78,7 +80,7 @@
         if (!started)
         {
             _scanning = false;
-            _cameraError = "カメラを利用できません（未対応ブラウザ／権限拒否）。USBバーコードリーダーまたは手入力をご利用ください。";
+            _cameraError = L["カメラを利用できません（未対応ブラウザ／権限拒否）。USBバーコードリーダーまたは手入力をご利用ください。"];
         }
     }
 

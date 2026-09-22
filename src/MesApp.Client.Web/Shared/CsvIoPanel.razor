@@ -4,42 +4,42 @@
 @* CSV一括入出力（エクスポート／テンプレート／取込）。マスタ（api/masters/csv）と実績（api/actuals/csv。取込のみ）で共用 *@
 <div class="card">
     <details>
-        <summary class="csv-summary">CSV入出力（@Label）</summary>
+        <summary class="csv-summary">@L["CSV入出力（{0}）", Label]</summary>
 
         <p class="text-muted mt-2">
             @if (CanExport)
             {
-                <span>エクスポートしたCSVをExcelで編集して取り込めます。取込は
-                <strong>@KeyLabel が既存と一致すれば更新、無ければ新規登録</strong>です。</span>
+                <span>@L["エクスポートしたCSVをExcelで編集して取り込めます。"]
+                <strong>@L["取込は、{0} が既存と一致すれば更新、無ければ新規登録です。", KeyLabel ?? L["コード"]]</strong></span>
             }
             else
             {
-                <span>取込は<strong>常に新規登録</strong>です（既存の記録は更新しません。同じファイルを2回取り込むと2回分登録されます）。</span>
+                <span><strong>@L["取込は常に新規登録です。"]</strong>@L["（既存の記録は更新しません。同じファイルを2回取り込むと2回分登録されます）"]</span>
             }
-            文字コードはUTF-8とShift_JISのどちらでも取り込めます。
+            @L["文字コードはUTF-8とShift_JISのどちらでも取り込めます。"]
         </p>
 
         <div class="actions">
             @if (CanExport)
             {
-                <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="ExportAsync">CSVエクスポート</button>
+                <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="ExportAsync">@L["CSVエクスポート"]</button>
             }
-            <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="TemplateAsync">テンプレート（空のCSV）</button>
+            <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="TemplateAsync">@L["テンプレート（空のCSV）"]</button>
         </div>
 
         <AuthorizeView Roles="@Roles">
             <div class="csv-import mt-2">
                 <div class="form-field">
-                    <label>取込ファイル（.csv）</label>
+                    <label>@L["取込ファイル（.csv）"]</label>
                     <InputFile OnChange="OnFileSelected" accept=".csv,text/csv" />
                 </div>
                 <div class="actions mt-2">
                     <label class="text-muted">
                         <input type="checkbox" style="width:auto;" @bind="_dryRun" />
-                        検証のみ（DBに反映しない）
+                        @L["検証のみ（DBに反映しない）"]
                     </label>
                     <button type="button" class="btn" disabled="@(_busy || _file is null)" @onclick="ImportAsync">
-                        取込を実行
+                        @L["取込を実行"]
                     </button>
                 </div>
             </div>
@@ -54,24 +54,24 @@
             @if (_result.Succeeded)
             {
                 <div class="alert alert-success mt-2">
-                    @(_result.DryRun ? "検証のみ：エラーはありません。" : "取り込みました。")
+                    @(_result.DryRun ? L["検証のみ：エラーはありません。"] : L["取り込みました。"])
                     @if (CanExport)
                     {
-                        <span>データ行 @_result.DataRows 件（新規 @_result.Created 件／更新 @_result.Updated 件）</span>
+                        <span>@L["データ行 {0} 件（新規 {1} 件／更新 {2} 件）", _result.DataRows, _result.Created, _result.Updated]</span>
                     }
                     else
                     {
-                        <span>データ行 @_result.DataRows 件（登録 @_result.Created 件）</span>
+                        <span>@L["データ行 {0} 件（登録 {1} 件）", _result.DataRows, _result.Created]</span>
                     }
                 </div>
                 @* 警告は取り込めている。エラーと違い取り消されないので、その旨を添えて出す *@
                 @if (_result.Warnings.Count > 0)
                 {
                     <div class="alert alert-warning mt-2">
-                        警告が @_result.Warnings.Count 件あります（<strong>取込は完了しています</strong>）。
+                        @L["警告が {0} 件あります。", _result.Warnings.Count] <strong>@L["取込は完了しています。"]</strong>
                     </div>
                     <table class="table">
-                        <thead><tr><th style="width:80px;">行</th><th>内容</th></tr></thead>
+                        <thead><tr><th style="width:80px;">@L["行"]</th><th>@L["内容"]</th></tr></thead>
                         <tbody>
                             @foreach (var warning in _result.Warnings)
                             {
@@ -87,11 +87,11 @@
             else
             {
                 <div class="alert alert-danger mt-2">
-                    エラーが @_result.Errors.Count 件あります。<strong>1行でもエラーがあると全件取り消されます</strong>
-                    （DBは変更されていません）。修正して再度取り込んでください。
+                    @L["エラーが {0} 件あります。", _result.Errors.Count] <strong>@L["1行でもエラーがあると全件取り消されます。"]</strong>
+                    @L["DBは変更されていません。修正して再度取り込んでください。"]
                 </div>
                 <table class="table">
-                    <thead><tr><th style="width:80px;">行</th><th>内容</th></tr></thead>
+                    <thead><tr><th style="width:80px;">@L["行"]</th><th>@L["内容"]</th></tr></thead>
                     <tbody>
                         @foreach (var error in _result.Errors)
                         {
@@ -108,16 +108,16 @@
         @if (_columns is not null)
         {
             <details class="mt-2">
-                <summary class="csv-summary">列の説明</summary>
+                <summary class="csv-summary">@L["列の説明"]</summary>
                 <table class="table mt-2">
-                    <thead><tr><th>列名</th><th>項目</th><th>必須</th><th>備考</th></tr></thead>
+                    <thead><tr><th>@L["列名"]</th><th>@L["項目"]</th><th>@L["必須"]</th><th>@L["備考"]</th></tr></thead>
                     <tbody>
                         @foreach (var column in _columns)
                         {
                             <tr>
                                 <td><code>@column.Name</code></td>
                                 <td>@column.Label</td>
-                                <td>@(column.Required ? "必須" : "任意")</td>
+                                <td>@(column.Required ? L["必須"] : L["任意"])</td>
                                 <td>@column.Note</td>
                             </tr>
                         }
@@ -125,8 +125,8 @@
                 </table>
                 <p class="text-muted">
                     @(CanExport
-                        ? "列の順序は自由です。不要な列は削除できます（削除した列は現在の値を保ちます）。"
-                        : "列の順序は自由です。任意の列は削除できます（削除した列は空欄と同じ扱いです）。")
+                        ? L["列の順序は自由です。不要な列は削除できます（削除した列は現在の値を保ちます）。"]
+                        : L["列の順序は自由です。任意の列は削除できます（削除した列は空欄と同じ扱いです）。"])
                 </p>
             </details>
         }
@@ -149,8 +149,8 @@
     /// <summary>画面表示用の名称</summary>
     [Parameter] public string Label { get; set; } = string.Empty;
 
-    /// <summary>キー列の説明（例：品目コード）</summary>
-    [Parameter] public string KeyLabel { get; set; } = "コード";
+    /// <summary>キー列の説明（例：品目コード）。省略時は「コード」</summary>
+    [Parameter] public string? KeyLabel { get; set; }
 
     /// <summary>取込を実行できるロール</summary>
     [Parameter] public string Roles { get; set; } = MesRoleGroups.MasterWrite;
@@ -208,7 +208,7 @@
         try
         {
             var response = await Http.GetAsync(url);
-            if (await response.ReadErrorAsync("CSVの出力に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["CSVの出力に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
@@ -238,7 +238,7 @@
         {
             if (_file.Size > MaxUploadBytes)
             {
-                _error = $"ファイルサイズが大きすぎます（上限 {MaxUploadBytes / 1024 / 1024} MB）。";
+                _error = L["ファイルサイズが大きすぎます（上限 {0} MB）。", MaxUploadBytes / 1024 / 1024];
                 return;
             }
 
@@ -254,7 +254,7 @@
             content.Add(fileContent, "file", _file.Name);
 
             var response = await Http.PostAsync($"{BaseUrl}/{Kind}?dryRun={(_dryRun ? "true" : "false")}", content);
-            if (await response.ReadErrorAsync("取込に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["取込に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;

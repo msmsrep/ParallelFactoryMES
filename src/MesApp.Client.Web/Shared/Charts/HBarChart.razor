@@ -3,7 +3,7 @@
 
 <div class="chart">
     <svg viewBox="0 0 @ChartScale.F(Width) @ChartScale.F(Height)" style="width:100%; min-width:520px;"
-         role="img" aria-label="@AriaLabel">
+         role="img" aria-label="@(AriaLabel ?? L["グラフ"])">
         @foreach (var tick in _ticks)
         {
             var x = X(tick);
@@ -56,7 +56,7 @@
     /// <summary>軸の上限を固定する（%なら100）。null なら最大値に合わせる</summary>
     [Parameter] public decimal? MaxValue { get; set; }
 
-    [Parameter] public string AriaLabel { get; set; } = "グラフ";
+    [Parameter] public string? AriaLabel { get; set; }
 
     /// <summary>
     /// 割合の棒を水準で色分けするときの向き（true なら高いほど悪い）。null なら凡例の色のまま。

@@ -4,39 +4,39 @@
 @* CSVのZIP一括取込・一括出力（Spec.md 3.8）。マスタ（api/masters/csv/bundle）と実績（api/actuals/csv/bundle。取込のみ）で共用 *@
 <div class="card">
     <details>
-        <summary class="csv-summary">ZIPで一括取込@(CanExport ? "・一括出力" : "")（@Label）</summary>
+        <summary class="csv-summary">@(CanExport ? L["ZIPで一括取込・一括出力（{0}）", Label] : L["ZIPで一括取込（{0}）", Label])</summary>
 
         <p class="text-muted mt-2">
-            複数のCSVをZIPにまとめて1回で取り込めます。<strong>ファイル名の順に取り込み</strong>、
-            種別はファイル名の「_」より後ろで決まります（例 <code>@Example</code>）。
-            <strong>1ファイルでもエラーがあると、ZIPの全ファイルが取り消されます。</strong>
-            CSV以外のファイルは無視します。@(CanExport ? "実績のCSVは入れられません（実績CSV取込で取り込みます）。" : "マスタのCSVは入れられません（マスタ管理で取り込みます）。")
+            @L["複数のCSVをZIPにまとめて1回で取り込めます。"] <strong>@L["ファイル名の順に取り込みます。"]</strong>
+            @L["種別はファイル名の「_」より後ろで決まります。例："] <code>@Example</code>
+            <strong>@L["1ファイルでもエラーがあると、ZIPの全ファイルが取り消されます。"]</strong>
+            @L["CSV以外のファイルは無視します。"] @(CanExport ? L["実績のCSVは入れられません（実績CSV取込で取り込みます）。"] : L["マスタのCSVは入れられません（マスタ管理で取り込みます）。"])
         </p>
 
         @if (CanExport)
         {
             <div class="actions">
-                <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="ExportAsync">全マスタをZIPで出力</button>
+                <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="ExportAsync">@L["全マスタをZIPで出力"]</button>
             </div>
             <p class="text-muted">
-                出力したZIPは取り込む順の番号付きで、そのまま一括取込に使えます。
-                ユーザーはパスワードを出力しないため、別の環境へ移すときはユーザーのCSVに初期パスワードを書き足してください。
+                @L["出力したZIPは取り込む順の番号付きで、そのまま一括取込に使えます。"]
+                @L["ユーザーはパスワードを出力しないため、別の環境へ移すときはユーザーのCSVに初期パスワードを書き足してください。"]
             </p>
         }
 
         <AuthorizeView Roles="@Roles">
             <div class="csv-import mt-2">
                 <div class="form-field">
-                    <label>取込ファイル（.zip）</label>
+                    <label>@L["取込ファイル（.zip）"]</label>
                     <InputFile OnChange="OnFileSelected" accept=".zip,application/zip" />
                 </div>
                 <div class="actions mt-2">
                     <label class="text-muted">
                         <input type="checkbox" style="width:auto;" @bind="_dryRun" />
-                        検証のみ（DBに反映しない）
+                        @L["検証のみ（DBに反映しない）"]
                     </label>
                     <button type="button" class="btn" disabled="@(_busy || _file is null)" @onclick="ImportAsync">
-                        一括取込を実行
+                        @L["一括取込を実行"]
                     </button>
                 </div>
             </div>
@@ -51,35 +51,35 @@
             @if (_result.Succeeded)
             {
                 <div class="alert alert-success mt-2">
-                    @(_result.DryRun ? "検証のみ：エラーはありません。" : "取り込みました。")
-                    @_result.Files.Count ファイル
+                    @(_result.DryRun ? L["検証のみ：エラーはありません。"] : L["取り込みました。"])
+                    @L["{0} ファイル", _result.Files.Count]
                 </div>
             }
             else
             {
                 <div class="alert alert-danger mt-2">
-                    エラーがあるため、<strong>ZIPの全ファイルを取り消しました</strong>（DBは変更されていません）。
-                    修正して再度取り込んでください。
+                    <strong>@L["エラーがあるため、ZIPの全ファイルを取り消しました。"]</strong>
+                    @L["DBは変更されていません。修正して再度取り込んでください。"]
                 </div>
             }
             <table class="table">
-                <thead><tr><th>ファイル</th><th style="width:140px;">結果</th><th>内容</th></tr></thead>
+                <thead><tr><th>@L["ファイル"]</th><th style="width:140px;">@L["結果"]</th><th>@L["内容"]</th></tr></thead>
                 <tbody>
                     @foreach (var file in _result.Files)
                     {
                         <tr>
                             <td><code>@file.FileName</code></td>
-                            <td>@(file.Result.Succeeded ? "OK" : $"エラー {file.Result.Errors.Count} 件")</td>
+                            <td>@(file.Result.Succeeded ? "OK" : L["エラー {0} 件", file.Result.Errors.Count])</td>
                             <td>
                                 @if (file.Result.Succeeded)
                                 {
-                                    <span class="text-muted">データ行 @file.Result.DataRows 件</span>
+                                    <span class="text-muted">@L["データ行 {0} 件", file.Result.DataRows]</span>
                                 }
                                 else
                                 {
                                     @foreach (var error in file.Result.Errors)
                                     {
-                                        <div>@(error.Line > 0 ? $"{error.Line}行目：" : "")@error.Message</div>
+                                        <div>@(error.Line > 0 ? L["{0}行目：", error.Line] : "")@error.Message</div>
                                     }
                                 }
                             </td>
@@ -89,8 +89,8 @@
                     {
                         <tr>
                             <td><code>@name</code></td>
-                            <td class="text-muted">未処理</td>
-                            <td class="text-muted">前のファイルでエラーがあったため取り込んでいません。</td>
+                            <td class="text-muted">@L["未処理"]</td>
+                            <td class="text-muted">@L["前のファイルでエラーがあったため取り込んでいません。"]</td>
                         </tr>
                     }
                 </tbody>
@@ -141,7 +141,7 @@
         try
         {
             var response = await Http.GetAsync($"{BaseUrl}/bundle?includeInactive=true");
-            if (await response.ReadErrorAsync("ZIPの出力に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["ZIPの出力に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
@@ -171,7 +171,7 @@
         {
             if (_file.Size > MaxUploadBytes)
             {
-                _error = $"ファイルサイズが大きすぎます（上限 {MaxUploadBytes / 1024 / 1024} MB）。";
+                _error = L["ファイルサイズが大きすぎます（上限 {0} MB）。", MaxUploadBytes / 1024 / 1024];
                 return;
             }
 
@@ -189,10 +189,10 @@
             var response = await Http.PostAsync($"{BaseUrl}/bundle?dryRun={(_dryRun ? "true" : "false")}", content);
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
-                _error = "ZIPに、取り込む権限の無い種別のCSVが含まれています（何も取り込んでいません）。";
+                _error = L["ZIPに、取り込む権限の無い種別のCSVが含まれています（何も取り込んでいません）。"];
                 return;
             }
-            if (await response.ReadErrorAsync("一括取込に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["一括取込に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;

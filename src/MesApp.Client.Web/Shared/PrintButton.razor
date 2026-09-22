@@ -1,10 +1,11 @@
 @inject IJSRuntime JS
 
 @* 帳票・ラベルの印刷／PDF出力（Spec.md 3.8）。印刷時は no-print 要素が非表示になる *@
-<button type="button" class="btn no-print" @onclick="PrintAsync">🖨 @Label</button>
+<button type="button" class="btn no-print" @onclick="PrintAsync">🖨 @(Label ?? L["印刷 / PDF出力"])</button>
 
 @code {
-    [Parameter] public string Label { get; set; } = "印刷 / PDF出力";
+    /// <summary>ボタンの文言。省略時は「印刷 / PDF出力」</summary>
+    [Parameter] public string? Label { get; set; }
 
     private async Task PrintAsync() => await JS.InvokeVoidAsync("mesApp.print");
 }

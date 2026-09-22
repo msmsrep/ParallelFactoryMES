@@ -2,14 +2,14 @@
 @typeparam TItem
 @inject HttpClient Http
 
-<input type="search" placeholder="@Placeholder" value="@_keyword" @oninput="OnKeywordChangedAsync" />
+<input type="search" placeholder="@(Placeholder ?? L["コードで検索（スキャン可）"])" value="@_keyword" @oninput="OnKeywordChangedAsync" />
 <select value="@Value" @onchange="OnSelectedAsync">
-    <option value="0">@EmptyLabel</option>
+    <option value="0">@(EmptyLabel ?? L["選択してください"])</option>
     @* 選択済みの項目が今の検索結果に入っていない場合（編集で読み込んだ値など）。
        出さないと選ばれているのに空欄に見える *@
     @if (Value != 0 && !Visible.Any(item => ValueOf(item) == Value))
     {
-        <option value="@Value">@(_selectedLabel ?? "選択中（検索して絞り込むと表示されます）")</option>
+        <option value="@Value">@(_selectedLabel ?? L["選択中（検索して絞り込むと表示されます）"])</option>
     }
     @foreach (var item in Visible)
     {
@@ -18,7 +18,7 @@
 </select>
 @if (_truncated)
 {
-    <span class="text-muted">該当が多いため一部のみ表示しています。コードで絞り込んでください。</span>
+    <span class="text-muted">@L["該当が多いため一部のみ表示しています。コードで絞り込んでください。"]</span>
 }
 
 @code {
@@ -34,8 +34,10 @@
     [Parameter, EditorRequired] public Func<TItem, int> ValueOf { get; set; } = default!;
     [Parameter, EditorRequired] public Func<TItem, string> LabelOf { get; set; } = default!;
 
-    [Parameter] public string EmptyLabel { get; set; } = "選択してください";
-    [Parameter] public string Placeholder { get; set; } = "コードで検索（スキャン可）";
+    /// <summary>未選択の表示。省略時は「選択してください」</summary>
+    [Parameter] public string? EmptyLabel { get; set; }
+    /// <summary>検索欄の案内。省略時は「コードで検索（スキャン可）」</summary>
+    [Parameter] public string? Placeholder { get; set; }
 
     /// <summary>
     /// 取得した選択肢をさらに絞る条件（出荷実行で指図の品目に限る場合など）。
