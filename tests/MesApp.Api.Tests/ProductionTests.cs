@@ -804,5 +804,17 @@ public class ProductionTests
             "/api/dashboard/trend?from=2026-09-07&to=2026-09-01")).StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, (await admin.GetAsync(
             "/api/dashboard/trend?from=2024-01-01&to=2026-09-01&unit=Day")).StatusCode);
+
+        // 区切りの表示名（曜日・合計・直なし）は表示言語で返す。直なしのキーは並び順に使うので訳さない
+        Assert.Equal(["09/06(日)", "09/07(月)"], daily.Rows.Select(r => r.Label));
+        admin.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en");
+        var dailyEn = await admin.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/trend?from=2026-09-06&to=2026-09-07&unit=Day");
+        Assert.Equal(["09/06(Sun)", "09/07(Mon)"], dailyEn!.Rows.Select(r => r.Label));
+        Assert.Equal("Total", dailyEn.Total.Label);
+        var byShiftEn = await admin.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/breakdown?from=2026-08-31&to=2026-09-07&axis=Shift");
+        var noShift = Assert.Single(byShiftEn!.Rows);
+        Assert.Equal((ShiftLabels.NoShift, "(No shift)"), (noShift.Key, noShift.Label));
     }
 }

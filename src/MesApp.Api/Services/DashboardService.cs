@@ -1,4 +1,5 @@
-﻿using MesApp.Api.Localization;
+﻿using System.Globalization;
+using MesApp.Api.Localization;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Constants;
@@ -67,7 +68,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
             {
                 DashboardPeriodUnit.Month => $"{start:yyyy-MM}",
                 DashboardPeriodUnit.Week => $"{from:MM/dd}〜{to:MM/dd}",
-                _ => $"{start:MM/dd}({"日月火水木金土"[(int)start.DayOfWeek]})",
+                _ => $"{start:MM/dd}({start.ToString("ddd", CultureInfo.CurrentUICulture)})", // 曜日は表示言語に合わせる（ja は「月」、en は「Mon」）
             };
             rows.Add(Aggregate($"{start:yyyy-MM-dd}", label, from, to,
                 production.Where(p => p.Date >= from && p.Date <= to),
@@ -117,7 +118,7 @@ public class DashboardService(MesAppDbContext db, IBusinessDateService businessD
         {
             DashboardAxis.Process => (p.ProcessKey, p.ProcessLabel),
             DashboardAxis.Product => (p.ProductKey, p.ProductLabel),
-            DashboardAxis.Shift => (p.ShiftKey ?? ShiftLabels.NoShift, p.ShiftKey ?? ShiftLabels.NoShift),
+            DashboardAxis.Shift => (p.ShiftKey ?? ShiftLabels.NoShift, p.ShiftKey ?? ApiText.T(ShiftLabels.NoShift)), // キーは並び順の判定に使うので訳さない
             DashboardAxis.Line => WorkCenterKey(p.WorkCenterId, toLine: true),
             _ => WorkCenterKey(p.WorkCenterId, toLine: false),
         };

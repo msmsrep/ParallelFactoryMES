@@ -5,20 +5,20 @@
 
 <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage">
     <div class="card">
-        <h2 style="margin-top:0;">保全手順書の作成（E-10-20。更新で版数が上がります）</h2>
+        <h2 style="margin-top:0;">@L["保全手順書の作成（E-10-20。更新で版数が上がります）"]</h2>
         <div class="form-grid">
             <div class="form-field">
-                <label>手順書番号</label>
+                <label>@L["手順書番号"]</label>
                 <input @bind="_procedure.ProcedureNo" />
             </div>
             <div class="form-field">
-                <label>表題</label>
+                <label>@L["表題"]</label>
                 <input @bind="_procedure.Title" />
             </div>
             <div class="form-field">
-                <label>対象設備</label>
+                <label>@L["対象設備"]</label>
                 <select @bind="_procedure.EquipmentId">
-                    <option value="0">なし</option>
+                    <option value="0">@L["なし"]</option>
                     @foreach (var equipment in _equipments)
                     {
                         <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
@@ -26,9 +26,9 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>対象治工具</label>
+                <label>@L["対象治工具"]</label>
                 <select @bind="_procedure.ToolId">
-                    <option value="0">なし</option>
+                    <option value="0">@L["なし"]</option>
                     @foreach (var tool in _tools)
                     {
                         <option value="@tool.Id">@tool.Code @tool.Name</option>
@@ -37,22 +37,22 @@
             </div>
         </div>
         <div class="form-field">
-            <label>手順ステップ</label>
+            <label>@L["手順ステップ"]</label>
             <textarea rows="4" @bind="_procedure.Steps"></textarea>
         </div>
-        <button class="btn mt-2" disabled="@_busy" @onclick="CreateProcedureAsync">手順書を登録</button>
+        <button class="btn mt-2" disabled="@_busy" @onclick="CreateProcedureAsync">@L["手順書を登録"]</button>
     </div>
 </AuthorizeView>
 
 <div class="card">
     @if (_procedures.Count == 0)
     {
-        <p class="text-muted">保全手順書はありません。</p>
+        <p class="text-muted">@L["保全手順書はありません。"]</p>
     }
     else
     {
         <table class="table">
-            <thead><tr><th>手順書番号</th><th>表題</th><th>対象</th><th>版数</th><th>手順</th></tr></thead>
+            <thead><tr><th>@L["手順書番号"]</th><th>@L["表題"]</th><th>@L["対象"]</th><th>@L["版数"]</th><th>@L["手順"]</th></tr></thead>
             <tbody>
                 @foreach (var procedure in _procedures)
                 {
@@ -104,7 +104,7 @@
     {
         if (string.IsNullOrWhiteSpace(_procedure.ProcedureNo) || string.IsNullOrWhiteSpace(_procedure.Steps))
         {
-            _error = "手順書番号と手順ステップを入力してください。";
+            _error = L["手順書番号と手順ステップを入力してください。"];
             return;
         }
         _busy = true;
@@ -117,12 +117,12 @@
                     _procedure.EquipmentId == 0 ? null : _procedure.EquipmentId,
                     _procedure.ToolId == 0 ? null : _procedure.ToolId,
                     _procedure.Steps));
-            if (await response.ReadErrorAsync("登録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["登録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "保全手順書を登録しました。";
+            _message = L["保全手順書を登録しました。"];
             _procedure.ProcedureNo = string.Empty;
             _procedure.Title = string.Empty;
             _procedure.Steps = string.Empty;

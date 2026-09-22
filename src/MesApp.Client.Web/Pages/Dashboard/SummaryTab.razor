@@ -6,55 +6,56 @@
 
 <Notice Error="@_error" />
 
-<h2>@(_range is { Unit: DashboardPeriodUnit.Day } && _range.From == _today ? "当日の実績" : "期間の実績")</h2>
+<h2>@(_range is { Unit: DashboardPeriodUnit.Day } && _range.From == _today ? L["当日の実績"] : L["期間の実績"])</h2>
 @if (_loading)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else if (_current is { } now)
 {
     var before = _previous;
     <div class="kpi-tiles">
-        <KpiTile Label="良品数" Value="@ChartScale.Number(now.GoodQuantity)"
+        <KpiTile Label="@L["良品数"]" Value="@ChartScale.Number(now.GoodQuantity)"
                  Delta="@(now.GoodQuantity - before?.GoodQuantity)" DeltaLabel="@DeltaLabel" HighIsBad="false" />
-        <KpiTile Label="不良数" Value="@ChartScale.Number(now.DefectQuantity)"
+        <KpiTile Label="@L["不良数"]" Value="@ChartScale.Number(now.DefectQuantity)"
                  Delta="@(now.DefectQuantity - before?.DefectQuantity)" DeltaLabel="@DeltaLabel" HighIsBad="true" />
-        <KpiTile Label="不良率" Value="@now.DefectRate?.ToString("0.##")" Unit="%"
+        <KpiTile Label="@L["不良率"]" Value="@now.DefectRate?.ToString("0.##")" Unit="%"
                  Delta="@(now.DefectRate - before?.DefectRate)" DeltaUnit="pt" DeltaLabel="@DeltaLabel" HighIsBad="true" />
-        <KpiTile Label="設備稼働率" Value="@now.UtilizationRate?.ToString("0.##")" Unit="%" EmptyText="記録なし"
+        <KpiTile Label="@L["設備稼働率"]" Value="@now.UtilizationRate?.ToString("0.##")" Unit="%" EmptyText="@L["記録なし"]"
                  Delta="@(now.UtilizationRate - before?.UtilizationRate)" DeltaUnit="pt" DeltaLabel="@DeltaLabel" HighIsBad="false">
             @if (now.UtilizationRate is { } utilization)
             {
-                <DonutGauge Value="utilization" Title="設備稼働率" />
+                <DonutGauge Value="utilization" Title="@L["設備稼働率"]" />
             }
         </KpiTile>
-        <KpiTile Label="検査 合格 / 不合格" Value="@($"{now.InspectionPassCount} / {now.InspectionFailCount}")" Unit="件">
+        <KpiTile Label="@L["検査 合格 / 不合格"]" Value="@($"{now.InspectionPassCount} / {now.InspectionFailCount}")" Unit="@L["件"]">
             @if (now.InspectionPassRate is { } passRate)
             {
-                <DonutGauge Value="passRate" Title="検査合格率" />
+                <DonutGauge Value="passRate" Title="@L["検査合格率"]" />
             }
         </KpiTile>
-        <KpiTile Label="未クローズの不適合" Value="@now.OpenNonconformanceCount.ToString()" Unit="件">
+        <KpiTile Label="@L["未クローズの不適合"]" Value="@now.OpenNonconformanceCount.ToString()" Unit="@L["件"]">
             @if (now.OpenNonconformanceCount > 0)
             {
-                <a class="badge badge-warning" href="nonconformances">要対応</a>
+                <a class="badge badge-warning" href="nonconformances">@L["要対応"]</a>
             }
         </KpiTile>
     </div>
     <p class="text-muted">
-        @DeltaLabel は直前の@(EnumLabels.Of(_range!.Unit).TrimEnd('次'))との差（率は%ポイント）。未クローズの不適合は期間中に起票されて未クローズのもの。
-        日・週・月の推移は「推移」タブ、工程・品目・直・ライン・設備ごとの内訳は「内訳」タブで見る。不良理由・停止原因は<a href="quality-analysis">品質分析</a>・<a href="maintenance">設備保全</a>で確認する。
+        @L["{0} は直前の期間との差（率は%ポイント）。未クローズの不適合は期間中に起票されて未クローズのもの。", DeltaLabel]
+        @L["日・週・月の推移は「推移」タブ、工程・品目・直・ライン・設備ごとの内訳は「内訳」タブで見る。"]
+        @L["不良理由・停止原因は"]<a href="quality-analysis">@L["品質分析"]</a>@L["・"]<a href="maintenance">@L["設備保全"]</a>@L["で確認する。"]
     </p>
 }
 
-<h2>生産進捗（A-30-10-01）</h2>
+<h2>@L["生産進捗（A-30-10-01）"]</h2>
 @if (_progress is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else if (_progress.Count == 0)
 {
-    <p class="text-muted">進行中の製造指図はありません。</p>
+    <p class="text-muted">@L["進行中の製造指図はありません。"]</p>
 }
 else
 {
@@ -63,25 +64,25 @@ else
         <p>
             @if (_overdueCount > 0)
             {
-                <span class="badge badge-danger">納期超過の指図 @_overdueCount 件</span>
+                <span class="badge badge-danger">@L["納期超過の指図 {0} 件", _overdueCount]</span>
                 <span>&nbsp;</span>
             }
             @if (_delayCount > 0)
             {
                 @* 工程レベルの遅れ（A-30-20-01）。内訳は工程進捗画面で見る *@
-                <a class="badge badge-warning" href="process-progress">遅れている作業指示 @_delayCount 件</a>
+                <a class="badge badge-warning" href="process-progress">@L["遅れている作業指示 {0} 件", _delayCount]</a>
             }
         </p>
     }
     <table class="table">
         <thead>
             <tr>
-                <th>指図番号</th>
-                <th>品目</th>
-                <th>数量</th>
-                <th>納期</th>
-                <th>状態</th>
-                <th>工程進捗</th>
+                <th>@L["指図番号"]</th>
+                <th>@L["品目"]</th>
+                <th>@L["数量"]</th>
+                <th>@L["納期"]</th>
+                <th>@L["状態"]</th>
+                <th>@L["工程進捗"]</th>
                 <th></th>
             </tr>
         </thead>
@@ -96,16 +97,16 @@ else
                         @(row.DueDate?.ToString("yyyy-MM-dd") ?? "-")
                         @if (row.IsOverdue)
                         {
-                            <span class="badge badge-danger">納期超過</span>
+                            <span class="badge badge-danger">@L["納期超過"]</span>
                         }
                     </td>
                     <td><StatusBadge Status="@row.Status.ToString()" /></td>
                     <td>
                         <progress value="@row.CompletedWorkOrderCount" max="@Math.Max(row.WorkOrderCount, 1)"
-                                  aria-label="工程進捗"></progress>
-                        @row.CompletedWorkOrderCount / @row.WorkOrderCount 工程完了
+                                  aria-label="@L["工程進捗"]"></progress>
+                        @L["{0} / {1} 工程完了", row.CompletedWorkOrderCount, row.WorkOrderCount]
                     </td>
-                    <td><a class="btn btn-secondary btn-sm" href="manufacturing-orders/@row.Id">詳細</a></td>
+                    <td><a class="btn btn-secondary btn-sm" href="manufacturing-orders/@row.Id">@L["詳細"]</a></td>
                 </tr>
             }
         </tbody>
@@ -143,9 +144,9 @@ else
 
     private string DeltaLabel => _range?.Unit switch
     {
-        DashboardPeriodUnit.Week => "前週比",
-        DashboardPeriodUnit.Month => "前月比",
-        _ => "前日比",
+        DashboardPeriodUnit.Week => L["前週比"],
+        DashboardPeriodUnit.Month => L["前月比"],
+        _ => L["前日比"],
     };
 
     protected override async Task OnInitializedAsync()
@@ -193,7 +194,7 @@ else
             {
                 // KPIが取れなくても進捗一覧は見せる（ダッシュボードが丸ごと落ちないようにする）
                 _current = null;
-                _error = "期間の実績の集計を取得できませんでした。時間をおいて再読込してください。";
+                _error = L["期間の実績の集計を取得できませんでした。時間をおいて再読込してください。"];
             }
         }
         finally

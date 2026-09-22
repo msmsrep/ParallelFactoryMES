@@ -3,14 +3,14 @@
 @page "/"
 @attribute [Authorize]
 
-<PageTitle>ダッシュボード - Parallel Factory MES</PageTitle>
+<PageTitle>@L["ダッシュボード - Parallel Factory MES"]</PageTitle>
 
-<h1>ダッシュボード</h1>
+<h1>@L["ダッシュボード"]</h1>
 
 <div class="tabs">
-    <button class="@TabClass("summary")" @onclick='() => _tab = "summary"'>サマリ</button>
-    <button class="@TabClass("trend")" @onclick='() => _tab = "trend"'>推移（日・週・月）</button>
-    <button class="@TabClass("breakdown")" @onclick='() => _tab = "breakdown"'>内訳（工程・品目・直・ライン・設備）</button>
+    <button class="@TabClass("summary")" @onclick='() => _tab = "summary"'>@L["サマリ"]</button>
+    <button class="@TabClass("trend")" @onclick='() => _tab = "trend"'>@L["推移（日・週・月）"]</button>
+    <button class="@TabClass("breakdown")" @onclick='() => _tab = "breakdown"'>@L["内訳（工程・品目・直・ライン・設備）"]</button>
 </div>
 
 @* タブの中身はそれぞれが自分で読み込む（MastersPage と同じ形） *@

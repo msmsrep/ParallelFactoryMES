@@ -1,17 +1,17 @@
 ﻿@page "/maintenance"
 @attribute [Authorize]
 
-<PageTitle>設備保全 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["設備保全 - Parallel Factory MES"]</PageTitle>
 
-<h1>設備保全</h1>
-<p class="text-muted">稼働履歴・稼働率（B-40-20、E-20-10）、保全計画（E-30-10）、保全指示・実績（E-30-20〜E-40-30）、保全手順書（E-10-20）。</p>
+<h1>@L["設備保全"]</h1>
+<p class="text-muted">@L["稼働履歴・稼働率（B-40-20、E-20-10）、保全計画（E-30-10）、保全指示・実績（E-30-20〜E-40-30）、保全手順書（E-10-20）。"]</p>
 
 <div class="tabs">
-    <button class="@TabClass("logs")" @onclick='() => _tab = "logs"'>稼働監視</button>
-    <button class="@TabClass("plans")" @onclick='() => _tab = "plans"'>保全計画</button>
-    <button class="@TabClass("orders")" @onclick='() => _tab = "orders"'>保全指示・実績</button>
-    <button class="@TabClass("procedures")" @onclick='() => _tab = "procedures"'>保全手順書</button>
-    <button class="@TabClass("parts")" @onclick='() => _tab = "parts"'>消耗材モニタリング</button>
+    <button class="@TabClass("logs")" @onclick='() => _tab = "logs"'>@L["稼働監視"]</button>
+    <button class="@TabClass("plans")" @onclick='() => _tab = "plans"'>@L["保全計画"]</button>
+    <button class="@TabClass("orders")" @onclick='() => _tab = "orders"'>@L["保全指示・実績"]</button>
+    <button class="@TabClass("procedures")" @onclick='() => _tab = "procedures"'>@L["保全手順書"]</button>
+    <button class="@TabClass("parts")" @onclick='() => _tab = "parts"'>@L["消耗材モニタリング"]</button>
 </div>
 
 @* タブの中身はそれぞれが自分で読み込む（MastersPage と同じ形）。

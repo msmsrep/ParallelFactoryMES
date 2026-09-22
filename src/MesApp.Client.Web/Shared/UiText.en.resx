@@ -3291,4 +3291,523 @@
   <data name="検査履歴" xml:space="preserve">
     <value>Inspection history</value>
   </data>
+  <data name="設備保全 - Parallel Factory MES" xml:space="preserve">
+    <value>Equipment Maintenance - Parallel Factory MES</value>
+  </data>
+  <data name="稼働履歴・稼働率（B-40-20、E-20-10）、保全計画（E-30-10）、保全指示・実績（E-30-20〜E-40-30）、保全手順書（E-10-20）。" xml:space="preserve">
+    <value>Operation history and utilization (B-40-20, E-20-10), maintenance plans (E-30-10), maintenance orders and records (E-30-20 to E-40-30), maintenance procedures (E-10-20).</value>
+  </data>
+  <data name="稼働監視" xml:space="preserve">
+    <value>Operation monitoring</value>
+  </data>
+  <data name="保全計画" xml:space="preserve">
+    <value>Maintenance plans</value>
+  </data>
+  <data name="保全指示・実績" xml:space="preserve">
+    <value>Orders and records</value>
+  </data>
+  <data name="保全手順書" xml:space="preserve">
+    <value>Procedures</value>
+  </data>
+  <data name="消耗材モニタリング" xml:space="preserve">
+    <value>Consumables monitoring</value>
+  </data>
+  <data name="稼働実績の記録（手入力。センサー自動収集は将来拡張）" xml:space="preserve">
+    <value>Record operation (manual entry; automatic sensor collection is a future extension)</value>
+  </data>
+  <data name="対象作業指示（任意）" xml:space="preserve">
+    <value>Work order (optional)</value>
+  </data>
+  <data name="（なし）" xml:space="preserve">
+    <value>(none)</value>
+  </data>
+  <data name="停止原因（停止・故障時は必須）" xml:space="preserve">
+    <value>Stop cause (required for stop / breakdown)</value>
+  </data>
+  <data name="稼働実績を記録" xml:space="preserve">
+    <value>Record operation</value>
+  </data>
+  <data name="設備別 稼働サマリ（E-20-10-03）" xml:space="preserve">
+    <value>Operation summary by equipment (E-20-10-03)</value>
+  </data>
+  <data name="終了時刻まで記録された稼働実績がありません。" xml:space="preserve">
+    <value>No operation records with an end time.</value>
+  </data>
+  <data name="稼働(h)" xml:space="preserve">
+    <value>Running (h)</value>
+  </data>
+  <data name="停止(h)" xml:space="preserve">
+    <value>Stopped (h)</value>
+  </data>
+  <data name="段取り(h)" xml:space="preserve">
+    <value>Setup (h)</value>
+  </data>
+  <data name="故障(h)" xml:space="preserve">
+    <value>Breakdown (h)</value>
+  </data>
+  <data name="アイドル(h)" xml:space="preserve">
+    <value>Idle (h)</value>
+  </data>
+  <data name="故障回数" xml:space="preserve">
+    <value>Breakdowns</value>
+  </data>
+  <data name="時間稼働率" xml:space="preserve">
+    <value>Availability</value>
+  </data>
+  <data name="設備総合効率 OEE（E-20-30-03）" xml:space="preserve">
+    <value>Overall equipment effectiveness (OEE, E-20-30-03)</value>
+  </data>
+  <data name="負荷(h)" xml:space="preserve">
+    <value>Loading (h)</value>
+  </data>
+  <data name="産出数" xml:space="preserve">
+    <value>Output</value>
+  </data>
+  <data name="性能稼働率" xml:space="preserve">
+    <value>Performance</value>
+  </data>
+  <data name="良品率" xml:space="preserve">
+    <value>Quality rate</value>
+  </data>
+  <data name="カバー率" xml:space="preserve">
+    <value>Coverage</value>
+  </data>
+  <data name="OEE＝時間稼働率×性能稼働率×良品率。" xml:space="preserve">
+    <value>OEE = availability × performance × quality rate.</value>
+  </data>
+  <data name="性能稼働率と良品率は作業指示に紐づけて記録した稼働からしか出せないため、紐付けのない稼働は対象外にしています（どれだけを見られているかがカバー率）。" xml:space="preserve">
+    <value>Performance and quality rate can only be calculated from operation records linked to a work order, so unlinked records are excluded (coverage shows how much is included).</value>
+  </data>
+  <data name="算出できない項目は「-」で、0%としては扱いません。" xml:space="preserve">
+    <value>Values that cannot be calculated are shown as "-" and are not treated as 0%.</value>
+  </data>
+  <data name="理論サイクルタイムは指図展開時に固定した標準作業時間（1個あたり）で、標準より速ければ性能稼働率は100%を超えます。" xml:space="preserve">
+    <value>The ideal cycle time is the standard time per unit fixed when the order was released; performance exceeds 100% when work is faster than standard.</value>
+  </data>
+  <data name="稼働履歴" xml:space="preserve">
+    <value>Operation history</value>
+  </data>
+  <data name="停止原因" xml:space="preserve">
+    <value>Stop cause</value>
+  </data>
+  <data name="稼働履歴はありません。" xml:space="preserve">
+    <value>No operation history.</value>
+  </data>
+  <data name="設備を選択してください。" xml:space="preserve">
+    <value>Select equipment.</value>
+  </data>
+  <data name="稼働実績を記録しました。" xml:space="preserve">
+    <value>Operation recorded.</value>
+  </data>
+  <data name="保全指示の作成（計画保全は保全担当、突発依頼は全ユーザー可。E-30-30-01）" xml:space="preserve">
+    <value>Create maintenance order (planned maintenance by maintenance staff; breakdown requests by any user, E-30-30-01)</value>
+  </data>
+  <data name="対象治工具（E-60-30）" xml:space="preserve">
+    <value>Tool (E-60-30)</value>
+  </data>
+  <data name="依頼区分" xml:space="preserve">
+    <value>Request type</value>
+  </data>
+  <data name="手順書" xml:space="preserve">
+    <value>Procedure</value>
+  </data>
+  <data name="予定日" xml:space="preserve">
+    <value>Scheduled date</value>
+  </data>
+  <data name="依頼内容" xml:space="preserve">
+    <value>Request details</value>
+  </data>
+  <data name="保全指示を作成" xml:space="preserve">
+    <value>Create maintenance order</value>
+  </data>
+  <data name="保全指示・実績一覧（E-20-30-01〜02）" xml:space="preserve">
+    <value>Maintenance orders and records (E-20-30-01 to 02)</value>
+  </data>
+  <data name="保全指示はありません。" xml:space="preserve">
+    <value>No maintenance orders.</value>
+  </data>
+  <data name="対象：{0}" xml:space="preserve">
+    <value>Target: {0}</value>
+  </data>
+  <data name="／手順書 {0}" xml:space="preserve">
+    <value>/ Procedure {0}</value>
+  </data>
+  <data name="／予定日 {0}" xml:space="preserve">
+    <value>/ Scheduled {0}</value>
+  </data>
+  <data name="消費部材" xml:space="preserve">
+    <value>Parts consumed</value>
+  </data>
+  <data name="消費部材・交換部品" xml:space="preserve">
+    <value>Parts consumed / replaced</value>
+  </data>
+  <data name="寿命カウンタをリセット（E-60-30）" xml:space="preserve">
+    <value>Reset life counter (E-60-30)</value>
+  </data>
+  <data name="消費部材（在庫から引き落とす）" xml:space="preserve">
+    <value>Parts consumed (deducted from stock)</value>
+  </data>
+  <data name="消費ロット（スキャン可）" xml:space="preserve">
+    <value>Lot consumed (scannable)</value>
+  </data>
+  <data name="この行を削除" xml:space="preserve">
+    <value>Remove this line</value>
+  </data>
+  <data name="消費部材の行を追加" xml:space="preserve">
+    <value>Add part line</value>
+  </data>
+  <data name="保全実績を登録" xml:space="preserve">
+    <value>Register maintenance record</value>
+  </data>
+  <data name="保全指示を作成しました。" xml:space="preserve">
+    <value>Maintenance order created.</value>
+  </data>
+  <data name="保全実績を登録しました（指示は完了になります）。" xml:space="preserve">
+    <value>Maintenance record registered (the order is now completed).</value>
+  </data>
+  <data name="保全指示を取消しました。" xml:space="preserve">
+    <value>Maintenance order canceled.</value>
+  </data>
+  <data name="消耗材の消費実績（E-20-10-04）" xml:space="preserve">
+    <value>Consumables usage (E-20-10-04)</value>
+  </data>
+  <data name="保全実績で在庫から引き落とした部材の集計。現在庫と見比べて補充の要否を判断する。" xml:space="preserve">
+    <value>Parts deducted from stock by maintenance records. Compare with current stock to decide whether to replenish.</value>
+  </data>
+  <data name="開始日" xml:space="preserve">
+    <value>Start date</value>
+  </data>
+  <data name="終了日" xml:space="preserve">
+    <value>End date</value>
+  </data>
+  <data name="該当期間の消費実績はありません。" xml:space="preserve">
+    <value>No usage in this period.</value>
+  </data>
+  <data name="消費数量" xml:space="preserve">
+    <value>Qty consumed</value>
+  </data>
+  <data name="保全件数" xml:space="preserve">
+    <value>Maintenance count</value>
+  </data>
+  <data name="保全計画の作成（E-30-10）" xml:space="preserve">
+    <value>Create maintenance plan (E-30-10)</value>
+  </data>
+  <data name="保全種別" xml:space="preserve">
+    <value>Maintenance type</value>
+  </data>
+  <data name="計画年度" xml:space="preserve">
+    <value>Plan year</value>
+  </data>
+  <data name="周期（日数）" xml:space="preserve">
+    <value>Cycle (days)</value>
+  </data>
+  <data name="計画を作成" xml:space="preserve">
+    <value>Create plan</value>
+  </data>
+  <data name="保全計画はありません。" xml:space="preserve">
+    <value>No maintenance plans.</value>
+  </data>
+  <data name="年度" xml:space="preserve">
+    <value>Year</value>
+  </data>
+  <data name="周期" xml:space="preserve">
+    <value>Cycle</value>
+  </data>
+  <data name="保全指示を発行" xml:space="preserve">
+    <value>Issue maintenance order</value>
+  </data>
+  <data name="保全計画を作成しました。" xml:space="preserve">
+    <value>Maintenance plan created.</value>
+  </data>
+  <data name="保全指示を発行しました。" xml:space="preserve">
+    <value>Maintenance order issued.</value>
+  </data>
+  <data name="保全手順書の作成（E-10-20。更新で版数が上がります）" xml:space="preserve">
+    <value>Create maintenance procedure (E-10-20; updating increments the version)</value>
+  </data>
+  <data name="対象治工具" xml:space="preserve">
+    <value>Tool</value>
+  </data>
+  <data name="手順書を登録" xml:space="preserve">
+    <value>Register procedure</value>
+  </data>
+  <data name="保全手順書はありません。" xml:space="preserve">
+    <value>No maintenance procedures.</value>
+  </data>
+  <data name="手順書番号と手順ステップを入力してください。" xml:space="preserve">
+    <value>Enter the procedure number and steps.</value>
+  </data>
+  <data name="保全手順書を登録しました。" xml:space="preserve">
+    <value>Maintenance procedure registered.</value>
+  </data>
+  <data name="ダッシュボード - Parallel Factory MES" xml:space="preserve">
+    <value>Dashboard - Parallel Factory MES</value>
+  </data>
+  <data name="推移（日・週・月）" xml:space="preserve">
+    <value>Trend (day / week / month)</value>
+  </data>
+  <data name="内訳（工程・品目・直・ライン・設備）" xml:space="preserve">
+    <value>Breakdown (process / item / shift / line / equipment)</value>
+  </data>
+  <data name="内訳の軸" xml:space="preserve">
+    <value>Breakdown by</value>
+  </data>
+  <data name="{0}別" xml:space="preserve">
+    <value>By {0}</value>
+  </data>
+  <data name="上位（工場・ライン・エリア）を選ぶと配下をまとめて集計する" xml:space="preserve">
+    <value>Selecting a parent (plant / line / area) aggregates everything under it</value>
+  </data>
+  <data name="設備別では生産数・不良率を出していません（設備は差立で決まり作業指示に固定されないため、生産実績を設備へ分けられない）。" xml:space="preserve">
+    <value>Production and defect rate are not shown by equipment (equipment is decided at dispatch and not fixed on the work order, so production cannot be split by equipment).</value>
+  </data>
+  <data name="{0}別では稼働率を出していません（稼働記録は設備単位で、作業指示との紐付けが任意のため）。稼働率はライン・作業区・設備別で見る。" xml:space="preserve">
+    <value>Utilization is not shown by {0} (operation records are per equipment and linking them to work orders is optional). View utilization by line, work center or equipment.</value>
+  </data>
+  <data name="この期間の実績はありません。" xml:space="preserve">
+    <value>No records in this period.</value>
+  </data>
+  <data name="{0}別の生産数" xml:space="preserve">
+    <value>Production by {0}</value>
+  </data>
+  <data name="{0}別の良品数・不良数" xml:space="preserve">
+    <value>Good and defect quantity by {0}</value>
+  </data>
+  <data name="不良率 {0:0.##}%" xml:space="preserve">
+    <value>Defect rate {0:0.##}%</value>
+  </data>
+  <data name="{0}別の設備稼働率" xml:space="preserve">
+    <value>Equipment utilization by {0}</value>
+  </data>
+  <data name="故障 {0} 件" xml:space="preserve">
+    <value>{0} breakdowns</value>
+  </data>
+  <data name="設備稼働率" xml:space="preserve">
+    <value>Equipment utilization</value>
+  </data>
+  <data name="稼働時間 / 記録時間" xml:space="preserve">
+    <value>Running / recorded hours</value>
+  </data>
+  <data name="故障件数" xml:space="preserve">
+    <value>Breakdowns</value>
+  </data>
+  <data name="記録なし" xml:space="preserve">
+    <value>No records</value>
+  </data>
+  <data name="（上位{0}件。全{1}件は下の表）" xml:space="preserve">
+    <value>(top {0}; all {1} in the table below)</value>
+  </data>
+  <data name="内訳の集計を取得できませんでした。" xml:space="preserve">
+    <value>Could not load the breakdown.</value>
+  </data>
+  <data name="集計単位" xml:space="preserve">
+    <value>Period unit</value>
+  </data>
+  <data name="◀ 前へ" xml:space="preserve">
+    <value>◀ Previous</value>
+  </data>
+  <data name="基準日" xml:space="preserve">
+    <value>Reference date</value>
+  </data>
+  <data name="次へ ▶" xml:space="preserve">
+    <value>Next ▶</value>
+  </data>
+  <data name="今日" xml:space="preserve">
+    <value>Today</value>
+  </data>
+  <data name="今日＝製造日 {0}（{1}時境界。夜勤の日跨ぎ実績も開始した製造日に集計する。週は月曜始まり）" xml:space="preserve">
+    <value>Today = production date {0} (day boundary at {1}:00; night-shift records crossing midnight count toward the production date they started on; weeks start on Monday)</value>
+  </data>
+  <data name="製造日を取得できなかったため、端末の日付で表示しています。" xml:space="preserve">
+    <value>Could not get the production date, so the device date is used.</value>
+  </data>
+  <data name="当日の実績" xml:space="preserve">
+    <value>Today's results</value>
+  </data>
+  <data name="期間の実績" xml:space="preserve">
+    <value>Results for the period</value>
+  </data>
+  <data name="件" xml:space="preserve">
+    <value>cases</value>
+  </data>
+  <data name="検査合格率" xml:space="preserve">
+    <value>Inspection pass rate</value>
+  </data>
+  <data name="{0} は直前の期間との差（率は%ポイント）。未クローズの不適合は期間中に起票されて未クローズのもの。" xml:space="preserve">
+    <value>{0} is the difference from the previous period (rates in percentage points). Open nonconformances are those raised in the period and not yet closed.</value>
+  </data>
+  <data name="日・週・月の推移は「推移」タブ、工程・品目・直・ライン・設備ごとの内訳は「内訳」タブで見る。" xml:space="preserve">
+    <value>See daily, weekly and monthly trends in the "Trend" tab, and breakdowns by process, item, shift, line and equipment in the "Breakdown" tab.</value>
+  </data>
+  <data name="不良理由・停止原因は" xml:space="preserve">
+    <value>Check defect reasons and stop causes in </value>
+  </data>
+  <data name="・" xml:space="preserve">
+    <value> / </value>
+  </data>
+  <data name="で確認する。" xml:space="preserve">
+    <value>.</value>
+  </data>
+  <data name="生産進捗（A-30-10-01）" xml:space="preserve">
+    <value>Production progress (A-30-10-01)</value>
+  </data>
+  <data name="進行中の製造指図はありません。" xml:space="preserve">
+    <value>No manufacturing orders in progress.</value>
+  </data>
+  <data name="納期超過の指図 {0} 件" xml:space="preserve">
+    <value>{0} overdue orders</value>
+  </data>
+  <data name="遅れている作業指示 {0} 件" xml:space="preserve">
+    <value>{0} delayed work orders</value>
+  </data>
+  <data name="工程進捗" xml:space="preserve">
+    <value>Process progress</value>
+  </data>
+  <data name="{0} / {1} 工程完了" xml:space="preserve">
+    <value>{0} / {1} processes completed</value>
+  </data>
+  <data name="前週比" xml:space="preserve">
+    <value>vs. previous week</value>
+  </data>
+  <data name="前月比" xml:space="preserve">
+    <value>vs. previous month</value>
+  </data>
+  <data name="前日比" xml:space="preserve">
+    <value>vs. previous day</value>
+  </data>
+  <data name="期間の実績の集計を取得できませんでした。時間をおいて再読込してください。" xml:space="preserve">
+    <value>Could not load the results for the period. Please reload later.</value>
+  </data>
+  <data name="全工程" xml:space="preserve">
+    <value>All processes</value>
+  </data>
+  <data name="全品目" xml:space="preserve">
+    <value>All items</value>
+  </data>
+  <data name="工程・品目で絞り込んでいるため稼働率は出していません（稼働記録と作業指示の紐付けは任意のため、工程・品目では稼働を正しく分けられない）。" xml:space="preserve">
+    <value>Utilization is not shown when filtering by process or item (linking operation records to work orders is optional, so operation cannot be split correctly by process or item).</value>
+  </data>
+  <data name="生産数と不良率" xml:space="preserve">
+    <value>Production and defect rate</value>
+  </data>
+  <data name="期間ごとの良品数・不良数と不良率" xml:space="preserve">
+    <value>Good and defect quantity and defect rate by period</value>
+  </data>
+  <data name="設備稼働率と故障件数" xml:space="preserve">
+    <value>Equipment utilization and breakdowns</value>
+  </data>
+  <data name="期間ごとの設備稼働率と故障件数" xml:space="preserve">
+    <value>Equipment utilization and breakdowns by period</value>
+  </data>
+  <data name="期間" xml:space="preserve">
+    <value>Period</value>
+  </data>
+  <data name="推移の集計を取得できませんでした。" xml:space="preserve">
+    <value>Could not load the trend.</value>
+  </data>
+  <data name="治工具管理 - Parallel Factory MES" xml:space="preserve">
+    <value>Tool Management - Parallel Factory MES</value>
+  </data>
+  <data name="利用実績の記録（E-60-20-01）、寿命通知（-02）、寿命分析（-03）。治工具マスタはマスタ管理、メンテナンス記録は設備保全から行います。" xml:space="preserve">
+    <value>Usage records (E-60-20-01), life notifications (-02), life analysis (-03). Tool masters are maintained under Masters, and maintenance records under Equipment Maintenance.</value>
+  </data>
+  <data name="利用実績の記録" xml:space="preserve">
+    <value>Record usage</value>
+  </data>
+  <data name="関連作業指示" xml:space="preserve">
+    <value>Related work order</value>
+  </data>
+  <data name="使用回数" xml:space="preserve">
+    <value>Shots</value>
+  </data>
+  <data name="使用時間（h）" xml:space="preserve">
+    <value>Hours used (h)</value>
+  </data>
+  <data name="利用実績を記録" xml:space="preserve">
+    <value>Record usage</value>
+  </data>
+  <data name="寿命ステータス（E-60-20-02：80%で交換時期接近、100%で要交換）" xml:space="preserve">
+    <value>Life status (E-60-20-02: replacement due soon at 80%, replace at 100%)</value>
+  </data>
+  <data name="警告・要交換のみ表示" xml:space="preserve">
+    <value>Warnings / replace only</value>
+  </data>
+  <data name="対象の治工具はありません。" xml:space="preserve">
+    <value>No tools.</value>
+  </data>
+  <data name="使用時間" xml:space="preserve">
+    <value>Hours used</value>
+  </data>
+  <data name="寿命消化率" xml:space="preserve">
+    <value>Life used</value>
+  </data>
+  <data name="通知" xml:space="preserve">
+    <value>Notice</value>
+  </data>
+  <data name="最終リセット" xml:space="preserve">
+    <value>Last reset</value>
+  </data>
+  <data name="閾値未設定" xml:space="preserve">
+    <value>No threshold</value>
+  </data>
+  <data name="要交換・廃棄" xml:space="preserve">
+    <value>Replace / scrap</value>
+  </data>
+  <data name="交換時期接近" xml:space="preserve">
+    <value>Replacement due soon</value>
+  </data>
+  <data name="寿命分析（E-60-20-03）" xml:space="preserve">
+    <value>Life analysis (E-60-20-03)</value>
+  </data>
+  <data name="分析" xml:space="preserve">
+    <value>Analyze</value>
+  </data>
+  <data name="有効な治工具がありません。" xml:space="preserve">
+    <value>No active tools.</value>
+  </data>
+  <data name="寿命閾値" xml:space="preserve">
+    <value>Life threshold</value>
+  </data>
+  <data name="累計" xml:space="preserve">
+    <value>Total</value>
+  </data>
+  <data name="残り" xml:space="preserve">
+    <value>Remaining</value>
+  </data>
+  <data name="期間内の使用" xml:space="preserve">
+    <value>Used in period</value>
+  </data>
+  <data name="使用日数" xml:space="preserve">
+    <value>Days used</value>
+  </data>
+  <data name="1日平均" xml:space="preserve">
+    <value>Avg. per day</value>
+  </data>
+  <data name="指示1件平均" xml:space="preserve">
+    <value>Avg. per order</value>
+  </data>
+  <data name="寿命到達見込み" xml:space="preserve">
+    <value>Expected end of life</value>
+  </data>
+  <data name="1日平均は「使用実績のあった日」で割る（稼働しない日を含めると余裕があるように見えるため）。" xml:space="preserve">
+    <value>The daily average is divided by days with usage (including idle days would make the remaining life look longer).</value>
+  </data>
+  <data name="寿命閾値が未設定・期間内に使用が無い・すでに寿命到達のものは見込みを出さない（「-」）。" xml:space="preserve">
+    <value>No estimate ("-") is shown when there is no life threshold, no usage in the period, or the life is already reached.</value>
+  </data>
+  <data name="引当中・払出中の治工具（B-20-30）" xml:space="preserve">
+    <value>Allocated / issued tools (B-20-30)</value>
+  </data>
+  <data name="引当中・払出中の治工具はありません。" xml:space="preserve">
+    <value>No allocated or issued tools.</value>
+  </data>
+  <data name="利用実績履歴" xml:space="preserve">
+    <value>Usage history</value>
+  </data>
+  <data name="利用実績はありません。" xml:space="preserve">
+    <value>No usage records.</value>
+  </data>
+  <data name="利用実績を記録しました。" xml:space="preserve">
+    <value>Usage recorded.</value>
+  </data>
 </root>

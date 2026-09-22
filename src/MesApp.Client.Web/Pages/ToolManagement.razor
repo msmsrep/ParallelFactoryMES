@@ -2,20 +2,20 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<PageTitle>治工具管理 - Parallel Factory MES</PageTitle>
+<PageTitle>@L["治工具管理 - Parallel Factory MES"]</PageTitle>
 
-<h1>治工具管理</h1>
-<p class="text-muted">利用実績の記録（E-60-20-01）、寿命通知（-02）、寿命分析（-03）。治工具マスタはマスタ管理、メンテナンス記録は設備保全から行います。</p>
+<h1>@L["治工具管理"]</h1>
+<p class="text-muted">@L["利用実績の記録（E-60-20-01）、寿命通知（-02）、寿命分析（-03）。治工具マスタはマスタ管理、メンテナンス記録は設備保全から行います。"]</p>
 
 <Notice Error="@_error" Message="@_message" />
 
 <div class="card">
-    <h2 style="margin-top:0;">利用実績の記録</h2>
+    <h2 style="margin-top:0;">@L["利用実績の記録"]</h2>
     <div class="form-grid">
         <div class="form-field">
-            <label>治工具</label>
+            <label>@L["治工具"]</label>
             <select @bind="_toolId">
-                <option value="0">選択してください</option>
+                <option value="0">@L["選択してください"]</option>
                 @foreach (var tool in _tools)
                 {
                     <option value="@tool.Id">@tool.Code @tool.Name</option>
@@ -23,46 +23,46 @@
             </select>
         </div>
         <div class="form-field">
-            <label>関連作業指示</label>
+            <label>@L["関連作業指示"]</label>
             <OptionSelect TItem="WorkOrderResponse" Endpoint="api/work-orders/options"
-                          @bind-Value="_workOrderId" EmptyLabel="なし"
+                          @bind-Value="_workOrderId" EmptyLabel="@L["なし"]"
                           ValueOf="w => w.Id"
-                          LabelOf='@(w => $"{w.WorkOrderNo}（{w.ProductCode}）")' />
+                          LabelOf='@(w => L["{0}（{1}）", w.WorkOrderNo, w.ProductCode])' />
         </div>
         <div class="form-field">
-            <label>使用回数</label>
+            <label>@L["使用回数"]</label>
             <input type="number" @bind="_usageCount" />
         </div>
         <div class="form-field">
-            <label>使用時間（h）</label>
+            <label>@L["使用時間（h）"]</label>
             <input type="number" step="any" @bind="_usageHours" />
         </div>
     </div>
-    <button class="btn" disabled="@_busy" @onclick="RecordUsageAsync">利用実績を記録</button>
+    <button class="btn" disabled="@_busy" @onclick="RecordUsageAsync">@L["利用実績を記録"]</button>
 </div>
 
 <div class="card">
-    <h2 style="margin-top:0;">寿命ステータス（E-60-20-02：80%で交換時期接近、100%で要交換）</h2>
+    <h2 style="margin-top:0;">@L["寿命ステータス（E-60-20-02：80%で交換時期接近、100%で要交換）"]</h2>
     <label style="display:block;margin-bottom:8px;">
         <input type="checkbox" style="width:auto;" @bind="_alertOnly" @bind:after="LoadAsync" />
-        警告・要交換のみ表示
+        @L["警告・要交換のみ表示"]
     </label>
 
     @if (_lifeStatus is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_lifeStatus.Count == 0)
     {
-        <p class="text-muted">対象の治工具はありません。</p>
+        <p class="text-muted">@L["対象の治工具はありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
                 <tr>
-                    <th>治工具</th><th>状態</th><th>使用回数</th><th>使用時間</th>
-                    <th>寿命消化率</th><th>通知</th><th>最終リセット</th>
+                    <th>@L["治工具"]</th><th>@L["状態"]</th><th>@L["使用回数"]</th><th>@L["使用時間"]</th>
+                    <th>@L["寿命消化率"]</th><th>@L["通知"]</th><th>@L["最終リセット"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -81,17 +81,17 @@
                             }
                             else
                             {
-                                <span class="text-muted">閾値未設定</span>
+                                <span class="text-muted">@L["閾値未設定"]</span>
                             }
                         </td>
                         <td>
                             @if (row.IsLifeReached)
                             {
-                                <span class="badge badge-danger">要交換・廃棄</span>
+                                <span class="badge badge-danger">@L["要交換・廃棄"]</span>
                             }
                             else if (row.IsWarning)
                             {
-                                <span class="badge badge-warning">交換時期接近</span>
+                                <span class="badge badge-warning">@L["交換時期接近"]</span>
                             }
                             else
                             {
@@ -108,34 +108,34 @@
 
 @* 寿命分析（E-60-20-03）。寿命ステータスが「いま何%か」なのに対し、こちらは「いつ交換が要るか」 *@
 <div class="card">
-    <h2 style="margin-top:0;">寿命分析（E-60-20-03）</h2>
+    <h2 style="margin-top:0;">@L["寿命分析（E-60-20-03）"]</h2>
     <div class="form-grid">
         <div class="form-field">
-            <label>開始日（製造日）</label>
+            <label>@L["開始日（製造日）"]</label>
             <input type="date" @bind="_analysisFrom" />
         </div>
         <div class="form-field">
-            <label>終了日（製造日）</label>
+            <label>@L["終了日（製造日）"]</label>
             <input type="date" @bind="_analysisTo" />
         </div>
     </div>
-    <button class="btn" @onclick="LoadAnalysisAsync">分析</button>
+    <button class="btn" @onclick="LoadAnalysisAsync">@L["分析"]</button>
 
     @if (_analysis is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_analysis.Count == 0)
     {
-        <p class="text-muted">有効な治工具がありません。</p>
+        <p class="text-muted">@L["有効な治工具がありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
                 <tr>
-                    <th>治工具</th><th>寿命閾値</th><th>累計</th><th>残り</th>
-                    <th>期間内の使用</th><th>使用日数</th><th>1日平均</th><th>指示1件平均</th><th>寿命到達見込み</th>
+                    <th>@L["治工具"]</th><th>@L["寿命閾値"]</th><th>@L["累計"]</th><th>@L["残り"]</th>
+                    <th>@L["期間内の使用"]</th><th>@L["使用日数"]</th><th>@L["1日平均"]</th><th>@L["指示1件平均"]</th><th>@L["寿命到達見込み"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -165,28 +165,28 @@
             </tbody>
         </table>
         <p class="text-muted">
-            1日平均は「使用実績のあった日」で割る（稼働しない日を含めると余裕があるように見えるため）。
-            寿命閾値が未設定・期間内に使用が無い・すでに寿命到達のものは見込みを出さない（「-」）。
+            @L["1日平均は「使用実績のあった日」で割る（稼働しない日を含めると余裕があるように見えるため）。"]
+            @L["寿命閾値が未設定・期間内に使用が無い・すでに寿命到達のものは見込みを出さない（「-」）。"]
         </p>
     }
 </div>
 
 @* いま現場に出ている治工具（B-20-30）。引当・払出そのものは作業指示の段取り画面から行う *@
 <div class="card">
-    <h2 style="margin-top:0;">引当中・払出中の治工具（B-20-30）</h2>
+    <h2 style="margin-top:0;">@L["引当中・払出中の治工具（B-20-30）"]</h2>
     @if (_openIssues is null)
     {
-        <p class="text-muted">読み込み中...</p>
+        <p class="text-muted">@L["読み込み中..."]</p>
     }
     else if (_openIssues.Count == 0)
     {
-        <p class="text-muted">引当中・払出中の治工具はありません。</p>
+        <p class="text-muted">@L["引当中・払出中の治工具はありません。"]</p>
     }
     else
     {
         <table class="table">
             <thead>
-                <tr><th>治工具</th><th>作業指示</th><th>品目</th><th>工程</th><th>状態</th><th>引当日時</th><th>受領者</th></tr>
+                <tr><th>@L["治工具"]</th><th>@L["作業指示"]</th><th>@L["品目"]</th><th>@L["工程"]</th><th>@L["状態"]</th><th>@L["引当日時"]</th><th>@L["受領者"]</th></tr>
             </thead>
             <tbody>
                 @foreach (var issue in _openIssues)
@@ -207,15 +207,15 @@
 </div>
 
 <div class="card">
-    <h2 style="margin-top:0;">利用実績履歴</h2>
+    <h2 style="margin-top:0;">@L["利用実績履歴"]</h2>
     @if (_usages is null || _usages.Total == 0)
     {
-        <p class="text-muted">利用実績はありません。</p>
+        <p class="text-muted">@L["利用実績はありません。"]</p>
     }
     else
     {
         <table class="table">
-            <thead><tr><th>記録日時</th><th>治工具</th><th>作業指示</th><th>使用回数</th><th>使用時間</th></tr></thead>
+            <thead><tr><th>@L["記録日時"]</th><th>@L["治工具"]</th><th>@L["作業指示"]</th><th>@L["使用回数"]</th><th>@L["使用時間"]</th></tr></thead>
             <tbody>
                 @foreach (var usage in _usages.Items)
                 {
@@ -273,7 +273,7 @@
     {
         if (_toolId == 0)
         {
-            _error = "治工具を選択してください。";
+            _error = L["治工具を選択してください。"];
             return;
         }
         _busy = true;
@@ -284,12 +284,12 @@
             var response = await Http.PostAsJsonAsync("api/tool-usages",
                 new ToolUsageRequest(_toolId, _workOrderId == 0 ? null : _workOrderId,
                     _usageCount, _usageHours));
-            if (await response.ReadErrorAsync("記録に失敗しました。") is { } error)
+            if (await response.ReadErrorAsync(L["記録に失敗しました。"]) is { } error)
             {
                 _error = error;
                 return;
             }
-            _message = "利用実績を記録しました。";
+            _message = L["利用実績を記録しました。"];
             _usageCount = 0;
             _usageHours = null;
             await LoadAsync();

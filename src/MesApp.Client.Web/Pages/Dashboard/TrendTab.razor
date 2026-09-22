@@ -7,9 +7,9 @@
 
 <div class="form-grid">
     <div class="form-field">
-        <label>工程</label>
+        <label>@L["工程"]</label>
         <select @bind="_processId" @bind:after="LoadAsync">
-            <option value="0">全工程</option>
+            <option value="0">@L["全工程"]</option>
             @foreach (var p in _processes)
             {
                 <option value="@p.Id">@p.Code @p.Name</option>
@@ -17,23 +17,23 @@
         </select>
     </div>
     <div class="form-field">
-        <label>品目</label>
+        <label>@L["品目"]</label>
         <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
                       Value="_productId" ValueChanged="OnProductChangedAsync"
-                      EmptyLabel="全品目"
+                      EmptyLabel="@L["全品目"]"
                       ValueOf="p => p.Id"
                       LabelOf='@(p => $"{p.Code} {p.Name}")' />
     </div>
     <div class="form-field">
-        <label>作業区</label>
+        <label>@L["作業区"]</label>
         <select @bind="_workCenterId" @bind:after="LoadAsync">
-            <option value="0">全作業区</option>
+            <option value="0">@L["全作業区"]</option>
             @foreach (var wc in _workCenters)
             {
                 <option value="@wc.Id">@wc.Code @wc.Name</option>
             }
         </select>
-        <span class="text-muted">上位（工場・ライン・エリア）を選ぶと配下をまとめて集計する</span>
+        <span class="text-muted">@L["上位（工場・ライン・エリア）を選ぶと配下をまとめて集計する"]</span>
     </div>
 </div>
 
@@ -41,46 +41,46 @@
 
 @if (_data is null)
 {
-    <p class="text-muted">読み込み中...</p>
+    <p class="text-muted">@L["読み込み中..."]</p>
 }
 else
 {
     @if (!_data.UtilizationAvailable)
     {
-        <p class="text-muted">工程・品目で絞り込んでいるため稼働率は出していません（稼働記録と作業指示の紐付けは任意のため、工程・品目では稼働を正しく分けられない）。</p>
+        <p class="text-muted">@L["工程・品目で絞り込んでいるため稼働率は出していません（稼働記録と作業指示の紐付けは任意のため、工程・品目では稼働を正しく分けられない）。"]</p>
     }
 
     @if (_data.Rows.Count > 0)
     {
         var labels = _data.Rows.Select(ShortLabel).ToList();
-        <h2>生産数と不良率</h2>
-        <ComboChart Labels="labels" AriaLabel="期間ごとの良品数・不良数と不良率"
-                    Bars="@([new ChartSeries("良品数", "var(--primary)", [.. _data.Rows.Select(r => r.GoodQuantity)]),
-                             new ChartSeries("不良数", "var(--danger)", [.. _data.Rows.Select(r => r.DefectQuantity)])])"
-                    Lines="@([new ChartSeries("不良率", "var(--warning)", [.. _data.Rows.Select(r => r.DefectRate)])])"
+        <h2>@L["生産数と不良率"]</h2>
+        <ComboChart Labels="labels" AriaLabel="@L["期間ごとの良品数・不良数と不良率"]"
+                    Bars="@([new ChartSeries(L["良品数"], "var(--primary)", [.. _data.Rows.Select(r => r.GoodQuantity)]),
+                             new ChartSeries(L["不良数"], "var(--danger)", [.. _data.Rows.Select(r => r.DefectQuantity)])])"
+                    Lines="@([new ChartSeries(L["不良率"], "var(--warning)", [.. _data.Rows.Select(r => r.DefectRate)])])"
                     LineUnit="%" LineMaxTop="100" />
         @if (_data.UtilizationAvailable)
         {
-            <h2>設備稼働率と故障件数</h2>
-            <ComboChart Labels="labels" AriaLabel="期間ごとの設備稼働率と故障件数"
-                        Bars="@([new ChartSeries("故障件数", "var(--danger)", [.. _data.Rows.Select(r => (decimal?)r.FailureCount)])])"
-                        Lines="@([new ChartSeries("設備稼働率", "var(--success)", [.. _data.Rows.Select(r => r.UtilizationRate)])])"
-                        BarUnit="件" BarInteger="true" LineUnit="%" LineMinTop="100" LineMaxTop="100" />
+            <h2>@L["設備稼働率と故障件数"]</h2>
+            <ComboChart Labels="labels" AriaLabel="@L["期間ごとの設備稼働率と故障件数"]"
+                        Bars="@([new ChartSeries(L["故障件数"], "var(--danger)", [.. _data.Rows.Select(r => (decimal?)r.FailureCount)])])"
+                        Lines="@([new ChartSeries(L["設備稼働率"], "var(--success)", [.. _data.Rows.Select(r => r.UtilizationRate)])])"
+                        BarUnit="@L["件"]" BarInteger="true" LineUnit="%" LineMinTop="100" LineMaxTop="100" />
         }
     }
 
     <table class="table">
         <thead>
             <tr>
-                <th>期間</th>
-                <th>良品数</th>
-                <th>不良数</th>
-                <th>不良率</th>
+                <th>@L["期間"]</th>
+                <th>@L["良品数"]</th>
+                <th>@L["不良数"]</th>
+                <th>@L["不良率"]</th>
                 @if (_data.UtilizationAvailable)
                 {
-                    <th>稼働時間 / 記録時間</th>
-                    <th>設備稼働率</th>
-                    <th>故障件数</th>
+                    <th>@L["稼働時間 / 記録時間"]</th>
+                    <th>@L["設備稼働率"]</th>
+                    <th>@L["故障件数"]</th>
                 }
             </tr>
         </thead>
@@ -99,7 +99,7 @@ else
                         }
                         else
                         {
-                            <span class="text-muted">実績なし</span>
+                            <span class="text-muted">@L["実績なし"]</span>
                         }
                     </td>
                     @if (_data.UtilizationAvailable)
@@ -113,7 +113,7 @@ else
                             }
                             else
                             {
-                                <span class="text-muted">記録なし</span>
+                                <span class="text-muted">@L["記録なし"]</span>
                             }
                         </td>
                         <td>@row.FailureCount</td>
@@ -171,7 +171,7 @@ else
         {
             return;
         }
-        if (await response.ReadErrorAsync("推移の集計を取得できませんでした。") is { } error)
+        if (await response.ReadErrorAsync(L["推移の集計を取得できませんでした。"]) is { } error)
         {
             _error = error;
             return;
