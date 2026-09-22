@@ -6,6 +6,7 @@ APIが同一オリジンでWebクライアントも配信します。
 - **紹介ページ（画面写真でひととおり見る）**: [Parallel Factory MES の紹介](https://msmsrep.github.io/ParallelFactoryMES/intro.html)
 - **ユーザーガイド（操作マニュアル）**: [ユーザーガイド](https://msmsrep.github.io/ParallelFactoryMES/)
 - **入手**: [Microsoft Store](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=ja-JP&gl=JP)（1台で試す）／[ZIP](https://github.com/msmsrep/ParallelFactoryMES/releases/latest)（Windows / Linux）／Docker `ghcr.io/msmsrep/parallelfactorymes`
+- **開発のサポート**: [GitHub Sponsors](https://github.com/sponsors/msmsrep)／[Ko-fi](https://ko-fi.com/msmsrep)（開発を続けるための寄付です。寄付による機能の追加や制限の解除はありません）
 
 ## ライセンス
 
