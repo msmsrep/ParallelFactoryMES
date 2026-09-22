@@ -3,5 +3,6 @@
   "IdentityName": "msmsrep.ParallelFactoryMES",
   "Publisher": "CN=5E0CB4C9-E2E2-4B35-A7BB-09FE6EB44D12",
   "PublisherDisplayName": "msmsrep",
+  "DisplayName": "ParallelFactoryMES",
   "Version": "1.0.0.0"
 }

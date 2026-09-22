@@ -30,6 +30,7 @@ Partner Center でアプリ名を予約すると「製品管理 → 製品ID」�
   "IdentityName": "12345Publisher.ParallelFactoryMES",
   "Publisher": "CN=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
   "PublisherDisplayName": "あなたの発行元表示名",
+  "DisplayName": "予約したアプリ名",
   "Version": "1.0.0.0"
 }
 ```
@@ -39,11 +40,12 @@ Partner Center でアプリ名を予約すると「製品管理 → 製品ID」�
 | `IdentityName` | パッケージ/ID/名前 |
 | `Publisher` | パッケージ/ID/発行者 |
 | `PublisherDisplayName` | パッケージ/ID/発行者表示名 |
+| `DisplayName` | 「製品管理 → アプリ名の管理」で予約した名前（**一字一句・空白・大文字小文字まで一致**させる。違うと提出時に「予約していない表示名が使用されています」で弾かれる） |
 
 本リポジトリでは設定済み（Store ID: `9P9FQJZH23HC` / PFN: `msmsrep.ParallelFactoryMES_77t1an0ygyrva`）。
 いずれも公開される識別子であり秘密情報ではない。
 
-3つの値がどれか1つでも `PLACEHOLDER` のままだと `Pack-Msix.ps1` は停止する。
+4つの値がどれか1つでも未設定か `PLACEHOLDER` のままだと `Pack-Msix.ps1` は停止する。
 リポジトリ外で管理したい場合は `-IdentityFile <パス>` で別ファイルを指定する。
 
 `Version` は **`x.y.z.0`（第4桁は必ず 0）**。ストアに提出するたびに上げる。
@@ -234,6 +236,10 @@ python build/New-StoreScreenshots.py
 
 撮影結果（`build/store/raw/`）はリポジトリに含めない。見出しの文言と対象画面は
 `build/New-StoreScreenshots.py` の `SHOTS`、撮る画面は `build/Capture-AppScreens.js` の `SHOTS` にある。
+
+ストアロゴ欄のアート画像（ポスター・ボックス・タイル・スーパーヒーロー）は、
+同じ撮影結果と `build/icon.svg` から `python build/New-StoreArt.py` で作る（Inkscape が要る）。
+どの欄にどれを登録するかは `docs-dev/StoreListing.md` の「ストアロゴ・トレーラー」。
 
 **実画面をそのまま使うこと**。審査で画面と機能が食い違うと差し戻されるうえ、
 サンプルデータは `samples/` のものなので、実在の取引先や個人の名前が写り込まない。
