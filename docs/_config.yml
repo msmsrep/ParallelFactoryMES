@@ -34,6 +34,8 @@ nav:
         url: getting-started.html
       - title: 画面構成と共通操作
         url: basics.html
+      - title: サンプルで見る 製造から出荷まで
+        url: walkthrough.html
   - section: 準備
     items:
       - title: マスタ管理

@@ -32,7 +32,7 @@ else
                 </tr>
                 <tr>
                     <th>@L["納期"]</th><td>@(order.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
-                    <th>@L["区分"]</th><td>@order.OrderType</td>
+                    <th>@L["区分"]</th><td>@EnumLabels.Of(order.OrderType)</td>
                 </tr>
                 <tr>
                     <th>@L["状態"]</th><td><StatusBadge Status="@order.Status.ToString()" /></td>

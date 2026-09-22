@@ -5,8 +5,8 @@ nav_url: basics.html
 lead: すべての画面に共通する見かたと操作です。最初にここを読んでおくと、以降の説明がスムーズです。
 prev_url: getting-started.html
 prev_title: 導入と初期設定
-next_url: masters.html
-next_title: マスタ管理
+next_url: walkthrough.html
+next_title: サンプルで見る 製造から出荷まで
 ---
 
 ## 画面の構成

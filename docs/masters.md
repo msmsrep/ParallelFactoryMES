@@ -3,8 +3,8 @@ layout: default
 title: マスタ管理
 nav_url: masters.html
 lead: 業務を始める前に登録が必要な基礎データです。登録の順番に決まりがあるので、この順に進めてください。
-prev_url: basics.html
-prev_title: 画面構成と共通操作
+prev_url: walkthrough.html
+prev_title: サンプルで見る 製造から出荷まで
 next_url: production.html
 next_title: 生産管理
 ---

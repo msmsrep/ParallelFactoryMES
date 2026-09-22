@@ -363,6 +363,60 @@ ol.steps > li::before {
   font-size: 12.5px;
 }
 
+/* ---------- 図解（walkthrough.md） ---------- */
+/* 担当ロールの色。図の枠と凡例で同じ色を使う */
+:root {
+  --r-pm: #1f6feb; --r-pm-bg: #ddf0ff;   /* 生産管理 */
+  --r-op: #1a7f37; --r-op-bg: #e6f6ec;   /* 現場作業者 */
+  --r-lg: #9a6700; --r-lg-bg: #fff6e0;   /* 物流・倉庫 */
+  --r-qc: #8250df; --r-qc-bg: #f3ecff;   /* 品質管理・品質保証 */
+  --r-ng: #b42318; --r-ng-bg: #ffebe9;   /* 不良・逸脱 */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --r-pm: #6cb0ff; --r-pm-bg: #16283f;
+    --r-op: #56d364; --r-op-bg: #12261a;
+    --r-lg: #e3b341; --r-lg-bg: #2a2213;
+    --r-qc: #c297ff; --r-qc-bg: #231a38;
+    --r-ng: #ff8a80; --r-ng-bg: #3a1618;
+  }
+}
+.fig { margin: 18px 0 26px; }
+/* 狭い画面では図を縮めすぎず、横にスクロールさせる */
+.fig .scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.fig svg { display: block; width: 100%; min-width: 680px; height: auto; font-family: inherit; }
+.fig figcaption { margin-top: 6px; font-size: 13px; color: var(--text-muted); text-align: center; }
+.fig .box { fill: var(--bg-alt); stroke: var(--border); }
+.fig .lane { fill: var(--bg-alt); }
+.fig .card { fill: var(--bg); stroke: var(--border); }
+.fig .t { fill: var(--text); font-size: 13px; }
+.fig .tb { fill: var(--text); font-size: 13px; font-weight: 700; }
+.fig .m { fill: var(--text-muted); font-size: 11.5px; }
+.fig .ln { fill: none; stroke: var(--text-muted); stroke-width: 1.4; }
+.fig .dash { stroke-dasharray: 5 4; }
+.fig .head { fill: var(--text-muted); }
+.fig .pm { fill: var(--r-pm-bg); stroke: var(--r-pm); }
+.fig .op { fill: var(--r-op-bg); stroke: var(--r-op); }
+.fig .lg { fill: var(--r-lg-bg); stroke: var(--r-lg); }
+.fig .qc { fill: var(--r-qc-bg); stroke: var(--r-qc); }
+.fig .ng { fill: var(--r-ng-bg); stroke: var(--r-ng); }
+.fig .c-pm { fill: var(--r-pm); } .fig .c-op { fill: var(--r-op); }
+.fig .c-lg { fill: var(--r-lg); } .fig .c-qc { fill: var(--r-qc); }
+.fig .c-ng { fill: var(--r-ng); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
+.legend span::before {
+  content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 5px;
+  vertical-align: -1px; border-radius: 3px; border: 1.5px solid;
+}
+.legend .pm::before { background: var(--r-pm-bg); border-color: var(--r-pm); }
+.legend .op::before { background: var(--r-op-bg); border-color: var(--r-op); }
+.legend .lg::before { background: var(--r-lg-bg); border-color: var(--r-lg); }
+.legend .qc::before { background: var(--r-qc-bg); border-color: var(--r-qc); }
+.legend .ng::before { background: var(--r-ng-bg); border-color: var(--r-ng); }
+.shot { margin: 16px 0 24px; }
+.shot img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; }
+.shot figcaption { margin-top: 6px; font-size: 13px; color: var(--text-muted); }
+
 /* ---------- responsive ---------- */
 @media (max-width: 900px) {
   .menu-toggle { display: block; }

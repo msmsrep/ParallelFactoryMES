@@ -187,6 +187,19 @@ $env:MESAPP_TEST_PROVIDER="SqlServer"; $env:MESAPP_TEST_CONNECTION="Server=(loca
 dotnet test tests/MesApp.Api.Tests
 ```
 
+## ユーザーガイドの確認（Jekyll）
+
+`docs/` は GitHub Pages（Jekyll）でそのまま公開されます。手元で見るには Ruby と Jekyll を入れて、リポジトリのルートで次を実行し、
+http://127.0.0.1:4000/ を開きます。`docs/` を保存すると作り直され、ブラウザも自動で再読み込みされます（止めるのは Ctrl+C）。
+
+```powershell
+jekyll serve -s docs -d "$env:TEMP\mes-docs-site" --livereload
+```
+
+ビルドだけ確かめるときは `jekyll build -s docs -d "$env:TEMP\mes-docs-site"` です。
+出力先（`-d`）はリポジトリの外にします。省くと `docs/_site` ができ、未追跡ファイルとして残ります。
+`jekyll` が見つからないときは、インストール後にターミナルを開き直すか、`$env:Path = "C:\Ruby40-x64\bin;$env:Path"` のように Ruby の `bin` を足してください。
+
 ## プロジェクト構成
 
 ```

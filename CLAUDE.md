@@ -43,6 +43,11 @@ dotnet test tests/MesApp.Api.Tests --filter FullyQualifiedName~MasterCsvTests -v
 ./scripts/Migrations.ps1 -RemoveLast      # 3プロバイダーの最新を取り消す
 ```
 
+ユーザーガイド（`docs/`）の表示確認は Jekyll でビルドする。出力はリポジトリの外に出す（`docs/_site` を作らない）。手動確認用の `jekyll serve` は Readme.md の「ユーザーガイドの確認」:
+```powershell
+jekyll build -s docs -d "$env:TEMP\mes-docs-site"
+```
+
 アプリ起動は `.claude/launch.json` の `mesapp`（preview_start）を使う。シェルから `dotnet run` を常駐させない。
 
 ## 構成（依存は Core ← Infrastructure ← Api、Client.Web → Core）
