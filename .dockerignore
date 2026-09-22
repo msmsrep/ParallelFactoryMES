@@ -1,0 +1,26 @@
+# ビルドに要るのは Directory.Build.props・src/・LICENSE だけ。それ以外を送らずビルドコンテキストを小さくする
+**/bin/
+**/obj/
+**/*.user
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/jwt-signing.key
+.git/
+.github/
+.vs/
+.idea/
+.claude/
+artifacts/
+build/
+docs/
+docs-dev/
+ref/
+samples/
+scripts/
+tests/
+TestResults/
+参考/
+参考2/
+MES.md
+src/MesApp.Desktop/

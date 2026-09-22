@@ -92,6 +92,7 @@
 改訂91: 2026-09-21（**DBプロバイダーをPostgreSQL・SQL Serverへ切り替えられるようにした**（4章。Phase 10のうちDB切替）。`Database:Provider`に`PostgreSql`/`SqlServer`を指定すると、それぞれ専用プロジェクトのマイグレーションを起動時に適用する。1つのモデルから3プロバイダーのスキーマを作るため、PostgreSQLでは`DateTimeOffset`をUTCで書き込み、SQL Serverでは多重連鎖を避けるため`SET NULL`をEF側の処理に移し、SQLite以外では精度未指定の`decimal`を`(18,6)`にした。SQLiteのスキーマは変えていない。採番（`NumberingService`）の生SQLは表名・列名をプロバイダーの引用符で囲み、同時作成で一意制約違反になったときはセーブポイントまで戻してから再試行する（PostgreSQLは失敗した文のあとトランザクションを受け付けないため）。テストは環境変数（`MESAPP_TEST_PROVIDER` / `MESAPP_TEST_CONNECTION`）で実DBに向けられ、PostgreSQL 18・SQL Server（LocalDB）で全件通過を確認した。PostgreSQL・SQL Serverでは小数桁固定の`decimal`が`1.500000`のように返るため、読み出し時に末尾ゼロを落としてSQLiteと同じ値の見え方にした。既存SQLiteデータの移行ツールと、実DBでの自動テストの常時実行は将来拡張とした）
 改訂92: 2026-09-21（**3プロバイダー分のマイグレーションをまとめて追加するスクリプト**（`scripts/Migrations.ps1`）を用意し、4章の将来拡張から「3プロバイダー分を作る運用の省力化」を外した。1つのマイグレーションで3プロバイダーを兼ねる形は、列の型がプロバイダーごとに生成されるため手修正が毎回必要になり採らない。あわせて、マイグレーションに生SQLを書かない規約を4章に加えた）
 改訂93: 2026-09-22（7.8節：ストア提出で「予約していない表示名」として弾かれたため、MSIXの表示名をマニフェストへの直書きから`build/msix-identity.json`の`DisplayName`に移し、予約名と一致させる旨を明記）
+改訂94: 2026-09-22（**Zip配布とDocker配布を実装した**（7.2節。Phase 10完了）。自己完結版zip（win-x64 / linux-x64）とコンテナイメージ（linux/amd64・arm64、GHCR）を、タグpushでGitHub Actionsから公開する。7.7節のDocker構成のバックアップをボリューム退避の手順に改め、9章の構成を実配置に合わせた。あわせて、Linuxで`~/.local/share`が未作成のときデータ保存先がカレントディレクトリになる不具合を直した（4章`MesAppDataDirectory`））
 参考: みんなのMES（min-MES） https://min-mes.com/ / OSS: https://github.com/mihatama/open-mes-project
 
 ---
@@ -572,8 +573,9 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
 
 ### 7.2 配布形態
 - **Windows Store（MSIX・単独PC向け）**: MesApp.Desktop。API・DB・Webクライアントを1つのパッケージに同梱し、1台のPCで完結して動作させる（7.8節）
-- **Zip配布**: MesApp.Api（バックエンド、Webクライアント静的ファイル同梱）のビルド済みバイナリをzip化し、社内サーバー等に手動配置できるようにする
-- **Docker配布**: MesApp.Api（Webクライアント同梱）および既定DBをDockerイメージ化し、`docker-compose.yml`で一括起動できるようにする（バックエンドのセルフホスト手段として）
+- **Zip配布**: MesApp.Api（Webクライアント静的ファイル同梱）を**自己完結版**（win-x64 / linux-x64。配布先に.NETランタイム不要）で発行してzip化し、社内サーバー等に手動配置できるようにする（`build/Pack-Zip.ps1`）。起動スクリプト（`start.cmd` / `start.sh`）・LICENSE・対応ソースの所在（コミット）を同梱する。zipはUnixの実行権限を保持しないため、`start.sh`が起動前に実行権限を付ける
+- **Docker配布**: MesApp.Api（Webクライアント同梱）をコンテナイメージ化し（`Dockerfile`。linux/amd64・linux/arm64）、`ghcr.io/msmsrep/parallelfactorymes`で公開する。非rootで動かし、DB（SQLite）とJWT署名鍵は`/data`ボリューム（`MESAPP_DATA_DIR=/data`）に置く。`TZ`の既定は`Asia/Tokyo`（業務日付の境界に効くため）。起動例として`compose.yaml`（SQLite）と`compose.postgres.yaml`（PostgreSQL）を置く。HTTPSはコンテナでは扱わず前段のリバースプロキシで終端する
+- **リリースの自動化**: タグ`vX.Y.Z`のpushでGitHub Actions（`.github/workflows/release.yml`）がビルド・テストの後にzipをGitHub Releaseへ添付し、イメージをGHCRへ登録する。版数はタグから取り（`-p:Version`）、既定値は`Directory.Build.props`。`-`を含むタグはプレリリース扱いにしてイメージに`latest`を付けない。MSIXは署名とストア提出が手作業のため対象外。push・PRごとのビルドとテストは`.github/workflows/ci.yml`（Windows。MesApp.Desktopを含むため）
 - MesApp.Client.Webは必ずMesApp.Apiが配信する（別配信は行わない。APIと同一オリジンに置き、CORSや配置の組み合わせを増やさないため）
 
 ### 7.3 オフライン動作について
@@ -660,7 +662,7 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
 いずれも後付けではなく、承認フロー（3.9節）と監査ログ（本節）の設計そのものを見直す規模になるため、［将来拡張］ではなく**対象外**として扱う。
 
 ### 7.7 バックアップ・リストア
-- SQLite利用時：稼働中のオンラインバックアップ手段（`VACUUM INTO` またはSQLite Backup API）を用いた定期バックアップ手順を提供する。WALモードで稼働するため、**稼働中のDBファイル単純コピーは行わない**ことを運用手順書に明記する。Docker構成ではバックアップ用ボリュームとバックアップスクリプトを`docker-compose.yml`に同梱する
+- SQLite利用時：稼働中のオンラインバックアップ手段（`VACUUM INTO` またはSQLite Backup API）を用いた定期バックアップ手順を提供する。WALモードで稼働するため、**稼働中のDBファイル単純コピーは行わない**ことを運用手順書に明記する。Docker構成ではコンテナを停止してから`/data`ボリュームを退避する手順を運用手順書に示す（バックアップ専用のコンテナやスクリプトは同梱しない。ボリュームの退避はDockerの標準手段で足りるため）
 - PostgreSQL/SQL Server利用時：各DBの標準手段（`pg_dump`等）によるバックアップを前提とし、推奨手順をドキュメント化する
 - リストア手順（バックアップファイルの差し替え→API再起動）と、リストアの影響範囲（実績データ・ユーザー・リフレッシュトークンがバックアップ時点へ巻き戻る。リストア後に再ログインが必要になり得る）を運用手順書に明記する
 - MesApp.Desktop（7.8節）ではDBの実体は`%LOCALAPPDATA%\Packages\<パッケージファミリー名>\LocalState\mesapp.db`。**アプリのアンインストールでこのフォルダーごと削除される**ため、残したいデータは事前に退避する必要がある点を運用手順書に明記する。WALモードで稼働するため、バックアップは稼働中のファイルコピーではなく`VACUUM INTO`で取得する
@@ -713,7 +715,6 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
     /MesApp.Api                  … ASP.NET Core Web API（バックエンド本体、Webクライアント配信）
       /Controllers
       /Services                  … 業務ロジック
-      Dockerfile
     /MesApp.Desktop              … WinForms + WebView2（単独PC向けMSIX配布のホスト）
       /Assets                    … MSIXのタイル画像・アプリアイコン
       Package.appxmanifest
@@ -721,9 +722,13 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
     /MesApp.Infrastructure        … EF Core、DBプロバイダー切替、リポジトリ実装（API専用）
   /tests
     /MesApp.Api.Tests
-  /docker
-    docker-compose.yml            … MesApp.Api + DB（必要に応じ）を一括起動
+  /.github/workflows
+    ci.yml                        … push・PRごとのビルドとテスト
+    release.yml                   … タグpushでzipとコンテナイメージを公開
+  Dockerfile                      … MesApp.Api（Webクライアント同梱）のイメージ
+  compose.yaml                    … SQLiteで起動する例（compose.postgres.yaml はPostgreSQL付き）
   /build
+    Pack-Zip.ps1                  … 自己完結版zipの作成
     Pack-Msix.ps1                 … MSIXパッケージの作成
     New-MsixAssets.ps1            … タイル画像・アイコンの生成
     msix-identity.json            … Partner CenterのパッケージID

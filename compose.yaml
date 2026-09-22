@@ -1,0 +1,23 @@
+# Parallel Factory MES を SQLite で動かす最小構成
+#   docker compose up -d        → http://localhost:8080
+# PostgreSQL で動かすときは compose.postgres.yaml を使う
+services:
+  mesapp:
+    image: ghcr.io/msmsrep/parallelfactorymes:latest
+    # ソースから作るときは image の代わりに次を有効にする
+    # build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - mesapp-data:/data
+    environment:
+      # 初期管理者を自動作成する（ユーザーが0件のときだけ。初回ログインでパスワード変更を強制）
+      # MesAdmin__UserName: admin
+      # MesAdmin__Password: ChangeMe123
+      # HTTPS を前段のリバースプロキシで終端するときは、プロキシのいるネットワークを信頼する
+      # ReverseProxy__KnownNetworks__0: 172.16.0.0/12
+      TZ: Asia/Tokyo
+    restart: unless-stopped
+
+volumes:
+  mesapp-data:

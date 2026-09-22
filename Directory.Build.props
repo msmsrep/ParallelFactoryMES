@@ -11,6 +11,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
+    <!-- リリース時はタグ（v1.2.3）の番号を -p:Version で渡して上書きする。MSIX だけは build/msix-identity.json で別管理 -->
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
 </Project>

@@ -1,0 +1,40 @@
+# Parallel Factory MES を PostgreSQL で動かす構成
+#   docker compose -f compose.postgres.yaml up -d      → http://localhost:8080
+# パスワードは .env ファイル（POSTGRES_PASSWORD=...）で与える。未設定だと起動しない
+# 既存の SQLite のデータを PostgreSQL へ移す機能はない（docs/operations.md）
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: mesapp
+      POSTGRES_USER: mesapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env に POSTGRES_PASSWORD を設定してください}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mesapp -d mesapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  mesapp:
+    image: ghcr.io/msmsrep/parallelfactorymes:latest
+    # build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      # DB は PostgreSQL に置くが、JWT 署名鍵は /data に残る。作り直すと全員ログアウトになるので残す
+      - mesapp-data:/data
+    environment:
+      Database__Provider: PostgreSql
+      Database__ConnectionString: Host=db;Database=mesapp;Username=mesapp;Password=${POSTGRES_PASSWORD}
+      TZ: Asia/Tokyo
+    restart: unless-stopped
+
+volumes:
+  pg-data:
+  mesapp-data:
