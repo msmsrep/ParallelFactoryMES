@@ -239,6 +239,17 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 .bar-meter-fill.bar-warning { background: var(--warning); }
 .bar-meter-fill.bar-danger { background: var(--danger); }
 
+/* ダッシュボードのグラフ（自作SVG。Shared/Charts）と KPI タイル */
+.chart { overflow-x: auto; }
+.chart svg { display: block; height: auto; }
+.kpi-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.kpi-tiles > .card { margin-bottom: 0; }
+
 /* 帳票・ラベル（印刷レイアウト） */
 .print-sheet {
     background: #fff;

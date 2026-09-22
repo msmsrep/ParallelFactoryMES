@@ -90,6 +90,7 @@ public static class MesAppHost
         builder.Services.AddScoped<WorkOrderDispatchService>();
         builder.Services.AddScoped<MasterCsvService>();
         builder.Services.AddScoped<ReceivingService>();
+        builder.Services.AddScoped<DashboardService>();
         builder.Services.AddScoped<ManufacturingOrderService>();
         builder.Services.AddScoped<WorkOrderExecutionService>();
         builder.Services.AddScoped<InspectionService>();

@@ -1,0 +1,227 @@
+﻿@* ダッシュボードのサマリ（Spec.md 3.8。期間の実績・稼働率・不良率・進捗のKPI表示。
+   B-60-10-05 生産性モニタリング／C-40-10-05 不適合モニタリング／E-20-10-03 稼働モニタリング／A-30-10-01 進捗） *@
+@inject HttpClient Http
+
+<PeriodPicker OnChanged="LoadKpiAsync" />
+
+<Notice Error="@_error" />
+
+<h2>@(_range is { Unit: DashboardPeriodUnit.Day } && _range.From == _today ? "当日の実績" : "期間の実績")</h2>
+@if (_loading)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else if (_current is { } now)
+{
+    var before = _previous;
+    <div class="kpi-tiles">
+        <KpiTile Label="良品数" Value="@ChartScale.Number(now.GoodQuantity)"
+                 Delta="@(now.GoodQuantity - before?.GoodQuantity)" DeltaLabel="@DeltaLabel" HighIsBad="false" />
+        <KpiTile Label="不良数" Value="@ChartScale.Number(now.DefectQuantity)"
+                 Delta="@(now.DefectQuantity - before?.DefectQuantity)" DeltaLabel="@DeltaLabel" HighIsBad="true" />
+        <KpiTile Label="不良率" Value="@now.DefectRate?.ToString("0.##")" Unit="%"
+                 Delta="@(now.DefectRate - before?.DefectRate)" DeltaUnit="pt" DeltaLabel="@DeltaLabel" HighIsBad="true" />
+        <KpiTile Label="設備稼働率" Value="@now.UtilizationRate?.ToString("0.##")" Unit="%" EmptyText="記録なし"
+                 Delta="@(now.UtilizationRate - before?.UtilizationRate)" DeltaUnit="pt" DeltaLabel="@DeltaLabel" HighIsBad="false">
+            @if (now.UtilizationRate is { } utilization)
+            {
+                <DonutGauge Value="utilization" Title="設備稼働率" />
+            }
+        </KpiTile>
+        <KpiTile Label="検査 合格 / 不合格" Value="@($"{now.InspectionPassCount} / {now.InspectionFailCount}")" Unit="件">
+            @if (now.InspectionPassRate is { } passRate)
+            {
+                <DonutGauge Value="passRate" Title="検査合格率" />
+            }
+        </KpiTile>
+        <KpiTile Label="未クローズの不適合" Value="@now.OpenNonconformanceCount.ToString()" Unit="件">
+            @if (now.OpenNonconformanceCount > 0)
+            {
+                <a class="badge badge-warning" href="nonconformances">要対応</a>
+            }
+        </KpiTile>
+    </div>
+    <p class="text-muted">
+        @DeltaLabel は直前の@(DashboardPeriods.UnitLabel(_range!.Unit).TrimEnd('次'))との差（率は%ポイント）。未クローズの不適合は期間中に起票されて未クローズのもの。
+        日・週・月の推移は「推移」タブ、工程・品目・直・ライン・設備ごとの内訳は「内訳」タブで見る。不良理由・停止原因は<a href="quality-analysis">品質分析</a>・<a href="maintenance">設備保全</a>で確認する。
+    </p>
+}
+
+<h2>生産進捗（A-30-10-01）</h2>
+@if (_progress is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else if (_progress.Count == 0)
+{
+    <p class="text-muted">進行中の製造指図はありません。</p>
+}
+else
+{
+    @if (_overdueCount > 0 || _delayCount > 0)
+    {
+        <p>
+            @if (_overdueCount > 0)
+            {
+                <span class="badge badge-danger">納期超過の指図 @_overdueCount 件</span>
+                <span>&nbsp;</span>
+            }
+            @if (_delayCount > 0)
+            {
+                @* 工程レベルの遅れ（A-30-20-01）。内訳は工程進捗画面で見る *@
+                <a class="badge badge-warning" href="process-progress">遅れている作業指示 @_delayCount 件</a>
+            }
+        </p>
+    }
+    <table class="table">
+        <thead>
+            <tr>
+                <th>指図番号</th>
+                <th>品目</th>
+                <th>数量</th>
+                <th>納期</th>
+                <th>状態</th>
+                <th>工程進捗</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _progress)
+            {
+                <tr>
+                    <td><a href="manufacturing-orders/@row.Id">@row.OrderNo</a></td>
+                    <td>@row.ProductCode @row.ProductName</td>
+                    <td>@row.Quantity</td>
+                    <td>
+                        @(row.DueDate?.ToString("yyyy-MM-dd") ?? "-")
+                        @if (row.IsOverdue)
+                        {
+                            <span class="badge badge-danger">納期超過</span>
+                        }
+                    </td>
+                    <td><StatusBadge Status="@row.Status.ToString()" /></td>
+                    <td>
+                        <progress value="@row.CompletedWorkOrderCount" max="@Math.Max(row.WorkOrderCount, 1)"
+                                  aria-label="工程進捗"></progress>
+                        @row.CompletedWorkOrderCount / @row.WorkOrderCount 工程完了
+                    </td>
+                    <td><a class="btn btn-secondary btn-sm" href="manufacturing-orders/@row.Id">詳細</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<OrderProgressResponse>? _progress;
+    private PeriodPicker.Range? _range;
+    private DateOnly? _today;
+    private bool _loading = true;
+    private string? _error;
+    private int _requestNo;
+
+    private int _overdueCount;
+    private int _delayCount;
+    private Kpi? _current;
+    private Kpi? _previous;
+
+    /// <summary>1つの期間のKPI（集計はAPI。ここでは合計と率を出すだけ）</summary>
+    private sealed record Kpi(
+        decimal GoodQuantity, decimal DefectQuantity, decimal RunningHours, decimal RecordedHours,
+        int InspectionPassCount, int InspectionFailCount, int OpenNonconformanceCount)
+    {
+        public decimal? DefectRate => GoodQuantity + DefectQuantity == 0
+            ? null
+            : DefectQuantity / (GoodQuantity + DefectQuantity) * 100m;
+
+        public decimal? UtilizationRate => RecordedHours == 0 ? null : RunningHours / RecordedHours * 100m;
+
+        public decimal? InspectionPassRate => InspectionPassCount + InspectionFailCount == 0
+            ? null
+            : (decimal)InspectionPassCount / (InspectionPassCount + InspectionFailCount) * 100m;
+    }
+
+    private string DeltaLabel => _range?.Unit switch
+    {
+        DashboardPeriodUnit.Week => "前週比",
+        DashboardPeriodUnit.Month => "前月比",
+        _ => "前日比",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 進捗・遅れは期間に依らない「今」の状態なので、期間を変えても読み直さない
+        _progress = await Http.GetFromJsonAsync<List<OrderProgressResponse>>(
+            "api/manufacturing-orders/progress");
+        _overdueCount = _progress?.Count(p => p.IsOverdue) ?? 0;
+        try
+        {
+            var delays = await Http.GetFromJsonAsync<List<WorkOrderDelayRow>>("api/work-orders/delays");
+            _delayCount = delays?.Count ?? 0;
+        }
+        catch (HttpRequestException)
+        {
+            // 遅れの件数が取れなくても進捗一覧は見せる
+        }
+    }
+
+    private async Task LoadKpiAsync(PeriodPicker.Range range)
+    {
+        _range = range;
+        _today ??= range.Unit == DashboardPeriodUnit.Day ? range.From : null;
+        _loading = true;
+        _error = null;
+        // 期間を続けて変えると応答の順が入れ替わることがある。最後に出した要求の結果だけを使う
+        var requestNo = ++_requestNo;
+        try
+        {
+            // 前の期間は同じ単位で1つ前（差を出すため。同じAPIを同じ条件で呼ぶので数え方がずれない）
+            var previousFrom = DashboardPeriods.Shift(range.From, range.Unit, -1);
+            var current = FetchKpiAsync(range.From, range.To);
+            var previous = FetchKpiAsync(previousFrom, range.From.AddDays(-1));
+            await Task.WhenAll(current, previous);
+            if (requestNo != _requestNo)
+            {
+                return;
+            }
+            _current = current.Result;
+            _previous = previous.Result;
+        }
+        catch (HttpRequestException)
+        {
+            if (requestNo == _requestNo)
+            {
+                // KPIが取れなくても進捗一覧は見せる（ダッシュボードが丸ごと落ちないようにする）
+                _current = null;
+                _error = "期間の実績の集計を取得できませんでした。時間をおいて再読込してください。";
+            }
+        }
+        finally
+        {
+            if (requestNo == _requestNo)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    private async Task<Kpi> FetchKpiAsync(DateOnly fromDate, DateOnly toDate)
+    {
+        var from = fromDate.ToString("yyyy-MM-dd");
+        var to = toDate.ToString("yyyy-MM-dd");
+        // 集計はAPI側で行う（Spec.md 7.5。一覧を全件取って画面で数えない）
+        var qualityTask = Http.GetFromJsonAsync<QualitySummaryResponse>($"api/quality/summary?from={from}&to={to}");
+        var utilizationTask = Http.GetFromJsonAsync<List<EquipmentUtilizationRow>>(
+            $"api/equipment-logs/summary?from={from}&to={to}");
+        var quality = await qualityTask;
+        var utilization = await utilizationTask;
+        return new Kpi(
+            quality?.ByProduct.Sum(r => r.GoodQuantity) ?? 0,
+            quality?.ByProduct.Sum(r => r.DefectQuantity) ?? 0,
+            utilization?.Sum(r => r.RunningHours) ?? 0,
+            utilization?.Sum(r => r.RunningHours + r.StoppedHours + r.SetupHours + r.FailureHours + r.IdleHours) ?? 0,
+            quality?.InspectionPassCount ?? 0,
+            quality?.InspectionFailCount ?? 0,
+            quality?.OpenNonconformanceCount ?? 0);
+    }
+}

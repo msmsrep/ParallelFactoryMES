@@ -2,9 +2,12 @@
 using System.Net.Http.Json;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Common;
+using MesApp.Core.Contracts.Dashboard;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Masters;
+using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Contracts.Production;
+using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
 
@@ -693,5 +696,113 @@ public class ProductionTests
         var afterComplete = await admin.GetFromJsonAsync<List<WorkOrderDelayRow>>(
             "/api/work-orders/delays?overrunPercent=-100");
         Assert.DoesNotContain(afterComplete!, d => d.WorkOrderNo == workOrder.WorkOrderNo);
+    }
+
+    [Fact]
+    public async Task ダッシュボードは開始時刻の製造日で日週月に区切り軸別に内訳を出す()
+    {
+        // +09:00 の時刻で製造日の境目を検証するので工場のタイムゾーンを日本に固定する
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["BusinessDay:TimeZone"] = "Asia/Tokyo",
+        });
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 1000m, ctx.MaterialLocationId);
+
+        var plant = await MasterTests.CreateWorkCenterAsync(admin, "P1", "第一工場", WorkCenterLevel.Plant, null);
+        var line = await MasterTests.CreateWorkCenterAsync(admin, "L1", "組立1ライン", WorkCenterLevel.Line, plant.Id);
+        var area = await MasterTests.CreateWorkCenterAsync(admin, "A1", "前工程エリア", WorkCenterLevel.Area, line.Id);
+        var wc = await MasterTests.CreateWorkCenterAsync(admin, "WC01", "組立作業区", WorkCenterLevel.WorkCenter, area.Id);
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, ctx.ProcessId, 30m, 10m, null, null, null, null, null, wc.Id),
+                new(2, ctx.ProcessId, 15m, 5m, null, null, null, null, null, wc.Id),
+            })).EnsureSuccessStatusCode();
+
+        var jst = TimeSpan.FromHours(9);
+        async Task RecordAsync(DateTime startedAt, decimal good, decimal defect)
+        {
+            var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+            (await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+                new ProductionRecordRequest(good, defect, new DateTimeOffset(startedAt, jst), null,
+                    ctx.ProductLocationId, false))).EnsureSuccessStatusCode();
+        }
+        await RecordAsync(new DateTime(2026, 8, 31, 10, 0, 0), 9m, 1m);   // 月曜・8月
+        await RecordAsync(new DateTime(2026, 9, 1, 22, 0, 0), 10m, 0m);   // 夜勤
+        await RecordAsync(new DateTime(2026, 9, 7, 5, 0, 0), 8m, 2m);     // 6時前なので製造日は 9/6（日曜）
+        await RecordAsync(new DateTime(2026, 9, 7, 10, 0, 0), 10m, 0m);   // 翌週の月曜
+
+        var equipment = await admin.PostAsJsonAsync("/api/equipments",
+            new EquipmentRequest("EQ-01", "プレス1号", null, EquipmentStatus.Available, MaintenanceType.None,
+                null, null, wc.Id));
+        equipment.EnsureSuccessStatusCode();
+        var equipmentId = (await equipment.Content.ReadFromJsonAsync<EquipmentResponse>())!.Id;
+        var logStart = new DateTimeOffset(new DateTime(2026, 9, 1, 8, 0, 0), jst);
+        (await admin.PostAsJsonAsync("/api/equipment-logs", new EquipmentLogRequest(equipmentId,
+            EquipmentLogStatus.Running, logStart, logStart.AddHours(6), null, null, null))).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/equipment-logs", new EquipmentLogRequest(equipmentId,
+            EquipmentLogStatus.Stopped, logStart.AddHours(6), logStart.AddHours(8), "材料待ち", null, null))).EnsureSuccessStatusCode();
+
+        // 日次：夜明け前の実績は前日の製造日に入る
+        var daily = await admin.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/trend?from=2026-09-06&to=2026-09-07&unit=Day");
+        Assert.Equal([8m, 10m], daily!.Rows.Select(r => r.GoodQuantity!.Value));
+
+        // 週次（月曜始まり）：9/6 の実績は 8/31 の週に入る。データの無い区切りも行として返す
+        var weekly = await admin.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/trend?from=2026-08-31&to=2026-09-20&unit=Week");
+        Assert.Equal(["2026-08-31", "2026-09-07", "2026-09-14"], weekly!.Rows.Select(r => r.Key));
+        Assert.Equal(27m, weekly.Rows[0].GoodQuantity);
+        Assert.Equal(10m, weekly.Rows[0].DefectRate);
+        Assert.Equal(75m, weekly.Rows[0].UtilizationRate);
+        Assert.Equal(0m, weekly.Rows[2].GoodQuantity);
+        Assert.Null(weekly.Rows[2].DefectRate);
+        Assert.Equal(37m, weekly.Total.GoodQuantity);
+
+        // 月次：期間の端で切り詰める
+        var monthly = await admin.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/trend?from=2026-08-31&to=2026-09-07&unit=Month");
+        Assert.Equal(2, monthly!.Rows.Count);
+        Assert.Equal(new DateOnly(2026, 8, 31), monthly.Rows[0].PeriodStart);
+        Assert.Equal(9m, monthly.Rows[0].GoodQuantity);
+        Assert.Equal(new DateOnly(2026, 9, 7), monthly.Rows[1].PeriodEnd);
+        Assert.Equal(28m, monthly.Rows[1].GoodQuantity);
+
+        // 工程で絞ると稼働は求めない（稼働ログと作業指示の紐付けは任意のため）
+        var byProcessFilter = await admin.GetFromJsonAsync<DashboardSummaryResponse>(
+            $"/api/dashboard/trend?from=2026-08-31&to=2026-09-07&unit=Week&processId={ctx.ProcessId}");
+        Assert.False(byProcessFilter!.UtilizationAvailable);
+        Assert.All(byProcessFilter.Rows, r => Assert.Null(r.UtilizationRate));
+
+        // ライン軸：最下段の作業区をラインへまとめ、生産と稼働の両方を出す。工場で絞っても配下が入る
+        var byLine = await admin.GetFromJsonAsync<DashboardSummaryResponse>(
+            $"/api/dashboard/breakdown?from=2026-08-31&to=2026-09-07&axis=Line&workCenterId={plant.Id}");
+        var lineRow = Assert.Single(byLine!.Rows);
+        Assert.Equal("L1", lineRow.Key);
+        Assert.Equal(37m, lineRow.GoodQuantity);
+        Assert.Equal(75m, lineRow.UtilizationRate);
+
+        // 設備軸は稼働だけ、工程軸は生産だけ
+        var byEquipment = await admin.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/breakdown?from=2026-08-31&to=2026-09-07&axis=Equipment");
+        Assert.False(byEquipment!.ProductionAvailable);
+        Assert.Null(Assert.Single(byEquipment.Rows).GoodQuantity);
+        var byProcess = await admin.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/breakdown?from=2026-08-31&to=2026-09-07&axis=Process");
+        Assert.False(byProcess!.UtilizationAvailable);
+        Assert.Equal(37m, Assert.Single(byProcess.Rows).GoodQuantity);
+
+        // 品質分析も登録時刻ではなく開始時刻の製造日で数える（ダッシュボードと食い違わない）
+        var quality = await admin.GetFromJsonAsync<QualitySummaryResponse>(
+            "/api/quality/summary?from=2026-09-06&to=2026-09-06");
+        Assert.Equal(8m, Assert.Single(quality!.ByProduct).GoodQuantity);
+
+        // 期間の逆転・区切りの上限超えは400
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, (await admin.GetAsync(
+            "/api/dashboard/trend?from=2026-09-07&to=2026-09-01")).StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, (await admin.GetAsync(
+            "/api/dashboard/trend?from=2024-01-01&to=2026-09-01&unit=Day")).StatusCode);
     }
 }

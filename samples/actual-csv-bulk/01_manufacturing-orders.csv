@@ -1,0 +1,23 @@
+﻿OrderNo,ProductCode,Quantity,DueDate,OrderType,SourceOrderNo,Note,Approve,Expand,OutputLotNumber
+BLK-SF-0629,SF-2000,450,,Normal,,ハウジング加工 2026-06-29 週,true,true,SF2000-B0629
+BLK-FG-0629,FG-1000,150,,Normal,,ギアポンプ組立 2026-06-29 週,true,true,FG1000-B0629
+BLK-SF-0706,SF-2000,450,,Normal,,ハウジング加工 2026-07-06 週,true,true,SF2000-B0706
+BLK-FG-0706,FG-1000,150,,Normal,,ギアポンプ組立 2026-07-06 週,true,true,FG1000-B0706
+BLK-SF-0713,SF-2000,450,,Normal,,ハウジング加工 2026-07-13 週,true,true,SF2000-B0713
+BLK-FG-0713,FG-1000,150,,Normal,,ギアポンプ組立 2026-07-13 週,true,true,FG1000-B0713
+BLK-SF-0720,SF-2000,450,,Normal,,ハウジング加工 2026-07-20 週,true,true,SF2000-B0720
+BLK-FG-0720,FG-1000,150,,Normal,,ギアポンプ組立 2026-07-20 週,true,true,FG1000-B0720
+BLK-SF-0727,SF-2000,450,,Normal,,ハウジング加工 2026-07-27 週,true,true,SF2000-B0727
+BLK-FG-0727,FG-1000,150,,Normal,,ギアポンプ組立 2026-07-27 週,true,true,FG1000-B0727
+BLK-SF-0803,SF-2000,450,,Normal,,ハウジング加工 2026-08-03 週,true,true,SF2000-B0803
+BLK-FG-0803,FG-1000,150,,Normal,,ギアポンプ組立 2026-08-03 週,true,true,FG1000-B0803
+BLK-SF-0817,SF-2000,450,,Normal,,ハウジング加工 2026-08-17 週,true,true,SF2000-B0817
+BLK-FG-0817,FG-1000,150,,Normal,,ギアポンプ組立 2026-08-17 週,true,true,FG1000-B0817
+BLK-SF-0824,SF-2000,450,,Normal,,ハウジング加工 2026-08-24 週,true,true,SF2000-B0824
+BLK-FG-0824,FG-1000,150,,Normal,,ギアポンプ組立 2026-08-24 週,true,true,FG1000-B0824
+BLK-SF-0831,SF-2000,450,,Normal,,ハウジング加工 2026-08-31 週,true,true,SF2000-B0831
+BLK-FG-0831,FG-1000,150,,Normal,,ギアポンプ組立 2026-08-31 週,true,true,FG1000-B0831
+BLK-SF-0907,SF-2000,450,,Normal,,ハウジング加工 2026-09-07 週,true,true,SF2000-B0907
+BLK-FG-0907,FG-1000,150,,Normal,,ギアポンプ組立 2026-09-07 週,true,true,FG1000-B0907
+BLK-SF-0914,SF-2000,450,,Normal,,ハウジング加工 2026-09-14 週,true,true,SF2000-B0914
+BLK-FG-0914,FG-1000,150,,Normal,,ギアポンプ組立 2026-09-14 週,true,true,FG1000-B0914

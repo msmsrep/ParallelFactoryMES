@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Dashboard;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
@@ -1098,6 +1099,57 @@ public class MasterCsvTests
             """);
         Assert.False(invalid.Succeeded);
         Assert.Contains(invalid.Errors, e => e.Message.Contains("LOC-X"));
+    }
+
+    [Fact]
+    public async Task 三か月分のサンプル実績を取り込むとダッシュボードで週次月次と内訳を比べられる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        var masters = await PostBundleAsync(client, "masters", ZipDirectory(FindSampleDirectory()));
+        Assert.True(masters.Succeeded, Describe(masters));
+
+        // 指図・生産実績・設備稼働記録（equipment-logs）の3ファイル
+        var bulk = await PostBundleAsync(client, "actuals", ZipDirectory(FindSampleDirectory("actual-csv-bulk")));
+        Assert.True(bulk.Succeeded, Describe(bulk));
+        Assert.Equal(3, bulk.Files.Count);
+
+        // 月次：7月・8月・9月がそろい、不良率は改善していく
+        var monthly = await client.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/trend?from=2026-07-01&to=2026-09-30&unit=Month");
+        Assert.Equal(["2026-07-01", "2026-08-01", "2026-09-01"], monthly!.Rows.Select(r => r.Key));
+        Assert.All(monthly.Rows, r => Assert.True(r.GoodQuantity > 0));
+        Assert.True(monthly.Rows[0].DefectRate > monthly.Rows[2].DefectRate);
+        Assert.All(monthly.Rows, r => Assert.NotNull(r.UtilizationRate));
+
+        // 週次：お盆休み（8/10の週）は実績なし
+        var weekly = await client.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/trend?from=2026-06-29&to=2026-09-20&unit=Week");
+        Assert.Equal(12, weekly!.Rows.Count);
+        var obon = weekly.Rows.Single(r => r.Key == "2026-08-10");
+        Assert.Equal(0m, obon.GoodQuantity);
+        Assert.Null(obon.UtilizationRate);
+
+        // 内訳：夜勤は昼勤より不良率が高く、設備は5台とも出る
+        var byShift = await client.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/breakdown?from=2026-06-29&to=2026-09-20&axis=Shift");
+        Assert.True(byShift!.Rows.Single(r => r.Key == "N 夜勤").DefectRate
+                    > byShift.Rows.Single(r => r.Key == "D 昼勤").DefectRate);
+        var byEquipment = await client.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/breakdown?from=2026-06-29&to=2026-09-20&axis=Equipment");
+        Assert.Equal(["EQ-01", "EQ-02", "EQ-03", "EQ-04", "EQ-05"], byEquipment!.Rows.Select(r => r.Key));
+        var byLine = await client.GetFromJsonAsync<DashboardSummaryResponse>(
+            "/api/dashboard/breakdown?from=2026-06-29&to=2026-09-20&axis=Line");
+        Assert.Contains(byLine!.Rows, r => r.Key == "LN-MC" && r.UtilizationRate is not null);
+
+        // 設備稼働記録CSVも単票APIと同じ判定を通る（停止には原因が要る、設備は資産番号で指す）
+        var invalid = await Phase3TestData.ImportActualCsvAsync(client, "equipment-logs",
+            "EquipmentAssetNo,Status,StartedAt,EndedAt,StopCause\n" +
+            "EQ-01,Stopped,2026-09-21 08:00,2026-09-21 09:00,\n" +
+            "EQ-99,Running,2026-09-21 08:00,2026-09-21 09:00,\n");
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 2 && e.Message.Contains("停止原因"));
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("EQ-99"));
     }
 
     // ---- ZIPによる一括取込・一括出力 ----

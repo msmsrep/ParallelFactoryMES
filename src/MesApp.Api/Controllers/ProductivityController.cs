@@ -30,7 +30,8 @@ public class ProductivityController(MesAppDbContext db, IBusinessDateService bus
         var records = (await db.ProductionRecords.AsNoTracking()
                 .Select(r => new
                 {
-                    r.CreatedAt,
+                    // 開始時刻が属する製造日で振り分ける（Spec.md 3.9。登録時刻だと朝に登録した夜勤の実績が翌日へずれる）
+                    r.StartedAt,
                     r.WorkOrderId,
                     r.GoodQuantity,
                     r.DefectQuantity,
@@ -39,8 +40,8 @@ public class ProductivityController(MesAppDbContext db, IBusinessDateService bus
                     OrderType = r.WorkOrder!.ManufacturingOrder!.OrderType,
                 })
                 .ToListAsync(ct))
-            .Where(r => (fromStart is null || r.CreatedAt >= fromStart)
-                        && (toEnd is null || r.CreatedAt < toEnd))
+            .Where(r => (fromStart is null || r.StartedAt >= fromStart)
+                        && (toEnd is null || r.StartedAt < toEnd))
             .ToList();
 
         ProductivityRow ToRow(string key, IEnumerable<decimal> good, IEnumerable<decimal> defect,

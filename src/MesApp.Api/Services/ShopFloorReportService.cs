@@ -1,5 +1,6 @@
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
+using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -7,9 +8,10 @@ using Microsoft.EntityFrameworkCore;
 namespace MesApp.Api.Services;
 
 /// <summary>
-/// 現場からの記録のうち作業指示の実行に属さないもの：作業時間（B-30-30-02、F-30-20-01）と
-/// 製造トラブル報告（B-40-10-06、B-60-10）。
-/// 単票API（<c>WorkTimeRecordsController</c>・<c>TroubleReportsController</c>）と実績CSV取込の両方から呼ぶ。
+/// 現場からの記録のうち作業指示の実行に属さないもの：作業時間（B-30-30-02、F-30-20-01）、
+/// 製造トラブル報告（B-40-10-06、B-60-10）、設備の稼働・停止の記録（B-40-20、E-20-10-01）。
+/// 単票API（<c>WorkTimeRecordsController</c>・<c>TroubleReportsController</c>・<c>EquipmentLogsController</c>）と
+/// 実績CSV取込の両方から呼ぶ。
 /// 保存と監査ログまで行う。トランザクションは呼び出し側が張る。
 /// </summary>
 public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger auditLogger)
@@ -74,5 +76,57 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
         await auditLogger.LogAsync("Execution", "TroubleReport", nameof(TroubleReport), report.Id.ToString(),
             detail: $"category={request.Category}", ct: ct);
         return Outcome<TroubleReport>.Ok(report);
+    }
+
+    /// <summary>
+    /// 設備の稼働・停止の記録（B-40-20、E-20-10-01）。記録はロールで絞らない（気づいた人がその場で上げる）。
+    /// 作業指示への紐付けは任意（段取り・保全のように紐づかない記録もある）
+    /// </summary>
+    public async Task<Outcome<EquipmentLog>> AddEquipmentLogAsync(
+        EquipmentLogRequest request, string? userId, CancellationToken ct)
+    {
+        var equipment = await db.Equipments.AsNoTracking().FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
+        if (equipment is null || !equipment.IsActive)
+        {
+            return Outcome<EquipmentLog>.Invalid("存在しない（または無効な）設備IDです。");
+        }
+        if (request.EndedAt is not null && request.EndedAt <= request.StartedAt)
+        {
+            return Outcome<EquipmentLog>.Invalid("終了時刻は開始時刻より後である必要があります。");
+        }
+        if (request.Status is EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure
+            && string.IsNullOrWhiteSpace(request.StopCause))
+        {
+            return Outcome<EquipmentLog>.Invalid("停止・故障の記録には停止原因（stopCause）が必要です（B-40-20-02）。");
+        }
+        // 作業指示に紐づけると、その指示で作ったロットの品質と設備の状態を突き合わせられる（PQC×EQC。Spec.md 5.7）
+        if (request.WorkOrderId is { } workOrderId
+            && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
+        {
+            return Outcome<EquipmentLog>.Invalid($"作業指示（ID {workOrderId}）が見つかりません。");
+        }
+
+        var log = new EquipmentLog
+        {
+            EquipmentId = request.EquipmentId,
+            WorkOrderId = request.WorkOrderId,
+            Status = request.Status,
+            StartedAt = request.StartedAt,
+            EndedAt = request.EndedAt,
+            StopCause = request.StopCause,
+            Note = request.Note,
+            RecordedByUserId = userId,
+        };
+        db.EquipmentLogs.Add(log);
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Equipment", "Log", nameof(EquipmentLog), log.Id.ToString(),
+            detail: new
+            {
+                equipmentId = log.EquipmentId,
+                workOrderId = log.WorkOrderId,
+                status = log.Status,
+                stopCause = log.StopCause,
+            }, ct: ct);
+        return Outcome<EquipmentLog>.Ok(log);
     }
 }

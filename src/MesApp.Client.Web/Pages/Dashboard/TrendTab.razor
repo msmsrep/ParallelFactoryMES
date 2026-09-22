@@ -1,0 +1,192 @@
+﻿@* ダッシュボードの推移（Spec.md 3.8。日次・週次・月次の生産数・不良率・稼働率。
+   B-60-10-05 生産性モニタリング／C-40-10-05 不適合モニタリング／E-20-10-03 稼働モニタリング）。
+   集計は api/dashboard/trend が行い、画面では数えない（Spec.md 7.5） *@
+@inject HttpClient Http
+
+<PeriodPicker Trend="true" OnChanged="OnRangeChangedAsync" />
+
+<div class="form-grid">
+    <div class="form-field">
+        <label>工程</label>
+        <select @bind="_processId" @bind:after="LoadAsync">
+            <option value="0">全工程</option>
+            @foreach (var p in _processes)
+            {
+                <option value="@p.Id">@p.Code @p.Name</option>
+            }
+        </select>
+    </div>
+    <div class="form-field">
+        <label>品目</label>
+        <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
+                      Value="_productId" ValueChanged="OnProductChangedAsync"
+                      EmptyLabel="全品目"
+                      ValueOf="p => p.Id"
+                      LabelOf='@(p => $"{p.Code} {p.Name}")' />
+    </div>
+    <div class="form-field">
+        <label>作業区</label>
+        <select @bind="_workCenterId" @bind:after="LoadAsync">
+            <option value="0">全作業区</option>
+            @foreach (var wc in _workCenters)
+            {
+                <option value="@wc.Id">@wc.Code @wc.Name</option>
+            }
+        </select>
+        <span class="text-muted">上位（工場・ライン・エリア）を選ぶと配下をまとめて集計する</span>
+    </div>
+</div>
+
+<Notice Error="@_error" />
+
+@if (_data is null)
+{
+    <p class="text-muted">読み込み中...</p>
+}
+else
+{
+    @if (!_data.UtilizationAvailable)
+    {
+        <p class="text-muted">工程・品目で絞り込んでいるため稼働率は出していません（稼働記録と作業指示の紐付けは任意のため、工程・品目では稼働を正しく分けられない）。</p>
+    }
+
+    @if (_data.Rows.Count > 0)
+    {
+        var labels = _data.Rows.Select(ShortLabel).ToList();
+        <h2>生産数と不良率</h2>
+        <ComboChart Labels="labels" AriaLabel="期間ごとの良品数・不良数と不良率"
+                    Bars="@([new ChartSeries("良品数", "var(--primary)", [.. _data.Rows.Select(r => r.GoodQuantity)]),
+                             new ChartSeries("不良数", "var(--danger)", [.. _data.Rows.Select(r => r.DefectQuantity)])])"
+                    Lines="@([new ChartSeries("不良率", "var(--warning)", [.. _data.Rows.Select(r => r.DefectRate)])])"
+                    LineUnit="%" LineMaxTop="100" />
+        @if (_data.UtilizationAvailable)
+        {
+            <h2>設備稼働率と故障件数</h2>
+            <ComboChart Labels="labels" AriaLabel="期間ごとの設備稼働率と故障件数"
+                        Bars="@([new ChartSeries("故障件数", "var(--danger)", [.. _data.Rows.Select(r => (decimal?)r.FailureCount)])])"
+                        Lines="@([new ChartSeries("設備稼働率", "var(--success)", [.. _data.Rows.Select(r => r.UtilizationRate)])])"
+                        BarUnit="件" BarInteger="true" LineUnit="%" LineMinTop="100" LineMaxTop="100" />
+        }
+    }
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>期間</th>
+                <th>良品数</th>
+                <th>不良数</th>
+                <th>不良率</th>
+                @if (_data.UtilizationAvailable)
+                {
+                    <th>稼働時間 / 記録時間</th>
+                    <th>設備稼働率</th>
+                    <th>故障件数</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _data.Rows.Append(_data.Total))
+            {
+                <tr style="@(row == _data.Total ? "font-weight:600;" : null)">
+                    <td>@row.Label</td>
+                    <td>@row.GoodQuantity?.ToString("0.##")</td>
+                    <td>@row.DefectQuantity?.ToString("0.##")</td>
+                    <td>
+                        @if (row.DefectRate is { } rate)
+                        {
+                            <span>@rate.ToString("0.##") %</span>
+                            <BarMeter Value="rate" />
+                        }
+                        else
+                        {
+                            <span class="text-muted">実績なし</span>
+                        }
+                    </td>
+                    @if (_data.UtilizationAvailable)
+                    {
+                        <td>@row.RunningHours?.ToString("0.##") / @row.RecordedHours?.ToString("0.##") h</td>
+                        <td>
+                            @if (row.UtilizationRate is { } utilization)
+                            {
+                                <span>@utilization.ToString("0.##") %</span>
+                                <BarMeter Value="utilization" HighIsBad="false" />
+                            }
+                            else
+                            {
+                                <span class="text-muted">記録なし</span>
+                            }
+                        </td>
+                        <td>@row.FailureCount</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private PeriodPicker.Range? _range;
+    private DashboardSummaryResponse? _data;
+    private List<ProcessResponse> _processes = [];
+    private List<WorkCenterResponse> _workCenters = [];
+    private int _processId;
+    private int _productId;
+    private int _workCenterId;
+    private string? _error;
+    private int _requestNo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
+        _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>("api/work-centers") ?? [];
+    }
+
+    private Task OnRangeChangedAsync(PeriodPicker.Range range)
+    {
+        _range = range;
+        return LoadAsync();
+    }
+
+    private Task OnProductChangedAsync(int productId)
+    {
+        _productId = productId;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_range is null)
+        {
+            return;
+        }
+        _error = null;
+        var url = $"api/dashboard/trend?from={_range.From:yyyy-MM-dd}&to={_range.To:yyyy-MM-dd}&unit={_range.Unit}";
+        if (_processId != 0) url += $"&processId={_processId}";
+        if (_productId != 0) url += $"&productId={_productId}";
+        if (_workCenterId != 0) url += $"&workCenterId={_workCenterId}";
+        // 期間・軸を続けて変えると応答の順が入れ替わることがある。最後に出した要求の結果だけを使う
+        var requestNo = ++_requestNo;
+        var response = await Http.GetAsync(url);
+        if (requestNo != _requestNo)
+        {
+            return;
+        }
+        if (await response.ReadErrorAsync("推移の集計を取得できませんでした。") is { } error)
+        {
+            _error = error;
+            return;
+        }
+        var data = await response.Content.ReadFromJsonAsync<DashboardSummaryResponse>();
+        if (requestNo == _requestNo)
+        {
+            _data = data;
+        }
+    }
+
+    /// <summary>グラフの軸ラベル（日次は日付、週次は開始日、月次は月）</summary>
+    private string ShortLabel(DashboardMetricsRow row) => _range?.Unit switch
+    {
+        DashboardPeriodUnit.Month => $"{row.PeriodStart:yyyy/MM}",
+        _ => $"{row.PeriodStart:MM/dd}",
+    };
+}

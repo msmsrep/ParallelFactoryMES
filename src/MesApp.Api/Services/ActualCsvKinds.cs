@@ -27,6 +27,7 @@ public static class ActualCsvKinds
     public const string Inspections = "inspections";
     public const string WorkTimeRecords = "work-time-records";
     public const string TroubleReports = "trouble-reports";
+    public const string EquipmentLogs = "equipment-logs";
 
     private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
     private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
@@ -146,10 +147,21 @@ public static class ActualCsvKinds
             new("EquipmentAssetNo", "設備の資産番号", false, null),
             new("Content", "内容", true, null),
         ]), AnyRole),
+        new(new CsvKindInfo(EquipmentLogs, "設備稼働記録", false,
+        [
+            new("EquipmentAssetNo", "設備の資産番号", true, "登録済みで有効な設備"),
+            new("Status", "区分", true, "Running（稼働）/ Stopped（停止）/ Setup（段取り）/ Failure（故障）/ Idle（アイドル）"),
+            new("StartedAt", "開始日時", true, DateTimeNote + "。稼働率はこの時刻が属する製造日で集計する"),
+            new("EndedAt", "終了日時", false, DateTimeNote + "。空欄は継続中（稼働率の集計には入らない）"),
+            new("StopCause", "停止原因", false, "停止・故障のときは必須"),
+            new("OrderNo", "指図番号", false, "作業指示に紐づける場合（工程順序と合わせて指す）"),
+            new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
+            new("Note", "備考", false, null),
+        ]), AnyRole),
     ];
 
     /// <summary>
-    /// 認証済みの全ロール。トラブル報告は単票APIもロールで絞っていない
+    /// 認証済みの全ロール。トラブル報告・設備稼働記録は単票APIもロールで絞っていない
     /// （異常は気づいた人がその場で上げられることを優先する。MesRoleGroups の方針）
     /// </summary>
     private static string AnyRole => string.Join(",", MesRoles.All);
