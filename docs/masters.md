@@ -304,7 +304,7 @@ CSVに登場しなかった親品目のMBOM・工順は変更されません。
 
 ## 実績のCSV取込 {#actual-csv}
 
-試験・移行・教育用に、**実績（受入・製造指図・段取り・チェックリスト・部材投入・生産実績・製造条件・検査・作業時間・トラブル報告）もCSVでまとめて登録できます**。
+試験・移行・教育用に、**実績（受入・製造指図・段取り・チェックリスト・部材投入・生産実績・製造条件・検査・作業時間・トラブル報告・設備稼働記録）もCSVでまとめて登録できます**。
 メニューの **管理 → 実績CSV取込** を開き、種別ごとのパネルから取り込みます。
 
 - 1件ずつ画面から登録したときと**同じチェック**を通ります（校正期限切れの検査機、理由の無い代替部品の投入、在庫不足などは取り込めません）。
@@ -321,6 +321,11 @@ CSVに登場しなかった親品目のMBOM・工順は変更されません。
 **[samples-actual-csv.zip](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip)** にあります
 （中身は [samples/actual-csv](https://github.com/msmsrep/ParallelFactoryMES/tree/main/samples/actual-csv)）。
 [サンプルCSV](#サンプルcsv) のマスタを取り込んだ後に、ファイル名の番号順に取り込んでください。
+
+ダッシュボードの週次・月次の推移や、工程・直・ライン・設備別の内訳を試すための**約3か月分の実績**は
+**[samples-actual-csv-bulk.zip](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv-bulk.zip)** にあります
+（中身と見どころは [samples/actual-csv-bulk](https://github.com/msmsrep/ParallelFactoryMES/tree/main/samples/actual-csv-bulk)）。
+期間は 2026-06-29〜2026-09-20 なので、ダッシュボードでは基準日をその期間に合わせて見てください。
 
 ### ユーザーのCSV（システム管理者のみ）
 

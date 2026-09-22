@@ -4,6 +4,7 @@ using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
+using MesApp.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +23,7 @@ namespace MesApp.Api.Controllers;
 [Route("api/equipment-logs")]
 [Authorize]
 public class EquipmentLogsController(
-    MesAppDbContext db, IAuditLogger auditLogger, IBusinessDateService businessDate) : ControllerBase
+    MesAppDbContext db, ShopFloorReportService reports, IBusinessDateService businessDate) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<EquipmentLogResponse>>> List(
@@ -56,58 +57,20 @@ public class EquipmentLogsController(
     [HttpPost]
     public async Task<ActionResult<EquipmentLogResponse>> Create(EquipmentLogRequest request, CancellationToken ct)
     {
-        var equipment = await db.Equipments.FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
-        if (equipment is null || !equipment.IsActive)
+        // 登録の判定と監査ログは実績CSV取込と共通（ShopFloorReportService）
+        var outcome = await reports.AddEquipmentLogAsync(
+            request, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        if (outcome.Value is not { } log)
         {
-            return this.BadRequestProblem("存在しない（または無効な）設備IDです。");
+            return this.BadRequestProblem(outcome.Error);
         }
-        if (request.EndedAt is not null && request.EndedAt <= request.StartedAt)
-        {
-            return this.BadRequestProblem("終了時刻は開始時刻より後である必要があります。");
-        }
-        if (request.Status is EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure
-            && string.IsNullOrWhiteSpace(request.StopCause))
-        {
-            return this.BadRequestProblem("停止・故障の記録には停止原因（stopCause）が必要です（B-40-20-02）。");
-        }
-
-        // 作業指示に紐づけると、その指示で作ったロットの品質と設備の状態を突き合わせられる
-        // （PQC×EQCの交差点。Spec.md 5.7）。段取り・保全のように紐づかない記録もあるため任意
-        WorkOrder? workOrder = null;
-        if (request.WorkOrderId is { } workOrderId)
-        {
-            workOrder = await db.WorkOrders.AsNoTracking()
-                .FirstOrDefaultAsync(w => w.Id == workOrderId, ct);
-            if (workOrder is null)
-            {
-                return this.BadRequestProblem($"作業指示（ID {workOrderId}）が見つかりません。");
-            }
-        }
-
-        var log = new EquipmentLog
-        {
-            EquipmentId = request.EquipmentId,
-            WorkOrderId = request.WorkOrderId,
-            Status = request.Status,
-            StartedAt = request.StartedAt,
-            EndedAt = request.EndedAt,
-            StopCause = request.StopCause,
-            Note = request.Note,
-            RecordedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-        };
-        db.EquipmentLogs.Add(log);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Equipment", "Log", nameof(EquipmentLog), log.Id.ToString(),
-            detail: new
-            {
-                equipmentId = log.EquipmentId,
-                workOrderId = log.WorkOrderId,
-                status = log.Status,
-                stopCause = log.StopCause,
-            }, ct: ct);
-        return new EquipmentLogResponse(log.Id, log.EquipmentId, equipment.Name, log.Status,
-            log.StartedAt, log.EndedAt, log.StopCause, log.Note,
-            log.WorkOrderId, workOrder?.WorkOrderNo);
+        return await db.EquipmentLogs.AsNoTracking()
+            .Where(l => l.Id == log.Id)
+            .Select(l => new EquipmentLogResponse(
+                l.Id, l.EquipmentId, l.Equipment!.Name, l.Status,
+                l.StartedAt, l.EndedAt, l.StopCause, l.Note,
+                l.WorkOrderId, l.WorkOrder != null ? l.WorkOrder.WorkOrderNo : null))
+            .SingleAsync(ct);
     }
 
     /// <summary>

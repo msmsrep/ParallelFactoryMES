@@ -2,6 +2,7 @@ using System.Globalization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Inventory;
+using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Quality;
@@ -68,6 +69,7 @@ public sealed class ActualCsvService(
             ActualCsvKinds.Inspections => await ImportInspectionsAsync(table, errors, userId!, ct),
             ActualCsvKinds.WorkTimeRecords => await ImportWorkTimeRecordsAsync(table, errors, userId!, ct),
             ActualCsvKinds.TroubleReports => await ImportTroubleReportsAsync(table, errors, userId!, ct),
+            ActualCsvKinds.EquipmentLogs => await ImportEquipmentLogsAsync(table, errors, userId, ct),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
         if (errors.Count == 0)
@@ -613,6 +615,44 @@ public sealed class ActualCsvService(
 
             var outcome = await reports.AddTroubleReportAsync(
                 new TroubleReportRequest(occurredAt!.Value, category, workOrderId, equipmentId, content), userId, ct);
+            if (outcome.Failed)
+            {
+                FailRow(reader, outcome.Error!);
+                continue;
+            }
+            created++;
+        }
+        return created;
+    }
+
+    /// <summary>設備稼働記録。1行＝1区間（記録者は取り込んだユーザー）</summary>
+    private async Task<int> ImportEquipmentLogsAsync(
+        CsvTable table, List<CsvImportError> errors, string? userId, CancellationToken ct)
+    {
+        var workOrders = await WorkOrderKeysAsync(ct);
+        var equipmentIds = await db.Equipments.AsNoTracking()
+            .ToDictionaryAsync(e => e.AssetNo, e => e.Id, StringComparer.Ordinal, ct);
+        var created = 0;
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            reader.RequiredText("EquipmentAssetNo");
+            var equipmentId = reader.Reference("EquipmentAssetNo", null, equipmentIds, "設備");
+            reader.RequiredText("Status");
+            var status = reader.Enum("Status", EquipmentLogStatus.Running, CsvEnumLabels.EquipmentLogStatuses);
+            var startedAt = RequiredDateTime(reader, "StartedAt");
+            var endedAt = reader.DateTimeOrNull("EndedAt", FactoryOffset);
+            var stopCause = reader.Text("StopCause", null, 500);
+            var workOrderId = ResolveOptionalWorkOrder(reader, workOrders);
+            var note = reader.Text("Note", null, 500);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            var outcome = await reports.AddEquipmentLogAsync(
+                new EquipmentLogRequest(equipmentId!.Value, status, startedAt!.Value, endedAt, stopCause, note, workOrderId),
+                userId, ct);
             if (outcome.Failed)
             {
                 FailRow(reader, outcome.Error!);

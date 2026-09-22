@@ -95,7 +95,7 @@ DBファイル（`mesapp.db`）とJWT署名鍵（`jwt-signing.key`）は**デー
 
 書き方の見本として、そのまま取り込めるサンプルデータ一式を [`samples/master-csv/`](samples/master-csv/) に置いています
 （ファイル名の番号順に取り込むと、製造指図から出荷まで試せる状態になります）。
-ZIPにしたものを Releases に添付しています（[マスタ](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)・[実績](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip)）。
+ZIPにしたものを Releases に添付しています（[マスタ](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)・[実績](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip)・[ダッシュボード確認用の3か月分の実績](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv-bulk.zip)）。
 
 ## 配布・本番相当の実行
 
