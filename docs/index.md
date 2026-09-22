@@ -61,9 +61,7 @@ next_title: 導入と初期設定
 | 出荷 | 出荷管理 | 物流・倉庫 | [物流・在庫管理](logistics.html) |
 | 設備・治工具 | 設備保全／治工具管理 | 設備保全 | [設備保全・治工具](maintenance.html) |
 
-## このバージョンでできること・できないこと
-
-**利用できます**
+## このバージョンでできること
 
 - 生産管理（製造指図・工程展開・進捗）
 - 製造実行（差立・段取り・チェックリスト・実績・トラブル報告）
@@ -73,10 +71,7 @@ next_title: 導入と初期設定
 - 設備保全（稼働記録・保全計画／指示／実績・手順書）と治工具寿命管理
 - 帳票・ラベル出力、バーコード／QRスキャン
 - データベースは SQLite（既定）・PostgreSQL・SQL Server から選択
-
-**まだ利用できません**
-
-- Docker イメージ・Zip パッケージでの配布
+- 配布は Microsoft Store 版（1台で試す）・ZIP（Windows / Linux）・Docker の3通り（[導入と初期設定](getting-started.html)）
 
 <div class="note">
 <p><strong>用語やステータスの意味を調べたいとき</strong>は<a href="reference.html">リファレンス</a>を、

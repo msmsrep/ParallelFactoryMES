@@ -93,6 +93,7 @@
 改訂92: 2026-09-21（**3プロバイダー分のマイグレーションをまとめて追加するスクリプト**（`scripts/Migrations.ps1`）を用意し、4章の将来拡張から「3プロバイダー分を作る運用の省力化」を外した。1つのマイグレーションで3プロバイダーを兼ねる形は、列の型がプロバイダーごとに生成されるため手修正が毎回必要になり採らない。あわせて、マイグレーションに生SQLを書かない規約を4章に加えた）
 改訂93: 2026-09-22（7.8節：ストア提出で「予約していない表示名」として弾かれたため、MSIXの表示名をマニフェストへの直書きから`build/msix-identity.json`の`DisplayName`に移し、予約名と一致させる旨を明記）
 改訂94: 2026-09-22（**Zip配布とDocker配布を実装した**（7.2節。Phase 10完了）。自己完結版zip（win-x64 / linux-x64）とコンテナイメージ（linux/amd64・arm64、GHCR）を、タグpushでGitHub Actionsから公開する。7.7節のDocker構成のバックアップをボリューム退避の手順に改め、9章の構成を実配置に合わせた。あわせて、Linuxで`~/.local/share`が未作成のときデータ保存先がカレントディレクトリになる不具合を直した（4章`MesAppDataDirectory`））
+改訂95: 2026-09-22（7.2節：リリースにサンプルCSVのzipを添付することにした。紹介ページとユーザーガイドを3つの配布方法（Microsoft Store・zip・Docker）に合わせて更新）
 参考: みんなのMES（min-MES） https://min-mes.com/ / OSS: https://github.com/mihatama/open-mes-project
 
 ---
@@ -573,7 +574,7 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
 
 ### 7.2 配布形態
 - **Windows Store（MSIX・単独PC向け）**: MesApp.Desktop。API・DB・Webクライアントを1つのパッケージに同梱し、1台のPCで完結して動作させる（7.8節）
-- **Zip配布**: MesApp.Api（Webクライアント静的ファイル同梱）を**自己完結版**（win-x64 / linux-x64。配布先に.NETランタイム不要）で発行してzip化し、社内サーバー等に手動配置できるようにする（`build/Pack-Zip.ps1`）。起動スクリプト（`start.cmd` / `start.sh`）・LICENSE・対応ソースの所在（コミット）を同梱する。zipはUnixの実行権限を保持しないため、`start.sh`が起動前に実行権限を付ける
+- **Zip配布**: MesApp.Api（Webクライアント静的ファイル同梱）を**自己完結版**（win-x64 / linux-x64。配布先に.NETランタイム不要）で発行してzip化し、社内サーバー等に手動配置できるようにする（`build/Pack-Zip.ps1`）。起動スクリプト（`start.cmd` / `start.sh`）・LICENSE・対応ソースの所在（コミット）を同梱する。zipはUnixの実行権限を保持しないため、`start.sh`が起動前に実行権限を付ける。リリースにはサンプルCSVのzip（`samples-master-csv.zip` / `samples-actual-csv.zip`）も添付する（リポジトリを持たないzip・ストア版の利用者が取込画面にそのまま渡せるよう。名前に版数を入れず`releases/latest/download/`の固定リンクで案内する）
 - **Docker配布**: MesApp.Api（Webクライアント同梱）をコンテナイメージ化し（`Dockerfile`。linux/amd64・linux/arm64）、`ghcr.io/msmsrep/parallelfactorymes`で公開する。非rootで動かし、DB（SQLite）とJWT署名鍵は`/data`ボリューム（`MESAPP_DATA_DIR=/data`）に置く。`TZ`の既定は`Asia/Tokyo`（業務日付の境界に効くため）。起動例として`compose.yaml`（SQLite）と`compose.postgres.yaml`（PostgreSQL）を置く。HTTPSはコンテナでは扱わず前段のリバースプロキシで終端する
 - **リリースの自動化**: タグ`vX.Y.Z`のpushでGitHub Actions（`.github/workflows/release.yml`）がビルド・テストの後にzipをGitHub Releaseへ添付し、イメージをGHCRへ登録する。版数はタグから取り（`-p:Version`）、既定値は`Directory.Build.props`。`-`を含むタグはプレリリース扱いにしてイメージに`latest`を付けない。MSIXは署名とストア提出が手作業のため対象外。push・PRごとのビルドとテストは`.github/workflows/ci.yml`（Windows。MesApp.Desktopを含むため）
 - MesApp.Client.Webは必ずMesApp.Apiが配信する（別配信は行わない。APIと同一オリジンに置き、CORSや配置の組み合わせを増やさないため）

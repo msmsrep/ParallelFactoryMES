@@ -33,6 +33,8 @@ prev_title: 管理者向け運用
 
 ### Microsoft Store 版（デスクトップアプリ）
 
+[Microsoft Store](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=ja-JP&gl=JP) から入手するデスクトップアプリです。
+
 データベース、認証用の署名鍵、起動ログ、WebView2 のユーザーデータは、Windows がこのアプリ専用に割り当てる領域に保存されます。
 
 ```

@@ -5,6 +5,7 @@
 .DESCRIPTION
     自己完結版なので配布先に .NET / ASP.NET Core Runtime は要らない。
     ZIP には起動スクリプト（start.cmd / start.sh）・LICENSE・ソースの所在（AGPL-3.0 の対応ソース）を同梱する。
+    あわせて、取込画面に渡せるサンプルCSVのZIP（samples-master-csv.zip / samples-actual-csv.zip）を作る。
 
     ZIP は Unix の実行権限を保持しないため、start.sh が起動前に MesApp.Api へ実行権限を付ける
     （利用者は `sh start.sh` で起動する）。
@@ -120,4 +121,14 @@ Parallel Factory MES $Version（$rid・自己完結版）
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip, [IO.Compression.CompressionLevel]::Optimal, $true)
     Remove-Item $stage -Recurse -Force
     Write-Host "作成: $zip ($([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB)"
+}
+
+# --- 4. サンプルCSV -------------------------------------------------------------------------
+# ZIP版・ストア版の利用者はリポジトリを持たないため、取込画面にそのまま渡せる形で添付する。
+# 版数を名前に入れず、releases/latest/download/<名前> の固定リンクで案内できるようにする
+foreach ($kind in 'master-csv', 'actual-csv') {
+    $zip = Join-Path $OutputDirectory "samples-$kind.zip"
+    if (Test-Path $zip) { Remove-Item $zip -Force }
+    [IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $repoRoot "samples/$kind"), $zip)
+    Write-Host "作成: $zip"
 }

@@ -5,6 +5,7 @@ APIが同一オリジンでWebクライアントも配信します。
 
 - **紹介ページ（画面写真でひととおり見る）**: [Parallel Factory MES の紹介](https://msmsrep.github.io/ParallelFactoryMES/intro.html)
 - **ユーザーガイド（操作マニュアル）**: [ユーザーガイド](https://msmsrep.github.io/ParallelFactoryMES/)
+- **入手**: [Microsoft Store](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=ja-JP&gl=JP)（1台で試す）／[ZIP](https://github.com/msmsrep/ParallelFactoryMES/releases/latest)（Windows / Linux）／Docker `ghcr.io/msmsrep/parallelfactorymes`
 
 ## ライセンス
 
@@ -94,12 +95,14 @@ DBファイル（`mesapp.db`）とJWT署名鍵（`jwt-signing.key`）は**デー
 
 書き方の見本として、そのまま取り込めるサンプルデータ一式を [`samples/master-csv/`](samples/master-csv/) に置いています
 （ファイル名の番号順に取り込むと、製造指図から出荷まで試せる状態になります）。
+ZIPにしたものを Releases に添付しています（[マスタ](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)・[実績](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip)）。
 
 ## 配布・本番相当の実行
 
 ビルド済みのものを使う場合（手順の詳細は [管理者向け運用](docs/operations.md)）:
 
-- **ZIP（自己完結版・.NET不要）**: [Releases](https://github.com/msmsrep/ParallelFactoryMES/releases) から
+- **Microsoft Store 版（1台で試す）**: [Microsoft Store](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=ja-JP&gl=JP) からインストールします。サーバー不要で、ほかの端末からは接続できません
+- **ZIP（自己完結版・.NET不要）**: [Releases](https://github.com/msmsrep/ParallelFactoryMES/releases/latest) から
   `ParallelFactoryMES-<版>-win-x64.zip` / `-linux-x64.zip` を取得し、展開して `start.cmd`（Linux は `sh start.sh`）で起動します（ポート 5000）
 - **Docker（amd64 / arm64）**: `docker compose up -d` で起動します（ポート 8080。PostgreSQL 付きは `compose.postgres.yaml`）
 
