@@ -840,14 +840,14 @@ public class ProductionTests
         var d1 = new DateOnly(2026, 10, 1);
         var d2 = new DateOnly(2026, 10, 2);
         await CreatePlanAsync(admin, new(d2, productId, processId, wc2.Id, 20m, null));
-        await CreatePlanAsync(admin, new(d1, productId, processId, wc1.Id, 10m, "初回"));
+        await CreatePlanAsync(admin, new(d2, productId, processId, wc1.Id, 10m, "初回"));
         await CreatePlanAsync(admin, new(d1, productId, processId, null, 5m, null));
         await CreatePlanAsync(admin, new(new DateOnly(2026, 10, 3), productId, processId, otherLine.Id, 0m, "休止"));
 
         // 期間は製造日の両端を含み、製造日→品目→工程→作業区の順に並ぶ
         var byPeriod = (await admin.GetFromJsonAsync<List<ProductionPlanResponse>>(
             "/api/production-plans?from=2026-10-01&to=2026-10-02"))!;
-        Assert.Equal([(d1, (string?)null), (d1, "WC01"), (d2, "WC02")],
+        Assert.Equal([(d1, (string?)null), (d2, "WC01"), (d2, "WC02")],
             byPeriod.Select(p => (p.BusinessDate, p.WorkCenterCode)));
         Assert.Equal(("FG-01", "PR-01", "初回"), (byPeriod[1].ProductCode, byPeriod[1].ProcessCode, byPeriod[1].Note));
 
@@ -876,18 +876,19 @@ public class ProductionTests
         var date = new DateOnly(2026, 10, 1);
 
         var withoutWc = await CreatePlanAsync(admin, new(date, productId, processId, null, 10m, null));
-        var withWc = await CreatePlanAsync(admin, new(date, productId, processId, wc.Id, 10m, null));
+        var date2 = date.AddDays(2);
+        var withWc = await CreatePlanAsync(admin, new(date2, productId, processId, wc.Id, 10m, null));
 
         // 作業区なしどうし・同じ作業区どうしはどちらも同じキー（NULL もDBに任せずAPIで止める）
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync("/api/production-plans",
             new ProductionPlanRequest(date, productId, processId, null, 3m, null))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync("/api/production-plans",
-            new ProductionPlanRequest(date, productId, processId, wc.Id, 3m, null))).StatusCode);
+            new ProductionPlanRequest(date2, productId, processId, wc.Id, 3m, null))).StatusCode);
         // 更新でほかの計画と同じキーへ付け替えるのも409。自分自身のキーのままの更新は通る
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PutAsJsonAsync($"/api/production-plans/{withWc.Id}",
             new ProductionPlanRequest(date, productId, processId, null, 3m, null))).StatusCode);
         var updated = await admin.PutAsJsonAsync($"/api/production-plans/{withWc.Id}",
-            new ProductionPlanRequest(date, productId, processId, wc.Id, 12m, "改訂"));
+            new ProductionPlanRequest(date2, productId, processId, wc.Id, 12m, "改訂"));
         updated.EnsureSuccessStatusCode();
         Assert.Equal(12m, (await updated.Content.ReadFromJsonAsync<ProductionPlanResponse>())!.PlannedQuantity);
 
@@ -912,6 +913,41 @@ public class ProductionTests
         Assert.Equal(HttpStatusCode.NotFound,
             (await admin.GetAsync($"/api/production-plans/{withoutWc.Id}")).StatusCode);
         await CreatePlanAsync(admin, new(date, productId, processId, null, 8m, null));
+    }
+
+    [Fact]
+    public async Task 生産計画は作業区の範囲が重なる計画を同じ製造日品目工程に併存させない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (productId, processId) = await SetupMastersAsync(admin);
+        var plant = await MasterTests.CreateWorkCenterAsync(admin, "P1", "第一工場", WorkCenterLevel.Plant, null);
+        var line = await MasterTests.CreateWorkCenterAsync(admin, "L1", "組立1ライン", WorkCenterLevel.Line, plant.Id);
+        var area = await MasterTests.CreateWorkCenterAsync(admin, "A1", "組立エリア", WorkCenterLevel.Area, line.Id);
+        var wc1 = await MasterTests.CreateWorkCenterAsync(admin, "WC01", "組立作業区1", WorkCenterLevel.WorkCenter, area.Id);
+        var wc2 = await MasterTests.CreateWorkCenterAsync(admin, "WC02", "組立作業区2", WorkCenterLevel.WorkCenter, area.Id);
+        var date = new DateOnly(2026, 10, 1);
+        var date2 = date.AddDays(1);
+
+        async Task<HttpStatusCode> PostAsync(DateOnly d, int? workCenterId) =>
+            (await admin.PostAsJsonAsync("/api/production-plans",
+                new ProductionPlanRequest(d, productId, processId, workCenterId, 1m, null))).StatusCode;
+
+        // 兄弟の作業区どうしは重ならないので併存できる
+        var plan1 = await CreatePlanAsync(admin, new(date, productId, processId, wc1.Id, 10m, null));
+        await CreatePlanAsync(admin, new(date, productId, processId, wc2.Id, 10m, null));
+        // 作業区なし（全体）・上位の段は配下の計画と重なるので409（予実で二重に数えるため）
+        Assert.Equal(HttpStatusCode.Conflict, await PostAsync(date, null));
+        Assert.Equal(HttpStatusCode.Conflict, await PostAsync(date, line.Id));
+        Assert.Equal(HttpStatusCode.Conflict, await PostAsync(date, area.Id));
+        // 逆向き（全体の計画が先にある日に作業区ありを足す）も409
+        await CreatePlanAsync(admin, new(date2, productId, processId, null, 20m, null));
+        Assert.Equal(HttpStatusCode.Conflict, await PostAsync(date2, wc1.Id));
+        // 更新で重なるキーへ付け替えるのも409。理由には重なる相手の作業区が出る
+        var moved = await admin.PutAsJsonAsync($"/api/production-plans/{plan1.Id}",
+            new ProductionPlanRequest(date2, productId, processId, wc1.Id, 10m, null));
+        Assert.Equal(HttpStatusCode.Conflict, moved.StatusCode);
+        Assert.Contains("WC01", await moved.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -959,14 +995,15 @@ public class ProductionTests
         using var admin = await TestAuth.CreateAdminClientAsync(factory);
         var ctx = await Phase3TestData.SetupAsync(admin);
         await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 1000m, ctx.MaterialLocationId);
-        var wc = await MasterTests.CreateWorkCenterAsync(admin, "P1", "第一工場", WorkCenterLevel.Plant, null);
+        var plant1 = await MasterTests.CreateWorkCenterAsync(admin, "P1", "第一工場", WorkCenterLevel.Plant, null);
+        var plant2 = await MasterTests.CreateWorkCenterAsync(admin, "P2", "第二工場", WorkCenterLevel.Plant, null);
 
         var d1 = new DateOnly(2026, 9, 1);
         var d2 = new DateOnly(2026, 9, 2);
         var d3 = new DateOnly(2026, 9, 3);
-        // 作業区違いの計画は1行に合算する。計画0（休止）の日は実績が無くても行になる
-        await CreatePlanAsync(admin, new(d1, ctx.ProductId, ctx.ProcessId, null, 20m, null));
-        await CreatePlanAsync(admin, new(d1, ctx.ProductId, ctx.ProcessId, wc.Id, 5m, null));
+        // 作業区違い（重ならない作業区どうし）の計画は1行に合算する。計画0（休止）の日は実績が無くても行になる
+        await CreatePlanAsync(admin, new(d1, ctx.ProductId, ctx.ProcessId, plant1.Id, 20m, null));
+        await CreatePlanAsync(admin, new(d1, ctx.ProductId, ctx.ProcessId, plant2.Id, 5m, null));
         await CreatePlanAsync(admin, new(d2, ctx.ProductId, ctx.ProcessId, null, 0m, "休止"));
 
         var jst = TimeSpan.FromHours(9);
@@ -1033,7 +1070,6 @@ public class ProductionTests
         var otherLine = await MasterTests.CreateWorkCenterAsync(admin, "L2", "組立2ライン", WorkCenterLevel.Line, plant.Id);
 
         var date = new DateOnly(2026, 9, 1);
-        await CreatePlanAsync(admin, new(date, ctx.ProductId, ctx.ProcessId, null, 20m, null));
         await CreatePlanAsync(admin, new(date, ctx.ProductId, ctx.ProcessId, wc.Id, 10m, null));
         await CreatePlanAsync(admin, new(date, ctx.ProductId, ctx.ProcessId, otherLine.Id, 7m, null));
 
@@ -1059,13 +1095,19 @@ public class ProductionTests
                 $"/api/production-plans/plan-actual?from=2026-09-01&to=2026-09-01{query}"))!);
 
         var all = await GetAsync(string.Empty);
-        Assert.Equal((37m, 8m), (all.PlannedQuantity, all.ActualQuantity));
+        Assert.Equal((17m, 8m), (all.PlannedQuantity, all.ActualQuantity));
 
-        // ラインを指定したら配下の作業区だけ。作業区なしの計画も作業区なしの実績も外れる
+        // ラインを指定したら配下の作業区だけ。作業区なしの実績は外れる
         var byLine = await GetAsync($"&workCenterId={line.Id}");
         Assert.Equal((10m, 3m, (decimal?)30m), (byLine.PlannedQuantity, byLine.ActualQuantity, byLine.AchievementRate));
         var byPlant = await GetAsync($"&workCenterId={plant.Id}");
         Assert.Equal((17m, 3m), (byPlant.PlannedQuantity, byPlant.ActualQuantity));
+
+        // 作業区なしの計画も、作業区で絞ると外れる（作業区ありと同じ日には置けないので翌日に置く）
+        await CreatePlanAsync(admin, new(date.AddDays(1), ctx.ProductId, ctx.ProcessId, null, 20m, null));
+        var twoDays = (await admin.GetFromJsonAsync<List<ProductionPlanActualRow>>(
+            $"/api/production-plans/plan-actual?from=2026-09-01&to=2026-09-02&workCenterId={plant.Id}"))!;
+        Assert.Equal([date], twoDays.Select(r => r.BusinessDate));
 
         Assert.Equal(HttpStatusCode.BadRequest,
             (await admin.GetAsync("/api/production-plans/plan-actual?workCenterId=9999")).StatusCode);

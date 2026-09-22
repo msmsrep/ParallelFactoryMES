@@ -1534,11 +1534,12 @@ public sealed partial class MasterCsvService
         var productIds = await ProductIdsAsync(ct);
         var processIds = await db.Processes.AsNoTracking()
             .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
-        var workCenterIds = await db.WorkCenters.AsNoTracking()
-            .ToDictionaryAsync(w => w.Code, w => w.Id, StringComparer.Ordinal, ct);
+        var workCenters = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
+        var workCenterIds = workCenters.ToDictionary(w => w.Code, w => w.Id, StringComparer.Ordinal);
         var hasNote = table.HasColumn("Note");
         var seen = new HashSet<ProductionPlanPolicy.PlanKey>();
-        var staged = new List<(ProductionPlanPolicy.PlanKey Key, decimal Quantity, string? Note)>();
+        var staged = new List<(CsvRecord Row, string ProductCode, string ProcessCode,
+            ProductionPlanPolicy.PlanKey Key, decimal Quantity, string? Note)>();
 
         // 1周目：行を読んでキーを決める
         foreach (var row in table.Rows)
@@ -1572,7 +1573,7 @@ public sealed partial class MasterCsvService
                     date, productCode, processCode, table.Value(row, "WorkCenterCode") ?? "-"));
                 continue;
             }
-            staged.Add((key, qty, note));
+            staged.Add((row, productCode!, processCode!, key, qty, note));
         }
         if (staged.Count == 0)
         {
@@ -1587,7 +1588,32 @@ public sealed partial class MasterCsvService
                 .ToListAsync(ct))
             .GroupBy(ProductionPlanPolicy.KeyOf)
             .ToDictionary(g => g.Key, g => g.First());
-        foreach (var (key, quantity, note) in staged)
+
+        // 取り込んだ後に同じ製造日・品目・工程で並ぶ作業区（既存＋ファイル。上書きではキーは変わらない）の範囲が
+        // 重なれば、その行を拒否する（単票APIと同じ規則。予実で二重に数えないため）
+        var afterImport = byKey.Keys.Concat(staged.Select(s => s.Key)).Distinct()
+            .GroupBy(k => (k.BusinessDate, k.ProductId, k.ProcessId))
+            .ToDictionary(g => g.Key, g => g.Select(k => k.WorkCenterId).ToList());
+        var codeById = workCenters.ToDictionary(w => w.Id, w => w.Code);
+        foreach (var s in staged)
+        {
+            var others = afterImport[(s.Key.BusinessDate, s.Key.ProductId, s.Key.ProcessId)]
+                .Where(other => other != s.Key.WorkCenterId);
+            foreach (var other in others.Where(other => ProductionPlanPolicy.Overlaps(s.Key.WorkCenterId, other, workCenters)))
+            {
+                new CsvRowReader(table, s.Row, errors).Fail(ProductionPlanPolicy.Overlapped(
+                    s.Key.BusinessDate, s.ProductCode, s.ProcessCode,
+                    s.Key.WorkCenterId is { } id ? codeById[id] : null,
+                    other is { } otherId ? codeById[otherId] : null));
+                break;
+            }
+        }
+        if (errors.Count > 0)
+        {
+            return;
+        }
+
+        foreach (var (_, _, _, key, quantity, note) in staged)
         {
             if (byKey.TryGetValue(key, out var plan))
             {

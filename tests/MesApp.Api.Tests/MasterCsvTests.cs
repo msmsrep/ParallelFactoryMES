@@ -1102,7 +1102,7 @@ public class MasterCsvTests
         var first = await ImportAsync(admin, "production-plans", """
             BusinessDate,ProductCode,ProcessCode,WorkCenterCode,PlannedQuantity,Note
             2026-10-01,FG-1,PR-01,,100,
-            2026-10-01,FG-1,PR-01,PL,50,工場分
+            2026-10-02,FG-1,PR-01,PL,50,工場分
             2026-10-02,FG-1,PR-02,,0,休止
             """);
         Assert.True(first.Succeeded, string.Join(" / ", first.Errors.Select(e => e.Message)));
@@ -1121,7 +1121,7 @@ public class MasterCsvTests
         Assert.Equal(120m, plans.Single(p => p.BusinessDate == new DateOnly(2026, 10, 1) && p.WorkCenterId is null).PlannedQuantity);
         Assert.Equal(50m, plans.Single(p => p.WorkCenterCode == "PL").PlannedQuantity);
         // Note 列が無いファイルでは備考を保つ
-        Assert.Equal("休止", plans.Single(p => p.BusinessDate == new DateOnly(2026, 10, 2)).Note);
+        Assert.Equal("休止", plans.Single(p => p.ProcessCode == "PR-02").Note);
 
         // CSVで入れた作業区なしの計画は、単票APIでも同じキーとして重複になる（判定が共通）
         var nullKey = plans.Single(p => p.BusinessDate == new DateOnly(2026, 10, 3));
@@ -1129,7 +1129,8 @@ public class MasterCsvTests
             nullKey.BusinessDate, nullKey.ProductId, nullKey.ProcessId, null, 5m, null));
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
 
-        // 存在しないコード・負の数量・ファイル内のキー重複はエラーで、正しい行も含めて全体を取り消す
+        // 存在しないコード・負の数量・ファイル内のキー重複、作業区なしと作業区ありの混在（既存との間・ファイル内とも）は
+        // エラーで、正しい行も含めて全体を取り消す
         var invalid = await ImportAsync(admin, "production-plans", """
             BusinessDate,ProductCode,ProcessCode,WorkCenterCode,PlannedQuantity
             2026-10-04,FG-1,PR-01,,10
@@ -1138,9 +1139,12 @@ public class MasterCsvTests
             2026-10-05,FG-1,PR-01,,-1
             2026-10-06,FG-1,PR-01,,5
             2026-10-06,FG-1,PR-01,,6
+            2026-10-01,FG-1,PR-01,PL,10
+            2026-10-07,FG-1,PR-01,,1
+            2026-10-07,FG-1,PR-01,PL,1
             """);
         Assert.False(invalid.Succeeded);
-        Assert.Equal([3, 4, 5, 7], invalid.Errors.Select(e => e.Line).Order());
+        Assert.Equal([3, 4, 5, 7, 8, 9, 10], invalid.Errors.Select(e => e.Line).Order());
         Assert.Equal(4, (await admin.GetFromJsonAsync<List<ProductionPlanResponse>>("/api/production-plans"))!.Count);
 
         // 出力したCSVをそのまま取り込み直しても差分が出ない

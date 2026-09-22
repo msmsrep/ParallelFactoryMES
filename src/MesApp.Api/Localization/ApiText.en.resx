@@ -1890,4 +1890,7 @@
   <data name="製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}'・作業区 '{3}' の計画が複数行にあります。" xml:space="preserve">
     <value>The plan for product '{1}', process '{2}' and work center '{3}' on production date {0:yyyy-MM-dd} appears on more than one row.</value>
   </data>
+  <data name="製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}' には作業区 '{3}' の計画があり、作業区 '{4}' の計画と範囲が重なります（作業区なしと作業区あり、上位の段と配下の段の計画は、予実で二重に数えるため同時に登録できません）。" xml:space="preserve">
+    <value>Product '{1}', process '{2}' on production date {0:yyyy-MM-dd} already has a plan for work center '{3}', which overlaps with work center '{4}'. Plans with and without a work center, or for a parent and its child work center, cannot coexist because the plan-vs-actual view would count them twice.</value>
+  </data>
 </root>

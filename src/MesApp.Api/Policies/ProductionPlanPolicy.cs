@@ -18,6 +18,10 @@ namespace MesApp.Api.Policies;
 /// DBの一意索引は NULL の行を止められない（SQLite/PostgreSQL は NULL を別値扱い、SQL Server はフィルタで外す）ので、
 /// 重複はこの判定で止める。
 /// </para>
+/// <para>
+/// 同じ製造日・品目・工程では、作業区の範囲が重なる計画（作業区なしと作業区あり、上位の段と配下の段）を併存させない。
+/// 予実は作業区違いの計画を合算するので、全体の計画と内訳の計画が並ぶと二重に数える。兄弟の作業区どうしは併存できる。
+/// </para>
 /// </summary>
 public static class ProductionPlanPolicy
 {
@@ -46,7 +50,23 @@ public static class ProductionPlanPolicy
             "製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}' の計画は、同じ作業区で既に登録されています。",
             businessDate, productCode, processCode);
 
-    /// <summary>判定の結果。<see cref="Conflict"/> はキーの重複（409）、それ以外は入力不正（400）</summary>
+    /// <summary>
+    /// 2つの作業区の範囲が重なるか。作業区なしは全体を表すのでどれとも重なり、
+    /// 作業区ありどうしは同じか一方が他方の配下にあるときに重なる（兄弟の作業区は重ならない）
+    /// </summary>
+    public static bool Overlaps(int? a, int? b, IReadOnlyCollection<WorkCenter> allWorkCenters) =>
+        a is not { } x || b is not { } y
+        || WorkCenterHierarchyPolicy.SelfAndDescendantIds(x, allWorkCenters).Contains(y)
+        || WorkCenterHierarchyPolicy.SelfAndDescendantIds(y, allWorkCenters).Contains(x);
+
+    /// <summary>範囲の重なる計画が既にあるときの理由（作業区なしは "-" で示す）</summary>
+    public static string Overlapped(
+        DateOnly businessDate, string productCode, string processCode, string? workCenterCode, string? otherWorkCenterCode) =>
+        ApiText.T(
+            "製造日 {0:yyyy-MM-dd} の品目 '{1}'・工程 '{2}' には作業区 '{3}' の計画があり、作業区 '{4}' の計画と範囲が重なります（作業区なしと作業区あり、上位の段と配下の段の計画は、予実で二重に数えるため同時に登録できません）。",
+            businessDate, productCode, processCode, otherWorkCenterCode ?? "-", workCenterCode ?? "-");
+
+    /// <summary>判定の結果。<see cref="Conflict"/> はキーの重複・範囲の重なり（409）、それ以外は入力不正（400）</summary>
     public sealed record Violation(string Message, bool Conflict);
 
     /// <summary>
@@ -79,6 +99,30 @@ public static class ProductionPlanPolicy
         var duplicated = await db.ProductionPlans
             .Where(SameKey(key))
             .AnyAsync(p => excludeId == null || p.Id != excludeId, ct);
-        return duplicated ? new(Duplicated(key.BusinessDate, product.Code, process.Code), true) : null;
+        if (duplicated)
+        {
+            return new(Duplicated(key.BusinessDate, product.Code, process.Code), true);
+        }
+
+        // 同じ製造日・品目・工程で作業区の範囲が重なる計画は、予実（作業区で絞らない表示）で合算されて二重に数える
+        var siblings = await db.ProductionPlans.AsNoTracking()
+            .Where(p => p.BusinessDate == key.BusinessDate && p.ProductId == key.ProductId
+                && p.ProcessId == key.ProcessId && (excludeId == null || p.Id != excludeId))
+            .Select(p => p.WorkCenterId)
+            .ToListAsync(ct);
+        if (siblings.Count == 0)
+        {
+            return null;
+        }
+        var workCenters = await db.WorkCenters.AsNoTracking().ToListAsync(ct);
+        foreach (var other in siblings.Where(other => Overlaps(key.WorkCenterId, other, workCenters)))
+        {
+            return new(Overlapped(key.BusinessDate, product.Code, process.Code,
+                CodeOf(key.WorkCenterId, workCenters), CodeOf(other, workCenters)), true);
+        }
+        return null;
     }
+
+    private static string? CodeOf(int? workCenterId, IReadOnlyCollection<WorkCenter> all) =>
+        workCenterId is { } id ? all.FirstOrDefault(w => w.Id == id)?.Code : null;
 }
