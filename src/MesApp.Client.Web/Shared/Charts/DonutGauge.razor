@@ -1,0 +1,30 @@
+@* 割合（0〜100%）のドーナツ表示（Spec.md 3.8 ダッシュボードのサマリ）。
+   色のしきい値は割合バー（BarMeter）と同じ ChartScale.Level を使う *@
+
+<svg viewBox="0 0 88 88" style="width:@(Size)px; height:@(Size)px; flex-shrink:0;" role="img"
+     aria-label="@Title @ChartScale.Number(Value) %">
+    <title>@Title @ChartScale.Number(Value) %</title>
+    <circle cx="44" cy="44" r="@ChartScale.F(Radius)" style="fill:none; stroke:var(--border); stroke-width:10;" />
+    <circle cx="44" cy="44" r="@ChartScale.F(Radius)" transform="rotate(-90 44 44)"
+            style="fill:none; stroke:@Color; stroke-width:10; stroke-dasharray:@ChartScale.F(Arc) @ChartScale.F(Circumference);" />
+    @ChartScale.Text(44, 49, $"{Value:0}%", "middle", "font-size:15px; font-weight:600; fill:var(--text);")
+</svg>
+
+@code {
+    /// <summary>割合（%）。0〜100 の外は端に丸める</summary>
+    [Parameter, EditorRequired] public decimal Value { get; set; }
+
+    /// <summary>値が高いほど危険な指標か。false なら高いほど良い指標（稼働率・合格率）</summary>
+    [Parameter] public bool HighIsBad { get; set; }
+
+    [Parameter] public string Title { get; set; } = "";
+
+    [Parameter] public int Size { get; set; } = 72;
+
+    private const decimal Radius = 36m;
+    private const decimal Circumference = 2m * 3.14159265m * Radius;
+
+    private decimal Arc => Math.Clamp(Value, 0, 100) / 100m * Circumference;
+
+    private string Color => ChartScale.Level(Value, HighIsBad) is { } level ? $"var(--{level})" : "var(--primary)";
+}

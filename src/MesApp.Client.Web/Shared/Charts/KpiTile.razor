@@ -1,0 +1,60 @@
+@* KPI の1枚（Spec.md 3.8 ダッシュボードのサマリ）。大きな数値と、前の期間との差（▲▼）を示す。
+   差の色は指標の向き（高いほど悪いか）で決める。値の計算はしない *@
+
+<div class="card">
+    <div class="text-muted">@Label</div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div>
+            @if (Value is null)
+            {
+                <div class="text-muted" style="font-size:18px; margin:6px 0;">@EmptyText</div>
+            }
+            else
+            {
+                <div style="font-size:26px; font-weight:600; line-height:1.3;">
+                    @Value<span style="font-size:14px; font-weight:400;"> @Unit</span>
+                </div>
+            }
+            @if (Delta is { } delta)
+            {
+                <div style="font-size:12px; color:@DeltaColor(delta);">
+                    @DeltaLabel @(delta > 0 ? "▲" : delta < 0 ? "▼" : "±") @ChartScale.Number(Math.Abs(delta))@DeltaUnit
+                </div>
+            }
+        </div>
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    /// <summary>表示する値（書式済み）。null なら <see cref="EmptyText"/> を出す</summary>
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public string? Unit { get; set; }
+
+    [Parameter] public string EmptyText { get; set; } = "実績なし";
+
+    /// <summary>前の期間との差。どちらかの期間で求められなければ null（差を出さない）</summary>
+    [Parameter] public decimal? Delta { get; set; }
+
+    /// <summary>差の単位（率なら「pt」）</summary>
+    [Parameter] public string? DeltaUnit { get; set; }
+
+    /// <summary>「前日比」など</summary>
+    [Parameter] public string DeltaLabel { get; set; } = "前期間比";
+
+    /// <summary>増えると悪い指標なら true、良い指標なら false、どちらでもなければ null（色を付けない）</summary>
+    [Parameter] public bool? HighIsBad { get; set; }
+
+    /// <summary>右側に添える図（ドーナツ・バッジなど）</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string DeltaColor(decimal delta) => (HighIsBad, Math.Sign(delta)) switch
+    {
+        (null, _) or (_, 0) => "var(--text-muted)",
+        (true, > 0) or (false, < 0) => "var(--danger)",
+        _ => "var(--success)",
+    };
+}
