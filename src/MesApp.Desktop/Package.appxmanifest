@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   MSIXパッケージマニフェストのテンプレート。
-  Identity の Name / Publisher / Version と PublisherDisplayName は
+  Identity の Name / Publisher / Version と DisplayName / PublisherDisplayName は
   build/Pack-Msix.ps1 が build/msix-identity.json の値で置換する。
 -->
 <Package
@@ -17,7 +17,7 @@
     ProcessorArchitecture="$Architecture$" />
 
   <Properties>
-    <DisplayName>Parallel Factory MES</DisplayName>
+    <DisplayName>$DisplayName$</DisplayName>
     <PublisherDisplayName>$PublisherDisplayName$</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -36,7 +36,7 @@
                  Executable="ParallelFactoryMES.exe"
                  EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="Parallel Factory MES"
+        DisplayName="$DisplayName$"
         Description="製造指図・作業実績・在庫・品質・保全を一貫して扱う製造実行システム（MES）。データはこのPC内に保存されます。"
         BackgroundColor="#FFFFFF"
         Square150x150Logo="Assets\Square150x150Logo.png"

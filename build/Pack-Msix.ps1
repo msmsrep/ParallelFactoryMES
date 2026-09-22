@@ -46,9 +46,9 @@ if (-not $OutputDirectory) { $OutputDirectory = Join-Path $repoRoot 'artifacts/m
 $identity = Get-Content $IdentityFile -Raw -Encoding UTF8 | ConvertFrom-Json
 if (-not $Version) { $Version = $identity.Version }
 
-foreach ($field in 'IdentityName', 'Publisher', 'PublisherDisplayName') {
-    if ($identity.$field -match 'PLACEHOLDER') {
-        throw "$IdentityFile の $field が未設定です。Partner Center の製品IDページの値に置き換えてください。"
+foreach ($field in 'IdentityName', 'Publisher', 'PublisherDisplayName', 'DisplayName') {
+    if (-not $identity.$field -or $identity.$field -match 'PLACEHOLDER') {
+        throw "$IdentityFile の $field が未設定です。Partner Center の製品IDページ（DisplayName は「アプリ名の管理」で予約した名前）の値に置き換えてください。"
     }
 }
 if ($Version -notmatch '^\d+\.\d+\.\d+\.0$') {
@@ -95,6 +95,7 @@ $manifest = $manifest.
     Replace('$IdentityName$', $identity.IdentityName).
     Replace('$Publisher$', $identity.Publisher).
     Replace('$PublisherDisplayName$', $identity.PublisherDisplayName).
+    Replace('$DisplayName$', [Security.SecurityElement]::Escape($identity.DisplayName)).
     Replace('$Version$', $Version).
     Replace('$Architecture$', $Architecture)
 [IO.File]::WriteAllText((Join-Path $stage 'AppxManifest.xml'), $manifest, (New-Object Text.UTF8Encoding($false)))

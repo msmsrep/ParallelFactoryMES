@@ -91,6 +91,7 @@
 改訂90: 2026-09-21（**シート・端末のライセンス管理を実装しないことに決定**し、本システムのライセンスを AGPL-3.0 のみとした。改訂10で将来の実装候補として残置していた2.2節A・B・D（ライセンス購入・端末アクティベーション・割当解除）、Cの端末認証、3.8節のシート・端末管理、5.6節（LicenseEntitlement・Device・SeatAssignment・ActivationCode）と5.7節のシート計算、6.1節の端末アクティベーション画面・シート・端末管理画面、6.2節（WPFライセンスアプリ）、7.1節（Store公開・アドオン課金）、7.4節のデバイストークン・アクティベーションコード関連、8〜9章のライセンスアプリ・Store API、Phase 8〜9を削除した。節・画面・フェーズの番号は他所からの参照を壊さないよう欠番として残す。Microsoft Store 配布は単独PC向けの MesApp.Desktop（7.8節）のみ）
 改訂91: 2026-09-21（**DBプロバイダーをPostgreSQL・SQL Serverへ切り替えられるようにした**（4章。Phase 10のうちDB切替）。`Database:Provider`に`PostgreSql`/`SqlServer`を指定すると、それぞれ専用プロジェクトのマイグレーションを起動時に適用する。1つのモデルから3プロバイダーのスキーマを作るため、PostgreSQLでは`DateTimeOffset`をUTCで書き込み、SQL Serverでは多重連鎖を避けるため`SET NULL`をEF側の処理に移し、SQLite以外では精度未指定の`decimal`を`(18,6)`にした。SQLiteのスキーマは変えていない。採番（`NumberingService`）の生SQLは表名・列名をプロバイダーの引用符で囲み、同時作成で一意制約違反になったときはセーブポイントまで戻してから再試行する（PostgreSQLは失敗した文のあとトランザクションを受け付けないため）。テストは環境変数（`MESAPP_TEST_PROVIDER` / `MESAPP_TEST_CONNECTION`）で実DBに向けられ、PostgreSQL 18・SQL Server（LocalDB）で全件通過を確認した。PostgreSQL・SQL Serverでは小数桁固定の`decimal`が`1.500000`のように返るため、読み出し時に末尾ゼロを落としてSQLiteと同じ値の見え方にした。既存SQLiteデータの移行ツールと、実DBでの自動テストの常時実行は将来拡張とした）
 改訂92: 2026-09-21（**3プロバイダー分のマイグレーションをまとめて追加するスクリプト**（`scripts/Migrations.ps1`）を用意し、4章の将来拡張から「3プロバイダー分を作る運用の省力化」を外した。1つのマイグレーションで3プロバイダーを兼ねる形は、列の型がプロバイダーごとに生成されるため手修正が毎回必要になり採らない。あわせて、マイグレーションに生SQLを書かない規約を4章に加えた）
+改訂93: 2026-09-22（7.8節：ストア提出で「予約していない表示名」として弾かれたため、MSIXの表示名をマニフェストへの直書きから`build/msix-identity.json`の`DisplayName`に移し、予約名と一致させる旨を明記）
 参考: みんなのMES（min-MES） https://min-mes.com/ / OSS: https://github.com/mihatama/open-mes-project
 
 ---
@@ -677,7 +678,7 @@ DBはバックエンド（MesApp.Api）のみが保持し、既定はSQLiteと�
 - **初回起動**：ユーザーが存在しないときのみ`MesAdmin`設定の初期管理者を作成する。初期パスワードは初回ログイン時に変更を強制する（`MustChangePassword`）。**ストア配布では利用者が手元に手順書を持たないため、初期管理者がまだパスワードを変更していない間はウィンドウ上端に資格情報を常時表示する**（変更が済むと自動的に消える）。ストア審査でも審査員がログインできずに機能を確認できない事態を防ぐ
 - **二重起動の抑止**：同じSQLiteファイルを複数プロセスで奪い合わないよう、2つ目以降の起動は既存ウィンドウを前面に出して終了する（ログオンユーザー単位のミューテックス）
 - **起動の記録と失敗時の扱い**：WinExeはコンソール出力が誰にも見えず起動失敗が無言になるため、起動の各段階を`%LOCALAPPDATA%\ParallelFactoryMES\startup.log`に記録する。ホストの起動はUIスレッドではなくスレッドプールで実行し（UIスレッド上で待つとデッドロックし得るため）、2分を超えたら打ち切ってウィンドウにエラーを表示する。未処理例外はログに残したうえでメッセージボックスで通知する
-- **パッケージID**：`Identity`の`Name` / `Publisher` / `PublisherDisplayName`はPartner Centerが発行する値を使う。バージョンは`x.y.z.0`（第4桁は0）
+- **パッケージID**：`Identity`の`Name` / `Publisher` / `PublisherDisplayName`はPartner Centerが発行する値を使う。表示名（`Properties/DisplayName`・`VisualElements`の`DisplayName`）はPartner Centerで予約したアプリ名と完全に一致させる（マニフェストに直書きせず`build/msix-identity.json`の`DisplayName`で与える）。バージョンは`x.y.z.0`（第4桁は0）
 - **署名**：ストア配布ではMicrosoft Storeが署名するため、提出用パッケージは署名しない。手元での動作確認時のみ自己署名する
 - **手順**：`build/Pack-Msix.ps1`（発行→不要ファイル除去→マニフェスト生成→`makeappx pack`）。詳細は`docs-dev/MsixRelease.md`
 
