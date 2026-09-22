@@ -146,10 +146,10 @@ public class OeeController(MesAppDbContext db, IBusinessDateService businessDate
 
         var records = (await db.ProductionRecords.AsNoTracking()
                 .Where(r => workOrderIds.Contains(r.WorkOrderId))
-                .Select(r => new { r.WorkOrderId, r.CreatedAt, r.GoodQuantity, r.DefectQuantity })
+                .Select(r => new { r.WorkOrderId, r.StartedAt, r.GoodQuantity, r.DefectQuantity })
                 .ToListAsync(ct))
-            .Where(r => (fromStart is null || r.CreatedAt >= fromStart)
-                        && (toEnd is null || r.CreatedAt < toEnd))
+            .Where(r => (fromStart is null || r.StartedAt >= fromStart)
+                        && (toEnd is null || r.StartedAt < toEnd))
             .GroupBy(r => r.WorkOrderId)
             .ToDictionary(g => g.Key,
                 g => (Good: g.Sum(r => r.GoodQuantity), Defect: g.Sum(r => r.DefectQuantity)));

@@ -30,7 +30,8 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
         var records = (await db.ProductionRecords.AsNoTracking()
                 .Select(r => new
                 {
-                    r.CreatedAt,
+                    // 開始時刻が属する製造日で振り分ける（Spec.md 3.9。登録時刻だと朝に登録した夜勤の実績が翌日へずれる）
+                    r.StartedAt,
                     r.GoodQuantity,
                     r.DefectQuantity,
                     r.ScrapQuantity,
@@ -41,8 +42,8 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
                     ShiftLabel = r.Shift == null ? null : r.Shift.Code + " " + r.Shift.Name,
                 })
                 .ToListAsync(ct))
-            .Where(r => (fromStart is null || r.CreatedAt >= fromStart)
-                        && (toEnd is null || r.CreatedAt < toEnd))
+            .Where(r => (fromStart is null || r.StartedAt >= fromStart)
+                        && (toEnd is null || r.StartedAt < toEnd))
             .ToList();
 
         var byProduct = records
@@ -70,15 +71,15 @@ public class QualityAnalysisController(MesAppDbContext db, IBusinessDateService 
         var defects = (await db.ProductionDefects.AsNoTracking()
                 .Select(d => new
                 {
-                    d.ProductionRecord!.CreatedAt,
+                    d.ProductionRecord!.StartedAt,
                     d.Quantity,
                     Code = d.DefectReason!.Code,
                     Name = d.DefectReason!.Name,
                     d.DefectReason!.Category,
                 })
                 .ToListAsync(ct))
-            .Where(d => (fromStart is null || d.CreatedAt >= fromStart)
-                        && (toEnd is null || d.CreatedAt < toEnd))
+            .Where(d => (fromStart is null || d.StartedAt >= fromStart)
+                        && (toEnd is null || d.StartedAt < toEnd))
             .ToList();
         var defectTotal = defects.Sum(d => d.Quantity);
         var byDefectReason = defects
