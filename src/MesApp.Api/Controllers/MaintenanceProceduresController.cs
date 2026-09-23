@@ -11,6 +11,7 @@ namespace MesApp.Api.Controllers;
 
 /// <summary>
 /// 保全手順書（E-10-20 作成・管理、E-20-30-04〜06 見直し）。更新のたびに版数を上げる。
+/// 必要スキル・資格を持たせると、保全実績の登録時に実施者と照合する（F-20-30-01）。
 /// </summary>
 [ApiController]
 [Route("api/maintenance-procedures")]
@@ -70,6 +71,7 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
             TargetEquipmentId = request.TargetEquipmentId,
             TargetToolId = request.TargetToolId,
             Steps = request.Steps,
+            RequiredSkillId = request.RequiredSkillId,
         };
         db.MaintenanceProcedures.Add(procedure);
         await db.SaveChangesAsync(ct);
@@ -103,6 +105,7 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
         procedure.TargetEquipmentId = request.TargetEquipmentId;
         procedure.TargetToolId = request.TargetToolId;
         procedure.Steps = request.Steps;
+        procedure.RequiredSkillId = request.RequiredSkillId;
         procedure.Version++; // 見直しの版数管理（E-20-30-06）
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Maintenance", "ProcedureUpdate", nameof(MaintenanceProcedure),
@@ -128,6 +131,10 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
         {
             return ApiText.T("存在しない対象治工具IDです。");
         }
+        if (request.RequiredSkillId is int skillId && !await db.Skills.AnyAsync(s => s.Id == skillId, ct))
+        {
+            return ApiText.T("存在しない必要スキルIDです。");
+        }
         return null;
     }
 
@@ -141,5 +148,6 @@ public class MaintenanceProceduresController(MesAppDbContext db, IAuditLogger au
             p.Id, p.ProcedureNo, p.Title,
             p.TargetEquipmentId, p.TargetEquipment!.Name,
             p.TargetToolId, p.TargetTool!.Name,
-            p.Steps, p.Version, p.IsActive);
+            p.Steps, p.Version, p.IsActive,
+            p.RequiredSkillId, p.RequiredSkill!.Name);
 }

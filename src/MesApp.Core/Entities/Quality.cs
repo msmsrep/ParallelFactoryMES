@@ -82,6 +82,13 @@ public class InspectionOrderItem
     public string? Method { get; set; }
 
     public int? SamplingCount { get; set; }
+
+    /// <summary>
+    /// 必要スキル・資格（発行時点）。検査実績の登録者と照合する（F-20-30-01）。
+    /// 発行後に基準の必要スキルが変わっても、この検査の照合条件は変わらない（作業指示の必要スキルと同じ）
+    /// </summary>
+    public int? RequiredSkillId { get; set; }
+    public SkillMaster? RequiredSkill { get; set; }
 }
 
 /// <summary>検査実績（Spec.md 5.4 InspectionResult。C-20）</summary>

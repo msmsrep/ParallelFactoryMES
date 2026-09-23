@@ -3,6 +3,7 @@ using System;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MesApp.Infrastructure.Migrations
 {
     [DbContext(typeof(MesAppDbContext))]
-    partial class MesAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260923112712_AddMaintenanceProcedureRequiredSkill")]
+    partial class AddMaintenanceProcedureRequiredSkill
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
@@ -644,9 +647,6 @@ namespace MesApp.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("RequiredSkillId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int?>("SamplingCount")
                         .HasColumnType("INTEGER");
 
@@ -674,8 +674,6 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
-
-                    b.HasIndex("RequiredSkillId");
 
                     b.HasIndex("TargetProcessId");
 
@@ -785,9 +783,6 @@ namespace MesApp.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("RequiredSkillId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int?>("SamplingCount")
                         .HasColumnType("INTEGER");
 
@@ -800,8 +795,6 @@ namespace MesApp.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("InspectionItemId");
-
-                    b.HasIndex("RequiredSkillId");
 
                     b.HasIndex("InspectionOrderId", "InspectionItemId")
                         .IsUnique();
@@ -3514,11 +3507,6 @@ namespace MesApp.Infrastructure.Migrations
 
             modelBuilder.Entity("MesApp.Core.Entities.InspectionItem", b =>
                 {
-                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
-                        .WithMany()
-                        .HasForeignKey("RequiredSkillId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("MesApp.Core.Entities.ProcessMaster", "TargetProcess")
                         .WithMany()
                         .HasForeignKey("TargetProcessId");
@@ -3526,8 +3514,6 @@ namespace MesApp.Infrastructure.Migrations
                     b.HasOne("MesApp.Core.Entities.Product", "TargetProduct")
                         .WithMany()
                         .HasForeignKey("TargetProductId");
-
-                    b.Navigation("RequiredSkill");
 
                     b.Navigation("TargetProcess");
 
@@ -3572,14 +3558,7 @@ namespace MesApp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
-                        .WithMany()
-                        .HasForeignKey("RequiredSkillId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("InspectionItem");
-
-                    b.Navigation("RequiredSkill");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.InspectionResult", b =>

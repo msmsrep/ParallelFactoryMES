@@ -160,6 +160,75 @@ public record ProductivitySummaryResponse(
     /// <summary>期間内に実績のあった作業指示の予実（超過率の大きい順）</summary>
     List<StandardTimeVarianceRow> TimeVariances);
 
+// ---- 製造リードタイム（B-60-10-05。ガイド 8.3.2 の納期実績の見える化）----
+
+/// <summary>
+/// 完了した製造指図1件のリードタイム。着手は最初の作業記録（段取り・生産実績の開始時刻）、
+/// 完了は最後の生産実績の終了時刻。日数は製造日の差（同じ製造日に着手・完了すれば0日）
+/// </summary>
+public record LeadTimeOrderRow(
+    int ManufacturingOrderId, string OrderNo, string ProductCode, string ProductName, decimal Quantity,
+    DateTimeOffset StartedAt, DateTimeOffset CompletedAt,
+    DateOnly StartedOn, DateOnly CompletedOn,
+    int LeadTimeDays,
+    /// <summary>着手から完了までの経過時間（時間）</summary>
+    decimal LeadTimeHours,
+    DateOnly? DueDate,
+    /// <summary>納期に対する遅れ（日）。完了の製造日−納期。0以下は納期内。納期なしはnull</summary>
+    int? DelayDays,
+    /// <summary>異常値（第3四分位＋1.5×四分位範囲を超える。四分位範囲は1日を下限にする）。個別に原因を調べる対象</summary>
+    bool IsOutlier);
+
+/// <summary>リードタイムの度数分布の1区切り（日数ごとの完了件数。うち納期遅れの件数）</summary>
+public record LeadTimeBucket(int Days, int Count, int LateCount);
+
+/// <summary>
+/// 製造リードタイムの分布（期間は完了の製造日。リワーク指図は含めない）。
+/// 平均だけではばらつきと異常値が見えないため、分布と四分位から見た異常値を返す
+/// </summary>
+public record LeadTimeResponse(
+    int OrderCount,
+    decimal? AverageDays, decimal? MedianDays, int? Percentile90Days, int? MaxDays,
+    /// <summary>異常値とみなすしきい値（日）。4件未満では求めない</summary>
+    decimal? OutlierThresholdDays,
+    int OnTimeCount, int LateCount, int NoDueDateCount,
+    List<LeadTimeBucket> Distribution,
+    /// <summary>リードタイムの長い順</summary>
+    List<LeadTimeOrderRow> Orders);
+
+// ---- 標準時間の見直し候補（B-60-10-05。ガイド 8.3.2(4) 業務ルールの定期的な再設計）----
+
+/// <summary>
+/// 工順の工程1つ分の標準時間と実績の比較。標準は工順マスタの現在値（見直す対象そのもの）、
+/// 実績は期間内の作業指示ごとの値の中央値（1件の極端な記録に引きずられないように）
+/// </summary>
+public record StandardTimeReviewRow(
+    int RoutingId, string ProductCode, string ProductName, int Sequence, string ProcessCode, string ProcessName,
+    /// <summary>標準作業時間（分/個。工順マスタの現在値）</summary>
+    decimal StandardWorkMinutes,
+    /// <summary>作業時間の実績がある作業指示の数（直接作業時間と産出数の両方があるもの）</summary>
+    int WorkSampleCount,
+    /// <summary>1個あたり実作業時間の中央値（分）＝ 直接作業時間 ÷（良品数＋不良数）</summary>
+    decimal? MedianWorkMinutes,
+    /// <summary>標準に対するずれ（%）。標準が0分ならnull</summary>
+    decimal? WorkDeviationRate,
+    /// <summary>標準段取り時間（分/回。工順マスタの現在値）</summary>
+    decimal StandardSetupMinutes,
+    int SetupSampleCount,
+    /// <summary>作業指示1件あたり段取り時間の中央値（分）</summary>
+    decimal? MedianSetupMinutes,
+    decimal? SetupDeviationRate,
+    /// <summary>見直し候補か（件数が足り、作業か段取りのずれがしきい値以上。標準0分で実績があるものも含む）</summary>
+    bool IsCandidate);
+
+public record StandardTimeReviewResponse(
+    /// <summary>候補とみなすずれ（%）</summary>
+    decimal ThresholdPercent,
+    /// <summary>候補とみなすのに必要な作業指示の数</summary>
+    int MinSamples,
+    /// <summary>候補を先に、ずれの大きい順</summary>
+    List<StandardTimeReviewRow> Rows);
+
 // ---- 遅延検知（A-30-20-01）----
 
 /// <summary>遅れの種類</summary>

@@ -5,6 +5,7 @@ using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Quality;
+using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Tests;
@@ -393,6 +394,94 @@ public class QualityTests
         // 承認（C-20-10-06）
         var approved = await admin.PostAsync($"/api/inspection-orders/{order.Id}/approve", null);
         Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+    }
+
+    [Fact]
+    public async Task 検査項目の必要スキルは発行時に写り検査実績の登録者と照合される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var skill = (await (await admin.PostAsJsonAsync("/api/skills",
+            new SkillRequest("SK-QC", "検査員認定", SkillType.Certification, true)))
+            .Content.ReadFromJsonAsync<SkillResponse>())!;
+        var created = await admin.PostAsJsonAsync("/api/inspection-items",
+            new InspectionItemRequest("INS-01", "外径測定", ctx.ProductId, null, InspectionType.FinalProduct,
+                9.5m, 10.5m, 10m, "ノギス", 1, skill.Id));
+        var item = (await created.Content.ReadFromJsonAsync<InspectionItemResponse>())!;
+        Assert.Equal("検査員認定", item.RequiredSkillName);
+
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 10m, ctx.ProductLocationId);
+        var order = (await (await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null)))
+            .Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+
+        // 発行後にマスタから必要スキルを外しても、発行済みの検査の照合条件は変わらない（スナップショット）
+        (await admin.PutAsJsonAsync($"/api/inspection-items/{item.Id}",
+            new InspectionItemRequest("INS-01", "外径測定", ctx.ProductId, null, InspectionType.FinalProduct,
+                9.5m, 10.5m, 10m, "ノギス", 1))).EnsureSuccessStatusCode();
+
+        List<InspectionResultRequest> results = [new(item.Id, 1, 10.0m, null, null)];
+        var rejected = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results", results);
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        var problem = await rejected.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Contains("検査員認定", problem!.Title);
+
+        // 有効期限内の資格を付与すると登録できる
+        var me = (await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users"))!
+            .Single(u => u.UserName == TestAuth.AdminUser);
+        (await admin.PutAsJsonAsync($"/api/users/{me.Id}/skills",
+            new List<UserSkillRequest> { new(skill.Id, null, DateOnly.FromDateTime(DateTime.Today).AddYears(1)) }))
+            .EnsureSuccessStatusCode();
+        var accepted = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results", results);
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+    }
+
+    [Fact]
+    public async Task 管理図は検査指示ごとに群を作り取消した検査の測定値を使わない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId);
+
+        async Task<InspectionOrderResponse> InspectAsync(params decimal[] values)
+        {
+            var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 10m, ctx.ProductLocationId);
+            var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+                new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+            var order = (await created.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+            (await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+                    values.Select((v, i) => new InspectionResultRequest(item.Id, i + 1, v, null, null)).ToList()))
+                .EnsureSuccessStatusCode();
+            return order;
+        }
+
+        await InspectAsync(10.0m, 10.2m);
+        await InspectAsync(9.9m, 10.1m);
+        var canceled = await InspectAsync(12.0m, 12.4m);
+        (await admin.PostAsync($"/api/inspection-orders/{canceled.Id}/cancel", null)).EnsureSuccessStatusCode();
+
+        var chart = await admin.GetFromJsonAsync<ControlChartResponse>(
+            $"/api/quality/control-chart?inspectionItemId={item.Id}");
+
+        Assert.Equal(2, chart!.Points.Count);
+        Assert.DoesNotContain(chart.Points, p => p.OrderNo == canceled.OrderNo);
+        Assert.False(chart.IsIndividuals);
+        Assert.Equal(2, chart.SubgroupSize);
+        Assert.Equal(10.05m, chart.CenterLine); // (10.1 + 10.0) / 2
+        Assert.Equal(9.5m, chart.LowerSpecLimit); // 規格は検査指示のスナップショット
+        Assert.Equal(10.5m, chart.UpperSpecLimit);
+        Assert.NotNull(chart.Cpk);
+
+        // 期間外を指定すると点は無く、管理限界も出さない
+        var empty = await admin.GetFromJsonAsync<ControlChartResponse>(
+            $"/api/quality/control-chart?inspectionItemId={item.Id}&from=2020-01-01&to=2020-01-31");
+        Assert.Empty(empty!.Points);
+        Assert.Null(empty.CenterLine);
+
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await admin.GetAsync("/api/quality/control-chart?inspectionItemId=99999")).StatusCode);
     }
 
     [Fact]

@@ -112,6 +112,7 @@ next_title: 帳票・ラベル・スキャン
 <li><strong>手順書番号</strong>と<strong>表題</strong>を入力します。</li>
 <li><strong>対象設備</strong>または<strong>対象治工具</strong>を選びます。</li>
 <li><strong>手順ステップ</strong>に作業手順を記入します（改行がそのまま保持されます）。</li>
+<li>実施に資格が要る手順（電気工事など）は <strong>必要スキル・資格</strong> を選びます。この手順書を使う保全指示では、実績を登録する人がその資格を持っていないか、期限が切れているとエラーになります。</li>
 <li><strong>手順書を登録</strong>を押します。</li>
 </ol>
 

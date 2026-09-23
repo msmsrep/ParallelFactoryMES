@@ -371,6 +371,24 @@ public class MasterCsvTests
         Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("基準値"));
         Assert.Contains(invalid.Errors, e => e.Line == 4 && e.Message.Contains("工程内検査の基準だけ"));
         Assert.Contains(invalid.Errors, e => e.Line == 5 && e.Message.Contains("対象品目か対象工程"));
+
+        // 必要スキルはコードで指定する。発行時に写す値なので、変えると版数が上がる
+        Assert.True((await ImportAsync(client, "skills", """
+            Code,Name,Type,RequiresExpiry
+            SK-QC,検査員認定,Certification,false
+            """)).Succeeded);
+        Assert.True((await ImportAsync(client, "inspection-items", """
+            Code,Name,Type,LowerLimit,UpperLimit,StandardValue,Method,SamplingCount,RequiredSkillCode
+            INS-01,外径測定（改称）,InProcess,9,11,10,マイクロメータ,10,SK-QC
+            """)).Succeeded);
+        var withSkill = (await client.GetFromJsonAsync<List<InspectionItemResponse>>("/api/inspection-items"))!.Single();
+        Assert.Equal("SK-QC", withSkill.RequiredSkillCode);
+        Assert.Equal(3, withSkill.Version);
+        var unknown = await ImportAsync(client, "inspection-items", """
+            Code,Name,Type,RequiredSkillCode
+            INS-01,外径測定（改称）,InProcess,SK-NONE
+            """);
+        Assert.False(unknown.Succeeded);
     }
 
     [Fact]

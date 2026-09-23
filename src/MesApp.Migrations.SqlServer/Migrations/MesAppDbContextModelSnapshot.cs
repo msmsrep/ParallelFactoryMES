@@ -684,6 +684,9 @@ namespace MesApp.Migrations.SqlServer.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<int?>("RequiredSkillId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("SamplingCount")
                         .HasColumnType("int");
 
@@ -713,6 +716,8 @@ namespace MesApp.Migrations.SqlServer.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("RequiredSkillId");
 
                     b.HasIndex("TargetProcessId");
 
@@ -827,6 +832,9 @@ namespace MesApp.Migrations.SqlServer.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<int?>("RequiredSkillId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("SamplingCount")
                         .HasColumnType("int");
 
@@ -841,6 +849,8 @@ namespace MesApp.Migrations.SqlServer.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("InspectionItemId");
+
+                    b.HasIndex("RequiredSkillId");
 
                     b.HasIndex("InspectionOrderId", "InspectionItemId")
                         .IsUnique();
@@ -1393,6 +1403,9 @@ namespace MesApp.Migrations.SqlServer.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("RequiredSkillId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Steps")
                         .IsRequired()
                         .HasMaxLength(4000)
@@ -1416,6 +1429,8 @@ namespace MesApp.Migrations.SqlServer.Migrations
 
                     b.HasIndex("ProcedureNo")
                         .IsUnique();
+
+                    b.HasIndex("RequiredSkillId");
 
                     b.HasIndex("TargetEquipmentId");
 
@@ -3701,6 +3716,11 @@ namespace MesApp.Migrations.SqlServer.Migrations
 
             modelBuilder.Entity("MesApp.Core.Entities.InspectionItem", b =>
                 {
+                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
+                        .WithMany()
+                        .HasForeignKey("RequiredSkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MesApp.Core.Entities.ProcessMaster", "TargetProcess")
                         .WithMany()
                         .HasForeignKey("TargetProcessId");
@@ -3708,6 +3728,8 @@ namespace MesApp.Migrations.SqlServer.Migrations
                     b.HasOne("MesApp.Core.Entities.Product", "TargetProduct")
                         .WithMany()
                         .HasForeignKey("TargetProductId");
+
+                    b.Navigation("RequiredSkill");
 
                     b.Navigation("TargetProcess");
 
@@ -3751,7 +3773,14 @@ namespace MesApp.Migrations.SqlServer.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
+                        .WithMany()
+                        .HasForeignKey("RequiredSkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("InspectionItem");
+
+                    b.Navigation("RequiredSkill");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.InspectionResult", b =>
@@ -3981,6 +4010,11 @@ namespace MesApp.Migrations.SqlServer.Migrations
 
             modelBuilder.Entity("MesApp.Core.Entities.MaintenanceProcedure", b =>
                 {
+                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
+                        .WithMany()
+                        .HasForeignKey("RequiredSkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MesApp.Core.Entities.Equipment", "TargetEquipment")
                         .WithMany()
                         .HasForeignKey("TargetEquipmentId")
@@ -3990,6 +4024,8 @@ namespace MesApp.Migrations.SqlServer.Migrations
                         .WithMany()
                         .HasForeignKey("TargetToolId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("RequiredSkill");
 
                     b.Navigation("TargetEquipment");
 

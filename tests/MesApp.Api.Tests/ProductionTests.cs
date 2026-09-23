@@ -528,6 +528,56 @@ public class ProductionTests
     }
 
     [Fact]
+    public async Task 着手は着手する者のスキルを照合し差立を省略しても通さない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var skillCreated = await admin.PostAsJsonAsync("/api/skills",
+            new SkillRequest("SK-01", "組立資格", SkillType.Certification, true));
+        var skill = await skillCreated.Content.ReadFromJsonAsync<SkillResponse>();
+        var (productId, _) = await SetupMastersAsync(admin, requiredSkillId: skill!.Id);
+
+        using var qualified = await TestAuth.CreateUserClientAsync(factory, admin, "worker1", "Passw0rd123", MesRoles.Operator);
+        using var unqualified = await TestAuth.CreateUserClientAsync(factory, admin, "worker2", "Passw0rd123", MesRoles.Operator);
+        var users = await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users");
+        var worker1 = users!.Single(u => u.UserName == "worker1");
+        var worker2 = users!.Single(u => u.UserName == "worker2");
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        await admin.PutAsJsonAsync($"/api/users/{worker1.Id}/skills",
+            new List<UserSkillRequest> { new(skill.Id, null, today.AddYears(1)) });
+        // worker2 は期限切れの資格だけを持つ
+        await admin.PutAsJsonAsync($"/api/users/{worker2.Id}/skills",
+            new List<UserSkillRequest> { new(skill.Id, null, today.AddDays(-10)) });
+
+        var order = await CreateOrderAsync(admin, productId);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        var detail = await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>();
+        var skilledStep = detail!.WorkOrders[0].Id; // 工順1（必要スキルあり）
+
+        // 差立を省略して、スキルを持たない管理者が着手 → 400
+        var byAdmin = await admin.PostAsync($"/api/work-orders/{skilledStep}/start", null);
+        Assert.Equal(HttpStatusCode.BadRequest, byAdmin.StatusCode);
+
+        // worker1 に差立しても、期限切れの worker2 が着手すれば 400
+        (await admin.PutAsJsonAsync($"/api/work-orders/{skilledStep}/dispatch",
+            new DispatchRequest(worker1.Id, null, 1))).EnsureSuccessStatusCode();
+        var byExpired = await unqualified.PostAsync($"/api/work-orders/{skilledStep}/start", null);
+        Assert.Equal(HttpStatusCode.BadRequest, byExpired.StatusCode);
+        var problem = await byExpired.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Contains("有効期限切れ", problem!.Title);
+
+        // 資格のある worker1 は着手できる
+        var byQualified = await qualified.PostAsync($"/api/work-orders/{skilledStep}/start", null);
+        Assert.Equal(HttpStatusCode.NoContent, byQualified.StatusCode);
+
+        // 必要スキルのない工順2は誰でも着手できる
+        var free = await admin.PostAsync($"/api/work-orders/{detail.WorkOrders[1].Id}/start", null);
+        Assert.Equal(HttpStatusCode.NoContent, free.StatusCode);
+    }
+
+    [Fact]
     public async Task 進捗一覧で納期遅延を検出できる()
     {
         using var factory = new ApiFactory();
@@ -695,6 +745,150 @@ public class ProductionTests
         Assert.Equal(0m, empty!.Total.GoodQuantity);
         Assert.Empty(empty.ByProduct);
         Assert.Empty(empty.TimeVariances);
+    }
+
+    [Fact]
+    public async Task 製造リードタイムは作業の記録の時刻から製造日で数え完了した指図だけを分布にする()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        // 製造日の境界に掛からないよう正午で組む（工場のタイムゾーンは既定でOSのローカル）
+        static DateTimeOffset Noon(int day) => new(new DateTime(2026, 6, day, 12, 0, 0, DateTimeKind.Local));
+
+        async Task<ManufacturingOrderDetailResponse> OrderAsync(DateOnly? due)
+        {
+            var created = await admin.PostAsJsonAsync("/api/manufacturing-orders",
+                new CreateManufacturingOrderRequest(ctx.ProductId, 10m, due, ManufacturingOrderType.Normal, null, null));
+            var order = (await created.Content.ReadFromJsonAsync<ManufacturingOrderResponse>())!;
+            (await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null)).EnsureSuccessStatusCode();
+            var expanded = await admin.PostAsJsonAsync($"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+            return (await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>())!;
+        }
+        async Task RecordAsync(int workOrderId, DateTimeOffset start, int? locationId = null) =>
+            (await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/production-records",
+                new ProductionRecordRequest(10m, 0m, start, start.AddHours(1), locationId, false)))
+            .EnsureSuccessStatusCode();
+
+        // A：6/1着手 → 6/3完了（2日）。納期6/2なので1日遅れ
+        var a = await OrderAsync(new DateOnly(2026, 6, 2));
+        await RecordAsync(a.WorkOrders[0].Id, Noon(1));
+        await RecordAsync(a.WorkOrders[1].Id, Noon(3), ctx.ProductLocationId);
+        // B：前段取りを6/4に始め、実績は6/5（段取りの開始から数えて1日）。納期なし
+        var b = await OrderAsync(null);
+        (await admin.PostAsJsonAsync($"/api/work-orders/{b.WorkOrders[0].Id}/setup-records",
+            new SetupRecordRequest(SetupType.Pre, Noon(4), Noon(4).AddHours(1), null))).EnsureSuccessStatusCode();
+        await RecordAsync(b.WorkOrders[0].Id, Noon(5));
+        await RecordAsync(b.WorkOrders[1].Id, Noon(5), ctx.ProductLocationId);
+        // C：2工程目が未完了なので対象外
+        var c = await OrderAsync(null);
+        await RecordAsync(c.WorkOrders[0].Id, Noon(1));
+
+        var result = await admin.GetFromJsonAsync<LeadTimeResponse>("/api/productivity/lead-time");
+
+        Assert.Equal(2, result!.OrderCount);
+        Assert.DoesNotContain(result.Orders, o => o.OrderNo == c.Order.OrderNo);
+        var rowA = Assert.Single(result.Orders, o => o.OrderNo == a.Order.OrderNo);
+        Assert.Equal(2, rowA.LeadTimeDays);
+        Assert.Equal(1, rowA.DelayDays);
+        Assert.Equal(new DateOnly(2026, 6, 3), rowA.CompletedOn);
+        var rowB = Assert.Single(result.Orders, o => o.OrderNo == b.Order.OrderNo);
+        Assert.Equal(1, rowB.LeadTimeDays);
+        Assert.Null(rowB.DelayDays);
+        Assert.Equal(a.Order.OrderNo, result.Orders[0].OrderNo); // 長い順
+        Assert.Equal(1, result.LateCount);
+        Assert.Equal(1, result.NoDueDateCount);
+        Assert.Equal(1.5m, result.MedianDays);
+        Assert.Null(result.OutlierThresholdDays); // 4件未満では異常値を判定しない
+        // 0日〜最大2日を件数0の日も含めて並べる
+        Assert.Equal([0, 1, 2], result.Distribution.Select(d => d.Days));
+        Assert.Equal([0, 1, 1], result.Distribution.Select(d => d.Count));
+        Assert.Equal(1, result.Distribution[2].LateCount);
+
+        // 期間は完了の製造日で絞る（Aは6/3完了、Bは6/5完了）
+        var onlyA = await admin.GetFromJsonAsync<LeadTimeResponse>("/api/productivity/lead-time?from=2026-06-01&to=2026-06-04");
+        Assert.Equal(a.Order.OrderNo, Assert.Single(onlyA!.Orders).OrderNo);
+
+        // 0日を3件と10日を1件足すと [0,0,0,1,2,10]。Q1=0・Q3=2 からしきい値 2+1.5×2=5 日を超える10日が異常値
+        for (var i = 0; i < 3; i++)
+        {
+            var same = await OrderAsync(null);
+            await RecordAsync(same.WorkOrders[0].Id, Noon(10));
+            await RecordAsync(same.WorkOrders[1].Id, Noon(10), ctx.ProductLocationId);
+        }
+        var slow = await OrderAsync(null);
+        await RecordAsync(slow.WorkOrders[0].Id, Noon(11));
+        await RecordAsync(slow.WorkOrders[1].Id, Noon(21), ctx.ProductLocationId);
+
+        var withOutlier = await admin.GetFromJsonAsync<LeadTimeResponse>("/api/productivity/lead-time");
+        Assert.Equal(5m, withOutlier!.OutlierThresholdDays);
+        var outlier = Assert.Single(withOutlier.Orders, o => o.IsOutlier);
+        Assert.Equal(slow.Order.OrderNo, outlier.OrderNo);
+        Assert.Equal(10, withOutlier.MaxDays);
+
+        // 0日を6件足して [0×9,1,2,10] にすると Q1=Q3=0。四分位範囲は1日を下限にするので
+        // しきい値は 0+1.5×1=1.5 日で、1日のBは異常値にならない（範囲0のままだと1日でも異常値になる）
+        for (var i = 0; i < 6; i++)
+        {
+            var same = await OrderAsync(null);
+            await RecordAsync(same.WorkOrders[0].Id, Noon(12));
+            await RecordAsync(same.WorkOrders[1].Id, Noon(12), ctx.ProductLocationId);
+        }
+        var concentrated = await admin.GetFromJsonAsync<LeadTimeResponse>("/api/productivity/lead-time");
+        Assert.Equal(1.5m, concentrated!.OutlierThresholdDays);
+        Assert.False(Assert.Single(concentrated.Orders, o => o.OrderNo == b.Order.OrderNo).IsOutlier);
+        Assert.True(Assert.Single(concentrated.Orders, o => o.OrderNo == a.Order.OrderNo).IsOutlier);
+    }
+
+    [Fact]
+    public async Task 標準時間の見直し候補は実績の中央値が工順マスタから外れた工程を件数が足りるときだけ挙げる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var started = DateTimeOffset.Now.AddHours(-12);
+
+        // 工順1段目（標準 作業30分/個）を3指図で、1個あたり60分・60分・66分で行う → 中央値60分（+100%）
+        // 工順2段目は1指図だけ時間を記録する（件数不足で候補にしない）。時間を記録しない作業指示は件数に入れない
+        var minutes = new[] { 600, 600, 660 };
+        for (var i = 0; i < 3; i++)
+        {
+            var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+            var first = order.WorkOrders[0].Id;
+            (await admin.PostAsJsonAsync($"/api/work-orders/{first}/production-records",
+                new ProductionRecordRequest(10m, 0m, started, started.AddHours(1), null, false))).EnsureSuccessStatusCode();
+            (await admin.PostAsJsonAsync("/api/work-time-records",
+                new WorkTimeRequest(WorkTimeType.Direct, null, first, started, started.AddMinutes(minutes[i]), null)))
+                .EnsureSuccessStatusCode();
+            var second = order.WorkOrders[1].Id;
+            (await admin.PostAsJsonAsync($"/api/work-orders/{second}/production-records",
+                new ProductionRecordRequest(10m, 0m, started, started.AddHours(1), ctx.ProductLocationId, false))).EnsureSuccessStatusCode();
+            if (i == 0)
+            {
+                (await admin.PostAsJsonAsync("/api/work-time-records",
+                    new WorkTimeRequest(WorkTimeType.Direct, null, second, started, started.AddMinutes(500), null)))
+                    .EnsureSuccessStatusCode();
+            }
+        }
+
+        var review = await admin.GetFromJsonAsync<StandardTimeReviewResponse>("/api/productivity/standard-time-review");
+
+        var step1 = Assert.Single(review!.Rows, r => r.Sequence == 1);
+        Assert.True(step1.IsCandidate);
+        Assert.Equal(3, step1.WorkSampleCount);
+        Assert.Equal(60m, step1.MedianWorkMinutes);
+        Assert.Equal(100m, step1.WorkDeviationRate);
+        var step2 = Assert.Single(review.Rows, r => r.Sequence == 2);
+        Assert.False(step2.IsCandidate);
+        Assert.Equal(1, step2.WorkSampleCount);
+        Assert.Equal(step1.RoutingId, review.Rows[0].RoutingId); // 候補が先
+
+        // しきい値を上げれば候補から外れる。マスタは書き換えない
+        var loose = await admin.GetFromJsonAsync<StandardTimeReviewResponse>(
+            "/api/productivity/standard-time-review?threshold=150");
+        Assert.DoesNotContain(loose!.Rows, r => r.IsCandidate);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await admin.GetAsync("/api/productivity/standard-time-review?threshold=0")).StatusCode);
     }
 
     [Fact]

@@ -111,6 +111,7 @@ public static class MasterCsvKinds
             new("StandardValue", "基準値", false, null),
             new("Method", "検査方法", false, null),
             new("SamplingCount", "サンプリング数", false, null),
+            new("RequiredSkillCode", "必要スキル・資格コード", false, "登録済みのスキル・資格コード。検査実績を登録する人と照合する"),
             new("IsActive", "有効", false, "true / false"),
             new("Version", "版数", false, "出力のみ。基準値が変わる更新で自動採番"),
         ]),

@@ -206,3 +206,51 @@ public record QualitySummaryResponse(
     int InspectionFailCount,
     /// <summary>未クローズの不適合件数（C-40-10-05）</summary>
     int OpenNonconformanceCount);
+
+// ---- 管理図・工程能力（C-50-10-01〜02）----
+
+/// <summary>
+/// 管理図の1点（1群）。群は「1つの検査指示で同じ検査項目を測った測定値の集まり」。
+/// 個別値管理図（群の大きさ1）では <see cref="Range"/> は直前の点との移動範囲で、先頭の点は null
+/// </summary>
+public record ControlChartPoint(
+    string OrderNo,
+    /// <summary>群の最初の測定日時</summary>
+    DateTimeOffset InspectedAt,
+    /// <summary>測定日時が属する製造日</summary>
+    DateOnly BusinessDate,
+    int SampleCount,
+    /// <summary>群の平均（個別値管理図では測定値そのもの）</summary>
+    decimal Mean,
+    /// <summary>範囲 R（個別値管理図では移動範囲 Rs）</summary>
+    decimal? Range,
+    /// <summary>平均が管理限界の外</summary>
+    bool MeanOutOfControl,
+    /// <summary>範囲が管理限界の外</summary>
+    bool RangeOutOfControl,
+    /// <summary>中心線の同じ側に9点以上続く並びの中にある（JIS Z 9020-2 のルール2）</summary>
+    bool InRun);
+
+/// <summary>
+/// 管理図と工程能力指数（C-50-10-01〜02。Spec.md 3.3）。
+/// 群の数が2未満のときは管理限界・工程能力を null で返す（点だけ描く）。
+/// 規格の片側しか無い項目は Cp を null にし、Cpk は片側で求める
+/// </summary>
+public record ControlChartResponse(
+    int InspectionItemId, string ItemCode, string ItemName,
+    /// <summary>個別値－移動範囲管理図（X-Rs）か。false なら X̄-R 管理図</summary>
+    bool IsIndividuals,
+    /// <summary>群の大きさ（使った群の大きさ。最も多い大きさに揃え、違う大きさの群は除外する）</summary>
+    int SubgroupSize,
+    decimal? CenterLine, decimal? UpperControlLimit, decimal? LowerControlLimit,
+    decimal? RangeCenterLine, decimal? RangeUpperControlLimit, decimal? RangeLowerControlLimit,
+    /// <summary>規格の下限・上限（最も新しい群の検査指示が発行時に写した値）</summary>
+    decimal? LowerSpecLimit, decimal? UpperSpecLimit,
+    /// <summary>期間内で規格値が改訂されている（工程能力は最新の規格で求めている）</summary>
+    bool SpecLimitsChanged,
+    /// <summary>群内のばらつきから推定した標準偏差（R̄/d2）</summary>
+    decimal? Sigma,
+    decimal? Cp, decimal? Cpk,
+    /// <summary>群の大きさが揃わないため除外した群の数</summary>
+    int ExcludedSubgroupCount,
+    List<ControlChartPoint> Points);

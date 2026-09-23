@@ -174,11 +174,11 @@
   <data name="作業指示（ID {0}）が見つかりません。" xml:space="preserve">
     <value>The work order (ID {0}) was not found.</value>
   </data>
-  <data name="作業者 '{0}' のスキル '{1}' は有効期限切れです。" xml:space="preserve">
-    <value>Skill '{1}' of operator '{0}' has expired.</value>
+  <data name="担当者 '{0}' のスキル '{1}' は有効期限切れです。" xml:space="preserve">
+    <value>Skill '{1}' of user '{0}' has expired.</value>
   </data>
-  <data name="作業者 '{0}' は必要スキル '{1}' を保有していません。" xml:space="preserve">
-    <value>Operator '{0}' does not have the required skill '{1}'.</value>
+  <data name="担当者 '{0}' は必要スキル '{1}' を保有していません。" xml:space="preserve">
+    <value>User '{0}' does not have the required skill '{1}'.</value>
   </data>
   <data name="使用回数または使用時間のどちらかを記録してください。" xml:space="preserve">
     <value>Record either the usage count or the usage time.</value>
@@ -2015,6 +2015,15 @@
   </data>
   <data name="工程管理項目 '{0}' は品目 {1} の工順から紐付けられているため無効化できません。" xml:space="preserve">
     <value>Control item '{0}' cannot be deactivated because it is linked from the routing of item {1}.</value>
+  </data>
+  <data name="着手する作業者を特定できません。" xml:space="preserve">
+    <value>Cannot identify the operator starting the work.</value>
+  </data>
+  <data name="存在しない必要スキルIDです。" xml:space="preserve">
+    <value>The required skill ID does not exist.</value>
+  </data>
+  <data name="しきい値は0より大きく、件数は1以上で指定してください。" xml:space="preserve">
+    <value>Specify a threshold greater than 0 and a count of at least 1.</value>
   </data>
   <data name="基準値が規格値の範囲の外にあります。" xml:space="preserve">
     <value>The standard value is outside the specification limits.</value>

@@ -247,6 +247,8 @@ internal sealed class InspectionItemConfiguration : IEntityTypeConfiguration<Ins
         e.Property(x => x.Code).HasMaxLength(50);
         e.Property(x => x.Name).HasMaxLength(200);
         e.Property(x => x.Method).HasMaxLength(500);
+        e.HasOne(x => x.RequiredSkill).WithMany().HasForeignKey(x => x.RequiredSkillId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

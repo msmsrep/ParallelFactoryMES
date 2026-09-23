@@ -10,13 +10,15 @@ public record MaintenanceProcedureRequest(
     [Required, MaxLength(200)] string Title,
     int? TargetEquipmentId,
     int? TargetToolId,
-    [Required, MaxLength(4000)] string Steps);
+    [Required, MaxLength(4000)] string Steps,
+    int? RequiredSkillId = null);
 
 public record MaintenanceProcedureResponse(
     int Id, string ProcedureNo, string Title,
     int? TargetEquipmentId, string? TargetEquipmentName,
     int? TargetToolId, string? TargetToolName,
-    string Steps, int Version, bool IsActive);
+    string Steps, int Version, bool IsActive,
+    int? RequiredSkillId = null, string? RequiredSkillName = null);
 
 // ---- 設備稼働履歴（B-40-20、E-20-10）----
 

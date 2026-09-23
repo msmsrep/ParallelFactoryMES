@@ -86,6 +86,7 @@ public sealed class MaintenanceOrderService(
     /// <summary>
     /// 保全実績の登録（E-40-30-01）。登録と同時に指示は完了。元計画は完了、
     /// 治工具メンテでresetToolLife指定時は寿命カウンタをリセットする（E-60-30）。
+    /// 手順書に必要スキルがあれば実施者（登録する者）を照合する（F-20-30-01）。
     /// </summary>
     public async Task<Outcome<MaintenanceOrder>> AddRecordAsync(
         int orderId, MaintenanceRecordRequest request, string userId, CancellationToken ct)
@@ -106,6 +107,22 @@ public sealed class MaintenanceOrderService(
         if (request.ResetToolLife && order.Tool is null)
         {
             return Outcome<MaintenanceOrder>.Invalid(ApiText.T("寿命リセットは治工具メンテナンスの指示でのみ指定できます。"));
+        }
+
+        // 手順書の必要スキル・資格を実施者と照合する（F-20-30-01）。差立・着手と同じ判定を使う
+        var requiredSkill = order.ProcedureId is int procedureId
+            ? await db.MaintenanceProcedures.Where(p => p.Id == procedureId)
+                .Select(p => p.RequiredSkill).FirstOrDefaultAsync(ct)
+            : null;
+        if (requiredSkill is not null)
+        {
+            var performer = await db.Users.FirstAsync(u => u.Id == userId, ct);
+            var userSkill = await db.UserSkills
+                .FirstOrDefaultAsync(s => s.UserId == userId && s.SkillId == requiredSkill.Id, ct);
+            if (SkillQualificationPolicy.Check(performer.DisplayName, requiredSkill, userSkill, businessDate.Today) is { } skillError)
+            {
+                return Outcome<MaintenanceOrder>.Invalid(skillError);
+            }
         }
 
         var record = new MaintenanceRecord

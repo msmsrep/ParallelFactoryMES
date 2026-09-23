@@ -3000,9 +3000,6 @@
   <data name="品質分析 - Parallel Factory MES" xml:space="preserve">
     <value>Quality Analysis - Parallel Factory MES</value>
   </data>
-  <data name="不良項目別・工程別・直別・期間別の集計（C-40-10-03）、不適合・逸脱発生状況のモニタリング（C-40-10-05）。期間は製造日（業務日付）基準。" xml:space="preserve">
-    <value>Defects by item, process, shift and period (C-40-10-03) and monitoring of nonconformances and deviations (C-40-10-05). Periods are based on the production (business) date.</value>
-  </data>
   <data name="サマリ" xml:space="preserve">
     <value>Summary</value>
   </data>
@@ -4178,5 +4175,155 @@
   </data>
   <data name="指示値の無い確認事項など" xml:space="preserve">
     <value>Checks without target values, etc.</value>
+  </data>
+  <data name="不良項目別・工程別・直別・期間別の集計（C-40-10-03）、不適合・逸脱発生状況のモニタリング（C-40-10-05）、管理図と工程能力（C-50-10-01〜02）。期間は製造日（業務日付）基準。" xml:space="preserve">
+    <value>Totals by defect item, process, shift and period (C-40-10-03), monitoring of nonconformances and deviations (C-40-10-05), and control charts with process capability (C-50-10-01 to 02). Periods are based on the production date (business date).</value>
+  </data>
+  <data name="管理図と工程能力" xml:space="preserve">
+    <value>Control chart and process capability</value>
+  </data>
+  <data name="検査実績の測定値を検査指示ごとの群にまとめ、X̄-R 管理図（群の大きさが1なら X-Rs 管理図）を描く。赤は管理限界の外、黄は中心線の同じ側に9点以上続く並び。工程能力指数は群内のばらつきから求める。" xml:space="preserve">
+    <value>Measured values are grouped into one subgroup per inspection order and plotted as an X̄-R chart (an X-Rs chart when the subgroup size is 1). Red points are outside the control limits; yellow points belong to a run of 9 or more on the same side of the center line. Process capability indices are calculated from within-subgroup variation.</value>
+  </data>
+  <data name="検査項目（定量）" xml:space="preserve">
+    <value>Inspection item (quantitative)</value>
+  </data>
+  <data name="対象期間の測定値はありません。" xml:space="preserve">
+    <value>No measured values in the selected period.</value>
+  </data>
+  <data name="管理図" xml:space="preserve">
+    <value>Control chart</value>
+  </data>
+  <data name="X-Rs 管理図" xml:space="preserve">
+    <value>X-Rs chart</value>
+  </data>
+  <data name="X̄-R 管理図（群の大きさ {0}）" xml:space="preserve">
+    <value>X̄-R chart (subgroup size {0})</value>
+  </data>
+  <data name="群の数" xml:space="preserve">
+    <value>Subgroups</value>
+  </data>
+  <data name="（大きさの違う {0} 群を除外）" xml:space="preserve">
+    <value>({0} subgroups of a different size excluded)</value>
+  </data>
+  <data name="1.33 未満" xml:space="preserve">
+    <value>Below 1.33</value>
+  </data>
+  <data name="群が2つ以上ないと管理限界と工程能力は求められません。" xml:space="preserve">
+    <value>At least 2 subgroups are needed to calculate control limits and process capability.</value>
+  </data>
+  <data name="期間内に規格値が改訂されています。工程能力は最新の規格値で求めています。" xml:space="preserve">
+    <value>The specification limits were revised within the period. Process capability is calculated with the latest limits.</value>
+  </data>
+  <data name="個別値（X）" xml:space="preserve">
+    <value>Individual values (X)</value>
+  </data>
+  <data name="平均値（X̄）" xml:space="preserve">
+    <value>Means (X̄)</value>
+  </data>
+  <data name="平均値の管理図" xml:space="preserve">
+    <value>Control chart of means</value>
+  </data>
+  <data name="移動範囲（Rs）" xml:space="preserve">
+    <value>Moving ranges (Rs)</value>
+  </data>
+  <data name="範囲（R）" xml:space="preserve">
+    <value>Ranges (R)</value>
+  </data>
+  <data name="範囲の管理図" xml:space="preserve">
+    <value>Control chart of ranges</value>
+  </data>
+  <data name="規格上限" xml:space="preserve">
+    <value>USL</value>
+  </data>
+  <data name="規格下限" xml:space="preserve">
+    <value>LSL</value>
+  </data>
+  <data name="製造リードタイム" xml:space="preserve">
+    <value>Manufacturing lead time</value>
+  </data>
+  <data name="完了した製造指図ごとに、最初の作業（段取り・実績の開始）から最後の実績の終了までを製造日で数える。期間は完了した製造日。リワーク指図は含めない。" xml:space="preserve">
+    <value>For each completed manufacturing order, counted in production days from the first activity (start of setup or production) to the end of the last production record. The period is the production date of completion. Rework orders are excluded.</value>
+  </data>
+  <data name="対象期間に完了した製造指図はありません。" xml:space="preserve">
+    <value>No manufacturing orders were completed in the selected period.</value>
+  </data>
+  <data name="完了した指図" xml:space="preserve">
+    <value>Completed orders</value>
+  </data>
+  <data name="平均" xml:space="preserve">
+    <value>Average</value>
+  </data>
+  <data name="{0} 日" xml:space="preserve">
+    <value>{0} days</value>
+  </data>
+  <data name="中央値" xml:space="preserve">
+    <value>Median</value>
+  </data>
+  <data name="90%点" xml:space="preserve">
+    <value>90th percentile</value>
+  </data>
+  <data name="最大" xml:space="preserve">
+    <value>Maximum</value>
+  </data>
+  <data name="納期内 / 遅れ / 納期なし" xml:space="preserve">
+    <value>On time / Late / No due date</value>
+  </data>
+  <data name="{0} 件 / {1} 件 / {2} 件" xml:space="preserve">
+    <value>{0} / {1} / {2}</value>
+  </data>
+  <data name="製造リードタイムの分布" xml:space="preserve">
+    <value>Distribution of manufacturing lead time</value>
+  </data>
+  <data name="リードタイムの長い指図" xml:space="preserve">
+    <value>Orders with the longest lead time</value>
+  </data>
+  <data name="リードタイム" xml:space="preserve">
+    <value>Lead time</value>
+  </data>
+  <data name="遅れ" xml:space="preserve">
+    <value>Delay</value>
+  </data>
+  <data name="異常値" xml:space="preserve">
+    <value>Outlier</value>
+  </data>
+  <data name="異常値は第3四分位＋1.5×四分位範囲（{0} 日）を超えるもの。平均を押し上げている原因を個別に調べる対象。" xml:space="preserve">
+    <value>Outliers exceed the third quartile + 1.5 × interquartile range ({0} days). Investigate each one individually, as they push up the average.</value>
+  </data>
+  <data name="納期内・納期なし" xml:space="preserve">
+    <value>On time / no due date</value>
+  </data>
+  <data name="納期遅れ" xml:space="preserve">
+    <value>Late</value>
+  </data>
+  <data name="標準時間の見直し候補" xml:space="preserve">
+    <value>Standard time review candidates</value>
+  </data>
+  <data name="工順の工程ごとに、実績の中央値（1個あたり作業時間・1回あたり段取り時間）を工順マスタの現在値と比べる。作業時間を記録していない作業指示は数えない。標準を実績に合わせるか、作業のほうを改めるかは現場で判断する。" xml:space="preserve">
+    <value>For each routing step, the median of the actuals (work time per unit and setup time per setup) is compared with the current routing master. Work orders without recorded work time are not counted. Whether to align the standard with the actuals or to change the work itself is decided on the shop floor.</value>
+  </data>
+  <data name="対象期間に作業時間・段取りの記録がある作業指示はありません。" xml:space="preserve">
+    <value>No work orders with work time or setup records in the selected period.</value>
+  </data>
+  <data name="標準作業（分/個）" xml:space="preserve">
+    <value>Standard work (min/unit)</value>
+  </data>
+  <data name="実績の中央値" xml:space="preserve">
+    <value>Actual median</value>
+  </data>
+  <data name="ずれ" xml:space="preserve">
+    <value>Deviation</value>
+  </data>
+  <data name="標準段取り（分/回）" xml:space="preserve">
+    <value>Standard setup (min/setup)</value>
+  </data>
+  <data name="{0}（{1} 件）" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="見直し候補" xml:space="preserve">
+    <value>Review candidate</value>
+  </data>
+  <data name="ずれが {0}% 以上で、作業指示が {1} 件以上あるものを見直し候補とする。標準の変更はマスタ管理の工順で行う。" xml:space="preserve">
+    <value>Steps with a deviation of {0}% or more and at least {1} work orders are review candidates. Change the standards in the routing under master management.</value>
   </data>
 </root>
