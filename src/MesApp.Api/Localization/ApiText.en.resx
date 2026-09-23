@@ -2019,4 +2019,7 @@
   <data name="着手する作業者を特定できません。" xml:space="preserve">
     <value>Cannot identify the operator starting the work.</value>
   </data>
+  <data name="存在しない必要スキルIDです。" xml:space="preserve">
+    <value>The required skill ID does not exist.</value>
+  </data>
 </root>

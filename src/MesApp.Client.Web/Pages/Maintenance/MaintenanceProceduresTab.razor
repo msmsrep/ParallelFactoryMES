@@ -1,6 +1,6 @@
 ﻿@inject HttpClient Http
 
-@* 保全手順書（Spec.md 3.1。E-10-20）。更新で版数が上がる *@
+@* 保全手順書（Spec.md 3.1。E-10-20）。更新で版数が上がる。必要スキルは保全実績の登録時に実施者と照合する（F-20-30-01） *@
 <Notice Error="@_error" Message="@_message" />
 
 <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage">
@@ -35,6 +35,16 @@
                     }
                 </select>
             </div>
+            <div class="form-field">
+                <label>@L["必要スキル・資格"]</label>
+                <select @bind="_procedure.SkillId">
+                    <option value="0">@L["なし"]</option>
+                    @foreach (var skill in _skills)
+                    {
+                        <option value="@skill.Id">@skill.Code @skill.Name</option>
+                    }
+                </select>
+            </div>
         </div>
         <div class="form-field">
             <label>@L["手順ステップ"]</label>
@@ -52,7 +62,7 @@
     else
     {
         <table class="table">
-            <thead><tr><th>@L["手順書番号"]</th><th>@L["表題"]</th><th>@L["対象"]</th><th>@L["版数"]</th><th>@L["手順"]</th></tr></thead>
+            <thead><tr><th>@L["手順書番号"]</th><th>@L["表題"]</th><th>@L["対象"]</th><th>@L["必要スキル・資格"]</th><th>@L["版数"]</th><th>@L["手順"]</th></tr></thead>
             <tbody>
                 @foreach (var procedure in _procedures)
                 {
@@ -60,6 +70,7 @@
                         <td>@procedure.ProcedureNo</td>
                         <td>@procedure.Title</td>
                         <td>@(procedure.TargetEquipmentName ?? procedure.TargetToolName ?? "-")</td>
+                        <td>@(procedure.RequiredSkillName ?? "-")</td>
                         <td>v@(procedure.Version)</td>
                         <td style="white-space:pre-wrap;max-width:340px;">@procedure.Steps</td>
                     </tr>
@@ -76,11 +87,13 @@
         public string Title { get; set; } = string.Empty;
         public int EquipmentId { get; set; }
         public int ToolId { get; set; }
+        public int SkillId { get; set; }
         public string Steps { get; set; } = string.Empty;
     }
 
     private List<EquipmentResponse> _equipments = [];
     private List<ToolResponse> _tools = [];
+    private List<SkillResponse> _skills = [];
     private List<MaintenanceProcedureResponse> _procedures = [];
 
     private readonly ProcedureForm _procedure = new();
@@ -93,6 +106,7 @@
     {
         _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments") ?? [];
         _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
+        _skills = await Http.GetFromJsonAsync<List<SkillResponse>>("api/skills") ?? [];
         await LoadProceduresAsync();
     }
 
@@ -116,7 +130,8 @@
                 new MaintenanceProcedureRequest(_procedure.ProcedureNo, _procedure.Title,
                     _procedure.EquipmentId == 0 ? null : _procedure.EquipmentId,
                     _procedure.ToolId == 0 ? null : _procedure.ToolId,
-                    _procedure.Steps));
+                    _procedure.Steps,
+                    _procedure.SkillId == 0 ? null : _procedure.SkillId));
             if (await response.ReadErrorAsync(L["登録に失敗しました。"]) is { } error)
             {
                 _error = error;

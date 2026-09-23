@@ -8,6 +8,7 @@ using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Quality;
+using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Tests;
@@ -167,6 +168,41 @@ public class MaintenanceTests
                 "1. 電源遮断\n2. ベルト張力確認\n3. 給油\n4. 安全カバー確認"));
         var updatedBody = await updated.Content.ReadFromJsonAsync<MaintenanceProcedureResponse>();
         Assert.Equal(2, updatedBody!.Version);
+    }
+
+    [Fact]
+    public async Task 手順書の必要スキルを持たない者は保全実績を登録できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+        var skillCreated = await admin.PostAsJsonAsync("/api/skills",
+            new SkillRequest("SK-EL", "電気工事士", SkillType.Certification, true));
+        var skill = (await skillCreated.Content.ReadFromJsonAsync<SkillResponse>())!;
+
+        var created = await admin.PostAsJsonAsync("/api/maintenance-procedures",
+            new MaintenanceProcedureRequest("PROC-EL", "制御盤点検", equipment.Id, null, "1. 遮断\n2. 端子増し締め", skill.Id));
+        var procedure = (await created.Content.ReadFromJsonAsync<MaintenanceProcedureResponse>())!;
+        Assert.Equal("電気工事士", procedure.RequiredSkillName);
+
+        var orderCreated = await admin.PostAsJsonAsync("/api/maintenance-orders",
+            new MaintenanceOrderCreateRequest(equipment.Id, null, null, procedure.Id, null,
+                MaintenanceRequestType.Spot, "制御盤の異音"));
+        var order = (await orderCreated.Content.ReadFromJsonAsync<MaintenanceOrderResponse>())!;
+        var record = new MaintenanceRecordRequest(DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now, null, "点検完了", null);
+
+        // 資格なし → 400、指示は完了しない
+        var rejected = await admin.PostAsJsonAsync($"/api/maintenance-orders/{order.Id}/record", record);
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+
+        // 資格を付与すると登録できる
+        var users = await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users");
+        var me = users!.Single(u => u.UserName == TestAuth.AdminUser);
+        (await admin.PutAsJsonAsync($"/api/users/{me.Id}/skills",
+            new List<UserSkillRequest> { new(skill.Id, null, DateOnly.FromDateTime(DateTime.Today).AddYears(1)) }))
+            .EnsureSuccessStatusCode();
+        var recorded = await admin.PostAsJsonAsync($"/api/maintenance-orders/{order.Id}/record", record);
+        Assert.Equal(HttpStatusCode.OK, recorded.StatusCode);
     }
 
     /// <summary>消耗品を1品目登録した設備と、その在庫ロットを用意する</summary>

@@ -32,6 +32,8 @@ internal sealed class MaintenanceProcedureConfiguration : IEntityTypeConfigurati
         e.Property(x => x.Steps).HasMaxLength(4000);
         e.HasOne(x => x.TargetEquipment).WithMany().HasForeignKey(x => x.TargetEquipmentId)
             .OnDelete(DeleteBehavior.Restrict);
+        e.HasOne(x => x.RequiredSkill).WithMany().HasForeignKey(x => x.RequiredSkillId)
+            .OnDelete(DeleteBehavior.Restrict);
         e.HasOne(x => x.TargetTool).WithMany().HasForeignKey(x => x.TargetToolId)
             .OnDelete(DeleteBehavior.Restrict);
     }

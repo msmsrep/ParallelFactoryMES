@@ -20,6 +20,13 @@ public class MaintenanceProcedure : IDeactivatableMaster
     public int? TargetToolId { get; set; }
     public Tool? TargetTool { get; set; }
 
+    /// <summary>
+    /// 実施に必要なスキル・資格（F-20-30-01）。保全実績の登録時に実施者と照合する。
+    /// 保全指示は手順書を版数ごと固定しないため、照合は手順書の現在値を使う
+    /// </summary>
+    public int? RequiredSkillId { get; set; }
+    public SkillMaster? RequiredSkill { get; set; }
+
     /// <summary>手順ステップ（テキスト。1行1ステップ等の自由書式）</summary>
     public string Steps { get; set; } = string.Empty;
 

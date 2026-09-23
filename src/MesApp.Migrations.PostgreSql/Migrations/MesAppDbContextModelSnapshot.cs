@@ -1392,6 +1392,9 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<int?>("RequiredSkillId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Steps")
                         .IsRequired()
                         .HasMaxLength(4000)
@@ -1415,6 +1418,8 @@ namespace MesApp.Migrations.PostgreSql.Migrations
 
                     b.HasIndex("ProcedureNo")
                         .IsUnique();
+
+                    b.HasIndex("RequiredSkillId");
 
                     b.HasIndex("TargetEquipmentId");
 
@@ -3985,6 +3990,11 @@ namespace MesApp.Migrations.PostgreSql.Migrations
 
             modelBuilder.Entity("MesApp.Core.Entities.MaintenanceProcedure", b =>
                 {
+                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
+                        .WithMany()
+                        .HasForeignKey("RequiredSkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MesApp.Core.Entities.Equipment", "TargetEquipment")
                         .WithMany()
                         .HasForeignKey("TargetEquipmentId")
@@ -3994,6 +4004,8 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .WithMany()
                         .HasForeignKey("TargetToolId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("RequiredSkill");
 
                     b.Navigation("TargetEquipment");
 

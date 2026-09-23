@@ -1315,6 +1315,9 @@ namespace MesApp.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("RequiredSkillId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Steps")
                         .IsRequired()
                         .HasMaxLength(4000)
@@ -1338,6 +1341,8 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.HasIndex("ProcedureNo")
                         .IsUnique();
+
+                    b.HasIndex("RequiredSkillId");
 
                     b.HasIndex("TargetEquipmentId");
 
@@ -3786,6 +3791,11 @@ namespace MesApp.Infrastructure.Migrations
 
             modelBuilder.Entity("MesApp.Core.Entities.MaintenanceProcedure", b =>
                 {
+                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
+                        .WithMany()
+                        .HasForeignKey("RequiredSkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MesApp.Core.Entities.Equipment", "TargetEquipment")
                         .WithMany()
                         .HasForeignKey("TargetEquipmentId")
@@ -3795,6 +3805,8 @@ namespace MesApp.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("TargetToolId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("RequiredSkill");
 
                     b.Navigation("TargetEquipment");
 
