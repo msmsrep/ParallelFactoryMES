@@ -5,7 +5,7 @@
 <PageTitle>@L["品質分析 - Parallel Factory MES"]</PageTitle>
 
 <h1>@L["品質分析"]</h1>
-<p class="text-muted">@L["不良項目別・工程別・直別・期間別の集計（C-40-10-03）、不適合・逸脱発生状況のモニタリング（C-40-10-05）。期間は製造日（業務日付）基準。"]</p>
+<p class="text-muted">@L["不良項目別・工程別・直別・期間別の集計（C-40-10-03）、不適合・逸脱発生状況のモニタリング（C-40-10-05）、管理図と工程能力（C-50-10-01〜02）。期間は製造日（業務日付）基準。"]</p>
 
 <div class="card">
     <div class="form-grid">
@@ -194,10 +194,92 @@ else
             </table>
         }
     </div>
+
+    @* 管理図と工程能力指数（C-50-10-01〜02）。群は検査指示ごと、期間は上の製造日 *@
+    <div class="card">
+        <h2 style="margin-top:0;">@L["管理図と工程能力"]</h2>
+        <p class="text-muted">
+            @L["検査実績の測定値を検査指示ごとの群にまとめ、X̄-R 管理図（群の大きさが1なら X-Rs 管理図）を描く。赤は管理限界の外、黄は中心線の同じ側に9点以上続く並び。工程能力指数は群内のばらつきから求める。"]
+        </p>
+        <div class="form-field">
+            <label>@L["検査項目（定量）"]</label>
+            <select value="@_chartItemId" @onchange="OnChartItemChangedAsync">
+                <option value="0">@L["選択してください"]</option>
+                @foreach (var item in _chartItems)
+                {
+                    <option value="@item.Id">@item.Code @item.Name</option>
+                }
+            </select>
+        </div>
+        @if (_chart is not null)
+        {
+            @if (_chart.Points.Count == 0)
+            {
+                <p class="text-muted">@L["対象期間の測定値はありません。"]</p>
+            }
+            else
+            {
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <th>@L["管理図"]</th>
+                            <td>@(_chart.IsIndividuals ? L["X-Rs 管理図"] : L["X̄-R 管理図（群の大きさ {0}）", _chart.SubgroupSize])</td>
+                            <th>@L["群の数"]</th>
+                            <td>
+                                @_chart.Points.Count
+                                @if (_chart.ExcludedSubgroupCount > 0)
+                                {
+                                    <span class="text-muted">@L["（大きさの違う {0} 群を除外）", _chart.ExcludedSubgroupCount]</span>
+                                }
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Cp</th>
+                            <td>@(_chart.Cp?.ToString("0.00") ?? "-")</td>
+                            <th>Cpk</th>
+                            <td>
+                                @(_chart.Cpk?.ToString("0.00") ?? "-")
+                                @if (_chart.Cpk is { } cpk && cpk < 1.33m)
+                                {
+                                    <span class="badge badge-warning">@L["1.33 未満"]</span>
+                                }
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                @if (_chart.CenterLine is null)
+                {
+                    <p class="text-muted">@L["群が2つ以上ないと管理限界と工程能力は求められません。"]</p>
+                }
+                @if (_chart.SpecLimitsChanged)
+                {
+                    <p class="text-muted">@L["期間内に規格値が改訂されています。工程能力は最新の規格値で求めています。"]</p>
+                }
+                <h3>@(_chart.IsIndividuals ? L["個別値（X）"] : L["平均値（X̄）"])</h3>
+                <ControlLineChart Labels="@ChartLabels" Values="@_chart.Points.Select(p => (decimal?)p.Mean).ToList()"
+                                  OutOfControl="@_chart.Points.Select(p => p.MeanOutOfControl).ToList()"
+                                  InRun="@_chart.Points.Select(p => p.InRun).ToList()"
+                                  Center="@_chart.CenterLine" Upper="@_chart.UpperControlLimit" Lower="@_chart.LowerControlLimit"
+                                  SpecUpper="@_chart.UpperSpecLimit" SpecLower="@_chart.LowerSpecLimit"
+                                  AriaLabel="@L["平均値の管理図"]" />
+                <h3>@(_chart.IsIndividuals ? L["移動範囲（Rs）"] : L["範囲（R）"])</h3>
+                <ControlLineChart Labels="@ChartLabels" Values="@_chart.Points.Select(p => p.Range).ToList()"
+                                  OutOfControl="@_chart.Points.Select(p => p.RangeOutOfControl).ToList()"
+                                  Center="@_chart.RangeCenterLine" Upper="@_chart.RangeUpperControlLimit"
+                                  Lower="@(_chart.RangeLowerControlLimit > 0 ? _chart.RangeLowerControlLimit : null)"
+                                  AriaLabel="@L["範囲の管理図"]" />
+            }
+        }
+    </div>
 }
 
 @code {
     private QualitySummaryResponse? _summary;
+    private List<InspectionItemResponse> _chartItems = [];
+    private int _chartItemId;
+    private ControlChartResponse? _chart;
+
+    private List<string> ChartLabels => _chart?.Points.Select(p => p.BusinessDate.ToString("MM/dd")).ToList() ?? [];
     private DateTime? _from;
     private DateTime? _to;
 
@@ -205,9 +287,33 @@ else
         ? _summary.NonconformanceByCause.Values.Max()
         : 0;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        // 管理図は測定値を持つ（規格値のある）項目だけを選べるようにする
+        _chartItems = (await Http.GetFromJsonAsync<List<InspectionItemResponse>>("api/inspection-items") ?? [])
+            .Where(i => i.LowerLimit is not null || i.UpperLimit is not null)
+            .ToList();
+        await LoadAsync();
+    }
 
-    private async Task LoadAsync()
+    private async Task OnChartItemChangedAsync(ChangeEventArgs e)
+    {
+        _chartItemId = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        await LoadChartAsync();
+    }
+
+    private async Task LoadChartAsync()
+    {
+        if (_chartItemId == 0)
+        {
+            _chart = null;
+            return;
+        }
+        _chart = await Http.GetFromJsonAsync<ControlChartResponse>(
+            $"api/quality/control-chart?inspectionItemId={_chartItemId}" + PeriodQuery("&"));
+    }
+
+    private string PeriodQuery(string prefix)
     {
         var query = new List<string>();
         if (_from is not null)
@@ -218,7 +324,12 @@ else
         {
             query.Add($"to={DateOnly.FromDateTime(_to.Value):yyyy-MM-dd}");
         }
-        var url = "api/quality/summary" + (query.Count > 0 ? "?" + string.Join("&", query) : string.Empty);
-        _summary = await Http.GetFromJsonAsync<QualitySummaryResponse>(url);
+        return query.Count > 0 ? prefix + string.Join("&", query) : string.Empty;
+    }
+
+    private async Task LoadAsync()
+    {
+        _summary = await Http.GetFromJsonAsync<QualitySummaryResponse>("api/quality/summary" + PeriodQuery("?"));
+        await LoadChartAsync();
     }
 }

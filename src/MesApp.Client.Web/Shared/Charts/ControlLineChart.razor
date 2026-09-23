@@ -1,0 +1,160 @@
+@* 管理図の1枚（Spec.md 3.3。C-50-10-01〜02）。点を折れ線で結び、中心線・管理限界・規格値を横線で引く。
+   管理限界の外の点と、中心線の同じ側に続く並びの点を色で示す。値の計算はせず、渡された値を描くだけ *@
+
+<div class="chart">
+    <svg viewBox="0 0 @ChartScale.F(Width) @ChartScale.F(Height)" style="width:100%; min-width:@(ChartScale.F(Width))px;"
+         role="img" aria-label="@(AriaLabel ?? L["グラフ"])">
+        @foreach (var tick in _ticks)
+        {
+            var y = Y(tick);
+            <line x1="@ChartScale.F(Left)" y1="@ChartScale.F(y)" x2="@ChartScale.F(Left + PlotWidth)" y2="@ChartScale.F(y)"
+                  style="stroke:var(--border); stroke-dasharray:2 3;" />
+            @ChartScale.Text(Left - 6, y + 3, ChartScale.Number(tick), "end")
+        }
+
+        @foreach (var (value, name, color, dash) in Guides())
+        {
+            var y = Y(value);
+            <line x1="@ChartScale.F(Left)" y1="@ChartScale.F(y)" x2="@ChartScale.F(Left + PlotWidth)" y2="@ChartScale.F(y)"
+                  style="stroke:@color; stroke-width:1.5; stroke-dasharray:@dash;">
+                <title>@name @ChartScale.Number(value)</title>
+            </line>
+            @ChartScale.Text(Left + PlotWidth + 4, y + 3, name, "start", $"font-size:10px; fill:{color};")
+        }
+
+        @foreach (var segment in Segments())
+        {
+            @if (segment.Count > 1)
+            {
+                <polyline points="@string.Join(' ', segment.Select(p => $"{ChartScale.F(p.X)},{ChartScale.F(p.Y)}"))"
+                          style="fill:none; stroke:var(--primary); stroke-width:1.5;" />
+            }
+        }
+        @for (var i = 0; i < Labels.Count; i++)
+        {
+            @if (Values[i] is { } value)
+            {
+                var color = OutOfControl.Count > i && OutOfControl[i] ? "var(--danger)"
+                    : InRun.Count > i && InRun[i] ? "var(--warning)" : "var(--primary)";
+                <circle cx="@ChartScale.F(X(i))" cy="@ChartScale.F(Y(value))" r="3.5"
+                        style="fill:@color; stroke:@color; stroke-width:1;">
+                    <title>@Labels[i] @ChartScale.Number(value)</title>
+                </circle>
+            }
+            @if (i % LabelEvery == 0)
+            {
+                @ChartScale.Text(X(i), Height - 8, Labels[i])
+            }
+        }
+    </svg>
+</div>
+
+@code {
+    /// <summary>横軸のラベル（点の数だけ）</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> Labels { get; set; } = [];
+
+    /// <summary>点の値。null の点は描かず、線もつなげない</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<decimal?> Values { get; set; } = [];
+
+    /// <summary>管理限界の外の点（赤で示す）</summary>
+    [Parameter] public IReadOnlyList<bool> OutOfControl { get; set; } = [];
+
+    /// <summary>中心線の同じ側に続く並びの点（黄で示す）</summary>
+    [Parameter] public IReadOnlyList<bool> InRun { get; set; } = [];
+
+    [Parameter] public decimal? Center { get; set; }
+    [Parameter] public decimal? Upper { get; set; }
+    [Parameter] public decimal? Lower { get; set; }
+    [Parameter] public decimal? SpecUpper { get; set; }
+    [Parameter] public decimal? SpecLower { get; set; }
+
+    [Parameter] public string? AriaLabel { get; set; }
+
+    private const decimal Height = 212m;
+    private const decimal Top = 16m;
+    private const decimal Bottom = 188m;
+    private const decimal Left = 56m;
+    private const decimal Right = 52m;
+
+    private IReadOnlyList<decimal> _ticks = [0m, 1m];
+    private decimal _min;
+    private decimal _max = 1m;
+
+    private decimal PlotWidth => Math.Max(Labels.Count * 28m, 480m);
+    private decimal Width => Left + PlotWidth + Right;
+    private decimal Slot => Labels.Count == 0 ? PlotWidth : PlotWidth / Labels.Count;
+    private int LabelEvery => Math.Max(1, (int)Math.Ceiling(Labels.Count / 12m));
+
+    protected override void OnParametersSet()
+    {
+        // 管理図は0から描くと変動が潰れるので、点・限界・規格の範囲に合わせて縦軸を取る
+        var all = Values.Where(v => v is not null).Select(v => v!.Value)
+            .Concat(new[] { Center, Upper, Lower, SpecUpper, SpecLower }.Where(v => v is not null).Select(v => v!.Value))
+            .ToList();
+        var min = all.Count == 0 ? 0m : all.Min();
+        var max = all.Count == 0 ? 1m : all.Max();
+        if (max == min)
+        {
+            max += 1m;
+            min -= 1m;
+        }
+        var step = ChartScale.NiceStep((max - min) / 5);
+        _min = Math.Floor(min / step) * step;
+        _max = Math.Ceiling(max / step) * step;
+        var ticks = new List<decimal>();
+        for (var t = _min; t <= _max; t += step)
+        {
+            ticks.Add(t);
+        }
+        _ticks = ticks;
+    }
+
+    private decimal Y(decimal value) => Bottom - (value - _min) / (_max - _min) * (Bottom - Top);
+
+    private decimal X(int i) => Left + Slot * i + Slot / 2;
+
+    private IEnumerable<(decimal Value, string Name, string Color, string Dash)> Guides()
+    {
+        if (SpecUpper is { } su)
+        {
+            yield return (su, L["規格上限"], "var(--danger)", "6 3");
+        }
+        if (SpecLower is { } sl)
+        {
+            yield return (sl, L["規格下限"], "var(--danger)", "6 3");
+        }
+        if (Upper is { } u)
+        {
+            yield return (u, "UCL", "var(--warning)", "4 2");
+        }
+        if (Lower is { } l)
+        {
+            yield return (l, "LCL", "var(--warning)", "4 2");
+        }
+        if (Center is { } c)
+        {
+            yield return (c, "CL", "var(--text-muted)", "none");
+        }
+    }
+
+    private IEnumerable<List<(decimal X, decimal Y)>> Segments()
+    {
+        var segment = new List<(decimal X, decimal Y)>();
+        for (var i = 0; i < Labels.Count; i++)
+        {
+            if (Values[i] is { } value)
+            {
+                segment.Add((X(i), Y(value)));
+            }
+            else if (segment.Count > 0)
+            {
+                yield return segment;
+                segment = [];
+            }
+        }
+        if (segment.Count > 0)
+        {
+            yield return segment;
+        }
+    }
+}

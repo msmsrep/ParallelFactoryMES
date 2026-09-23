@@ -233,6 +233,53 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 管理図は検査指示ごとに群を作り取消した検査の測定値を使わない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId);
+
+        async Task<InspectionOrderResponse> InspectAsync(params decimal[] values)
+        {
+            var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 10m, ctx.ProductLocationId);
+            var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+                new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null));
+            var order = (await created.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+            (await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+                    values.Select((v, i) => new InspectionResultRequest(item.Id, i + 1, v, null, null)).ToList()))
+                .EnsureSuccessStatusCode();
+            return order;
+        }
+
+        await InspectAsync(10.0m, 10.2m);
+        await InspectAsync(9.9m, 10.1m);
+        var canceled = await InspectAsync(12.0m, 12.4m);
+        (await admin.PostAsync($"/api/inspection-orders/{canceled.Id}/cancel", null)).EnsureSuccessStatusCode();
+
+        var chart = await admin.GetFromJsonAsync<ControlChartResponse>(
+            $"/api/quality/control-chart?inspectionItemId={item.Id}");
+
+        Assert.Equal(2, chart!.Points.Count);
+        Assert.DoesNotContain(chart.Points, p => p.OrderNo == canceled.OrderNo);
+        Assert.False(chart.IsIndividuals);
+        Assert.Equal(2, chart.SubgroupSize);
+        Assert.Equal(10.05m, chart.CenterLine); // (10.1 + 10.0) / 2
+        Assert.Equal(9.5m, chart.LowerSpecLimit); // 規格は検査指示のスナップショット
+        Assert.Equal(10.5m, chart.UpperSpecLimit);
+        Assert.NotNull(chart.Cpk);
+
+        // 期間外を指定すると点は無く、管理限界も出さない
+        var empty = await admin.GetFromJsonAsync<ControlChartResponse>(
+            $"/api/quality/control-chart?inspectionItemId={item.Id}&from=2020-01-01&to=2020-01-31");
+        Assert.Empty(empty!.Points);
+        Assert.Null(empty.CenterLine);
+
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await admin.GetAsync("/api/quality/control-chart?inspectionItemId=99999")).StatusCode);
+    }
+
+    [Fact]
     public async Task 検査基準を改訂しても発行済みの検査は当時の規格値で判定され成績書も変わらない()
     {
         using var factory = new ApiFactory();

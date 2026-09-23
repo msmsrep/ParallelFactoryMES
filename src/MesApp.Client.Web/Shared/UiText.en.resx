@@ -3000,9 +3000,6 @@
   <data name="品質分析 - Parallel Factory MES" xml:space="preserve">
     <value>Quality Analysis - Parallel Factory MES</value>
   </data>
-  <data name="不良項目別・工程別・直別・期間別の集計（C-40-10-03）、不適合・逸脱発生状況のモニタリング（C-40-10-05）。期間は製造日（業務日付）基準。" xml:space="preserve">
-    <value>Defects by item, process, shift and period (C-40-10-03) and monitoring of nonconformances and deviations (C-40-10-05). Periods are based on the production (business) date.</value>
-  </data>
   <data name="サマリ" xml:space="preserve">
     <value>Summary</value>
   </data>
@@ -4178,5 +4175,68 @@
   </data>
   <data name="指示値の無い確認事項など" xml:space="preserve">
     <value>Checks without target values, etc.</value>
+  </data>
+  <data name="不良項目別・工程別・直別・期間別の集計（C-40-10-03）、不適合・逸脱発生状況のモニタリング（C-40-10-05）、管理図と工程能力（C-50-10-01〜02）。期間は製造日（業務日付）基準。" xml:space="preserve">
+    <value>Totals by defect item, process, shift and period (C-40-10-03), monitoring of nonconformances and deviations (C-40-10-05), and control charts with process capability (C-50-10-01 to 02). Periods are based on the production date (business date).</value>
+  </data>
+  <data name="管理図と工程能力" xml:space="preserve">
+    <value>Control chart and process capability</value>
+  </data>
+  <data name="検査実績の測定値を検査指示ごとの群にまとめ、X̄-R 管理図（群の大きさが1なら X-Rs 管理図）を描く。赤は管理限界の外、黄は中心線の同じ側に9点以上続く並び。工程能力指数は群内のばらつきから求める。" xml:space="preserve">
+    <value>Measured values are grouped into one subgroup per inspection order and plotted as an X̄-R chart (an X-Rs chart when the subgroup size is 1). Red points are outside the control limits; yellow points belong to a run of 9 or more on the same side of the center line. Process capability indices are calculated from within-subgroup variation.</value>
+  </data>
+  <data name="検査項目（定量）" xml:space="preserve">
+    <value>Inspection item (quantitative)</value>
+  </data>
+  <data name="対象期間の測定値はありません。" xml:space="preserve">
+    <value>No measured values in the selected period.</value>
+  </data>
+  <data name="管理図" xml:space="preserve">
+    <value>Control chart</value>
+  </data>
+  <data name="X-Rs 管理図" xml:space="preserve">
+    <value>X-Rs chart</value>
+  </data>
+  <data name="X̄-R 管理図（群の大きさ {0}）" xml:space="preserve">
+    <value>X̄-R chart (subgroup size {0})</value>
+  </data>
+  <data name="群の数" xml:space="preserve">
+    <value>Subgroups</value>
+  </data>
+  <data name="（大きさの違う {0} 群を除外）" xml:space="preserve">
+    <value>({0} subgroups of a different size excluded)</value>
+  </data>
+  <data name="1.33 未満" xml:space="preserve">
+    <value>Below 1.33</value>
+  </data>
+  <data name="群が2つ以上ないと管理限界と工程能力は求められません。" xml:space="preserve">
+    <value>At least 2 subgroups are needed to calculate control limits and process capability.</value>
+  </data>
+  <data name="期間内に規格値が改訂されています。工程能力は最新の規格値で求めています。" xml:space="preserve">
+    <value>The specification limits were revised within the period. Process capability is calculated with the latest limits.</value>
+  </data>
+  <data name="個別値（X）" xml:space="preserve">
+    <value>Individual values (X)</value>
+  </data>
+  <data name="平均値（X̄）" xml:space="preserve">
+    <value>Means (X̄)</value>
+  </data>
+  <data name="平均値の管理図" xml:space="preserve">
+    <value>Control chart of means</value>
+  </data>
+  <data name="移動範囲（Rs）" xml:space="preserve">
+    <value>Moving ranges (Rs)</value>
+  </data>
+  <data name="範囲（R）" xml:space="preserve">
+    <value>Ranges (R)</value>
+  </data>
+  <data name="範囲の管理図" xml:space="preserve">
+    <value>Control chart of ranges</value>
+  </data>
+  <data name="規格上限" xml:space="preserve">
+    <value>USL</value>
+  </data>
+  <data name="規格下限" xml:space="preserve">
+    <value>LSL</value>
   </data>
 </root>

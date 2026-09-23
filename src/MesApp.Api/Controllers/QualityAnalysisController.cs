@@ -11,7 +11,7 @@ namespace MesApp.Api.Controllers;
 
 /// <summary>
 /// 品質分析（Spec.md 3.3：C-40-10 不良項目別・工程別・期間別の集計、不適合発生状況のモニタリング）。
-/// 期間は製造日（業務日付）基準。SPC・管理図（C-50-10）は将来拡張。
+/// 期間は製造日（業務日付）基準。管理図（C-50-10-01〜02）は `ControlChartController`。
 /// </summary>
 [ApiController]
 [Route("api/quality/summary")]
