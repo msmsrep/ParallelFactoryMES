@@ -1525,6 +1525,14 @@ public class MasterCsvTests
         Assert.Equal(NonconformanceStatus.ActionInstructed, sampleNcs.Single(n => n.ReportNo == "SMP-NC-001").Status);
         var samples = (await client.GetFromJsonAsync<List<Core.Contracts.Inventory.SampleStorageResponse>>("/api/sample-storages"))!;
         Assert.Equal(2, samples.Count);
+        // 画面専用だった記録がどれもサンプルだけで入っている（CSV-08。各画面の一覧が空でない）
+        Assert.NotEmpty((await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.MaintenanceProcedureResponse>>("/api/maintenance-procedures"))!);
+        Assert.NotEmpty((await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.ToolUsageResponse>>("/api/tool-usages"))!.Items);
+        Assert.NotEmpty((await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.ToolIssueResponse>>("/api/tool-issues"))!);
+        Assert.NotEmpty((await client.GetFromJsonAsync<List<InspectionDeviceCalibrationResponse>>(
+            $"/api/inspection-devices/{devices.Single(d => d.Code == "DV-03").Id}/calibrations"))!);
+        Assert.NotEmpty((await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Execution.TransferOrderResponse>>("/api/transfer-orders"))!.Items);
+        Assert.NotEmpty((await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.StocktakeResponse>>("/api/stocktakes"))!.Items);
         // 出荷は判定を承認した SMP-SH-001 だけが出荷まで進み、保留の SMP-SH-002 は指示のまま残る
         var shipping = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.ShippingOrderResponse>>(
             "/api/shipping-orders"))!.Items;

@@ -131,7 +131,7 @@ dotnet run --project src/MesApp.Api
 業務を始めるにはマスタ登録が必要です。特に **工程 → 品目 → 工順（BOP）** の順で登録しないと
 製造指図を工程展開できません。[マスタ管理](masters.html)へ進んでください。
 
-まず動きを試したい場合は、サンプルデータを入れると製造指図から出荷まで操作できる状態になります。
+まず動きを試したい場合は、サンプルデータを入れると製造指図から出荷までと、保全・治工具・在庫・物流・不適合の記録がそろった状態になります。
 [マスタのサンプル](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)を
 **マスタ管理**の「ZIPで一括取込」で、続けて[実績のサンプル](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip)を
 **管理 → 実績CSV取込**の「ZIPで一括取込」で取り込みます（[マスタ管理のCSV](masters.html#csv)）。
