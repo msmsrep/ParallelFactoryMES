@@ -33,6 +33,7 @@ public sealed partial class ActualCsvService(
     MaintenanceOrderService maintenanceOrders,
     ToolIssueService toolIssues,
     InspectionDeviceService devices,
+    LotOperationService lotOperations,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
@@ -78,6 +79,7 @@ public sealed partial class ActualCsvService(
             ActualCsvKinds.ToolUsages => await ImportToolUsagesAsync(table, errors, userId, ct),
             ActualCsvKinds.ToolIssues => await ImportToolIssuesAsync(table, errors, userId, ct),
             ActualCsvKinds.Calibrations => await ImportCalibrationsAsync(table, errors, userId, ct),
+            ActualCsvKinds.InventoryOperations => await ImportInventoryOperationsAsync(table, errors, userId, ct),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
         if (errors.Count == 0)

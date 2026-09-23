@@ -2259,4 +2259,76 @@
   <data name="有効な治工具" xml:space="preserve">
     <value>Active tool</value>
   </data>
+  <data name="操作 &#x27;{0}&#x27; には {1} が必要です。" xml:space="preserve">
+    <value>Operation '{0}' requires {1}.</value>
+  </data>
+  <data name="Quantity（数量）は0より大きい値にしてください。" xml:space="preserve">
+    <value>Quantity must be greater than 0.</value>
+  </data>
+  <data name="ロット &#x27;{0}&#x27; は登録されていません（{1}）。" xml:space="preserve">
+    <value>Lot '{0}' is not registered ({1}).</value>
+  </data>
+  <data name="Move（移動）/ Adjust（数量調整）/ Status（状態変更）/ Split（分割）/ Merge（統合）/ Transfer（振替）/ Discard（廃棄）/ Return（返品）/ IssueReturn（払出戻し）" xml:space="preserve">
+    <value>Move / Adjust (quantity adjustment) / Status (status change) / Split / Merge / Transfer / Discard / Return (return to supplier) / IssueReturn (return from issue)</value>
+  </data>
+  <data name="ロット番号" xml:space="preserve">
+    <value>Lot number</value>
+  </data>
+  <data name="分割・振替で作るロットの番号。空欄なら自動採番（後の行から指すなら指定する）" xml:space="preserve">
+    <value>Number of the lot created by split or transfer. Blank means automatic numbering (specify it to reference the lot from later rows)</value>
+  </data>
+  <data name="品目振替のとき。振替では振替先品目か新ロット番号のどちらかが必要" xml:space="preserve">
+    <value>For a product transfer. A transfer needs either the destination product or a new lot number</value>
+  </data>
+  <data name="在庫オペレーション" xml:space="preserve">
+    <value>Inventory operations</value>
+  </data>
+  <data name="在庫状態" xml:space="preserve">
+    <value>Stock status</value>
+  </data>
+  <data name="払出戻しで作業指示を記録する場合（工程順序と合わせて指す）" xml:space="preserve">
+    <value>To record the work order on a return from issue (specify with the routing sequence)</value>
+  </data>
+  <data name="振替先品目コード" xml:space="preserve">
+    <value>Destination product code</value>
+  </data>
+  <data name="操作" xml:space="preserve">
+    <value>Operation</value>
+  </data>
+  <data name="操作するロット（統合では統合元）。前の行で分割・振替したロットも指せる" xml:space="preserve">
+    <value>Lot to operate on (the source lot for a merge). Lots split or transferred on earlier rows can also be specified</value>
+  </data>
+  <data name="操作する在庫の場所（移動元・払出戻しの戻し先）。状態変更以外で必須" xml:space="preserve">
+    <value>Location of the stock (source of a move, destination of a return from issue). Required except for status changes</value>
+  </data>
+  <data name="数量" xml:space="preserve">
+    <value>Quantity</value>
+  </data>
+  <data name="数量調整で必須。状態変更・廃棄・返品では状態履歴・在庫履歴に残る" xml:space="preserve">
+    <value>Required for adjustments. For status changes, discards and returns it is kept in the status/stock history</value>
+  </data>
+  <data name="新ロット番号" xml:space="preserve">
+    <value>New lot number</value>
+  </data>
+  <data name="状態変更で必須。Normal（正常）/ OnHold（保留）/ AwaitingInspection（検査待ち）/ Defective（不良）/ ToBeDiscarded（廃棄予定）" xml:space="preserve">
+    <value>Required for status changes. Normal / OnHold / AwaitingInspection / Defective / ToBeDiscarded</value>
+  </data>
+  <data name="状態変更・統合以外で必須。数量調整では調整後の数量（0以上）、ほかは0より大きい数値" xml:space="preserve">
+    <value>Required except for status changes and merges. For adjustments, the quantity after adjustment (0 or more); otherwise a number greater than 0</value>
+  </data>
+  <data name="理由" xml:space="preserve">
+    <value>Reason</value>
+  </data>
+  <data name="移動で必須" xml:space="preserve">
+    <value>Required for moves</value>
+  </data>
+  <data name="移動先ロケーションコード" xml:space="preserve">
+    <value>Destination location code</value>
+  </data>
+  <data name="統合で必須。同じ品目・同じロケーションのロット" xml:space="preserve">
+    <value>Required for merges. A lot of the same product at the same location</value>
+  </data>
+  <data name="統合先ロット番号" xml:space="preserve">
+    <value>Merge target lot number</value>
+  </data>
 </root>

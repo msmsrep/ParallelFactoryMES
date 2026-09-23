@@ -591,6 +591,55 @@ public class InventoryTests
     }
 
     [Fact]
+    public async Task 在庫オペレーションをCSVで取り込み分割したロットを後の行から指せる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId, lotNumber: "RM-A");
+        var other = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 10m, ctx.MaterialLocationId, lotNumber: "RM-B");
+
+        // 操作ごとの必須列（数量調整の理由）が無い行と、単票でも拒否される行（在庫を超える移動）があれば全件取り消す
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "inventory-operations", """
+            Operation,LotNumber,LocationCode,ToLocationCode,Quantity,Reason
+            Move,RM-A,LOC-M,LOC-P,10,
+            Adjust,RM-A,LOC-M,,95,
+            Move,RM-B,LOC-M,LOC-P,999,
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("Reason"));
+        Assert.Contains(invalid.Errors, e => e.Line == 4);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 分割で作ったロットを同じファイルの後の行で移動・統合し、状態変更の理由は状態履歴に残る
+        var imported = await Phase3TestData.ImportActualCsvAsync(admin, "inventory-operations", """
+            Operation,LotNumber,LocationCode,ToLocationCode,Quantity,NewLotNumber,TargetLotNumber,Status,Reason
+            分割,RM-A,LOC-M,,30,RM-A-1,,,
+            Move,RM-A-1,LOC-M,LOC-P,30,,,,
+            Merge,RM-B,LOC-M,,,,RM-A,,
+            Adjust,RM-A,LOC-M,,75,,,,実数確認
+            Status,RM-A,,,,,,保留,外観確認待ち
+            Transfer,RM-A,LOC-M,,5,RM-A-2,,,
+            """);
+        Assert.True(imported.Succeeded, string.Join(" / ", imported.Errors.Select(e => $"{e.Line} {e.Message}")));
+        Assert.Equal(6, imported.Created);
+
+        var split = await admin.GetFromJsonAsync<PagedResult<StockResponse>>("/api/inventory/stocks?pageSize=100");
+        Assert.Contains(split!.Items, s => s.LotNumber == "RM-A-1" && s.LocationCode == "LOC-P" && s.Quantity == 30m);
+        Assert.Contains(split.Items, s => s.LotNumber == "RM-A-2" && s.Quantity == 5m);
+        // 70（分割後）＋10（統合）→ 75 に調整 → 5 を振替
+        Assert.Equal(70m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+        Assert.Equal(0m, await Phase3TestData.GetStockQuantityAsync(admin, other.Id));
+        var history = (await admin.GetFromJsonAsync<MesApp.Core.Contracts.Quality.LotHistoryResponse>($"/api/traceability/{lot.Id}/history"))!;
+        Assert.Contains(history.StatusHistory, h => h.ToStatus == LotStockStatus.OnHold && h.Reason == "外観確認待ち");
+
+        // 在庫・物流の権限（作業者は取り込めない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "op1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(operator_, "inventory-operations",
+            "Operation,LotNumber\nStatus,RM-A\n")).StatusCode);
+    }
+
+    [Fact]
     public async Task 在庫トランザクションはページングされ総件数が返る()
     {
         using var factory = new ApiFactory();

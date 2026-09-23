@@ -36,6 +36,7 @@ public static class ActualCsvKinds
     public const string ToolUsages = "tool-usages";
     public const string ToolIssues = "tool-issues";
     public const string Calibrations = "calibrations";
+    public const string InventoryOperations = "inventory-operations";
 
     private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
     private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
@@ -245,6 +246,23 @@ public static class ActualCsvKinds
             new("NextDueOn", "次回校正期限", false, "yyyy-MM-dd。空欄なら校正日＋校正周期（周期も無ければ期限なし）"),
             new("Result", "校正結果", false, "合格・調整後合格 など"),
         ]), MesRoleGroups.QualityManage),
+        new(new CsvKindInfo(InventoryOperations, "在庫オペレーション", false,
+        [
+            new("Operation", "操作", true,
+                "Move（移動）/ Adjust（数量調整）/ Status（状態変更）/ Split（分割）/ Merge（統合）/ Transfer（振替）/ Discard（廃棄）/ Return（返品）/ IssueReturn（払出戻し）"),
+            new("LotNumber", "ロット番号", true, "操作するロット（統合では統合元）。前の行で分割・振替したロットも指せる"),
+            new("LocationCode", "ロケーションコード", false, "操作する在庫の場所（移動元・払出戻しの戻し先）。状態変更以外で必須"),
+            new("ToLocationCode", "移動先ロケーションコード", false, "移動で必須"),
+            new("Quantity", "数量", false, "状態変更・統合以外で必須。数量調整では調整後の数量（0以上）、ほかは0より大きい数値"),
+            new("NewLotNumber", "新ロット番号", false, "分割・振替で作るロットの番号。空欄なら自動採番（後の行から指すなら指定する）"),
+            new("TargetLotNumber", "統合先ロット番号", false, "統合で必須。同じ品目・同じロケーションのロット"),
+            new("ProductCode", "振替先品目コード", false, "品目振替のとき。振替では振替先品目か新ロット番号のどちらかが必要"),
+            new("Status", "在庫状態", false,
+                "状態変更で必須。Normal（正常）/ OnHold（保留）/ AwaitingInspection（検査待ち）/ Defective（不良）/ ToBeDiscarded（廃棄予定）"),
+            new("OrderNo", "指図番号", false, "払出戻しで作業指示を記録する場合（工程順序と合わせて指す）"),
+            new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
+            new("Reason", "理由", false, "数量調整で必須。状態変更・廃棄・返品では状態履歴・在庫履歴に残る"),
+        ]), MesRoleGroups.InventoryManage),
     ];
 
     /// <summary>

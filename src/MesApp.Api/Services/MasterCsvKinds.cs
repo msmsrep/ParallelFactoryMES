@@ -327,6 +327,11 @@ public static class CsvEnumLabels
         ("可", ShipmentJudgmentResult.Approved), ("保留", ShipmentJudgmentResult.Hold),
         ("特採", ShipmentJudgmentResult.SpecialAcceptance), ("特別採用", ShipmentJudgmentResult.SpecialAcceptance));
 
+    public static readonly IReadOnlyDictionary<string, LotStockStatus> LotStockStatuses = Build(
+        ("正常", LotStockStatus.Normal), ("保留", LotStockStatus.OnHold),
+        ("検査待ち", LotStockStatus.AwaitingInspection), ("不良", LotStockStatus.Defective),
+        ("廃棄予定", LotStockStatus.ToBeDiscarded));
+
     public static readonly IReadOnlyDictionary<string, MaintenanceRequestType> MaintenanceRequestTypes = Build(
         ("計画", MaintenanceRequestType.Planned), ("計画保全", MaintenanceRequestType.Planned),
         ("突発", MaintenanceRequestType.Spot), ("突発依頼", MaintenanceRequestType.Spot));
