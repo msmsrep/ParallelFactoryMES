@@ -2331,4 +2331,106 @@
   <data name="統合先ロット番号" xml:space="preserve">
     <value>Merge target lot number</value>
   </data>
+  <data name="Quantity（数量）は必須です。" xml:space="preserve">
+    <value>Quantity is required.</value>
+  </data>
+  <data name="出荷ピッキングには ShippingNo（出荷番号）が必要です。" xml:space="preserve">
+    <value>Shipping picking requires ShippingNo (shipping number).</value>
+  </data>
+  <data name="棚卸 &#x27;{0}&#x27; は登録されていません（StocktakeNo）。" xml:space="preserve">
+    <value>Stocktake '{0}' is not registered (StocktakeNo).</value>
+  </data>
+  <data name="CountedQuantity（実棚数量）は必須です。" xml:space="preserve">
+    <value>CountedQuantity (counted quantity) is required.</value>
+  </data>
+  <data name="棚卸 &#x27;{0}&#x27; にロット &#x27;{1}&#x27;・ロケーション &#x27;{2}&#x27; の明細はありません。" xml:space="preserve">
+    <value>Stocktake '{0}' has no line for lot '{1}' at location '{2}'.</value>
+  </data>
+  <data name="搬送指示が見つかりません。" xml:space="preserve">
+    <value>Transfer order not found.</value>
+  </data>
+  <data name="1行＝1明細。ロット・ロケーションは先入れ先出し（有効期限優先）で自動引当する" xml:space="preserve">
+    <value>One row is one line. Lots and locations are allocated automatically by first-in first-out (earliest expiry first)</value>
+  </data>
+  <data name="ProcessIssue（工程払出）/ Shipping（出荷）。省略時は工程払出。まとまりの最初の行の値を使う" xml:space="preserve">
+    <value>ProcessIssue (issue to process) / Shipping. Defaults to ProcessIssue. The value on the first row of the group is used</value>
+  </data>
+  <data name="true でピッキングを実行し在庫を引き落とす（まとまりの最初の行の値）" xml:space="preserve">
+    <value>true executes the picking and issues the stock (value on the first row of the group)</value>
+  </data>
+  <data name="true で実棚数の登録に続けて確定し、差異を在庫へ反映する（まとまりの最初の行の値）" xml:space="preserve">
+    <value>true finalizes after registering the counts and applies the differences to stock (value on the first row of the group)</value>
+  </data>
+  <data name="true で指示に続けて在庫を移動し完了にする。空欄なら指示のまま残る" xml:space="preserve">
+    <value>true moves the stock and completes the order. Blank leaves it as instructed</value>
+  </data>
+  <data name="ピッキング指示" xml:space="preserve">
+    <value>Picking orders</value>
+  </data>
+  <data name="ピッキング番号" xml:space="preserve">
+    <value>Picking number</value>
+  </data>
+  <data name="出荷ピッキングで必須" xml:space="preserve">
+    <value>Required for shipping picking</value>
+  </data>
+  <data name="同じ番号の行を1件の指示にまとめる。PKで始まる番号は自動採番用のため使えない" xml:space="preserve">
+    <value>Rows with the same number form one order. Numbers starting with PK are reserved for automatic numbering</value>
+  </data>
+  <data name="実棚数" xml:space="preserve">
+    <value>Stocktake counts</value>
+  </data>
+  <data name="実棚数量" xml:space="preserve">
+    <value>Counted quantity</value>
+  </data>
+  <data name="対象ロケーションコード" xml:space="preserve">
+    <value>Target location code</value>
+  </data>
+  <data name="工程払出で必須" xml:space="preserve">
+    <value>Required for issue to process</value>
+  </data>
+  <data name="工程払出で必須（工程順序と合わせて払出先の作業指示を指す）" xml:space="preserve">
+    <value>Required for issue to process (specifies the destination work order together with the routing sequence)</value>
+  </data>
+  <data name="後続の実棚数CSVから指示を指す。STで始まる番号は自動採番用のため使えない" xml:space="preserve">
+    <value>Referenced from the stocktake count CSV that follows. Numbers starting with ST are reserved for automatic numbering</value>
+  </data>
+  <data name="払出区分" xml:space="preserve">
+    <value>Issue type</value>
+  </data>
+  <data name="搬送するロット" xml:space="preserve">
+    <value>Lot to transfer</value>
+  </data>
+  <data name="搬送指示" xml:space="preserve">
+    <value>Transfer orders</value>
+  </data>
+  <data name="棚卸の明細のロケーション" xml:space="preserve">
+    <value>Location of the stocktake line</value>
+  </data>
+  <data name="棚卸の明細のロット" xml:space="preserve">
+    <value>Lot of the stocktake line</value>
+  </data>
+  <data name="棚卸指示" xml:space="preserve">
+    <value>Stocktakes</value>
+  </data>
+  <data name="棚卸番号" xml:space="preserve">
+    <value>Stocktake number</value>
+  </data>
+  <data name="登録済みで有効なロケーション" xml:space="preserve">
+    <value>A registered, active location</value>
+  </data>
+  <data name="登録済みの棚卸（棚卸指示CSVの StocktakeNo）。同じ番号の行をまとめて登録する" xml:space="preserve">
+    <value>A registered stocktake (StocktakeNo in the stocktake CSV). Rows with the same number are registered together</value>
+  </data>
+  <data name="確定する" xml:space="preserve">
+    <value>Finalize</value>
+  </data>
+  <data name="移動を実行する" xml:space="preserve">
+    <value>Execute the move</value>
+  </data>
+  <data name="移動元ロケーションコード" xml:space="preserve">
+    <value>Source location code</value>
+  </data>
+  <data name="空欄なら全ロケーション。作成時点の現在庫が明細になる" xml:space="preserve">
+    <value>Blank means all locations. The stock at the time of creation becomes the lines</value>
+  </data>
 </root>

@@ -1487,7 +1487,7 @@ public class MasterCsvTests
         // 実績は同じ種別を番号違いで複数含む（05_consumptions と 07_consumptions）
         var actualResult = await PostBundleAsync(client, "actuals", actuals);
         Assert.True(actualResult.Succeeded, Describe(actualResult));
-        Assert.Equal(23, actualResult.Files.Count);
+        Assert.Equal(27, actualResult.Files.Count);
         // 保全：突発依頼の実績で消耗品が引き落とされ、計画保全は指示のまま残る
         var maintenance = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.MaintenanceOrderResponse>>(
             "/api/maintenance-orders?pageSize=100"))!.Items;
@@ -1507,6 +1507,17 @@ public class MasterCsvTests
         var stocks = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.StockResponse>>(
             "/api/inventory/stocks?pageSize=200"))!.Items;
         Assert.Contains(stocks, s => s.LotNumber == "R3005-260901-L" && s.LocationCode == "WIP-02" && s.Quantity == 100m);
+        // 物流：工程払出のピッキングは期限切れの R3006-250801 を引き当てず、棚卸の確定で差異が在庫に反映される
+        var pickings = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.PickingOrderResponse>>(
+            "/api/picking-orders?pageSize=100"))!.Items;
+        var processIssue = pickings.Single(p => p.OrderNo == "SMP-PK-001");
+        Assert.Equal(PickingOrderStatus.Completed, processIssue.Status);
+        Assert.DoesNotContain(processIssue.Lines, l => l.LotNumber == "R3006-250801");
+        Assert.Contains(stocks, s => s.LotNumber == "MP9002-260901" && s.Quantity == 2m);
+        var progress = (await client.GetFromJsonAsync<Core.Contracts.Inventory.WarehouseProgressResponse>(
+            "/api/inventory/warehouse-progress?from=2026-01-01"))!;
+        Assert.True(progress.Rows.Single(r => r.Kind == "在庫移動").OpenCount > 0);
+        Assert.True(progress.Rows.Single(r => r.Kind == "棚卸").CompletedCount > 0);
         // 出荷は判定を承認した SMP-SH-001 だけが出荷まで進み、保留の SMP-SH-002 は指示のまま残る
         var shipping = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.ShippingOrderResponse>>(
             "/api/shipping-orders"))!.Items;

@@ -327,6 +327,9 @@ public static class CsvEnumLabels
         ("可", ShipmentJudgmentResult.Approved), ("保留", ShipmentJudgmentResult.Hold),
         ("特採", ShipmentJudgmentResult.SpecialAcceptance), ("特別採用", ShipmentJudgmentResult.SpecialAcceptance));
 
+    public static readonly IReadOnlyDictionary<string, PickingOrderType> PickingOrderTypes = Build(
+        ("工程払出", PickingOrderType.ProcessIssue), ("出荷", PickingOrderType.Shipping));
+
     public static readonly IReadOnlyDictionary<string, LotStockStatus> LotStockStatuses = Build(
         ("正常", LotStockStatus.Normal), ("保留", LotStockStatus.OnHold),
         ("検査待ち", LotStockStatus.AwaitingInspection), ("不良", LotStockStatus.Defective),

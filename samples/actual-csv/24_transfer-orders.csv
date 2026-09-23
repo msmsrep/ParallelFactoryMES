@@ -1,0 +1,3 @@
+﻿LotNumber,FromLocationCode,ToLocationCode,Quantity,Execute
+SF2000-S001,WIP-02,WH-P01,5,true
+R3004-260901,WH-M02,WIP-02,20,false

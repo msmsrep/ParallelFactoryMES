@@ -640,6 +640,83 @@ public class InventoryTests
     }
 
     [Fact]
+    public async Task 搬送_ピッキング_棚卸をCSVで取り込み実行と確定まで進められる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var today = (await admin.GetFromJsonAsync<BusinessDateResponse>("/api/business-date"))!.Today;
+        // 期限切れのロットは先入れ先出しの引当に入らない
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 50m, ctx.MaterialLocationId,
+            expiresOn: today.AddDays(-1), lotNumber: "RM-OLD");
+        var fresh = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 50m, ctx.MaterialLocationId,
+            expiresOn: today.AddDays(30), lotNumber: "RM-NEW");
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 1m);
+        var orderNo = order.Order.OrderNo;
+
+        // 搬送：Execute=true の行は移動まで、空欄の行は指示のまま
+        var transfers = await Phase3TestData.ImportActualCsvAsync(admin, "transfer-orders", """
+            LotNumber,FromLocationCode,ToLocationCode,Quantity,Execute
+            RM-NEW,LOC-M,LOC-P,10,true
+            RM-NEW,LOC-M,LOC-P,5,
+            """);
+        Assert.True(transfers.Succeeded, string.Join(" / ", transfers.Errors.Select(e => e.Message)));
+        Assert.Equal(10m, await Phase3TestData.GetStockQuantityAsync(admin, fresh.Id, (await LocationIdAsync(admin, "LOC-P"))));
+
+        // ピッキング：同じ番号の行が1件の指示の明細になり、期限切れロットを避けて引き当てて払い出す。
+        // 自動採番の形式（PK〜）の番号は拒否する
+        var reserved = await Phase3TestData.ImportActualCsvAsync(admin, "picking-orders", $$"""
+            PickingNo,Type,OrderNo,Sequence,ProductCode,Quantity
+            PK-1,ProcessIssue,{{orderNo}},1,RM-01,1
+            """);
+        Assert.False(reserved.Succeeded);
+        var picked = await Phase3TestData.ImportActualCsvAsync(admin, "picking-orders", $$"""
+            PickingNo,Type,OrderNo,Sequence,ProductCode,Quantity,Execute
+            CSV-PK-1,工程払出,{{orderNo}},1,RM-01,3,true
+            CSV-PK-1,,,,RM-01,2,
+            """);
+        Assert.True(picked.Succeeded, string.Join(" / ", picked.Errors.Select(e => e.Message)));
+        var pickings = (await admin.GetFromJsonAsync<PagedResult<PickingOrderResponse>>("/api/picking-orders"))!.Items;
+        var pk = Assert.Single(pickings);
+        Assert.Equal(PickingOrderStatus.Completed, pk.Status);
+        Assert.All(pk.Lines, l => Assert.Equal("RM-NEW", l.LotNumber));
+        Assert.Equal(5m, pk.Lines.Sum(l => l.Quantity));
+
+        // 棚卸：指示を作り、実棚数を入れて確定すると差異が棚卸調整になる
+        var stocktake = await Phase3TestData.ImportActualCsvAsync(admin, "stocktakes", """
+            StocktakeNo,LocationCode
+            CSV-ST-1,LOC-M
+            """);
+        Assert.True(stocktake.Succeeded, string.Join(" / ", stocktake.Errors.Select(e => e.Message)));
+        // 明細に無いロットの行があれば、確定を含めて全件取り消す
+        var wrongLine = await Phase3TestData.ImportActualCsvAsync(admin, "stocktake-counts", """
+            StocktakeNo,LotNumber,LocationCode,CountedQuantity,Finalize
+            CSV-ST-1,RM-NEW,LOC-M,30,true
+            CSV-ST-1,RM-NEW,LOC-P,10,
+            """);
+        Assert.False(wrongLine.Succeeded);
+        Assert.Contains(wrongLine.Errors, e => e.Line == 3 && e.Message.Contains("LOC-P"));
+        var counts = await Phase3TestData.ImportActualCsvAsync(admin, "stocktake-counts", """
+            StocktakeNo,LotNumber,LocationCode,CountedQuantity,Finalize
+            CSV-ST-1,RM-NEW,LOC-M,30,true
+            """);
+        Assert.True(counts.Succeeded, string.Join(" / ", counts.Errors.Select(e => e.Message)));
+        var saved = Assert.Single((await admin.GetFromJsonAsync<PagedResult<StocktakeResponse>>("/api/stocktakes"))!.Items);
+        Assert.Equal(StocktakeStatus.Finalized, saved.Status);
+        // 50 − 10（搬送）− 5（ピッキング）＝ 35 を実棚 30 に合わせる
+        Assert.Equal(30m, await Phase3TestData.GetStockQuantityAsync(admin, fresh.Id, ctx.MaterialLocationId));
+
+        // 倉庫業務進捗に指示が出る（搬送の1件は未完了）
+        var progress = (await admin.GetFromJsonAsync<WarehouseProgressResponse>("/api/inventory/warehouse-progress"))!;
+        Assert.Equal(1, progress.Rows.Single(r => r.Kind == "在庫移動").OpenCount);
+        Assert.Equal(1, progress.Rows.Single(r => r.Kind == "出庫ピッキング").CompletedCount);
+        Assert.Equal(1, progress.Rows.Single(r => r.Kind == "棚卸").CompletedCount);
+    }
+
+    private static async Task<int> LocationIdAsync(HttpClient client, string code) =>
+        (await client.GetFromJsonAsync<List<LocationResponse>>("/api/locations"))!.Single(l => l.Code == code).Id;
+
+    [Fact]
     public async Task 在庫トランザクションはページングされ総件数が返る()
     {
         using var factory = new ApiFactory();

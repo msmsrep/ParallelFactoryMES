@@ -1,8 +1,5 @@
-using MesApp.Core.Localization;
-using MesApp.Api.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
-using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Entities;
@@ -26,8 +23,7 @@ namespace MesApp.Api.Controllers;
 [Authorize]
 public class TransferOrdersController(
     MesAppDbContext db,
-    InventoryService inventory,
-    IAuditLogger auditLogger) : ControllerBase
+    TransferOrderService transfers) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<TransferOrderResponse>>> List(
@@ -57,34 +53,14 @@ public class TransferOrdersController(
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<TransferOrderResponse>> Create(TransferOrderRequest request, CancellationToken ct)
     {
-        if (!await db.Lots.AnyAsync(l => l.Id == request.LotId, ct))
+        // 判定・保存は実績CSV取込と共通（TransferOrderService）
+        var outcome = await transfers.CreateAsync(request, CurrentUserId, ct);
+        if (outcome.Failed)
         {
-            return this.BadRequestProblem(ApiText.T("存在しないロットIDです。"));
+            return ToProblem(outcome);
         }
-        if (request.FromLocationId == request.ToLocationId)
-        {
-            return this.BadRequestProblem(ApiText.T("移動元と移動先が同一です。"));
-        }
-        var locationIds = new[] { request.FromLocationId, request.ToLocationId };
-        if (await db.Locations.CountAsync(l => locationIds.Contains(l.Id) && l.IsActive, ct) != 2)
-        {
-            return this.BadRequestProblem(ApiText.T("存在しない（または無効な）ロケーションが含まれています。"));
-        }
-
-        var order = new TransferOrder
-        {
-            LotId = request.LotId,
-            Quantity = request.Quantity,
-            FromLocationId = request.FromLocationId,
-            ToLocationId = request.ToLocationId,
-            CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-        };
-        db.TransferOrders.Add(order);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "TransferCreate", nameof(TransferOrder), order.Id.ToString(),
-            detail: new { lotId = order.LotId, quantity = order.Quantity,
-                from = order.FromLocationId, to = order.ToLocationId }, ct: ct);
-        return CreatedAtAction(nameof(Get), new { id = order.Id }, await GetResponseAsync(order.Id, ct));
+        var id = outcome.Value!.Id;
+        return CreatedAtAction(nameof(Get), new { id }, await GetResponseAsync(id, ct));
     }
 
     /// <summary>移動実行（B-50-10-02。在庫を移動して完了にする）</summary>
@@ -92,55 +68,26 @@ public class TransferOrdersController(
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<TransferOrderResponse>> Execute(int id, CancellationToken ct)
     {
-        var order = await db.TransferOrders.Include(t => t.Lot).FirstOrDefaultAsync(t => t.Id == id, ct);
-        if (order is null)
-        {
-            return NotFound();
-        }
-        if (order.Status != TransferOrderStatus.Instructed)
-        {
-            return this.ConflictProblem(ApiText.T("状態 '{0}' の搬送指示は実行できません。", EnumLabels.Of(order.Status)));
-        }
-
-        try
-        {
-            await inventory.MoveAsync(order.Lot!, order.FromLocationId, order.ToLocationId, order.Quantity,
-                InventoryTransactionType.Move, User.FindFirstValue(ClaimTypes.NameIdentifier),
-                note: $"搬送指示 #{order.Id}", ct: ct);
-        }
-        catch (InventoryException ex)
-        {
-            return this.BadRequestProblem(ex.Message);
-        }
-
-        order.Status = TransferOrderStatus.Completed;
-        order.ExecutedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        order.ExecutedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "Transfer", nameof(TransferOrder), id.ToString(), ct: ct);
-        return await GetResponseAsync(id, ct);
+        var outcome = await transfers.ExecuteAsync(id, CurrentUserId, ct);
+        return outcome.Failed ? ToProblem(outcome) : await GetResponseAsync(id, ct);
     }
 
     [HttpPost("{id:int}/cancel")]
     [Authorize(Roles = MesRoleGroups.InventoryManage)]
     public async Task<ActionResult<TransferOrderResponse>> Cancel(int id, CancellationToken ct)
     {
-        var order = await db.TransferOrders.FindAsync([id], ct);
-        if (order is null)
-        {
-            return NotFound();
-        }
-        if (order.Status != TransferOrderStatus.Instructed)
-        {
-            return this.ConflictProblem(ApiText.T("状態 '{0}' の搬送指示は取消できません。", EnumLabels.Of(order.Status)));
-        }
-        var before = order.Status;
-        order.Status = TransferOrderStatus.Canceled;
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Inventory", "TransferCancel", nameof(TransferOrder), id.ToString(),
-            detail: new { before, after = order.Status }, ct: ct);
-        return await GetResponseAsync(id, ct);
+        var outcome = await transfers.CancelAsync(id, ct);
+        return outcome.Failed ? ToProblem(outcome) : await GetResponseAsync(id, ct);
     }
+
+    private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+    private ActionResult ToProblem(Outcome<TransferOrder> outcome) => outcome.Kind switch
+    {
+        OutcomeError.NotFound => NotFound(),
+        OutcomeError.Conflict => this.ConflictProblem(outcome.Error),
+        _ => this.BadRequestProblem(outcome.Error),
+    };
 
     private async Task<TransferOrderResponse> GetResponseAsync(int id, CancellationToken ct) =>
         await db.TransferOrders.AsNoTracking()

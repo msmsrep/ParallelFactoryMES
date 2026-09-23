@@ -1,0 +1,4 @@
+﻿PickingNo,Type,OrderNo,Sequence,ShippingNo,ProductCode,Quantity,Execute
+SMP-PK-001,ProcessIssue,SMP-FG-001,10,,RM-3006,2,true
+SMP-PK-001,,,,,RM-3005,10,
+SMP-PK-002,Shipping,,,SMP-SH-002,FG-1000,3,false

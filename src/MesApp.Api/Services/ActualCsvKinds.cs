@@ -37,6 +37,10 @@ public static class ActualCsvKinds
     public const string ToolIssues = "tool-issues";
     public const string Calibrations = "calibrations";
     public const string InventoryOperations = "inventory-operations";
+    public const string TransferOrders = "transfer-orders";
+    public const string PickingOrders = "picking-orders";
+    public const string Stocktakes = "stocktakes";
+    public const string StocktakeCounts = "stocktake-counts";
 
     private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
     private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
@@ -262,6 +266,41 @@ public static class ActualCsvKinds
             new("OrderNo", "指図番号", false, "払出戻しで作業指示を記録する場合（工程順序と合わせて指す）"),
             new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
             new("Reason", "理由", false, "数量調整で必須。状態変更・廃棄・返品では状態履歴・在庫履歴に残る"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(TransferOrders, "搬送指示", false,
+        [
+            new("LotNumber", "ロット番号", true, "搬送するロット"),
+            new("FromLocationCode", "移動元ロケーションコード", true, null),
+            new("ToLocationCode", "移動先ロケーションコード", true, "登録済みで有効なロケーション"),
+            new("Quantity", "数量", true, "0より大きい数値"),
+            new("Execute", "移動を実行する", false, "true で指示に続けて在庫を移動し完了にする。空欄なら指示のまま残る"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(PickingOrders, "ピッキング指示", false,
+        [
+            new("PickingNo", "ピッキング番号", true,
+                "同じ番号の行を1件の指示にまとめる。PKで始まる番号は自動採番用のため使えない"),
+            new("Type", "払出区分", false,
+                "ProcessIssue（工程払出）/ Shipping（出荷）。省略時は工程払出。まとまりの最初の行の値を使う"),
+            new("OrderNo", "指図番号", false, "工程払出で必須（工程順序と合わせて払出先の作業指示を指す）"),
+            new("Sequence", "工程順序", false, "工程払出で必須"),
+            new("ShippingNo", "出荷番号", false, "出荷ピッキングで必須"),
+            new("ProductCode", "品目コード", true, "1行＝1明細。ロット・ロケーションは先入れ先出し（有効期限優先）で自動引当する"),
+            new("Quantity", "数量", true, "0より大きい数値"),
+            new("Execute", "払い出す", false, "true でピッキングを実行し在庫を引き落とす（まとまりの最初の行の値）"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(Stocktakes, "棚卸指示", false,
+        [
+            new("StocktakeNo", "棚卸番号", true,
+                "後続の実棚数CSVから指示を指す。STで始まる番号は自動採番用のため使えない"),
+            new("LocationCode", "対象ロケーションコード", false, "空欄なら全ロケーション。作成時点の現在庫が明細になる"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(StocktakeCounts, "実棚数", false,
+        [
+            new("StocktakeNo", "棚卸番号", true, "登録済みの棚卸（棚卸指示CSVの StocktakeNo）。同じ番号の行をまとめて登録する"),
+            new("LotNumber", "ロット番号", true, "棚卸の明細のロット"),
+            new("LocationCode", "ロケーションコード", true, "棚卸の明細のロケーション"),
+            new("CountedQuantity", "実棚数量", true, "0以上"),
+            new("Finalize", "確定する", false, "true で実棚数の登録に続けて確定し、差異を在庫へ反映する（まとまりの最初の行の値）"),
         ]), MesRoleGroups.InventoryManage),
     ];
 
