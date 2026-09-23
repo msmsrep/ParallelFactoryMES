@@ -75,6 +75,13 @@ public class ManufacturingOrderMaterial
 
     /// <summary>代替部品か（展開時点のMBOMの値。投入時に理由の記録を求める）</summary>
     public bool IsAlternative { get; set; }
+
+    /// <summary>
+    /// この部材を消費する工程順序（展開時点のMBOMの値。未設定の行は展開時に最終工程へ解決して入れる）。
+    /// バックフラッシュはこの工程の作業指示でだけ消費する。
+    /// null は本項目の追加前に展開した指図で、最終工程で消費したものとして扱う
+    /// </summary>
+    public int? RoutingSequence { get; set; }
 }
 
 /// <summary>作業指示（Spec.md 5.2 WorkOrder。製造指図×工程。B-10）</summary>

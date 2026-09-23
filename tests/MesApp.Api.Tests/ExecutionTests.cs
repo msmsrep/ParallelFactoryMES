@@ -311,7 +311,7 @@ public class ExecutionTests
             new List<MesApp.Core.Contracts.Masters.BomItemRequest>
             {
                 new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
-                new(other.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1"),
+                new(other.Id, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, "G1", IsAlternative: true),
             })).EnsureSuccessStatusCode();
         var stillRejected = await admin.PostAsJsonAsync($"/api/work-orders/{workOrderId}/consumptions",
             new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m));
@@ -321,7 +321,7 @@ public class ExecutionTests
         var newOrder = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
         var accepted2 = await admin.PostAsJsonAsync(
             $"/api/work-orders/{newOrder.WorkOrders[0].Id}/consumptions",
-            new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m));
+            new ConsumptionRequest(otherLot.Id, ctx.MaterialLocationId, 5m, "主材料の欠品"));
         Assert.Equal(HttpStatusCode.OK, accepted2.StatusCode);
         Assert.Equal(95m, await Phase3TestData.GetStockQuantityAsync(admin, otherLot.Id));
     }
@@ -407,6 +407,58 @@ public class ExecutionTests
         Assert.Single(consumptions!);
         Assert.Equal(ConsumptionMethod.Backflush, consumptions![0].Method);
         Assert.Equal(20m, consumptions[0].Quantity);
+    }
+
+    [Fact]
+    public async Task バックフラッシュは部材を消費工程の作業指示でだけ引く()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        // RM-01 は工程1で消費、RM-02 は消費工程を指定しない（＝最終工程の工程2）
+        var packing = await MasterTests.CreateProductAsync(admin, "RM-02", "梱包材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom", new List<BomItemRequest>
+        {
+            new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, null, RoutingSequence: 1),
+            new(packing.Id, 1m, MakeOrBuy.InHouse, null),
+        })).EnsureSuccessStatusCode();
+        var materialLot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var packingLot = await Phase3TestData.ReceiveAsync(admin, packing.Id, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        // 未指定の行は展開時に最終工程へ解決して固定する（以降の工順改訂に左右されない）
+        Assert.Equal(1, order.Materials!.Single(m => m.ChildProductId == ctx.MaterialId).RoutingSequence);
+        Assert.Equal(2, order.Materials!.Single(m => m.ChildProductId == packing.Id).RoutingSequence);
+
+        // 工程ごとにバックフラッシュしても、各部材は自分の工程で1回だけ引かれる（工程数ぶん二重に減らない）
+        (await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[0].Id}/production-records",
+            new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now.AddHours(-2), DateTimeOffset.Now.AddHours(-1),
+                null, Backflush: true))).EnsureSuccessStatusCode();
+        Assert.Equal(80m, await Phase3TestData.GetStockQuantityAsync(admin, materialLot.Id));
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, packingLot.Id));
+
+        (await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+            new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now,
+                ctx.ProductLocationId, Backflush: true))).EnsureSuccessStatusCode();
+        Assert.Equal(80m, await Phase3TestData.GetStockQuantityAsync(admin, materialLot.Id));
+        Assert.Equal(90m, await Phase3TestData.GetStockQuantityAsync(admin, packingLot.Id));
+    }
+
+    [Fact]
+    public async Task 消費する部材の無い工程ではバックフラッシュを拒否する()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var materialLot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+
+        // 部材は消費工程が未指定＝最終工程（工程2）。工程1で引こうとしたら、黙って何もしないのではなく知らせる
+        var record = await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[0].Id}/production-records",
+            new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now,
+                null, Backflush: true));
+        Assert.Equal(HttpStatusCode.BadRequest, record.StatusCode);
+        Assert.Equal(100m, await Phase3TestData.GetStockQuantityAsync(admin, materialLot.Id));
     }
 
     [Fact]

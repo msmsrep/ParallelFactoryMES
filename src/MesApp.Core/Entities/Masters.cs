@@ -20,7 +20,10 @@ public class Product : IDeactivatableMaster
 
     public ProductType Type { get; set; }
 
-    /// <summary>標準不良率（%。A-40-10-04）</summary>
+    /// <summary>
+    /// 標準不良率（%。A-40-10-04）。指図の展開で予定材料の数量を 原単位×指図数量÷(1－率) に割り増す。
+    /// 不良品も部材を消費する（バックフラッシュは良品＋不良の数で引く）ため、良品を指図数量だけ得るのに要る部材を見込む
+    /// </summary>
     public decimal StandardDefectRate { get; set; }
 
     /// <summary>
@@ -61,6 +64,13 @@ public class BomItem
     /// 代替部品の投入には理由の記録を求める（Spec.md 3.9 部材投入の照合）
     /// </summary>
     public bool IsAlternative { get; set; }
+
+    /// <summary>
+    /// この部材を消費する工程（親品目の工順の工程順序 <see cref="Routing.Sequence"/>。B-40-10-09）。
+    /// 未設定なら最終工程で消費する。工順は一括置換で行が作り直されるため、IDではなく工程順序で指す。
+    /// 工順に無い工程順序は指図の展開時に拒否する（MBOMと工順はどちらを先に登録してもよいため、登録時には照合しない）
+    /// </summary>
+    public int? RoutingSequence { get; set; }
 }
 
 /// <summary>工程マスタ（Spec.md 5.1 Process）</summary>

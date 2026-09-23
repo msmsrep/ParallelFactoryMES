@@ -343,13 +343,20 @@ public sealed class WorkOrderExecutionService(
             {
                 // 消費量の基準は展開時に固定した予定材料の原単位（Spec.md 5.7）。
                 // 代替部品の行は除く：主材料の代わりに使う部材なので、両方を原単位ぶん引くと二重に減る。
-                // 代替の投入には理由が要る（Spec.md 3.9）ため、代替部品は手動の部材投入で理由とともに記録する
+                // 代替の投入には理由が要る（Spec.md 3.9）ため、代替部品は手動の部材投入で理由とともに記録する。
+                // 引くのはこの作業指示の工程で消費する部材だけ。指図の全部材を引くと、工程ごとに
+                // バックフラッシュしたとき工程数ぶん二重に減る。消費工程が null の行（項目追加前の指図）は最終工程で引く
+                var sequence = workOrder.RoutingSequence;
                 var bom = await db.ManufacturingOrderMaterials
-                    .Where(m => m.ManufacturingOrderId == workOrder.ManufacturingOrderId && !m.IsAlternative)
+                    .Where(m => m.ManufacturingOrderId == workOrder.ManufacturingOrderId && !m.IsAlternative
+                                && (m.RoutingSequence == sequence || (m.RoutingSequence == null && isFinalStep)))
                     .ToListAsync(ct);
                 if (bom.Count == 0)
                 {
-                    return Outcome<ProductionRecordResult>.Invalid(ApiText.T("予定材料が未登録（展開時にMBOMが未登録）のためバックフラッシュできません。"));
+                    return Outcome<ProductionRecordResult>.Invalid(
+                        await db.ManufacturingOrderMaterials.AnyAsync(m => m.ManufacturingOrderId == workOrder.ManufacturingOrderId, ct)
+                            ? ApiText.T("この工程（工程順序 {0}）で消費する予定材料が無いためバックフラッシュできません。", sequence)
+                            : ApiText.T("予定材料が未登録（展開時にMBOMが未登録）のためバックフラッシュできません。"));
                 }
                 var totalProduced = request.GoodQuantity + request.DefectQuantity;
                 foreach (var bomItem in bom)

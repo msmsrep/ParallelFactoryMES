@@ -101,7 +101,7 @@ public static class ActualCsvKinds
             new("StartedAt", "開始日時", true, DateTimeNote + "。この時刻で直を決める"),
             new("EndedAt", "終了日時", false, DateTimeNote),
             new("OutputLocationCode", "入庫先ロケーションコード", false, "最終工程で良品があるときは必須"),
-            new("Backflush", "バックフラッシュ", false, "true で予定材料×(良品+不良)を先入れ先出しで自動消費"),
+            new("Backflush", "バックフラッシュ", false, "true でこの工程で使う予定材料を 原単位×(良品+不良) だけ先入れ先出しで自動消費（代替部品は引かない）"),
             new("Defects", "不良理由別の内訳", false, "不良理由コード=数量 をセミコロン区切り（DR-02=2;DR-03=1）。合計は不良数以下"),
         ]), MesRoleGroups.ShopFloorRecord),
         new(new CsvKindInfo(DataRecords, "製造条件データ", false,

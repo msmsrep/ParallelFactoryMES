@@ -20,6 +20,12 @@ public sealed partial class MasterCsvService
 
         /// <summary>取り込めたが伝えたいこと（エラーと違いロールバックしない。<c>CsvImportResult.Warnings</c>）</summary>
         public List<CsvImportError> Warnings { get; } = [];
+
+        /// <summary>
+        /// 保存の後に書く個別の監査ログ（対象の種類・ID・内容）。監査ログは書くたびに保存するため、
+        /// 取込の途中で書くと検証前の変更まで保存してしまう。全行の検証が通って保存した後にまとめて書く
+        /// </summary>
+        public List<(string TargetType, string TargetId, object Detail)> Audits { get; } = [];
     }
 
     public async Task<CsvImportResult> ImportAsync(
@@ -113,6 +119,10 @@ public sealed partial class MasterCsvService
             await db.SaveChangesAsync(ct);
             await auditLogger.LogAsync("Master", "CsvImport", kind.Kind, null,
                 detail: $"rows={table.Rows.Count}, created={counter.Created}, updated={counter.Updated}", ct: ct);
+            foreach (var (targetType, targetId, detail) in counter.Audits)
+            {
+                await auditLogger.LogAsync("Master", "Update", targetType, targetId, detail: detail, ct: ct);
+            }
         }
         return new CsvFileImportCount(counter.Created, counter.Updated) { Warnings = counter.Warnings };
     }
@@ -144,7 +154,7 @@ public sealed partial class MasterCsvService
             var unit = reader.RequiredText("Unit", 20);
             var specification = reader.Text("Specification", product.Specification);
             var type = reader.Enum("Type", product.Type, CsvEnumLabels.ProductTypes);
-            var defectRate = reader.Number("StandardDefectRate", product.StandardDefectRate, 0, 100);
+            var defectRate = reader.Number("StandardDefectRate", product.StandardDefectRate, 0, 99.99m);
             var defaultLocationId = reader.Reference(
                 "DefaultLocationCode", product.DefaultLocationId, locationIds, "ロケーション");
             var isActive = reader.Bool("IsActive", product.IsActive);
@@ -905,6 +915,10 @@ public sealed partial class MasterCsvService
     {
         var productIds = await ProductIdsAsync(ct);
         var existing = await db.BomItems.ToListAsync(ct);
+        // 循環の判定に使う明細。取り込んだ親品目の分はその都度置き換え、後の行が前の行と循環するのも捕まえる
+        var edges = existing.GroupBy(b => b.ParentProductId)
+            .ToDictionary(g => g.Key, g => g.Select(b => b.ChildProductId).ToList());
+        var codeById = productIds.ToDictionary(p => p.Value, p => p.Key);
 
         foreach (var group in GroupRows(table, "ParentProductCode", errors))
         {
@@ -928,6 +942,7 @@ public sealed partial class MasterCsvService
                 var makeOrBuy = reader.Enum("MakeOrBuy", MakeOrBuy.InHouse, CsvEnumLabels.MakeOrBuys);
                 var alternativeGroup = reader.Text("AlternativeGroup", null, 50);
                 var isAlternative = reader.Bool("IsAlternative", false);
+                var routingSequence = reader.IntOrNull("RoutingSequence", null, 1);
                 if (quantity is null && !reader.Failed)
                 {
                     reader.Fail(ApiText.T("QuantityPer（必要数量）は必須です。"));
@@ -951,16 +966,31 @@ public sealed partial class MasterCsvService
                     ChildProductId = childId!.Value,
                     QuantityPer = quantity!.Value,
                     MakeOrBuy = makeOrBuy,
-                    AlternativeGroup = alternativeGroup,
+                    AlternativeGroup = ProductStructurePolicy.NormalizeAlternativeGroup(alternativeGroup),
                     IsAlternative = isAlternative,
+                    RoutingSequence = routingSequence,
                 });
             }
             if (failed)
             {
                 continue;
             }
+            if (ProductStructurePolicy.CheckAlternativeGroups(
+                    lines.Select(l => (codeById[l.ChildProductId], l.AlternativeGroup, l.IsAlternative))) is { } alternativeError)
+            {
+                parentReader.Fail(ApiText.T("親品目 '{0}'：{1}", parentCode, alternativeError));
+                continue;
+            }
+            if (ProductStructurePolicy.FindBomCycle(edges, parentId, lines.Select(l => l.ChildProductId)) is { } cycle)
+            {
+                parentReader.Fail(ApiText.T("MBOMが循環します（{0}）。", string.Join(" → ", cycle.Select(id => codeById[id]))));
+                continue;
+            }
+            edges[parentId] = [.. lines.Select(l => l.ChildProductId)];
 
             var current = existing.Where(b => b.ParentProductId == parentId).ToList();
+            // 設計変更の追跡（A-40-10-05）は単票APIと同じ形で残す。CSVから改訂すると中身が追えない、にしない
+            counter.Audits.Add(("Bom", parentId.ToString(), ProductStructureService.BomChangeDetail(current, lines, codeById)));
             db.BomItems.RemoveRange(current);
             db.BomItems.AddRange(lines);
             if (current.Count > 0)

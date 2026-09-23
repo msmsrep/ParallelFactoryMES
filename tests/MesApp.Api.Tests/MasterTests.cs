@@ -76,6 +76,69 @@ public class MasterTests
     }
 
     [Fact]
+    public async Task 循環するMBOMは登録できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var fg = await CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var sf = await CreateProductAsync(admin, "SF-01", "半製品", ProductType.SemiFinished);
+        var rm = await CreateProductAsync(admin, "RM-01", "部材", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/products/{fg.Id}/bom",
+            new List<BomItemRequest> { new(sf.Id, 1m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+        (await admin.PutAsJsonAsync($"/api/products/{sf.Id}/bom",
+            new List<BomItemRequest> { new(rm.Id, 1m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+
+        // RM-01 → FG-01 を足すと FG-01 → SF-01 → RM-01 → FG-01 と一周する。経路をそのまま示す
+        var cyclic = await admin.PutAsJsonAsync($"/api/products/{rm.Id}/bom",
+            new List<BomItemRequest> { new(fg.Id, 1m, MakeOrBuy.InHouse, null) });
+        Assert.Equal(HttpStatusCode.BadRequest, cyclic.StatusCode);
+        var problem = await cyclic.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Contains("RM-01 → FG-01 → SF-01 → RM-01", problem!.Title);
+
+        // 親品目自身の既存明細は置き換えられるので、循環の判定に入れない（SF-01 の子を差し替えるのは循環ではない）
+        (await admin.PutAsJsonAsync($"/api/products/{sf.Id}/bom",
+            new List<BomItemRequest> { new(rm.Id, 2m, MakeOrBuy.InHouse, null) })).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task 代替部品グループは主材料をちょうど1つ持つ()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var fg = await CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var main = await CreateProductAsync(admin, "RM-01", "主材料", ProductType.Material);
+        var sub = await CreateProductAsync(admin, "RM-02", "代替部材", ProductType.Material);
+
+        async Task<string?> PutAsync(params BomItemRequest[] items)
+        {
+            var response = await admin.PutAsJsonAsync($"/api/products/{fg.Id}/bom", items.ToList());
+            return response.IsSuccessStatusCode
+                ? null
+                : (await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>())!.Title;
+        }
+
+        // グループの無い代替部品は、どの主材料の代わりか決まらない
+        Assert.Contains("RM-02", await PutAsync(
+            new(main.Id, 1m, MakeOrBuy.InHouse, null),
+            new(sub.Id, 1m, MakeOrBuy.InHouse, null, IsAlternative: true)));
+        // 主材料が無いと、バックフラッシュがグループの部材を何も引かない
+        Assert.Contains("GRP-1", await PutAsync(
+            new(main.Id, 1m, MakeOrBuy.InHouse, "GRP-1", IsAlternative: true),
+            new(sub.Id, 1m, MakeOrBuy.InHouse, "GRP-1", IsAlternative: true)));
+        // 主材料が2つだと、代わりになるはずの部材を両方引く
+        Assert.Contains("RM-01, RM-02", await PutAsync(
+            new(main.Id, 1m, MakeOrBuy.InHouse, "GRP-1"),
+            new(sub.Id, 1m, MakeOrBuy.InHouse, "GRP-1")));
+
+        // グループ名は前後の空白を除いて比べ、その形で保存する
+        Assert.Null(await PutAsync(
+            new(main.Id, 1m, MakeOrBuy.InHouse, "GRP-1"),
+            new(sub.Id, 1m, MakeOrBuy.InHouse, " GRP-1 ", IsAlternative: true)));
+        var bom = await admin.GetFromJsonAsync<List<BomItemResponse>>($"/api/products/{fg.Id}/bom");
+        Assert.All(bom!, b => Assert.Equal("GRP-1", b.AlternativeGroup));
+    }
+
+    [Fact]
     public async Task MBOMと工順を一括登録できる()
     {
         using var factory = new ApiFactory();

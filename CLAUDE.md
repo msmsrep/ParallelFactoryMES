@@ -125,6 +125,7 @@ Entity（`Core/Entities`）→ `MesAppDbContext` の `DbSet` と `Configurations
 ## 進め方の要点（詳細は Orchestration.md）
 
 - 1セッション＝1タスク。無関係な作業に移るときは `/clear`、同じファイル群を触るなら継続
+- モデルは Opus 5.5 で統一し、層は effort で分ける（L1 設計＝high、高リスク領域＝xhigh、L2 実装＝medium、定型＝low）。モデル・effort はセッション途中で変えない
 - 探索は Glob → Grep（`-n`・パス限定）→ 該当行±40行の Read。1タスクあたり読込1,500行・Grep 8回まで
 - **同じエラーで2回失敗したら3回目を同じやり方で試さない**。前提（変更対象・受入条件）を疑う
 - 機械的に確認できることは build / test / grep で確認する。推測で「直った」と言わない

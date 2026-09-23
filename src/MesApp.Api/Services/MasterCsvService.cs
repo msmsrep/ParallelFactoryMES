@@ -217,6 +217,7 @@ public sealed partial class MasterCsvService(
         {
             b.ParentProduct!.Code, b.ChildProduct!.Code, Num(b.QuantityPer),
             b.MakeOrBuy.ToString(), b.AlternativeGroup, Bool(b.IsAlternative),
+            b.RoutingSequence?.ToString(CultureInfo.InvariantCulture),
         })];
     }
 

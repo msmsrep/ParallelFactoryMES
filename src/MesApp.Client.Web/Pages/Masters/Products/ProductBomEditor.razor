@@ -5,7 +5,7 @@
     <h2 style="margin-top:0;">@L["{0} {1} の MBOM（A-40-10）", Product.Code, Product.Name]</h2>
     <Notice Error="@_error" Message="@_message" />
     <table class="table">
-        <thead><tr><th>@L["子品目"]</th><th>@L["必要数量（親1単位）"]</th><th>@L["内外製"]</th><th>@L["代替グループ"]</th><th>@L["代替部品"]</th><th></th></tr></thead>
+        <thead><tr><th>@L["子品目"]</th><th>@L["必要数量（親1単位）"]</th><th>@L["内外製"]</th><th>@L["代替グループ"]</th><th>@L["代替部品"]</th><th>@L["消費工程"]</th><th></th></tr></thead>
         <tbody>
             @foreach (var line in _lines)
             {
@@ -15,6 +15,7 @@
                     <td>@EnumLabels.Of(line.MakeOrBuy)</td>
                     <td>@(line.AlternativeGroup ?? "-")</td>
                     <td>@(line.IsAlternative ? L["代替"] : L["主"])</td>
+                    <td>@StepLabel(line.RoutingSequence)</td>
                     <td><button class="btn btn-danger btn-sm" @onclick="() => _lines.Remove(line)">@L["削除"]</button></td>
                 </tr>
             }
@@ -54,6 +55,17 @@
                     @L["代替部品（主材料でない）"]
                 </label>
             </div>
+            @* バックフラッシュはこの工程の作業指示で部材を引く（B-40-10-09） *@
+            <div class="form-field">
+                <label>@L["消費工程"]</label>
+                <select @bind="_routingSequence">
+                    <option value="0">@L["最終工程（未指定）"]</option>
+                    @foreach (var step in _routing)
+                    {
+                        <option value="@step.Sequence">@step.Sequence @step.ProcessName</option>
+                    }
+                </select>
+            </div>
         </div>
         <div class="actions">
             <button class="btn btn-secondary" @onclick="AddLine">@L["明細に追加"]</button>
@@ -73,6 +85,7 @@
     [Parameter] public EventCallback OnSaved { get; set; }
 
     private readonly List<BomItemRequest> _lines = [];
+    private List<RoutingStepResponse> _routing = [];
     private int _loadedProductId;
 
     private int _childId;
@@ -80,6 +93,7 @@
     private MakeOrBuy _makeOrBuy = MakeOrBuy.InHouse;
     private string? _altGroup;
     private bool _isAlternative;
+    private int _routingSequence;
 
     private string? _error;
     private string? _message;
@@ -101,7 +115,9 @@
         var bom = await Http.GetFromJsonAsync<List<BomItemResponse>>($"api/products/{Product.Id}/bom") ?? [];
         _lines.AddRange(bom.Select(b =>
             new BomItemRequest(b.ChildProductId, b.QuantityPer, b.MakeOrBuy, b.AlternativeGroup,
-                b.IsAlternative)));
+                b.IsAlternative, b.RoutingSequence)));
+        // 消費工程の選択肢。工順は隣の編集欄で直せるため、MBOMを読み直すたびに取り直す
+        _routing = await Http.GetFromJsonAsync<List<RoutingStepResponse>>($"api/products/{Product.Id}/routing") ?? [];
         // 親から呼ばれたときはパラメータが変わらないため、自分で再描画を要求する
         StateHasChanged();
     }
@@ -115,10 +131,19 @@
         }
         _error = null;
         _lines.Add(new BomItemRequest(_childId, _quantity, _makeOrBuy,
-            string.IsNullOrWhiteSpace(_altGroup) ? null : _altGroup, _isAlternative));
+            string.IsNullOrWhiteSpace(_altGroup) ? null : _altGroup, _isAlternative,
+            _routingSequence == 0 ? null : _routingSequence));
         _childId = 0;
         _isAlternative = false;
     }
+
+    /// <summary>消費工程の表示。工順に無い工程順序は指図の展開で拒否されるため、ここで目立たせる</summary>
+    private string StepLabel(int? sequence) => sequence switch
+    {
+        null => L["最終工程"],
+        { } s when _routing.FirstOrDefault(r => r.Sequence == s) is { } step => $"{s} {step.ProcessName}",
+        { } s => L["{0}（工順に無し）", s],
+    };
 
     private async Task SaveAsync()
     {

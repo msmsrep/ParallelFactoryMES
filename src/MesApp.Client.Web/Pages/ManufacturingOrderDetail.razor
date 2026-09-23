@@ -105,7 +105,7 @@ else
         <h2>@L["予定材料（展開時のMBOMで確定）"]</h2>
         <table class="table">
             <thead>
-                <tr><th>@L["品目"]</th><th>@L["原単位"]</th><th>@L["予定数量"]</th><th>@L["代替部品グループ"]</th></tr>
+                <tr><th>@L["品目"]</th><th>@L["原単位"]</th><th>@L["予定数量"]</th><th>@L["代替部品グループ"]</th><th>@L["消費工程"]</th></tr>
             </thead>
             <tbody>
                 @foreach (var material in _detail.Materials)
@@ -115,6 +115,7 @@ else
                         <td>@material.QuantityPer</td>
                         <td>@material.PlannedQuantity</td>
                         <td>@(material.AlternativeGroup ?? "-")</td>
+                        <td>@(material.RoutingSequence?.ToString() ?? L["最終工程"].Value)</td>
                     </tr>
                 }
             </tbody>

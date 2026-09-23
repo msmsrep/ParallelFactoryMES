@@ -240,9 +240,9 @@ MBOMと工順の登録方法は、[マスタ管理の品目・MBOM・工順](mas
 <rect class="op" x="330" y="85" width="280" height="40" rx="6"/><text class="tb" x="344" y="110">SMP-FG-001-20</text><text class="t" x="470" y="110">PR-40 最終検査 10台</text>
 <rect class="op" x="330" y="140" width="280" height="40" rx="6"/><text class="tb" x="344" y="165">SMP-FG-001-30</text><text class="t" x="470" y="165">PR-50 梱包 10台</text>
 <rect class="card" x="650" y="30" width="290" height="50" rx="6"/><text class="tb" x="664" y="52">産出ロット FG1000-S001</text><text class="m" x="664" y="70">最終工程の良品が、このロットで入庫する</text>
-<rect class="card" x="650" y="92" width="290" height="88" rx="6"/><text class="tb" x="664" y="114">予定材料（MBOM×10台で固定）</text>
-<text class="m" x="664" y="134">SF-2000 10・ギアセット 10・シャフト 10</text>
-<text class="m" x="664" y="152">Oリング 20（代替可）・ボルト 40・潤滑油 0.5 L</text>
+<rect class="card" x="650" y="92" width="290" height="88" rx="6"/><text class="tb" x="664" y="114">予定材料（MBOM×10台÷(1−1.5%)で固定）</text>
+<text class="m" x="664" y="134">SF-2000 10.15・ギアセット 10.15・シャフト 10.15</text>
+<text class="m" x="664" y="152">Oリング 20.30（代替可）・ボルト 40.61・潤滑油 0.51 L</text>
 <text class="m" x="664" y="170">予定にない品目は投入できない</text>
 <text class="tb" x="20" y="250">製造指図の状態</text>
 <g text-anchor="middle">
@@ -270,8 +270,8 @@ MBOMと工順の登録方法は、[マスタ管理の品目・MBOM・工順](mas
 </figure>
 
 <figure class="shot">
-<img src="assets/walkthrough/order-detail.webp" width="1440" height="934" alt="製造指図 SMP-FG-001 の詳細画面。予定材料7品目と、工程展開でできた作業指示3件が表示されている" loading="lazy">
-<figcaption>製造指図の詳細。予定材料と、工程展開でできた作業指示が並ぶ。各行から段取り・実績入力・指示書の印刷へ進める</figcaption>
+<img src="assets/walkthrough/order-detail.webp" width="1440" height="947" alt="製造指図 SMP-FG-001 の詳細画面。予定材料7品目（予定数量は標準不良率ぶん割り増し、消費工程はすべて10）と、工程展開でできた作業指示3件が表示されている" loading="lazy">
+<figcaption>製造指図の詳細。予定材料と、工程展開でできた作業指示が並ぶ。予定数量はギアポンプの標準不良率 1.5% ぶん割り増され、部材はどれも組立（工程10）で使う。各行から段取り・実績入力・指示書の印刷へ進める</figcaption>
 </figure>
 
 **差立**では、作業指示ごとに作業者・設備・着手順を割り当てます。作業者には工順の必要スキルが照合され、

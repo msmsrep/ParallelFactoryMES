@@ -2127,11 +2127,11 @@
   <data name="作 業 指 示 書" xml:space="preserve">
     <value>WORK INSTRUCTION</value>
   </data>
-  <data name="構成部品（MBOM）" xml:space="preserve">
-    <value>Components (MBOM)</value>
+  <data name="この工程で使う部材（予定材料）" xml:space="preserve">
+    <value>Materials used in this step (planned materials)</value>
   </data>
-  <data name="MBOMは登録されていません。" xml:space="preserve">
-    <value>No MBOM registered.</value>
+  <data name="この工程で使う部材はありません。" xml:space="preserve">
+    <value>No materials are used in this step.</value>
   </data>
   <data name="必要数量（計画数分）" xml:space="preserve">
     <value>Required Qty (for planned qty)</value>
@@ -4154,5 +4154,17 @@
   </data>
   <data name="製造日＋品目コード＋工程コード＋作業区コード" xml:space="preserve">
     <value>production date + product code + process code + work center code</value>
+  </data>
+  <data name="消費工程" xml:space="preserve">
+    <value>Consuming step</value>
+  </data>
+  <data name="最終工程" xml:space="preserve">
+    <value>Final step</value>
+  </data>
+  <data name="最終工程（未指定）" xml:space="preserve">
+    <value>Final step (not specified)</value>
+  </data>
+  <data name="{0}（工順に無し）" xml:space="preserve">
+    <value>{0} (not in routing)</value>
   </data>
 </root>

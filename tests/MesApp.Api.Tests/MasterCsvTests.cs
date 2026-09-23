@@ -161,7 +161,7 @@ public class MasterCsvTests
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Errors, e => e.Line == 2 && e.Message == "Name is required.");
-        Assert.Contains(result.Errors, e => e.Line == 3 && e.Message == "StandardDefectRate must be 100 or less ('200').");
+        Assert.Contains(result.Errors, e => e.Line == 3 && e.Message == "StandardDefectRate must be 99.99 or less ('200').");
         Assert.Contains(result.Errors, e => e.Line == 5 && e.Message == "Item code 'P-003' appears on multiple rows.");
     }
 
@@ -187,6 +187,49 @@ public class MasterCsvTests
     }
 
     [Fact]
+    public async Task 循環するMBOMはCSVでも取り込めない()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(client, "products", """
+            Code,Name,Unit,Type
+            FG-01,完成品,個,Product
+            SF-01,半製品,個,SemiFinished
+            """)).Succeeded);
+
+        // 同じファイルの後の行が前の行と循環するのも捕まえる（単票APIと同じ判定。Spec.md 7.4）
+        var result = await ImportAsync(client, "bom", """
+            ParentProductCode,ChildProductCode,QuantityPer
+            FG-01,SF-01,1
+            SF-01,FG-01,1
+            """);
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, e => e.Line == 3 && e.Message.Contains("SF-01 → FG-01 → SF-01"));
+    }
+
+    [Fact]
+    public async Task 代替部品グループの整合はCSVでも確かめる()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(client, "products", """
+            Code,Name,Unit,Type
+            FG-01,完成品,個,Product
+            RM-01,主材料,個,Material
+            RM-02,代替部材,個,Material
+            """)).Succeeded);
+
+        // 単票APIと同じ判定（ProductStructurePolicy）。主材料の無いグループは取り込めない
+        var result = await ImportAsync(client, "bom", """
+            ParentProductCode,ChildProductCode,QuantityPer,AlternativeGroup,IsAlternative
+            FG-01,RM-01,1,GRP-1,true
+            FG-01,RM-02,1,GRP-1,true
+            """);
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, e => e.Line == 2 && e.Message.Contains("GRP-1") && e.Message.Contains("FG-01"));
+    }
+
+    [Fact]
     public async Task MBOMと工順をコード指定のCSVで一括登録できる()
     {
         using var factory = new ApiFactory();
@@ -206,9 +249,9 @@ public class MasterCsvTests
             """)).Succeeded);
 
         var bom = await ImportAsync(client, "bom", """
-            ParentProductCode,ChildProductCode,QuantityPer,MakeOrBuy,AlternativeGroup
-            FG-01,RM-01,2,InHouse,
-            FG-01,RM-02,1.5,Outsourced,ALT-1
+            ParentProductCode,ChildProductCode,QuantityPer,MakeOrBuy,AlternativeGroup,RoutingSequence
+            FG-01,RM-01,2,InHouse,,1
+            FG-01,RM-02,1.5,Outsourced,ALT-1,
             """);
         Assert.True(bom.Succeeded, string.Join(" / ", bom.Errors.Select(e => e.Message)));
         Assert.Equal(1, bom.Created);
@@ -218,6 +261,9 @@ public class MasterCsvTests
         var bomLines = await client.GetFromJsonAsync<List<BomItemResponse>>($"/api/products/{parentId}/bom");
         Assert.Equal(2, bomLines!.Count);
         Assert.Equal(1.5m, bomLines.Single(b => b.ChildProductCode == "RM-02").QuantityPer);
+        // 消費工程は空なら未指定（最終工程で消費）
+        Assert.Equal(1, bomLines.Single(b => b.ChildProductCode == "RM-01").RoutingSequence);
+        Assert.Null(bomLines.Single(b => b.ChildProductCode == "RM-02").RoutingSequence);
 
         var routing = await ImportAsync(client, "routing", """
             ProductCode,Sequence,ProcessCode,StandardWorkMinutes,StandardSetupMinutes,ControlItems

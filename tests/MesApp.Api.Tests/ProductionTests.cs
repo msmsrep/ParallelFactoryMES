@@ -414,6 +414,51 @@ public class ProductionTests
     }
 
     [Fact]
+    public async Task 予定材料は親品目の標準不良率ぶん割り増される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+
+        // 不良品も部材を使うので、良品10を得るには 2×10÷(1－0.2)=25 の部材が要る（A-40-10-04）
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}",
+            new ProductRequest("FG-01", "完成品", "個", null, ProductType.Product, 20m))).EnsureSuccessStatusCode();
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        Assert.Equal(25m, order.Materials!.Single().PlannedQuantity);
+
+        // 割り切れないときは小数6桁で切り上げる（2×10÷0.7＝28.5714285…）
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}",
+            new ProductRequest("FG-01", "完成品", "個", null, ProductType.Product, 30m))).EnsureSuccessStatusCode();
+        var rounded = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        Assert.Equal(28.571429m, rounded.Materials!.Single().PlannedQuantity);
+
+        // ÷(1－率) なので100%は受け付けない
+        var invalid = await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}",
+            new ProductRequest("FG-01", "完成品", "個", null, ProductType.Product, 100m));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
+    [Fact]
+    public async Task MBOMの消費工程が工順に無い品目の指図は展開できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        // 工順は工程順序 1・2。MBOMと工順は別々に改訂できるため、ずれは展開時に止める
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/bom", new List<BomItemRequest>
+        {
+            new(ctx.MaterialId, Phase3TestData.BomQuantityPer, MakeOrBuy.InHouse, null, RoutingSequence: 3),
+        })).EnsureSuccessStatusCode();
+        var order = await CreateOrderAsync(admin, ctx.ProductId);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        Assert.Equal(HttpStatusCode.BadRequest, expanded.StatusCode);
+        Assert.Contains("RM-01", await expanded.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task 承認済みの指図を変更すると未承認に戻る()
     {
         using var factory = new ApiFactory();

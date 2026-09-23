@@ -34,7 +34,7 @@
             </div>
             <div class="form-field">
                 <label>@L["標準不良率(%)"]</label>
-                <input type="number" step="any" @bind="_defectRate" />
+                <input type="number" step="any" min="0" max="99.99" @bind="_defectRate" />
             </div>
             <div class="form-field">
                 <label>@L["既定ロケーション（入庫先の推奨。D-10-30-03）"]</label>

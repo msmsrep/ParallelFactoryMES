@@ -202,6 +202,9 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)");
 
+                    b.Property<int?>("RoutingSequence")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ChildProductId");
@@ -1618,6 +1621,9 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.Property<decimal>("QuantityPer")
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)");
+
+                    b.Property<int?>("RoutingSequence")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 

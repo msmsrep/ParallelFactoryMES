@@ -11,7 +11,8 @@ public record ProductRequest(
     [Required, MaxLength(20)] string Unit,
     string? Specification,
     ProductType Type,
-    [Range(0, 100)] decimal StandardDefectRate,
+    /// <summary>標準不良率（%）。予定材料の数量を割り増す（÷(1－率)）ため100%は受け付けない</summary>
+    [Range(0, 99.99)] decimal StandardDefectRate,
     /// <summary>既定の入庫先ロケーション（推奨ロケーション指示の第一候補。D-10-30-03、D-40-40-03）</summary>
     int? DefaultLocationId = null);
 
@@ -28,12 +29,14 @@ public record BomItemRequest(
     MakeOrBuy MakeOrBuy,
     string? AlternativeGroup,
     /// <summary>代替部品か（同一グループ内の主材料でない行。投入時に理由の記録を求める）</summary>
-    bool IsAlternative = false);
+    bool IsAlternative = false,
+    /// <summary>消費する工程の工程順序（未指定なら最終工程。バックフラッシュはこの工程で引く）</summary>
+    [Range(1, int.MaxValue)] int? RoutingSequence = null);
 
 public record BomItemResponse(
     int Id, int ChildProductId, string ChildProductCode, string ChildProductName,
     decimal QuantityPer, MakeOrBuy MakeOrBuy, string? AlternativeGroup,
-    bool IsAlternative = false);
+    bool IsAlternative = false, int? RoutingSequence = null);
 
 // ---- 工程（Process）----
 

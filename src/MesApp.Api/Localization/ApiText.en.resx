@@ -1380,8 +1380,8 @@
   <data name="代替部品" xml:space="preserve">
     <value>Substitute part</value>
   </data>
-  <data name="true / false。trueの行を投入するには理由の記録が必要" xml:space="preserve">
-    <value>true / false. Consuming a true row requires recording a reason</value>
+  <data name="true / false。trueの行はAlternativeGroupが必須で、投入するには理由の記録が必要" xml:space="preserve">
+    <value>true / false. A true row requires AlternativeGroup, and consuming it requires recording a reason</value>
   </data>
   <data name="工順（BOP）" xml:space="preserve">
     <value>Routing (BOP)</value>
@@ -1704,8 +1704,8 @@
   <data name="バックフラッシュ" xml:space="preserve">
     <value>Backflush</value>
   </data>
-  <data name="true で予定材料×(良品+不良)を先入れ先出しで自動消費" xml:space="preserve">
-    <value>true consumes planned materials × (good + defect) automatically by FIFO</value>
+  <data name="true でこの工程で使う予定材料を 原単位×(良品+不良) だけ先入れ先出しで自動消費（代替部品は引かない）" xml:space="preserve">
+    <value>true consumes the planned materials used at this step (quantity per × (good + defect)) first-in first-out (substitutes are not consumed)</value>
   </data>
   <data name="不良理由別の内訳" xml:space="preserve">
     <value>Defects by reason</value>
@@ -1982,5 +1982,38 @@
   </data>
   <data name="0より大きい数値。出荷済みと合わせて指示数量を超えられない" xml:space="preserve">
     <value>A number greater than 0. Together with the quantity already shipped, it cannot exceed the instructed quantity.</value>
+  </data>
+  <data name="MBOMの部材 '{0}' の消費工程（工程順序 {1}）が品目 '{2}' の工順にありません。MBOMか工順を直してください。" xml:space="preserve">
+    <value>The consuming step (sequence {1}) of MBOM material '{0}' is not in the routing of item '{2}'. Correct the MBOM or the routing.</value>
+  </data>
+  <data name="この工程（工程順序 {0}）で消費する予定材料が無いためバックフラッシュできません。" xml:space="preserve">
+    <value>Cannot backflush because no planned materials are consumed at this step (sequence {0}).</value>
+  </data>
+  <data name="消費工程（工程順序）" xml:space="preserve">
+    <value>Consuming step (sequence)</value>
+  </data>
+  <data name="親品目の工順の工程順序。空なら最終工程。バックフラッシュはこの工程で部材を引く" xml:space="preserve">
+    <value>Sequence in the parent item's routing. Blank means the final step. Backflush consumes the material at this step</value>
+  </data>
+  <data name="0〜99.99。指図の予定材料をこの率ぶん割り増す" xml:space="preserve">
+    <value>0 to 99.99. Planned materials of an order are increased by this rate</value>
+  </data>
+  <data name="MBOMが循環します（{0}）。" xml:space="preserve">
+    <value>The MBOM is circular ({0}).</value>
+  </data>
+  <data name="代替部品の行には代替部品グループが必要です（子品目 '{0}'）。" xml:space="preserve">
+    <value>A substitute row needs a substitute group (child item '{0}').</value>
+  </data>
+  <data name="代替部品グループ '{0}' に主材料（代替部品でない行）がありません。" xml:space="preserve">
+    <value>Substitute group '{0}' has no primary material (a row that is not a substitute).</value>
+  </data>
+  <data name="代替部品グループ '{0}' に主材料が複数あります（{1}）。主材料は1つにし、他は代替部品にしてください。" xml:space="preserve">
+    <value>Substitute group '{0}' has more than one primary material ({1}). Keep one primary and mark the others as substitutes.</value>
+  </data>
+  <data name="親品目 '{0}'：{1}" xml:space="preserve">
+    <value>Parent item '{0}': {1}</value>
+  </data>
+  <data name="グループの主材料（IsAlternative=false）はちょうど1つ" xml:space="preserve">
+    <value>Exactly one primary material (IsAlternative=false) per group</value>
   </data>
 </root>
