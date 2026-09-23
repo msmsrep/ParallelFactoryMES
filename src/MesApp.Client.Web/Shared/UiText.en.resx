@@ -4239,4 +4239,61 @@
   <data name="規格下限" xml:space="preserve">
     <value>LSL</value>
   </data>
+  <data name="製造リードタイム" xml:space="preserve">
+    <value>Manufacturing lead time</value>
+  </data>
+  <data name="完了した製造指図ごとに、最初の作業（段取り・実績の開始）から最後の実績の終了までを製造日で数える。期間は完了した製造日。リワーク指図は含めない。" xml:space="preserve">
+    <value>For each completed manufacturing order, counted in production days from the first activity (start of setup or production) to the end of the last production record. The period is the production date of completion. Rework orders are excluded.</value>
+  </data>
+  <data name="対象期間に完了した製造指図はありません。" xml:space="preserve">
+    <value>No manufacturing orders were completed in the selected period.</value>
+  </data>
+  <data name="完了した指図" xml:space="preserve">
+    <value>Completed orders</value>
+  </data>
+  <data name="平均" xml:space="preserve">
+    <value>Average</value>
+  </data>
+  <data name="{0} 日" xml:space="preserve">
+    <value>{0} days</value>
+  </data>
+  <data name="中央値" xml:space="preserve">
+    <value>Median</value>
+  </data>
+  <data name="90%点" xml:space="preserve">
+    <value>90th percentile</value>
+  </data>
+  <data name="最大" xml:space="preserve">
+    <value>Maximum</value>
+  </data>
+  <data name="納期内 / 遅れ / 納期なし" xml:space="preserve">
+    <value>On time / Late / No due date</value>
+  </data>
+  <data name="{0} 件 / {1} 件 / {2} 件" xml:space="preserve">
+    <value>{0} / {1} / {2}</value>
+  </data>
+  <data name="製造リードタイムの分布" xml:space="preserve">
+    <value>Distribution of manufacturing lead time</value>
+  </data>
+  <data name="リードタイムの長い指図" xml:space="preserve">
+    <value>Orders with the longest lead time</value>
+  </data>
+  <data name="リードタイム" xml:space="preserve">
+    <value>Lead time</value>
+  </data>
+  <data name="遅れ" xml:space="preserve">
+    <value>Delay</value>
+  </data>
+  <data name="異常値" xml:space="preserve">
+    <value>Outlier</value>
+  </data>
+  <data name="異常値は第3四分位＋1.5×四分位範囲（{0} 日）を超えるもの。平均を押し上げている原因を個別に調べる対象。" xml:space="preserve">
+    <value>Outliers exceed the third quartile + 1.5 × interquartile range ({0} days). Investigate each one individually, as they push up the average.</value>
+  </data>
+  <data name="納期内・納期なし" xml:space="preserve">
+    <value>On time / no due date</value>
+  </data>
+  <data name="納期遅れ" xml:space="preserve">
+    <value>Late</value>
+  </data>
 </root>

@@ -160,6 +160,42 @@ public record ProductivitySummaryResponse(
     /// <summary>期間内に実績のあった作業指示の予実（超過率の大きい順）</summary>
     List<StandardTimeVarianceRow> TimeVariances);
 
+// ---- 製造リードタイム（B-60-10-05。ガイド 8.3.2 の納期実績の見える化）----
+
+/// <summary>
+/// 完了した製造指図1件のリードタイム。着手は最初の作業記録（段取り・生産実績の開始時刻）、
+/// 完了は最後の生産実績の終了時刻。日数は製造日の差（同じ製造日に着手・完了すれば0日）
+/// </summary>
+public record LeadTimeOrderRow(
+    int ManufacturingOrderId, string OrderNo, string ProductCode, string ProductName, decimal Quantity,
+    DateTimeOffset StartedAt, DateTimeOffset CompletedAt,
+    DateOnly StartedOn, DateOnly CompletedOn,
+    int LeadTimeDays,
+    /// <summary>着手から完了までの経過時間（時間）</summary>
+    decimal LeadTimeHours,
+    DateOnly? DueDate,
+    /// <summary>納期に対する遅れ（日）。完了の製造日−納期。0以下は納期内。納期なしはnull</summary>
+    int? DelayDays,
+    /// <summary>異常値（第3四分位＋1.5×四分位範囲を超える）。個別に原因を調べる対象</summary>
+    bool IsOutlier);
+
+/// <summary>リードタイムの度数分布の1区切り（日数ごとの完了件数。うち納期遅れの件数）</summary>
+public record LeadTimeBucket(int Days, int Count, int LateCount);
+
+/// <summary>
+/// 製造リードタイムの分布（期間は完了の製造日。リワーク指図は含めない）。
+/// 平均だけではばらつきと異常値が見えないため、分布と四分位から見た異常値を返す
+/// </summary>
+public record LeadTimeResponse(
+    int OrderCount,
+    decimal? AverageDays, decimal? MedianDays, int? Percentile90Days, int? MaxDays,
+    /// <summary>異常値とみなすしきい値（日）。4件未満では求めない</summary>
+    decimal? OutlierThresholdDays,
+    int OnTimeCount, int LateCount, int NoDueDateCount,
+    List<LeadTimeBucket> Distribution,
+    /// <summary>リードタイムの長い順</summary>
+    List<LeadTimeOrderRow> Orders);
+
 // ---- 遅延検知（A-30-20-01）----
 
 /// <summary>遅れの種類</summary>
