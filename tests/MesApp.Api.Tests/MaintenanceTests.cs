@@ -61,7 +61,9 @@ public class MaintenanceTests
         Assert.True(usages.Succeeded, string.Join(" / ", usages.Errors.Select(e => e.Message)));
         var saved = Assert.Single((await admin.GetFromJsonAsync<PagedResult<ToolUsageResponse>>("/api/tool-usages"))!.Items);
         Assert.Equal(order.WorkOrders[0].Id, saved.WorkOrderId);
-        Assert.Equal(new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.FromHours(9)), saved.RecordedAt);
+        // オフセットの無い日時は工場（サーバー）の時刻として読む。CI は UTC で動くので +09:00 を決め打ちしない
+        var recordedAt = new DateTime(2026, 9, 1, 10, 0, 0);
+        Assert.Equal(new DateTimeOffset(recordedAt, TimeZoneInfo.Local.GetUtcOffset(recordedAt)), saved.RecordedAt);
         var life = (await admin.GetFromJsonAsync<List<ToolLifeStatusRow>>("/api/tool-usages/life-status"))!;
         Assert.True(Assert.Single(life).IsWarning);
 
