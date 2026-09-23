@@ -810,13 +810,12 @@ public class MasterCsvTests
             """)).Succeeded);
 
         var result = await ImportAsync(client, "control-items", """
-            Code,Name,Unit,TargetProductCode,TargetProcessCode,TargetValue,LowerLimit,UpperLimit,IsActive
-            CI-01,加熱温度,℃,,PR-01,180,175,185,true
+            Code,Name,Unit,TargetValue,LowerLimit,UpperLimit,IsActive
+            CI-01,加熱温度,℃,180,175,185,true
             """);
         Assert.True(result.Succeeded, string.Join(" / ", result.Errors.Select(e => e.Message)));
         var items = await client.GetFromJsonAsync<List<ControlItemResponse>>("/api/control-items");
         Assert.Equal(180m, items!.Single().TargetValue);
-        Assert.Equal("PR-01", items!.Single().TargetProcessCode);
 
         // 単票APIと同じ条件で弾かれる
         var invalid = await ImportAsync(client, "control-items", """
@@ -837,6 +836,33 @@ public class MasterCsvTests
         Assert.Equal(1, revised.Updated);
         var after = await client.GetFromJsonAsync<List<ControlItemResponse>>("/api/control-items");
         Assert.Equal(2, after!.Single().Version);
+
+        // 工順CSVで工程に紐付ける。未登録のコードはその行の誤り
+        Assert.True((await ImportAsync(client, "products", """
+            Code,Name,Unit,Type
+            FG-01,完成品,個,Product
+            """)).Succeeded);
+        var unknown = await ImportAsync(client, "routing", """
+            ProductCode,Sequence,ProcessCode,ControlItemCodes
+            FG-01,1,PR-01,CI-01;CI-99
+            """);
+        Assert.False(unknown.Succeeded);
+        Assert.Contains(unknown.Errors, e => e.Line == 2 && e.Message.Contains("CI-99"));
+        var linked = await ImportAsync(client, "routing", """
+            ProductCode,Sequence,ProcessCode,ControlItemCodes
+            FG-01,1,PR-01,CI-01
+            """);
+        Assert.True(linked.Succeeded, string.Join(" / ", linked.Errors.Select(e => e.Message)));
+        var export = await (await client.GetAsync("/api/masters/csv/routing")).Content.ReadAsStringAsync();
+        Assert.Contains("CI-01", export);
+
+        // 紐付け中の項目はCSVからも無効化できない（単票APIと同じ条件）
+        var deactivate = await ImportAsync(client, "control-items", """
+            Code,Name,IsActive
+            CI-01,加熱温度,false
+            """);
+        Assert.False(deactivate.Succeeded);
+        Assert.Contains(deactivate.Errors, e => e.Message.Contains("FG-01"));
     }
 
     [Fact]

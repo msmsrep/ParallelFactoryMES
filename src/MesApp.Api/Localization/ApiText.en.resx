@@ -900,9 +900,6 @@
   <data name="品目 '{0}' の工程順序 {1} が重複しています。" xml:space="preserve">
     <value>Process sequence {1} of item '{0}' is duplicated.</value>
   </data>
-  <data name="候補設備 '{0}' は登録されていません（EquipmentAssetNos）。" xml:space="preserve">
-    <value>Candidate equipment '{0}' is not registered (EquipmentAssetNos).</value>
-  </data>
   <data name="StartTime（開始時刻）とEndTime（終了時刻）は HH:mm で指定してください。" xml:space="preserve">
     <value>StartTime (start time) and EndTime (end time) must be in HH:mm format.</value>
   </data>
@@ -2015,5 +2012,8 @@
   </data>
   <data name="グループの主材料（IsAlternative=false）はちょうど1つ" xml:space="preserve">
     <value>Exactly one primary material (IsAlternative=false) per group</value>
+  </data>
+  <data name="工程管理項目 '{0}' は品目 {1} の工順から紐付けられているため無効化できません。" xml:space="preserve">
+    <value>Control item '{0}' cannot be deactivated because it is linked from the routing of item {1}.</value>
   </data>
 </root>

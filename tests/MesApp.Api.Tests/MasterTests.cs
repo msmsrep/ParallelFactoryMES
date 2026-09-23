@@ -453,38 +453,31 @@ public class MasterTests
     {
         using var factory = new ApiFactory();
         using var client = await TestAuth.CreateAdminClientAsync(factory);
-        var process = await CreateProcessAsync(client, "PR-01", "加熱");
 
         var created = await client.PostAsJsonAsync("/api/control-items",
-            new ControlItemRequest("CI-01", "加熱温度", "℃", null, process.Id, 180m, 175m, 185m));
+            new ControlItemRequest("CI-01", "加熱温度", "℃", 180m, 175m, 185m));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var item = await created.Content.ReadFromJsonAsync<ControlItemResponse>();
         Assert.Equal(1, item!.Version);
-        Assert.Equal("PR-01", item.TargetProcessCode);
 
         // コード重複は409
         var duplicated = await client.PostAsJsonAsync("/api/control-items",
-            new ControlItemRequest("CI-01", "別項目", null, null, null, null, null, null));
+            new ControlItemRequest("CI-01", "別項目", null, null, null, null));
         Assert.Equal(HttpStatusCode.Conflict, duplicated.StatusCode);
 
         // 下限>上限は400
         var reversed = await client.PostAsJsonAsync("/api/control-items",
-            new ControlItemRequest("CI-02", "逆転", null, null, null, null, 200m, 100m));
+            new ControlItemRequest("CI-02", "逆転", null, null, 200m, 100m));
         Assert.Equal(HttpStatusCode.BadRequest, reversed.StatusCode);
 
         // 指示値が許容範囲の外は400（指示どおり作っても逸脱になってしまうため）
         var outOfRange = await client.PostAsJsonAsync("/api/control-items",
-            new ControlItemRequest("CI-03", "範囲外", null, null, null, 300m, 175m, 185m));
+            new ControlItemRequest("CI-03", "範囲外", null, 300m, 175m, 185m));
         Assert.Equal(HttpStatusCode.BadRequest, outOfRange.StatusCode);
-
-        // 存在しない対象工程は400
-        var missingProcess = await client.PostAsJsonAsync("/api/control-items",
-            new ControlItemRequest("CI-04", "工程なし", null, null, 9999, null, null, null));
-        Assert.Equal(HttpStatusCode.BadRequest, missingProcess.StatusCode);
 
         // 更新で版数が上がる
         var updated = await client.PutAsJsonAsync($"/api/control-items/{item.Id}",
-            new ControlItemRequest("CI-01", "加熱温度", "℃", null, process.Id, 182m, 178m, 186m));
+            new ControlItemRequest("CI-01", "加熱温度", "℃", 182m, 178m, 186m));
         var updatedBody = await updated.Content.ReadFromJsonAsync<ControlItemResponse>();
         Assert.Equal(2, updatedBody!.Version);
         Assert.Equal(182m, updatedBody.TargetValue);
@@ -494,6 +487,51 @@ public class MasterTests
             (await client.DeleteAsync($"/api/control-items/{item.Id}")).StatusCode);
         var active = await client.GetFromJsonAsync<List<ControlItemResponse>>("/api/control-items");
         Assert.Empty(active!);
+    }
+
+    [Fact]
+    public async Task 工順に紐付けた工程管理項目は無効化できず無効な項目は紐付けられない()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        var product = await CreateProductAsync(client, "FG-01", "完成品", ProductType.Product);
+        var process = await CreateProcessAsync(client, "PR-01", "加熱");
+        async Task<int> CreateItemAsync(string code)
+        {
+            var created = await client.PostAsJsonAsync("/api/control-items",
+                new ControlItemRequest(code, code, null, null, null, null));
+            created.EnsureSuccessStatusCode();
+            return (await created.Content.ReadFromJsonAsync<ControlItemResponse>())!.Id;
+        }
+        var linkedId = await CreateItemAsync("CI-02");
+        var otherId = await CreateItemAsync("CI-01");
+
+        // 紐付けは工程ごとにコード順で返る（同じ項目の二重指定は1つにまとめる）
+        var saved = await client.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, ControlItemIds: [linkedId, otherId, linkedId]),
+            });
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var steps = await saved.Content.ReadFromJsonAsync<List<RoutingStepResponse>>();
+        Assert.Equal(["CI-01", "CI-02"], steps!.Single().ControlItemCodes!);
+
+        // 紐付け中は無効化できない（展開する作業指示に使わせないはずの条件が載り続ける）
+        var inUse = await client.DeleteAsync($"/api/control-items/{linkedId}");
+        Assert.Equal(HttpStatusCode.Conflict, inUse.StatusCode);
+        Assert.Contains("FG-01", await inUse.Content.ReadAsStringAsync());
+
+        // 紐付けを外せば無効化でき、無効な項目は紐付けられない
+        (await client.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, null, null) }))
+            .EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/control-items/{linkedId}")).StatusCode);
+        var inactive = await client.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, process.Id, 30m, 10m, null, null, null, null, null, ControlItemIds: [linkedId]),
+            });
+        Assert.Equal(HttpStatusCode.BadRequest, inactive.StatusCode);
     }
 
     internal static async Task<WorkCenterResponse> CreateWorkCenterAsync(

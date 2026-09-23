@@ -25,6 +25,17 @@ public static class MasterDeactivationPolicy
             : ApiText.T("手順書 '{0}' は品目 {1} の工順から参照されているため無効化できません。", procedureNo, string.Join("、", referencingProductCodes));
 
     /// <summary>
+    /// 工程管理項目（B-30-30-04）。工順から紐付けている項目を無効化すると、
+    /// 以降に展開する作業指示へ「使わせないはずの条件」が載り続ける（展開時は紐付けどおりに写すため）。
+    /// </summary>
+    /// <param name="referencingProductCodes">その項目を紐付けている工順の品目コード（重複なし）</param>
+    public static string? CheckControlItem(
+        string code, IReadOnlyCollection<string> referencingProductCodes) =>
+        referencingProductCodes.Count == 0
+            ? null
+            : ApiText.T("工程管理項目 '{0}' は品目 {1} の工順から紐付けられているため無効化できません。", code, string.Join("、", referencingProductCodes));
+
+    /// <summary>
     /// 勤務シフト（F-10-10-01）。所属する直として使われている間に無効化すると、従業員の所属が宙に浮く。
     /// </summary>
     /// <param name="assignedActiveUserCount">その直を所属する直としている在籍中の従業員数</param>

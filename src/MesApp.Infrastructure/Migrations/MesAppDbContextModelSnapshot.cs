@@ -349,12 +349,6 @@ namespace MesApp.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("TargetProcessId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("TargetProductId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<decimal?>("TargetValue")
                         .HasColumnType("TEXT");
 
@@ -372,10 +366,6 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
-
-                    b.HasIndex("TargetProcessId");
-
-                    b.HasIndex("TargetProductId");
 
                     b.ToTable("ControlItems");
                 });
@@ -2231,6 +2221,28 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("Routings");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.RoutingControlItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ControlItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RoutingId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ControlItemId");
+
+                    b.HasIndex("RoutingId", "ControlItemId")
+                        .IsUnique();
+
+                    b.ToTable("RoutingControlItems");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.RoutingEquipment", b =>
                 {
                     b.Property<int>("Id")
@@ -3420,21 +3432,6 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("ChecklistItem");
                 });
 
-            modelBuilder.Entity("MesApp.Core.Entities.ControlItem", b =>
-                {
-                    b.HasOne("MesApp.Core.Entities.ProcessMaster", "TargetProcess")
-                        .WithMany()
-                        .HasForeignKey("TargetProcessId");
-
-                    b.HasOne("MesApp.Core.Entities.Product", "TargetProduct")
-                        .WithMany()
-                        .HasForeignKey("TargetProductId");
-
-                    b.Navigation("TargetProcess");
-
-                    b.Navigation("TargetProduct");
-                });
-
             modelBuilder.Entity("MesApp.Core.Entities.Equipment", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
@@ -4220,6 +4217,25 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("WorkProcedure");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.RoutingControlItem", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.ControlItem", "ControlItem")
+                        .WithMany()
+                        .HasForeignKey("ControlItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Routing", "Routing")
+                        .WithMany("ControlItemLinks")
+                        .HasForeignKey("RoutingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ControlItem");
+
+                    b.Navigation("Routing");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.RoutingEquipment", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
@@ -4727,6 +4743,8 @@ namespace MesApp.Infrastructure.Migrations
 
             modelBuilder.Entity("MesApp.Core.Entities.Routing", b =>
                 {
+                    b.Navigation("ControlItemLinks");
+
                     b.Navigation("EquipmentCandidates");
                 });
 

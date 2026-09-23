@@ -24,6 +24,13 @@ public static class ProductStructurePolicy
     public static IQueryable<WorkProcedure> AssignableWorkProcedures(IQueryable<WorkProcedure> source) =>
         source.Where(p => p.IsActive);
 
+    /// <summary>
+    /// 工順に紐付けられる工程管理項目。無効な項目を紐付けると、使わせないはずの条件が作業指示に載る
+    /// （紐付け中の無効化は <see cref="MasterDeactivationPolicy.CheckControlItem"/> で止める）
+    /// </summary>
+    public static IQueryable<ControlItem> AssignableControlItems(IQueryable<ControlItem> source) =>
+        source.Where(i => i.IsActive);
+
     /// <summary>品目の既定ロケーションに指定できるロケーション。無効なロケーションは推奨に出せないため弾く</summary>
     public static IQueryable<Location> AssignableDefaultLocations(IQueryable<Location> source) =>
         source.Where(l => l.IsActive);

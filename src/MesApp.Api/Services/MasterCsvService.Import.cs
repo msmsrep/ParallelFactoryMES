@@ -773,11 +773,17 @@ public sealed partial class MasterCsvService
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
     {
         var byCode = await db.ControlItems.ToDictionaryAsync(i => i.Code, StringComparer.Ordinal, ct);
-        var productIds = await db.Products.AsNoTracking()
-            .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
-        var processIds = await db.Processes.AsNoTracking()
-            .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        // 工順から紐付けている項目を無効化できないのは単票APIと同じ。行ごとに引けるよう先にまとめて読む
+        // （工順は別種別のCSVなので、この取込の途中で紐付けが変わることはない）
+        var referencingProducts = (await db.RoutingControlItems.AsNoTracking()
+                .Select(l => new { l.ControlItemId, ProductCode = l.Routing!.Product!.Code })
+                .Distinct()
+                .ToListAsync(ct))
+            .GroupBy(x => x.ControlItemId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyCollection<string>)g.Select(x => x.ProductCode).ToList());
 
         foreach (var row in table.Rows)
         {
@@ -793,12 +799,16 @@ public sealed partial class MasterCsvService
 
             var name = reader.RequiredText("Name", 200);
             var unit = reader.Text("Unit", item.Unit, 30);
-            var productId = reader.Reference("TargetProductCode", item.TargetProductId, productIds, "対象品目");
-            var processId = reader.Reference("TargetProcessCode", item.TargetProcessId, processIds, "対象工程");
             var target = reader.NumberOrNull("TargetValue", item.TargetValue);
             var lower = reader.NumberOrNull("LowerLimit", item.LowerLimit);
             var upper = reader.NumberOrNull("UpperLimit", item.UpperLimit);
             var isActive = reader.Bool("IsActive", item.IsActive);
+            if (!isNew && item.IsActive && !isActive
+                && MasterDeactivationPolicy.CheckControlItem(
+                    code, referencingProducts.GetValueOrDefault(item.Id, [])) is { } inUse)
+            {
+                reader.Fail(inUse);
+            }
             if (reader.Failed)
             {
                 continue;
@@ -817,8 +827,6 @@ public sealed partial class MasterCsvService
 
             item.Name = name;
             item.Unit = unit;
-            item.TargetProductId = productId;
-            item.TargetProcessId = processId;
             item.TargetValue = target;
             item.LowerLimit = lower;
             item.UpperLimit = upper;
@@ -1092,6 +1100,9 @@ public sealed partial class MasterCsvService
         // 候補をここで絞ることで、上位の段を書いた行は「登録されていません」として弾かれる
         var workCenterIds = await ProductStructurePolicy.AssignableWorkCenters(db.WorkCenters.AsNoTracking())
             .ToDictionaryAsync(w => w.Code, w => w.Id, StringComparer.Ordinal, ct);
+        // 無効な工程管理項目は候補に入れない（単票APIと共通の条件）
+        var controlItemIds = await ProductStructurePolicy.AssignableControlItems(db.ControlItems.AsNoTracking())
+            .ToDictionaryAsync(i => i.Code, i => i.Id, StringComparer.Ordinal, ct);
         var existing = await db.Routings.ToListAsync(ct);
 
         foreach (var group in GroupRows(table, "ProductCode", errors))
@@ -1116,7 +1127,9 @@ public sealed partial class MasterCsvService
                 var setup = reader.Number("StandardSetupMinutes", 0m, 0);
                 var skillId = reader.Reference("RequiredSkillCode", null, skillIds, "スキル・資格");
                 var equipmentId = reader.Reference("EquipmentAssetNo", null, equipmentIds, "設備");
-                var candidateIds = ParseCandidates(reader, table, row, equipmentIds);
+                var candidateIds = ParseCodeList(reader, table, row, "EquipmentAssetNos", equipmentIds, ApiText.T("候補設備"));
+                var linkedControlItemIds = ParseCodeList(
+                    reader, table, row, "ControlItemCodes", controlItemIds, ApiText.T("工程管理項目"));
                 var toolId = reader.Reference("ToolCode", null, toolIds, "治工具");
                 var checklistId = reader.Reference("ChecklistCode", null, checklistIds, "チェックリスト");
                 var workCenterId = reader.Reference("WorkCenterCode", null, workCenterIds, "作業区");
@@ -1157,6 +1170,10 @@ public sealed partial class MasterCsvService
                     WorkCenterId = workCenterId,
                     ChecklistId = checklistId,
                     ControlItems = controlItems,
+                    ControlItemLinks =
+                    [
+                        .. linkedControlItemIds.Distinct().Select(x => new RoutingControlItem { ControlItemId = x }),
+                    ],
                     WorkProcedureId = workProcedureId,
                 });
             }
@@ -1181,15 +1198,19 @@ public sealed partial class MasterCsvService
 
     // ---- ユーザー（システム管理者のみ）----
 
-    /// <summary>工順CSVの候補設備列（セミコロン区切りの資産番号）を解決する</summary>
-    private static List<int> ParseCandidates(
-        CsvRowReader reader, CsvTable table, CsvRecord row, IReadOnlyDictionary<string, int> equipmentIds)
+    /// <summary>
+    /// 工順CSVのセミコロン区切りのコード列（候補設備の資産番号・工程管理項目コード）を解決する。
+    /// 候補に無いコード（未登録・無効）はその行の誤りにする
+    /// </summary>
+    private static List<int> ParseCodeList(
+        CsvRowReader reader, CsvTable table, CsvRecord row, string column,
+        IReadOnlyDictionary<string, int> idsByCode, string label)
     {
-        if (!table.HasColumn("EquipmentAssetNos"))
+        if (!table.HasColumn(column))
         {
             return [];
         }
-        var raw = table.Value(row, "EquipmentAssetNos");
+        var raw = table.Value(row, column);
         if (string.IsNullOrWhiteSpace(raw))
         {
             return [];
@@ -1197,13 +1218,13 @@ public sealed partial class MasterCsvService
         var result = new List<int>();
         foreach (var code in raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            if (equipmentIds.TryGetValue(code, out var id))
+            if (idsByCode.TryGetValue(code, out var id))
             {
                 result.Add(id);
             }
             else
             {
-                reader.Fail(ApiText.T("候補設備 '{0}' は登録されていません（EquipmentAssetNos）。", code));
+                reader.Fail(ApiText.T("{0} '{1}' は登録されていません（{2}）。", label, code, column));
             }
         }
         return result;

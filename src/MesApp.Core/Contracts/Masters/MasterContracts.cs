@@ -63,7 +63,9 @@ public record RoutingStepRequest(
     /// <summary>候補設備（B-10-20-02）。空なら差立で設備を限定しない</summary>
     List<int>? EquipmentIds = null,
     /// <summary>作業手順書（SOP。I-30-20-12）</summary>
-    int? WorkProcedureId = null);
+    int? WorkProcedureId = null,
+    /// <summary>この工程で記録する工程管理項目（I-30-20-10）。有効な項目だけを指定できる</summary>
+    List<int>? ControlItemIds = null);
 
 public record RoutingStepResponse(
     int Id, int Sequence, int ProcessId, string ProcessCode, string ProcessName,
@@ -74,7 +76,10 @@ public record RoutingStepResponse(
     /// <summary>候補設備の資産番号（表示用）</summary>
     List<string>? EquipmentAssetNos = null,
     List<int>? EquipmentIds = null,
-    int? WorkProcedureId = null, string? WorkProcedureNo = null, string? WorkProcedureTitle = null);
+    int? WorkProcedureId = null, string? WorkProcedureNo = null, string? WorkProcedureTitle = null,
+    /// <summary>この工程で記録する工程管理項目（コード順）</summary>
+    List<int>? ControlItemIds = null,
+    List<string>? ControlItemCodes = null);
 
 // ---- 作業手順書（SOP。I-30-40、B-10-30-03）----
 
@@ -212,16 +217,12 @@ public record ControlItemRequest(
     [Required, MaxLength(50)] string Code,
     [Required, MaxLength(200)] string Name,
     [MaxLength(30)] string? Unit,
-    int? TargetProductId,
-    int? TargetProcessId,
     decimal? TargetValue,
     decimal? LowerLimit,
     decimal? UpperLimit);
 
 public record ControlItemResponse(
     int Id, string Code, string Name, string? Unit,
-    int? TargetProductId, string? TargetProductCode,
-    int? TargetProcessId, string? TargetProcessCode,
     decimal? TargetValue, decimal? LowerLimit, decimal? UpperLimit,
     int Version, bool IsActive);
 

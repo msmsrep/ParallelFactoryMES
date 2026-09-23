@@ -205,6 +205,7 @@ public sealed class ManufacturingOrderService(
 
         var routing = await db.Routings
             .Include(r => r.WorkProcedure)
+            .Include(r => r.ControlItemLinks).ThenInclude(l => l.ControlItem)
             .Where(r => r.ProductId == order.ProductId)
             .OrderBy(r => r.Sequence)
             .ToListAsync(ct);
@@ -251,14 +252,8 @@ public sealed class ManufacturingOrderService(
 
         // 工順（BOP）は展開時点の値を作業指示へ写して固定する（Spec.md 5.7）。
         // 以降に工順が改訂されても、この指図の標準時間・必要スキル・管理項目は変わらない
-        // 工程管理項目も同じ理由で展開時点の値を写す（B-30-30-04）。検査基準のスナップショットと同じ方針で、
-        // 対象品目/工程に合致する有効な項目を自動選択する（工順に明示的な紐付けを持たせない）
-        var controlItems = await db.ControlItems.AsNoTracking()
-            .Where(i => i.IsActive && i.TargetProductId == order.ProductId)
-            .ToListAsync(ct);
-        var processControlItems = await db.ControlItems.AsNoTracking()
-            .Where(i => i.IsActive && i.TargetProcessId != null)
-            .ToListAsync(ct);
+        // 工程管理項目も同じ理由で展開時点の値を写す（B-30-30-04）。どの項目を載せるかは工順の工程ごとの紐付けに従う
+        // （I-30-20-10。紐付け中の項目は無効化できないため、ここで有効かを見直す必要はない）
 
         foreach (var step in routing)
         {
@@ -281,13 +276,11 @@ public sealed class ManufacturingOrderService(
                 // 表示はマスタの現在値を使い、ここには「計画時の版数」だけを残す
                 WorkProcedureVersion = step.WorkProcedure?.Version,
             };
-            // 品目単位の項目と、この工程を対象にした項目を合わせる（同じ項目は1回だけ）
             workOrder.ControlItemSnapshots =
             [
-                .. controlItems
-                    .Concat(processControlItems.Where(i => i.TargetProcessId == step.ProcessId))
-                    .DistinctBy(i => i.Id)
-                    .OrderBy(i => i.Code)
+                .. step.ControlItemLinks
+                    .Select(l => l.ControlItem!)
+                    .OrderBy(i => i.Code, StringComparer.Ordinal)
                     .Select(i => new WorkOrderControlItem
                     {
                         ControlItemId = i.Id,

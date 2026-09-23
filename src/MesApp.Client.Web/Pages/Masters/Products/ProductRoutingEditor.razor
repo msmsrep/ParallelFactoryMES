@@ -6,7 +6,7 @@
     <Notice Error="@_error" Message="@_message" />
     <table class="table">
         <thead>
-            <tr><th>@L["順序"]</th><th>@L["工程"]</th><th>@L["標準作業(分)"]</th><th>@L["標準段取(分)"]</th><th>@L["必要スキル"]</th><th>@L["候補設備"]</th><th>@L["治工具"]</th><th>@L["チェックリスト"]</th><th>@L["管理項目"]</th><th>@L["作業手順書"]</th><th></th></tr>
+            <tr><th>@L["順序"]</th><th>@L["工程"]</th><th>@L["標準作業(分)"]</th><th>@L["標準段取(分)"]</th><th>@L["必要スキル"]</th><th>@L["候補設備"]</th><th>@L["治工具"]</th><th>@L["チェックリスト"]</th><th>@L["管理項目"]</th><th>@L["補足"]</th><th>@L["作業手順書"]</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var step in _steps.OrderBy(s => s.Sequence))
@@ -17,9 +17,10 @@
                     <td>@step.StandardWorkMinutes</td>
                     <td>@step.StandardSetupMinutes</td>
                     <td>@(_skills.FirstOrDefault(s => s.Id == step.RequiredSkillId)?.Name ?? "-")</td>
-                    <td>@CandidateLabel(step)</td>
+                    <td>@ShortList(step.EquipmentIds ?? (step.EquipmentId is { } single ? [single] : []), id => _equipments.FirstOrDefault(e => e.Id == id)?.AssetNo)</td>
                     <td>@(_tools.FirstOrDefault(t => t.Id == step.ToolId)?.Code ?? "-")</td>
                     <td>@(_checklists.FirstOrDefault(c => c.Id == step.ChecklistId)?.Code ?? "-")</td>
+                    <td>@ShortList(step.ControlItemIds ?? [], id => _controlItemOptions.FirstOrDefault(i => i.Id == id)?.Code)</td>
                     <td>@(step.ControlItems ?? "-")</td>
                     <td>@(_workProcedures.FirstOrDefault(w => w.Id == step.WorkProcedureId)?.ProcedureNo ?? "-")</td>
                     <td><button class="btn btn-danger btn-sm" @onclick="() => _steps.Remove(step)">@L["削除"]</button></td>
@@ -104,8 +105,20 @@
                 </select>
             </div>
             <div class="form-field">
-                <label>@L["工程管理項目"]</label>
-                <input @bind="_controlItems" placeholder="@L["例：温度、回転数"]" />
+                @* 工程管理項目の紐付け（I-30-20-10）。展開時にこの工程の作業指示へ指示値・許容範囲を写す *@
+                <label>@L["工程管理項目（Ctrl/Shiftで複数選択）"]</label>
+                <select multiple size="4" @onchange="OnControlItemsChanged">
+                    @foreach (var item in _controlItemOptions)
+                    {
+                        <option value="@item.Id" selected="@_controlItemIds.Contains(item.Id)">
+                            @item.Code @item.Name
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@L["工程管理項目の補足"]</label>
+                <input @bind="_controlItems" placeholder="@L["指示値の無い確認事項など"]" />
             </div>
             <div class="form-field">
                 @* 作業手順書の紐付け（I-30-20-12）。作業者は作業指示からこれを辿る *@
@@ -139,6 +152,8 @@
     private List<ToolResponse> _tools = [];
     private List<ChecklistResponse> _checklists = [];
     private List<WorkProcedureResponse> _workProcedures = [];
+    /// <summary>紐付けられる工程管理項目（有効なものだけ）</summary>
+    private List<ControlItemResponse> _controlItemOptions = [];
     /// <summary>工順の作業区は最下段のみ（Spec.md 5.7 資源階層への紐付け）</summary>
     private List<WorkCenterResponse> _workCenters = [];
 
@@ -157,6 +172,7 @@
     private int _workProcedureId;
     private int _workCenterId;
     private string? _controlItems;
+    private readonly List<int> _controlItemIds = [];
 
     private string? _error;
     private string? _message;
@@ -170,6 +186,7 @@
         _tools = await Http.GetFromJsonAsync<List<ToolResponse>>("api/tools") ?? [];
         _checklists = await Http.GetFromJsonAsync<List<ChecklistResponse>>("api/checklists") ?? [];
         _workProcedures = await Http.GetFromJsonAsync<List<WorkProcedureResponse>>("api/work-procedures") ?? [];
+        _controlItemOptions = await Http.GetFromJsonAsync<List<ControlItemResponse>>("api/control-items") ?? [];
         _workCenters = await Http.GetFromJsonAsync<List<WorkCenterResponse>>(
             $"api/work-centers?level={WorkCenterLevel.WorkCenter}") ?? [];
     }
@@ -192,7 +209,7 @@
         _steps.AddRange(routing.Select(r => new RoutingStepRequest(
             r.Sequence, r.ProcessId, r.StandardWorkMinutes, r.StandardSetupMinutes,
             r.RequiredSkillId, r.EquipmentId, r.ToolId, r.ControlItems, r.ChecklistId,
-            r.WorkCenterId, r.EquipmentIds, r.WorkProcedureId)));
+            r.WorkCenterId, r.EquipmentIds, r.WorkProcedureId, r.ControlItemIds)));
         _sequence = _steps.Count == 0 ? 1 : _steps.Max(s => s.Sequence) + 1;
         // 親から呼ばれたときはパラメータが変わらないため、自分で再描画を要求する
         StateHasChanged();
@@ -219,37 +236,43 @@
             _checklistId == 0 ? null : _checklistId,
             _workCenterId == 0 ? null : _workCenterId,
             _equipmentIds.Count == 0 ? null : [.. _equipmentIds],
-            _workProcedureId == 0 ? null : _workProcedureId));
+            _workProcedureId == 0 ? null : _workProcedureId,
+            _controlItemIds.Count == 0 ? null : [.. _controlItemIds]));
         _sequence = _steps.Max(s => s.Sequence) + 1;
         _controlItems = null;
         _equipmentIds.Clear();
+        _controlItemIds.Clear();
     }
 
     /// <summary>複数選択の設備一覧から候補を取り込む</summary>
-    private void OnCandidatesChanged(ChangeEventArgs e)
+    private void OnCandidatesChanged(ChangeEventArgs e) => ReadSelected(e, _equipmentIds);
+
+    /// <summary>複数選択の工程管理項目一覧から紐付けを取り込む</summary>
+    private void OnControlItemsChanged(ChangeEventArgs e) => ReadSelected(e, _controlItemIds);
+
+    private static void ReadSelected(ChangeEventArgs e, List<int> target)
     {
-        _equipmentIds.Clear();
+        target.Clear();
         foreach (var value in (string[])(e.Value ?? Array.Empty<string>()))
         {
             if (int.TryParse(value, out var id))
             {
-                _equipmentIds.Add(id);
+                target.Add(id);
             }
         }
     }
 
-    /// <summary>一覧に出す候補設備の表示（多いときは件数で省略する）</summary>
-    private string CandidateLabel(RoutingStepRequest step)
+    /// <summary>一覧に出す候補設備・工程管理項目の表示（多いときは件数で省略する）</summary>
+    private string ShortList(IEnumerable<int> ids, Func<int, string?> codeOf)
     {
-        var ids = step.EquipmentIds ?? (step.EquipmentId is { } single ? [single] : []);
-        if (ids.Count == 0)
+        var codes = ids
+            .Select(codeOf)
+            .Where(code => code is not null)
+            .ToList();
+        if (codes.Count == 0)
         {
             return "-";
         }
-        var codes = ids
-            .Select(id => _equipments.FirstOrDefault(e => e.Id == id)?.AssetNo)
-            .Where(code => code is not null)
-            .ToList();
         return codes.Count <= 3 ? string.Join(L["、"], codes) : L["{0} ほか{1}件", string.Join(L["、"], codes.Take(3)), codes.Count - 3];
     }
 

@@ -162,12 +162,11 @@ public sealed partial class MasterCsvService(
     private async Task<List<string?[]>> ExportControlItemsAsync(bool includeInactive, CancellationToken ct)
     {
         var items = await db.ControlItems.AsNoTracking()
-            .Include(i => i.TargetProduct).Include(i => i.TargetProcess)
             .Where(i => includeInactive || i.IsActive)
             .OrderBy(i => i.Code).ToListAsync(ct);
         return [.. items.Select(i => new string?[]
         {
-            i.Code, i.Name, i.Unit, i.TargetProduct?.Code, i.TargetProcess?.Code,
+            i.Code, i.Name, i.Unit,
             Num(i.TargetValue), Num(i.LowerLimit), Num(i.UpperLimit), Bool(i.IsActive),
         })];
     }
@@ -229,6 +228,7 @@ public sealed partial class MasterCsvService(
             .Include(r => r.Tool).Include(r => r.Checklist).Include(r => r.WorkCenter)
             .Include(r => r.WorkProcedure)
             .Include(r => r.EquipmentCandidates).ThenInclude(c => c.Equipment)
+            .Include(r => r.ControlItemLinks).ThenInclude(l => l.ControlItem)
             .OrderBy(r => r.Product!.Code).ThenBy(r => r.Sequence)
             .ToListAsync(ct);
         return [.. items.Select(r => new string?[]
@@ -238,7 +238,9 @@ public sealed partial class MasterCsvService(
             r.RequiredSkill?.Code, r.Equipment?.AssetNo,
             string.Join(";", r.EquipmentCandidates.Select(c => c.Equipment!.AssetNo).Order(StringComparer.Ordinal)),
             r.Tool?.Code, r.WorkCenter?.Code,
-            r.Checklist?.Code, r.ControlItems, r.WorkProcedure?.ProcedureNo,
+            r.Checklist?.Code, r.ControlItems,
+            string.Join(";", r.ControlItemLinks.Select(l => l.ControlItem!.Code).Order(StringComparer.Ordinal)),
+            r.WorkProcedure?.ProcedureNo,
         })];
     }
 

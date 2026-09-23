@@ -370,12 +370,6 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<int?>("TargetProcessId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("TargetProductId")
-                        .HasColumnType("integer");
-
                     b.Property<decimal?>("TargetValue")
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)");
@@ -395,10 +389,6 @@ namespace MesApp.Migrations.PostgreSql.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
-
-                    b.HasIndex("TargetProcessId");
-
-                    b.HasIndex("TargetProductId");
 
                     b.ToTable("ControlItems");
                 });
@@ -2367,6 +2357,30 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.ToTable("Routings");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.RoutingControlItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ControlItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RoutingId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ControlItemId");
+
+                    b.HasIndex("RoutingId", "ControlItemId")
+                        .IsUnique();
+
+                    b.ToTable("RoutingControlItems");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.RoutingEquipment", b =>
                 {
                     b.Property<int>("Id")
@@ -3617,21 +3631,6 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.Navigation("ChecklistItem");
                 });
 
-            modelBuilder.Entity("MesApp.Core.Entities.ControlItem", b =>
-                {
-                    b.HasOne("MesApp.Core.Entities.ProcessMaster", "TargetProcess")
-                        .WithMany()
-                        .HasForeignKey("TargetProcessId");
-
-                    b.HasOne("MesApp.Core.Entities.Product", "TargetProduct")
-                        .WithMany()
-                        .HasForeignKey("TargetProductId");
-
-                    b.Navigation("TargetProcess");
-
-                    b.Navigation("TargetProduct");
-                });
-
             modelBuilder.Entity("MesApp.Core.Entities.Equipment", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
@@ -4417,6 +4416,25 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.Navigation("WorkProcedure");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.RoutingControlItem", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.ControlItem", "ControlItem")
+                        .WithMany()
+                        .HasForeignKey("ControlItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.Routing", "Routing")
+                        .WithMany("ControlItemLinks")
+                        .HasForeignKey("RoutingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ControlItem");
+
+                    b.Navigation("Routing");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.RoutingEquipment", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
@@ -4924,6 +4942,8 @@ namespace MesApp.Migrations.PostgreSql.Migrations
 
             modelBuilder.Entity("MesApp.Core.Entities.Routing", b =>
                 {
+                    b.Navigation("ControlItemLinks");
+
                     b.Navigation("EquipmentCandidates");
                 });
 

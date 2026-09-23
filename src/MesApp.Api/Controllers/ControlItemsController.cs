@@ -1,4 +1,5 @@
 ﻿using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -13,6 +14,7 @@ namespace MesApp.Api.Controllers;
 /// 工程管理項目マスタ（Spec.md 5.1 ControlItem。B-30-30-04）。
 /// 温度・回転数など製造時に記録すべき条件の定義と指示値・上下限を持つ。
 /// 条件の改訂では版数を自動インクリメントする（検査項目 C-10-10-03 と同じ扱い）。
+/// どの工程で記録するかは工順（BOP）側で紐付ける（I-30-20-10。<see cref="RoutingControlItem"/>）。
 /// </summary>
 [ApiController]
 [Route("api/control-items")]
@@ -22,22 +24,12 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
     [HttpGet]
     public async Task<ActionResult<List<ControlItemResponse>>> List(
         [FromQuery] bool includeInactive = false,
-        [FromQuery] int? targetProductId = null,
-        [FromQuery] int? targetProcessId = null,
         CancellationToken ct = default)
     {
         var query = BaseQuery();
         if (!includeInactive)
         {
             query = query.Where(i => i.IsActive);
-        }
-        if (targetProductId is not null)
-        {
-            query = query.Where(i => i.TargetProductId == targetProductId);
-        }
-        if (targetProcessId is not null)
-        {
-            query = query.Where(i => i.TargetProcessId == targetProcessId);
         }
         return await query.OrderBy(i => i.Code).Select(i => ToResponse(i)).ToListAsync(ct);
     }
@@ -57,7 +49,7 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
         {
             return this.ConflictProblem(ApiText.T("工程管理項目コード '{0}' は既に存在します。", request.Code));
         }
-        if (await ValidateAsync(request, ct) is { } error)
+        if (Validate(request) is { } error)
         {
             return this.BadRequestProblem(error);
         }
@@ -67,8 +59,6 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
             Code = request.Code,
             Name = request.Name,
             Unit = request.Unit,
-            TargetProductId = request.TargetProductId,
-            TargetProcessId = request.TargetProcessId,
             TargetValue = request.TargetValue,
             LowerLimit = request.LowerLimit,
             UpperLimit = request.UpperLimit,
@@ -94,7 +84,7 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
         {
             return this.ConflictProblem(ApiText.T("工程管理項目コード '{0}' は既に存在します。", request.Code));
         }
-        if (await ValidateAsync(request, ct) is { } error)
+        if (Validate(request) is { } error)
         {
             return this.BadRequestProblem(error);
         }
@@ -102,8 +92,6 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
         item.Code = request.Code;
         item.Name = request.Name;
         item.Unit = request.Unit;
-        item.TargetProductId = request.TargetProductId;
-        item.TargetProcessId = request.TargetProcessId;
         item.TargetValue = request.TargetValue;
         item.LowerLimit = request.LowerLimit;
         item.UpperLimit = request.UpperLimit;
@@ -117,10 +105,19 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
     [HttpDelete("{id:int}")]
     [Authorize(Roles = MesRoleGroups.MasterWrite)]
     public Task<IActionResult> Deactivate(int id, CancellationToken ct) =>
-        this.DeactivateMasterAsync<ControlItem>(db, auditLogger, id, item => $"code={item.Code}", ct);
+        this.DeactivateMasterAsync<ControlItem>(db, auditLogger, id, item => $"code={item.Code}", ct,
+            // 工順から紐付けている項目を無効化すると、展開した作業指示に改訂されない指示値が載り続ける。
+            // 判定は MasterDeactivationPolicy に置き、CSV取込と同じ条件・同じ文面で弾く
+            precheck: async item => MasterDeactivationPolicy.CheckControlItem(
+                item.Code,
+                await db.RoutingControlItems.AsNoTracking()
+                    .Where(l => l.ControlItemId == id)
+                    .Select(l => l.Routing!.Product!.Code)
+                    .Distinct()
+                    .ToListAsync(ct)));
 
-    /// <summary>上下限の整合と参照先の存在を確認する。問題があれば日本語の理由を返す</summary>
-    private async Task<string?> ValidateAsync(ControlItemRequest request, CancellationToken ct)
+    /// <summary>上下限と指示値の整合を確認する。問題があれば日本語の理由を返す</summary>
+    private static string? Validate(ControlItemRequest request)
     {
         if (request.LowerLimit is { } lower && request.UpperLimit is { } upper && lower > upper)
         {
@@ -138,23 +135,10 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
                 return ApiText.T("指示値が許容上限を超えています。");
             }
         }
-        if (request.TargetProductId is { } productId
-            && !await db.Products.AnyAsync(p => p.Id == productId, ct))
-        {
-            return ApiText.T("対象品目（ID {0}）が見つかりません。", productId);
-        }
-        if (request.TargetProcessId is { } processId
-            && !await db.Processes.AnyAsync(p => p.Id == processId, ct))
-        {
-            return ApiText.T("対象工程（ID {0}）が見つかりません。", processId);
-        }
         return null;
     }
 
-    private IQueryable<ControlItem> BaseQuery() =>
-        db.ControlItems.AsNoTracking()
-            .Include(i => i.TargetProduct)
-            .Include(i => i.TargetProcess);
+    private IQueryable<ControlItem> BaseQuery() => db.ControlItems.AsNoTracking();
 
     private async Task<ControlItemResponse?> GetResponseAsync(int id, CancellationToken ct)
     {
@@ -164,7 +148,5 @@ public class ControlItemsController(MesAppDbContext db, IAuditLogger auditLogger
 
     private static ControlItemResponse ToResponse(ControlItem i) =>
         new(i.Id, i.Code, i.Name, i.Unit,
-            i.TargetProductId, i.TargetProduct?.Code,
-            i.TargetProcessId, i.TargetProcess?.Code,
             i.TargetValue, i.LowerLimit, i.UpperLimit, i.Version, i.IsActive);
 }
