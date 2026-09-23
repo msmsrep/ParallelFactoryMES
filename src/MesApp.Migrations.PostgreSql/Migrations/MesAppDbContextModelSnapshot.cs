@@ -683,6 +683,9 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<int?>("RequiredSkillId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("SamplingCount")
                         .HasColumnType("integer");
 
@@ -712,6 +715,8 @@ namespace MesApp.Migrations.PostgreSql.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("RequiredSkillId");
 
                     b.HasIndex("TargetProcessId");
 
@@ -826,6 +831,9 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int?>("RequiredSkillId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("SamplingCount")
                         .HasColumnType("integer");
 
@@ -840,6 +848,8 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("InspectionItemId");
+
+                    b.HasIndex("RequiredSkillId");
 
                     b.HasIndex("InspectionOrderId", "InspectionItemId")
                         .IsUnique();
@@ -3703,6 +3713,11 @@ namespace MesApp.Migrations.PostgreSql.Migrations
 
             modelBuilder.Entity("MesApp.Core.Entities.InspectionItem", b =>
                 {
+                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
+                        .WithMany()
+                        .HasForeignKey("RequiredSkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MesApp.Core.Entities.ProcessMaster", "TargetProcess")
                         .WithMany()
                         .HasForeignKey("TargetProcessId");
@@ -3710,6 +3725,8 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.HasOne("MesApp.Core.Entities.Product", "TargetProduct")
                         .WithMany()
                         .HasForeignKey("TargetProductId");
+
+                    b.Navigation("RequiredSkill");
 
                     b.Navigation("TargetProcess");
 
@@ -3754,7 +3771,14 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("MesApp.Core.Entities.SkillMaster", "RequiredSkill")
+                        .WithMany()
+                        .HasForeignKey("RequiredSkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("InspectionItem");
+
+                    b.Navigation("RequiredSkill");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.InspectionResult", b =>

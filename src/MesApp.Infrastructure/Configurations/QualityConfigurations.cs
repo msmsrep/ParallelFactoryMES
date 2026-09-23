@@ -55,6 +55,8 @@ internal sealed class InspectionOrderItemConfiguration : IEntityTypeConfiguratio
         e.Property(x => x.Method).HasMaxLength(500);
         e.HasOne(x => x.InspectionItem).WithMany().HasForeignKey(x => x.InspectionItemId)
             .OnDelete(DeleteBehavior.Restrict);
+        e.HasOne(x => x.RequiredSkill).WithMany().HasForeignKey(x => x.RequiredSkillId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

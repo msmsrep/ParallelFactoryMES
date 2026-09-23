@@ -62,6 +62,16 @@
                 <label>@L["サンプリング数"]</label>
                 <input type="number" @bind="_sampling" />
             </div>
+            <div class="form-field">
+                <label>@L["必要スキル・資格"]</label>
+                <select @bind="_skillId">
+                    <option value="0">@L["なし"]</option>
+                    @foreach (var skill in _skills)
+                    {
+                        <option value="@skill.Id">@skill.Code @skill.Name</option>
+                    }
+                </select>
+            </div>
         </div>
         <div class="actions">
             <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新（版数+1）"])</button>
@@ -84,7 +94,7 @@
     {
         <table class="table">
             <thead>
-                <tr><th>@L["コード"]</th><th>@L["名称"]</th><th>@L["種別"]</th><th>@L["対象"]</th><th>@L["規格値"]</th><th>@L["方法"]</th><th>@L["ｻﾝﾌﾟﾘﾝｸﾞ"]</th><th>@L["版数"]</th><th></th></tr>
+                <tr><th>@L["コード"]</th><th>@L["名称"]</th><th>@L["種別"]</th><th>@L["対象"]</th><th>@L["規格値"]</th><th>@L["方法"]</th><th>@L["ｻﾝﾌﾟﾘﾝｸﾞ"]</th><th>@L["必要スキル・資格"]</th><th>@L["版数"]</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var item in _items)
@@ -99,6 +109,7 @@
                         <td>@(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")</td>
                         <td>@(item.Method ?? "-")</td>
                         <td>@(item.SamplingCount?.ToString() ?? "-")</td>
+                        <td>@(item.RequiredSkillName ?? "-")</td>
                         <td>v@(item.Version)</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
@@ -120,6 +131,7 @@
 @code {
     private List<InspectionItemResponse>? _items;
     private List<ProcessResponse> _processes = [];
+    private List<SkillResponse> _skills = [];
 
     private int? _editingId;
     private string _code = string.Empty;
@@ -132,6 +144,7 @@
     private decimal? _standard;
     private string? _method;
     private int? _sampling;
+    private int _skillId;
     private string? _error;
     private string? _message;
     private bool _busy;
@@ -139,6 +152,7 @@
     protected override async Task OnInitializedAsync()
     {
         _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
+        _skills = await Http.GetFromJsonAsync<List<SkillResponse>>("api/skills") ?? [];
         await LoadAsync();
     }
 
@@ -158,6 +172,7 @@
         _standard = item.StandardValue;
         _method = item.Method;
         _sampling = item.SamplingCount;
+        _skillId = item.RequiredSkillId ?? 0;
     }
 
     private void ResetForm()
@@ -173,6 +188,7 @@
         _standard = null;
         _method = null;
         _sampling = null;
+        _skillId = 0;
     }
 
     private async Task SaveAsync()
@@ -190,7 +206,8 @@
             var request = new InspectionItemRequest(_code, _name,
                 _productId == 0 ? null : _productId,
                 _processId == 0 ? null : _processId,
-                _type, _lower, _upper, _standard, _method, _sampling);
+                _type, _lower, _upper, _standard, _method, _sampling,
+                _skillId == 0 ? null : _skillId);
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/inspection-items", request)
                 : await Http.PutAsJsonAsync($"api/inspection-items/{_editingId}", request);

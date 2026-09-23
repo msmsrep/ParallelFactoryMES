@@ -5,6 +5,7 @@ using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Quality;
+using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
 
 namespace MesApp.Api.Tests;
@@ -393,6 +394,47 @@ public class QualityTests
         // 承認（C-20-10-06）
         var approved = await admin.PostAsync($"/api/inspection-orders/{order.Id}/approve", null);
         Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+    }
+
+    [Fact]
+    public async Task 検査項目の必要スキルは発行時に写り検査実績の登録者と照合される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var skill = (await (await admin.PostAsJsonAsync("/api/skills",
+            new SkillRequest("SK-QC", "検査員認定", SkillType.Certification, true)))
+            .Content.ReadFromJsonAsync<SkillResponse>())!;
+        var created = await admin.PostAsJsonAsync("/api/inspection-items",
+            new InspectionItemRequest("INS-01", "外径測定", ctx.ProductId, null, InspectionType.FinalProduct,
+                9.5m, 10.5m, 10m, "ノギス", 1, skill.Id));
+        var item = (await created.Content.ReadFromJsonAsync<InspectionItemResponse>())!;
+        Assert.Equal("検査員認定", item.RequiredSkillName);
+
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 10m, ctx.ProductLocationId);
+        var order = (await (await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null)))
+            .Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+
+        // 発行後にマスタから必要スキルを外しても、発行済みの検査の照合条件は変わらない（スナップショット）
+        (await admin.PutAsJsonAsync($"/api/inspection-items/{item.Id}",
+            new InspectionItemRequest("INS-01", "外径測定", ctx.ProductId, null, InspectionType.FinalProduct,
+                9.5m, 10.5m, 10m, "ノギス", 1))).EnsureSuccessStatusCode();
+
+        List<InspectionResultRequest> results = [new(item.Id, 1, 10.0m, null, null)];
+        var rejected = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results", results);
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        var problem = await rejected.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Contains("検査員認定", problem!.Title);
+
+        // 有効期限内の資格を付与すると登録できる
+        var me = (await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users"))!
+            .Single(u => u.UserName == TestAuth.AdminUser);
+        (await admin.PutAsJsonAsync($"/api/users/{me.Id}/skills",
+            new List<UserSkillRequest> { new(skill.Id, null, DateOnly.FromDateTime(DateTime.Today).AddYears(1)) }))
+            .EnsureSuccessStatusCode();
+        var accepted = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results", results);
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
     }
 
     [Fact]

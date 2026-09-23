@@ -148,14 +148,14 @@ public sealed partial class MasterCsvService(
     private async Task<List<string?[]>> ExportInspectionItemsAsync(bool includeInactive, CancellationToken ct)
     {
         var items = await db.InspectionItems.AsNoTracking()
-            .Include(i => i.TargetProduct).Include(i => i.TargetProcess)
+            .Include(i => i.TargetProduct).Include(i => i.TargetProcess).Include(i => i.RequiredSkill)
             .Where(i => includeInactive || i.IsActive)
             .OrderBy(i => i.Code).ToListAsync(ct);
         return [.. items.Select(i => new string?[]
         {
             i.Code, i.Name, i.TargetProduct?.Code, i.TargetProcess?.Code, i.Type.ToString(),
             Num(i.LowerLimit), Num(i.UpperLimit), Num(i.StandardValue), i.Method, Num(i.SamplingCount),
-            Bool(i.IsActive), i.Version.ToString(CultureInfo.InvariantCulture),
+            i.RequiredSkill?.Code, Bool(i.IsActive), i.Version.ToString(CultureInfo.InvariantCulture),
         })];
     }
 

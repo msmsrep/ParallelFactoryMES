@@ -76,6 +76,7 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
             StandardValue = request.StandardValue,
             Method = request.Method,
             SamplingCount = request.SamplingCount,
+            RequiredSkillId = request.RequiredSkillId,
         };
         db.InspectionItems.Add(i);
         await db.SaveChangesAsync(ct);
@@ -114,6 +115,7 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
         i.StandardValue = request.StandardValue;
         i.Method = request.Method;
         i.SamplingCount = request.SamplingCount;
+        i.RequiredSkillId = request.RequiredSkillId;
         i.Version++; // 基準改訂（C-10-10-03）
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Master", "Update", nameof(InspectionItem), id.ToString(),
@@ -136,6 +138,10 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
         {
             return ApiText.T("存在しない対象工程IDです。");
         }
+        if (request.RequiredSkillId is int skillId && !await db.Skills.AnyAsync(s => s.Id == skillId, ct))
+        {
+            return ApiText.T("存在しない必要スキルIDです。");
+        }
         // 判定条件はマスタCSV取込と共通（片方だけ通る状態を作らない。Spec.md 7.4）
         return InspectionItemPolicy.CheckDefinition(request.Type, request.TargetProductId, request.TargetProcessId,
             request.LowerLimit, request.UpperLimit, request.StandardValue);
@@ -149,7 +155,8 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
     private IQueryable<InspectionItem> BaseQuery() =>
         db.InspectionItems.AsNoTracking()
             .Include(i => i.TargetProduct)
-            .Include(i => i.TargetProcess);
+            .Include(i => i.TargetProcess)
+            .Include(i => i.RequiredSkill);
 
     /// <summary>保存後の応答。対象マスタを読み込み直してコードまで返す</summary>
     private async Task<InspectionItemResponse> GetResponseAsync(int id, CancellationToken ct) =>
@@ -160,5 +167,6 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
             i.TargetProductId, i.TargetProduct?.Code,
             i.TargetProcessId, i.TargetProcess?.Code,
             i.Type, i.LowerLimit, i.UpperLimit, i.StandardValue,
-            i.Method, i.SamplingCount, i.Version, i.IsActive);
+            i.Method, i.SamplingCount, i.Version, i.IsActive,
+            i.RequiredSkillId, i.RequiredSkill?.Code, i.RequiredSkill?.Name);
 }

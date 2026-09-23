@@ -508,6 +508,13 @@ public class InspectionItem : IDeactivatableMaster
     /// <summary>サンプリング数</summary>
     public int? SamplingCount { get; set; }
 
+    /// <summary>
+    /// 検査の実施に必要なスキル・資格（F-20-30-01）。検査指示の発行時に写し、
+    /// 検査実績の登録時に登録者（検査員）と照合する
+    /// </summary>
+    public int? RequiredSkillId { get; set; }
+    public SkillMaster? RequiredSkill { get; set; }
+
     /// <summary>版数（基準改訂の管理）</summary>
     public int Version { get; set; } = 1;
 

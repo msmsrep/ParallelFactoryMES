@@ -164,6 +164,7 @@ public sealed class InspectionService(
                 StandardValue = i.StandardValue,
                 Method = i.Method,
                 SamplingCount = i.SamplingCount,
+                RequiredSkillId = i.RequiredSkillId,
             }).ToList(),
         };
         db.InspectionOrders.Add(order);
@@ -182,7 +183,10 @@ public sealed class InspectionService(
         return Outcome<InspectionOrder>.Ok(order);
     }
 
-    /// <summary>検査実績の登録（C-20-10-03 ほか）。測定値があり規格値が定義されていれば自動判定する</summary>
+    /// <summary>
+    /// 検査実績の登録（C-20-10-03 ほか）。測定値があり規格値が定義されていれば自動判定する。
+    /// 検査項目に必要スキル（発行時点）があれば、登録する者を照合する（F-20-30-01）
+    /// </summary>
     public async Task<Outcome<InspectionOrder>> AddResultsAsync(
         int orderId, List<InspectionResultRequest> requests, string userId, CancellationToken ct)
     {
@@ -202,6 +206,27 @@ public sealed class InspectionService(
         }
 
         var itemById = order.Items.ToDictionary(i => i.InspectionItemId);
+
+        // 検査員のスキル・資格照合（F-20-30-01）。条件は発行時に写した必要スキルで、登録する者に対して行う
+        // （差立・着手・保全と同じ SkillQualificationPolicy。検査員の割当は持たないため、照合は登録時だけ）
+        var requiredSkillIds = requests
+            .Select(r => itemById.TryGetValue(r.InspectionItemId, out var i) ? i.RequiredSkillId : null)
+            .Where(id => id is not null).Select(id => id!.Value).Distinct().ToList();
+        if (requiredSkillIds.Count > 0)
+        {
+            var inspector = await db.Users.FirstAsync(u => u.Id == userId, ct);
+            var skills = await db.Skills.Where(s => requiredSkillIds.Contains(s.Id)).ToListAsync(ct);
+            var held = await db.UserSkills.Where(s => s.UserId == userId && requiredSkillIds.Contains(s.SkillId))
+                .ToDictionaryAsync(s => s.SkillId, ct);
+            foreach (var skill in skills.OrderBy(s => s.Code, StringComparer.Ordinal))
+            {
+                if (SkillQualificationPolicy.Check(inspector.DisplayName, skill, held.GetValueOrDefault(skill.Id),
+                        businessDate.Today) is { } skillError)
+                {
+                    return Outcome<InspectionOrder>.Invalid(skillError);
+                }
+            }
+        }
 
         // 校正期限を過ぎた検査機で測った結果は品質保証の根拠にならないため、記録させない
         // （判定は InspectionDeviceCalibrationPolicy。期限接近の一覧と同じ条件を使う）

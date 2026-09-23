@@ -238,14 +238,17 @@ public record InspectionItemRequest(
     decimal? UpperLimit,
     decimal? StandardValue,
     string? Method,
-    int? SamplingCount);
+    int? SamplingCount,
+    /// <summary>検査の実施に必要なスキル・資格（検査実績の登録者と照合する。F-20-30-01）</summary>
+    int? RequiredSkillId = null);
 
 public record InspectionItemResponse(
     int Id, string Code, string Name,
     int? TargetProductId, string? TargetProductCode,
     int? TargetProcessId, string? TargetProcessCode,
     InspectionType Type, decimal? LowerLimit, decimal? UpperLimit, decimal? StandardValue,
-    string? Method, int? SamplingCount, int Version, bool IsActive);
+    string? Method, int? SamplingCount, int Version, bool IsActive,
+    int? RequiredSkillId = null, string? RequiredSkillCode = null, string? RequiredSkillName = null);
 
 // ---- チェックリスト（Checklist）----
 

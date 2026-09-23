@@ -656,6 +656,8 @@ public sealed partial class MasterCsvService
         var productIds = await ProductIdsAsync(ct);
         var processIds = await db.Processes.AsNoTracking()
             .ToDictionaryAsync(p => p.Code, p => p.Id, StringComparer.Ordinal, ct);
+        var skillIds = await db.Skills.AsNoTracking()
+            .ToDictionaryAsync(s => s.Code, s => s.Id, StringComparer.Ordinal, ct);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var row in table.Rows)
@@ -679,6 +681,7 @@ public sealed partial class MasterCsvService
             var standard = reader.NumberOrNull("StandardValue", item.StandardValue);
             var method = reader.Text("Method", item.Method, 200);
             var sampling = reader.IntOrNull("SamplingCount", item.SamplingCount, 0);
+            var requiredSkillId = reader.Reference("RequiredSkillCode", item.RequiredSkillId, skillIds, "スキル・資格");
             var isActive = reader.Bool("IsActive", item.IsActive);
             // 判定条件は単票APIと共通（片方だけ通る状態を作らない。Spec.md 7.4）
             if (!reader.Failed
@@ -694,7 +697,8 @@ public sealed partial class MasterCsvService
             // 基準そのものが変わる更新は版数を上げる（C-10-10-03）
             var criteriaChanged = !isNew &&
                 (item.Type != type || item.LowerLimit != lower || item.UpperLimit != upper
-                 || item.StandardValue != standard || item.Method != method || item.SamplingCount != sampling);
+                 || item.StandardValue != standard || item.Method != method || item.SamplingCount != sampling
+                 || item.RequiredSkillId != requiredSkillId);
 
             item.Name = name;
             item.TargetProductId = productId;
@@ -705,6 +709,7 @@ public sealed partial class MasterCsvService
             item.StandardValue = standard;
             item.Method = method;
             item.SamplingCount = sampling;
+            item.RequiredSkillId = requiredSkillId;
             item.IsActive = isActive;
             if (criteriaChanged)
             {
