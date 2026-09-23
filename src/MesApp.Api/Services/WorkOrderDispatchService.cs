@@ -1,4 +1,5 @@
 using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Production;
@@ -49,20 +50,12 @@ public sealed class WorkOrderDispatchService(
             // 必要スキルは工順マスタの現在値ではなく、展開時点のスナップショットを使う（Spec.md 5.7）
             if (workOrder.RequiredSkillId is int skillId)
             {
-                var today = businessDate.Today;
-                var userSkill = await db.UserSkills.Include(s => s.Skill)
+                var skill = await db.Skills.FirstAsync(s => s.Id == skillId, ct);
+                var userSkill = await db.UserSkills
                     .FirstOrDefaultAsync(s => s.UserId == user.Id && s.SkillId == skillId, ct);
-                var skillName = userSkill?.Skill?.Name
-                    ?? await db.Skills.Where(s => s.Id == skillId).Select(s => s.Name).FirstAsync(ct);
-                if (userSkill is null)
+                if (SkillQualificationPolicy.Check(user.DisplayName, skill, userSkill, businessDate.Today) is { } error)
                 {
-                    return Outcome<WorkOrder>.Invalid(
-                        ApiText.T("作業者 '{0}' は必要スキル '{1}' を保有していません。", user.DisplayName, skillName));
-                }
-                if (userSkill.Skill!.RequiresExpiry && (userSkill.ExpiresOn is null || userSkill.ExpiresOn < today))
-                {
-                    return Outcome<WorkOrder>.Invalid(
-                        ApiText.T("作業者 '{0}' のスキル '{1}' は有効期限切れです。", user.DisplayName, skillName));
+                    return Outcome<WorkOrder>.Invalid(error);
                 }
             }
         }

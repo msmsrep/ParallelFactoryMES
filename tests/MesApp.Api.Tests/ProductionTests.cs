@@ -528,6 +528,56 @@ public class ProductionTests
     }
 
     [Fact]
+    public async Task 着手は着手する者のスキルを照合し差立を省略しても通さない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var skillCreated = await admin.PostAsJsonAsync("/api/skills",
+            new SkillRequest("SK-01", "組立資格", SkillType.Certification, true));
+        var skill = await skillCreated.Content.ReadFromJsonAsync<SkillResponse>();
+        var (productId, _) = await SetupMastersAsync(admin, requiredSkillId: skill!.Id);
+
+        using var qualified = await TestAuth.CreateUserClientAsync(factory, admin, "worker1", "Passw0rd123", MesRoles.Operator);
+        using var unqualified = await TestAuth.CreateUserClientAsync(factory, admin, "worker2", "Passw0rd123", MesRoles.Operator);
+        var users = await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users");
+        var worker1 = users!.Single(u => u.UserName == "worker1");
+        var worker2 = users!.Single(u => u.UserName == "worker2");
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        await admin.PutAsJsonAsync($"/api/users/{worker1.Id}/skills",
+            new List<UserSkillRequest> { new(skill.Id, null, today.AddYears(1)) });
+        // worker2 は期限切れの資格だけを持つ
+        await admin.PutAsJsonAsync($"/api/users/{worker2.Id}/skills",
+            new List<UserSkillRequest> { new(skill.Id, null, today.AddDays(-10)) });
+
+        var order = await CreateOrderAsync(admin, productId);
+        await admin.PostAsync($"/api/manufacturing-orders/{order.Id}/approve", null);
+        var expanded = await admin.PostAsJsonAsync(
+            $"/api/manufacturing-orders/{order.Id}/expand", new ExpandRequest(null));
+        var detail = await expanded.Content.ReadFromJsonAsync<ManufacturingOrderDetailResponse>();
+        var skilledStep = detail!.WorkOrders[0].Id; // 工順1（必要スキルあり）
+
+        // 差立を省略して、スキルを持たない管理者が着手 → 400
+        var byAdmin = await admin.PostAsync($"/api/work-orders/{skilledStep}/start", null);
+        Assert.Equal(HttpStatusCode.BadRequest, byAdmin.StatusCode);
+
+        // worker1 に差立しても、期限切れの worker2 が着手すれば 400
+        (await admin.PutAsJsonAsync($"/api/work-orders/{skilledStep}/dispatch",
+            new DispatchRequest(worker1.Id, null, 1))).EnsureSuccessStatusCode();
+        var byExpired = await unqualified.PostAsync($"/api/work-orders/{skilledStep}/start", null);
+        Assert.Equal(HttpStatusCode.BadRequest, byExpired.StatusCode);
+        var problem = await byExpired.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Contains("有効期限切れ", problem!.Title);
+
+        // 資格のある worker1 は着手できる
+        var byQualified = await qualified.PostAsync($"/api/work-orders/{skilledStep}/start", null);
+        Assert.Equal(HttpStatusCode.NoContent, byQualified.StatusCode);
+
+        // 必要スキルのない工順2は誰でも着手できる
+        var free = await admin.PostAsync($"/api/work-orders/{detail.WorkOrders[1].Id}/start", null);
+        Assert.Equal(HttpStatusCode.NoContent, free.StatusCode);
+    }
+
+    [Fact]
     public async Task 進捗一覧で納期遅延を検出できる()
     {
         using var factory = new ApiFactory();

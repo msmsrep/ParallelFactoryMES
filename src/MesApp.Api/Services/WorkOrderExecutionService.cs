@@ -50,7 +50,10 @@ public sealed class WorkOrderExecutionService(
     IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
-    /// <summary>着手（B-30-30-01）。未配布でも着手可能（差立を省略する小規模運用を許容）</summary>
+    /// <summary>
+    /// 着手（B-30-30-01）。未配布でも着手可能（差立を省略する小規模運用を許容）。
+    /// 必要スキルのある作業指示は、着手する者のスキル・資格を照合する（F-20-30-01）
+    /// </summary>
     public async Task<Outcome<WorkOrder>> StartAsync(int workOrderId, string? userId, CancellationToken ct)
     {
         var workOrder = await db.WorkOrders.FindAsync([workOrderId], ct);
@@ -62,6 +65,25 @@ public sealed class WorkOrderExecutionService(
         {
             return Outcome<WorkOrder>.Conflict(ApiText.T("状態 '{0}' の作業指示は着手できません。", EnumLabels.Of(workOrder.Status)));
         }
+
+        // スキル・資格照合（F-20-30-01）。照合するのは割当者ではなく実際に着手する者。
+        // 差立を省略した運用・割当者以外の着手・差立後の期限切れを、差立の照合だけでは防げないため
+        if (workOrder.RequiredSkillId is int skillId)
+        {
+            var user = userId is null ? null : await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+            if (user is null)
+            {
+                return Outcome<WorkOrder>.Invalid(ApiText.T("着手する作業者を特定できません。"));
+            }
+            var skill = await db.Skills.FirstAsync(s => s.Id == skillId, ct);
+            var userSkill = await db.UserSkills
+                .FirstOrDefaultAsync(s => s.UserId == user.Id && s.SkillId == skillId, ct);
+            if (SkillQualificationPolicy.Check(user.DisplayName, skill, userSkill, businessDate.Today) is { } error)
+            {
+                return Outcome<WorkOrder>.Invalid(error);
+            }
+        }
+
         workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Started,
             WorkOrderStatusChangeSource.Start, userId);
         await db.SaveChangesAsync(ct);

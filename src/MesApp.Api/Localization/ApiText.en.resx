@@ -2016,4 +2016,7 @@
   <data name="工程管理項目 '{0}' は品目 {1} の工順から紐付けられているため無効化できません。" xml:space="preserve">
     <value>Control item '{0}' cannot be deactivated because it is linked from the routing of item {1}.</value>
   </data>
+  <data name="着手する作業者を特定できません。" xml:space="preserve">
+    <value>Cannot identify the operator starting the work.</value>
+  </data>
 </root>
