@@ -1,0 +1,2 @@
+﻿OrderNo,ProductCode,Quantity,DueDate,OrderType,SourceOrderNo,Note,Approve,Expand,OutputLotNumber
+SMP-RW-001,FG-1000,1,2026-10-09,Rework,SMP-FG-001,梱包工程のシール不良1台の手直し（展開は画面から試す）,true,false,

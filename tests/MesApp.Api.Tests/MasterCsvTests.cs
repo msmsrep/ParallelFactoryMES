@@ -1415,12 +1415,23 @@ public class MasterCsvTests
         // 実績は同じ種別を番号違いで複数含む（05_consumptions と 07_consumptions）
         var actualResult = await PostBundleAsync(client, "actuals", actuals);
         Assert.True(actualResult.Succeeded, Describe(actualResult));
-        Assert.Equal(15, actualResult.Files.Count);
+        Assert.Equal(17, actualResult.Files.Count);
         // 出荷は判定を承認した SMP-SH-001 だけが出荷まで進み、保留の SMP-SH-002 は指示のまま残る
         var shipping = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.ShippingOrderResponse>>(
             "/api/shipping-orders"))!.Items;
         Assert.Equal(ShippingOrderStatus.Completed, shipping.Single(s => s.ShippingNo == "SMP-SH-001").Status);
         Assert.Equal(ShippingOrderStatus.Instructed, shipping.Single(s => s.ShippingNo == "SMP-SH-002").Status);
+        // 少量のサンプルだけでも稼働監視を試せる（故障・停止を含む設備稼働記録）
+        var logs = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.EquipmentLogResponse>>(
+            "/api/equipment-logs?pageSize=100"))!.Items;
+        Assert.Contains(logs, l => l.Status == EquipmentLogStatus.Failure && l.StopCause != null);
+        // リワーク指図は元指図 SMP-FG-001 を指し、承認まで進んでいる
+        var orders = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Production.ManufacturingOrderResponse>>(
+            "/api/manufacturing-orders?pageSize=100"))!.Items;
+        var rework = orders.Single(o => o.OrderNo == "SMP-RW-001");
+        Assert.Equal(ManufacturingOrderType.Rework, rework.OrderType);
+        Assert.Equal(orders.Single(o => o.OrderNo == "SMP-FG-001").Id, rework.SourceOrderId);
+        Assert.Equal(ManufacturingOrderStatus.Approved, rework.Status);
 
         // マスタと実績が混ざったZIPはどちらの一括取込でも受け付けない
         var mixed = ZipFiles(("01_processes.csv", "Code,Name\nPR-99,検査\n"), ("02_receiving.csv", "ProductCode,Quantity,LocationCode\nRM-3001,1,WH-M01\n"));
