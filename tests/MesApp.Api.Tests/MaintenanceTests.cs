@@ -10,6 +10,7 @@ using MesApp.Core.Contracts.Production;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MesApp.Api.Tests;
 
@@ -231,6 +232,21 @@ public class MaintenanceTests
                 MaintenanceRequestType.Spot, "Oリング交換"));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<MaintenanceOrderResponse>())!;
+    }
+
+    [Fact]
+    public async Task 保全指示の手入力番号は自動採番の形式と既存の番号を拒否する()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+
+        using var scope = factory.Services.CreateScope();
+        var orders = scope.ServiceProvider.GetRequiredService<MesApp.Api.Services.MaintenanceOrderService>();
+        await InventoryTests.AssertManualNumberAsync(
+            no => orders.CreateAsync(new MaintenanceOrderCreateRequest(equipment.Id, null, null, null, null,
+                MaintenanceRequestType.Spot, null), no, null, default),
+            "mt-1", "PM-001", o => o.OrderNo, "MT");
     }
 
     [Fact]

@@ -2064,4 +2064,28 @@
   <data name="取消済みの検査は訂正できません。" xml:space="preserve">
     <value>A canceled inspection cannot be corrected.</value>
   </data>
+  <data name="ピッキング番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Picking number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="ピッキング番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Picking number '{0}' already exists.</value>
+  </data>
+  <data name="棚卸番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Stocktake number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="棚卸番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Stocktake number '{0}' already exists.</value>
+  </data>
+  <data name="不適合番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Nonconformance number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="不適合番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Nonconformance number '{0}' already exists.</value>
+  </data>
+  <data name="保全指示番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Maintenance order number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="保全指示番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Maintenance order number '{0}' already exists.</value>
+  </data>
 </root>

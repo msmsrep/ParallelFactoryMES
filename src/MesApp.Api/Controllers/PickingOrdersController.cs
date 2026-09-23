@@ -59,7 +59,7 @@ public class PickingOrdersController(
     public async Task<ActionResult<PickingOrderResponse>> Create(
         PickingOrderCreateRequest request, CancellationToken ct)
     {
-        var outcome = await picking.CreateAsync(request, CurrentUserId, ct);
+        var outcome = await picking.CreateAsync(request, null, CurrentUserId, ct);
         if (outcome.Failed)
         {
             return ToProblem(outcome);

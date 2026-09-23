@@ -78,7 +78,7 @@ public class MaintenanceOrdersController(
         {
             return Forbid();
         }
-        var outcome = await maintenanceOrders.CreateAsync(request, CurrentUserId, ct);
+        var outcome = await maintenanceOrders.CreateAsync(request, null, CurrentUserId, ct);
         if (outcome.Failed)
         {
             return ToProblem(outcome);

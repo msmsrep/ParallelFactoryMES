@@ -23,9 +23,6 @@ public sealed class ShippingService(
     IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
-    /// <summary>自動採番の出荷番号の接頭辞（手入力の番号と衝突させないため、手入力では使わせない）</summary>
-    public const string AutoShippingNoPrefix = "SH";
-
     /// <summary>
     /// 出荷指示の作成（D-40-20-01）。
     /// shippingNo を渡すとその番号で登録する（CSV取込で後続の出荷判定・出荷実行から指示を指すため。空なら自動採番）
@@ -47,11 +44,10 @@ public sealed class ShippingService(
         {
             shippingNo = await numbering.NextShippingNoAsync(ct);
         }
-        else if (shippingNo.StartsWith(AutoShippingNoPrefix, StringComparison.OrdinalIgnoreCase))
+        else if (NumberingService.IsAutoNumberFormat(shippingNo, NumberingService.ShippingNoPrefix))
         {
-            // 自動採番の連番は採番テーブルで管理しており、同じ形式の手入力番号があると後で衝突する
             return Outcome<ShippingOrder>.Invalid(
-                ApiText.T("出荷番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", shippingNo, AutoShippingNoPrefix));
+                ApiText.T("出荷番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", shippingNo, NumberingService.ShippingNoPrefix));
         }
         else if (await db.ShippingOrders.AnyAsync(s => s.ShippingNo == shippingNo, ct))
         {

@@ -19,9 +19,12 @@ public sealed class NonconformanceService(
     LotStatusService lotStatus,
     IAuditLogger auditLogger)
 {
-    /// <summary>逸脱・品質不具合の記録（B-40-30-01〜02）</summary>
+    /// <summary>
+    /// 逸脱・品質不具合の記録（B-40-30-01〜02）。
+    /// reportNo を渡すとその番号で登録する（CSV取込で後続の行から不適合を指すため。空なら自動採番）
+    /// </summary>
     public async Task<Outcome<NonconformanceReport>> CreateAsync(
-        NonconformanceCreateRequest request, string? userId, CancellationToken ct)
+        NonconformanceCreateRequest request, string? reportNo, string? userId, CancellationToken ct)
     {
         if (request.LotId is int lotId && !await db.Lots.AnyAsync(l => l.Id == lotId, ct))
         {
@@ -38,9 +41,23 @@ public sealed class NonconformanceService(
             return Outcome<NonconformanceReport>.Invalid(ApiText.T("存在しない検査指示IDです。"));
         }
 
+        if (string.IsNullOrWhiteSpace(reportNo))
+        {
+            reportNo = await numbering.NextNonconformanceNoAsync(ct);
+        }
+        else if (NumberingService.IsAutoNumberFormat(reportNo, NumberingService.NonconformanceNoPrefix))
+        {
+            return Outcome<NonconformanceReport>.Invalid(
+                ApiText.T("不適合番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", reportNo, NumberingService.NonconformanceNoPrefix));
+        }
+        else if (await db.NonconformanceReports.AnyAsync(x => x.ReportNo == reportNo, ct))
+        {
+            return Outcome<NonconformanceReport>.Conflict(ApiText.T("不適合番号 '{0}' は既に存在します。", reportNo));
+        }
+
         var report = new NonconformanceReport
         {
-            ReportNo = await numbering.NextNonconformanceNoAsync(ct),
+            ReportNo = reportNo,
             Source = request.Source,
             LotId = request.LotId,
             WorkOrderId = request.WorkOrderId,

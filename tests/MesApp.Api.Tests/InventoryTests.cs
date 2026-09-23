@@ -535,6 +535,62 @@ public class InventoryTests
     }
 
     [Fact]
+    public async Task 手入力の番号は自動採番の形式と既存の番号を拒否する()
+    {
+        // CSV取込で後続の行から指すための手入力番号（CSV-01）。空なら従来どおり自動採番
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 1m);
+        var workOrderId = order.WorkOrders[0].Id;
+
+        using var scope = factory.Services.CreateScope();
+        var services = scope.ServiceProvider;
+
+        var picking = services.GetRequiredService<MesApp.Api.Services.PickingService>();
+        Task<MesApp.Api.Services.Outcome<PickingOrder>> Pick(string? no) => picking.CreateAsync(
+            new PickingOrderCreateRequest(PickingOrderType.ProcessIssue, workOrderId, null,
+                [new PickingRequestLine(ctx.MaterialId, 1m)]), no, null, default);
+        await AssertManualNumberAsync(Pick, "pk20260101-0001", "PICK-001", o => o.OrderNo, "PK");
+
+        var stocktakes = services.GetRequiredService<MesApp.Api.Services.StocktakeService>();
+        await AssertManualNumberAsync(
+            no => stocktakes.CreateAsync(new StocktakeCreateRequest(null), no, null, default),
+            "ST-1", "TANA-001", s => s.StocktakeNo, "ST");
+
+        var nonconformances = services.GetRequiredService<MesApp.Api.Services.NonconformanceService>();
+        await AssertManualNumberAsync(
+            no => nonconformances.CreateAsync(new MesApp.Core.Contracts.Quality.NonconformanceCreateRequest(
+                NonconformanceSource.Production, null, null, null, "傷", null, null), no, null, default),
+            "NC-1", "FR-001", n => n.ReportNo, "NC");
+    }
+
+    /// <summary>
+    /// 手入力番号の共通の検査：空は自動採番（接頭辞付き）、接頭辞と重なる番号は入力不正、
+    /// 手入力の番号はそのまま登録され、同じ番号の2件目は重複
+    /// </summary>
+    internal static async Task AssertManualNumberAsync<T>(
+        Func<string?, Task<MesApp.Api.Services.Outcome<T>>> create, string autoLike, string manual,
+        Func<T, string> numberOf, string prefix)
+    {
+        var auto = await create(null);
+        Assert.False(auto.Failed, auto.Error);
+        Assert.StartsWith(prefix, numberOf(auto.Value!), StringComparison.Ordinal);
+
+        var reserved = await create(autoLike);
+        Assert.Equal(MesApp.Api.Services.OutcomeError.Invalid, reserved.Kind);
+        Assert.Contains("自動採番", reserved.Error);
+
+        var created = await create(manual);
+        Assert.False(created.Failed, created.Error);
+        Assert.Equal(manual, numberOf(created.Value!));
+
+        var duplicate = await create(manual);
+        Assert.Equal(MesApp.Api.Services.OutcomeError.Conflict, duplicate.Kind);
+    }
+
+    [Fact]
     public async Task 在庫トランザクションはページングされ総件数が返る()
     {
         using var factory = new ApiFactory();

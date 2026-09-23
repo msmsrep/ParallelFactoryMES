@@ -26,9 +26,12 @@ public sealed class MaintenanceOrderService(
     IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
-    /// <summary>保全指示の作成。保全計画から作る場合は計画を「指示済み」にする</summary>
+    /// <summary>
+    /// 保全指示の作成。保全計画から作る場合は計画を「指示済み」にする。
+    /// maintenanceNo を渡すとその番号で登録する（CSV取込で後続の行から指示を指すため。空なら自動採番）
+    /// </summary>
     public async Task<Outcome<MaintenanceOrder>> CreateAsync(
-        MaintenanceOrderCreateRequest request, string? userId, CancellationToken ct)
+        MaintenanceOrderCreateRequest request, string? maintenanceNo, string? userId, CancellationToken ct)
     {
         if ((request.EquipmentId is null) == (request.ToolId is null))
         {
@@ -49,6 +52,20 @@ public sealed class MaintenanceOrderService(
             return Outcome<MaintenanceOrder>.Invalid(ApiText.T("存在しない（または無効な）手順書IDです。"));
         }
 
+        if (string.IsNullOrWhiteSpace(maintenanceNo))
+        {
+            maintenanceNo = await numbering.NextMaintenanceNoAsync(ct);
+        }
+        else if (NumberingService.IsAutoNumberFormat(maintenanceNo, NumberingService.MaintenanceNoPrefix))
+        {
+            return Outcome<MaintenanceOrder>.Invalid(
+                ApiText.T("保全指示番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", maintenanceNo, NumberingService.MaintenanceNoPrefix));
+        }
+        else if (await db.MaintenanceOrders.AnyAsync(x => x.OrderNo == maintenanceNo, ct))
+        {
+            return Outcome<MaintenanceOrder>.Conflict(ApiText.T("保全指示番号 '{0}' は既に存在します。", maintenanceNo));
+        }
+
         MaintenancePlan? plan = null;
         if (request.MaintenancePlanId is int planId)
         {
@@ -66,7 +83,7 @@ public sealed class MaintenanceOrderService(
 
         var order = new MaintenanceOrder
         {
-            OrderNo = await numbering.NextMaintenanceNoAsync(ct),
+            OrderNo = maintenanceNo,
             EquipmentId = request.EquipmentId,
             ToolId = request.ToolId,
             MaintenancePlanId = plan?.Id,

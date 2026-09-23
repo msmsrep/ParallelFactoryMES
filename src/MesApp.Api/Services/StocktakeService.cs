@@ -18,9 +18,12 @@ public sealed class StocktakeService(
     NumberingService numbering,
     IAuditLogger auditLogger)
 {
-    /// <summary>棚卸指示の作成（D-50-10-01。現在庫（数量&gt;0）のスナップショットを明細化）</summary>
+    /// <summary>
+    /// 棚卸指示の作成（D-50-10-01。現在庫（数量&gt;0）のスナップショットを明細化）。
+    /// stocktakeNo を渡すとその番号で登録する（CSV取込で後続の行から棚卸を指すため。空なら自動採番）
+    /// </summary>
     public async Task<Outcome<Stocktake>> CreateAsync(
-        StocktakeCreateRequest request, string? userId, CancellationToken ct)
+        StocktakeCreateRequest request, string? stocktakeNo, string? userId, CancellationToken ct)
     {
         if (request.TargetLocationId is int locationId
             && !await db.Locations.AnyAsync(l => l.Id == locationId, ct))
@@ -39,9 +42,23 @@ public sealed class StocktakeService(
             return Outcome<Stocktake>.Invalid(ApiText.T("対象在庫がありません。"));
         }
 
+        if (string.IsNullOrWhiteSpace(stocktakeNo))
+        {
+            stocktakeNo = await numbering.NextStocktakeNoAsync(ct);
+        }
+        else if (NumberingService.IsAutoNumberFormat(stocktakeNo, NumberingService.StocktakeNoPrefix))
+        {
+            return Outcome<Stocktake>.Invalid(
+                ApiText.T("棚卸番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", stocktakeNo, NumberingService.StocktakeNoPrefix));
+        }
+        else if (await db.Stocktakes.AnyAsync(x => x.StocktakeNo == stocktakeNo, ct))
+        {
+            return Outcome<Stocktake>.Conflict(ApiText.T("棚卸番号 '{0}' は既に存在します。", stocktakeNo));
+        }
+
         var stocktake = new Stocktake
         {
-            StocktakeNo = await numbering.NextStocktakeNoAsync(ct),
+            StocktakeNo = stocktakeNo,
             TargetLocationId = request.TargetLocationId,
             CreatedByUserId = userId,
             Lines = stocks.Select(s => new StocktakeLine
