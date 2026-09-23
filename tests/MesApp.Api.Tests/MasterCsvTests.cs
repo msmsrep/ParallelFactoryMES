@@ -1432,6 +1432,13 @@ public class MasterCsvTests
         Assert.Equal(ManufacturingOrderType.Rework, rework.OrderType);
         Assert.Equal(orders.Single(o => o.OrderNo == "SMP-FG-001").Id, rework.SourceOrderId);
         Assert.Equal(ManufacturingOrderStatus.Approved, rework.Status);
+        // 受入検査の不合格：ロットは不良になり、不適合が自動で起票されている
+        var ncs = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Quality.NonconformanceResponse>>(
+            "/api/nonconformances?pageSize=100"))!.Items;
+        Assert.Contains(ncs, n => n.Source == NonconformanceSource.Inspection && n.LotNumber == "R3001-260902");
+        // 期限切れのロットは、取り込んだ日によらず期限アラートに出る
+        var expiring = (await client.GetFromJsonAsync<List<Core.Contracts.Inventory.StockResponse>>("/api/inventory/expiring"))!;
+        Assert.Contains(expiring, s => s.LotNumber == "R3006-250801");
 
         // マスタと実績が混ざったZIPはどちらの一括取込でも受け付けない
         var mixed = ZipFiles(("01_processes.csv", "Code,Name\nPR-99,検査\n"), ("02_receiving.csv", "ProductCode,Quantity,LocationCode\nRM-3001,1,WH-M01\n"));

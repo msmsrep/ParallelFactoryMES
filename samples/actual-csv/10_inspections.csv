@@ -5,3 +5,4 @@ IPQC-SF,,,,,INS-01,2,49.98,,,DV-01,,,
 IPQC-SF,,,,,INS-02,1,,キズなし,Pass,,,,
 FQC-FG,FinalProduct,FG1000-S001,,,INS-04,1,20.3,,,DV-02,true,A,完成品検査（グレードA）
 FQC-FG,,,,,INS-05,1,,漏れなし,Pass,,,,
+RCV-3001B,Receiving,R3001-260902,,,INS-03,1,,巣あり（3個）,Fail,,true,,追加入荷の受入検査（不合格→ロットは不良・不適合を自動起票）
