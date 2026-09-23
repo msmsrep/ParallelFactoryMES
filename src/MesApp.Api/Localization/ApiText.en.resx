@@ -2037,4 +2037,10 @@
   <data name="在庫ステータスが「{0}」のロット '{1}' には検査指示を発行できません（不良ロットは再検査のみ。保留は不適合の処置で解除してください）。" xml:space="preserve">
     <value>An inspection order cannot be issued for lot '{1}' with stock status "{0}" (defective lots allow reinspection only; release holds through nonconformance disposition).</value>
   </data>
+  <data name="検査項目 '{0}' の測定値 {1} は規格値による判定が「{2}」です。判定を手で変えることはできません（規格外の品を使う場合は不適合の特採で処置してください）。" xml:space="preserve">
+    <value>The measured value {1} for inspection item '{0}' is judged "{2}" by the specification limits. The judgment cannot be changed manually (use a nonconformance concession to use out-of-spec products).</value>
+  </data>
+  <data name="検査項目 '{0}' はサンプリング数 {1} に対して実績が {2} サンプルです。サンプリング数以上の実績を登録してから判定してください。" xml:space="preserve">
+    <value>Inspection item '{0}' requires {1} samples but has results for {2}. Register results for at least the sampling count before judging.</value>
+  </data>
 </root>

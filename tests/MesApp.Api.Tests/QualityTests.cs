@@ -180,6 +180,47 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 規格値で決まる合否は手で変えられずサンプリング数がそろうまで判定できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var response = await admin.PostAsJsonAsync("/api/inspection-items",
+            new InspectionItemRequest("INS-01", "外径測定", ctx.ProductId, null, InspectionType.FinalProduct,
+                9.5m, 10.5m, 10m, "ノギス", 2));
+        var item = (await response.Content.ReadFromJsonAsync<InspectionItemResponse>())!;
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+        var order = (await (await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.FinalProduct, lot.Id, null, null, null)))
+            .Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+
+        // 規格外の測定値を「合格」と指定しても通さない（規格外品を使うなら不適合の特採で処置する）
+        var overridden = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 12.0m, null, InspectionJudgment.Pass) });
+        Assert.Equal(HttpStatusCode.BadRequest, overridden.StatusCode);
+        // 自動判定と同じ合否なら指定してもよい
+        var recorded = await (await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 10.0m, null, InspectionJudgment.Pass) }))
+            .Content.ReadFromJsonAsync<InspectionOrderResponse>();
+
+        // サンプリング数2に対して1サンプルでは判定できない
+        var early = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/judge", new InspectionJudgeRequest(null));
+        Assert.Equal(HttpStatusCode.BadRequest, early.StatusCode);
+        Assert.Contains("サンプリング数", await early.Content.ReadAsStringAsync());
+
+        // 訂正も同じ条件：規格外の値へ直しながら合格にはできない
+        var resultId = recorded!.Results.Single().Id;
+        var badCorrection = await admin.PutAsJsonAsync($"/api/inspection-orders/{order.Id}/results/{resultId}",
+            new InspectionResultCorrectionRequest(11.0m, null, InspectionJudgment.Pass, "転記ミス"));
+        Assert.Equal(HttpStatusCode.BadRequest, badCorrection.StatusCode);
+
+        (await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 2, 10.1m, null, null) })).EnsureSuccessStatusCode();
+        var judged = await admin.PostAsJsonAsync($"/api/inspection-orders/{order.Id}/judge", new InspectionJudgeRequest(null));
+        Assert.Equal(HttpStatusCode.OK, judged.StatusCode);
+    }
+
+    [Fact]
     public async Task 検査指示を取消すと検査待ちのロットが解放され承認済みは取消せない()
     {
         using var factory = new ApiFactory();

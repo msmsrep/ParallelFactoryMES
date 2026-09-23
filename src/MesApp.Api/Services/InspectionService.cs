@@ -188,12 +188,11 @@ public sealed class InspectionService(
             {
                 return Outcome<InspectionOrder>.Invalid(ApiText.T("検査項目ID {0} はこの検査指示の対象ではありません。", request.InspectionItemId));
             }
-            // 判定は指示発行時点の規格値（スナップショット）で行う
-            var judgment = Judge(item, request.MeasuredValue, request.Judgment);
-            if (judgment is null)
+            // 判定は指示発行時点の規格値（スナップショット）で行う。規格値で決まる合否は手で変えられない
+            var (judgment, invalid) = InspectionJudgmentPolicy.Resolve(item, request.MeasuredValue, request.Judgment);
+            if (invalid is not null)
             {
-                return Outcome<InspectionOrder>.Invalid(
-                    ApiText.T("検査項目 '{0}' は規格値による自動判定ができません。judgmentを指定してください。", item.ItemCode));
+                return Outcome<InspectionOrder>.Invalid(invalid);
             }
             db.InspectionResults.Add(new InspectionResult
             {
@@ -202,7 +201,7 @@ public sealed class InspectionService(
                 SampleNo = request.SampleNo ?? 1,
                 MeasuredValue = request.MeasuredValue,
                 TextValue = request.TextValue,
-                Judgment = judgment.Value,
+                Judgment = judgment!.Value,
                 InspectedByUserId = userId,
                 InspectionDeviceId = request.InspectionDeviceId,
             });
@@ -235,13 +234,10 @@ public sealed class InspectionService(
             return Outcome<InspectionOrder>.Conflict(ApiText.T("状態 '{0}' の検査指示は判定できません。", EnumLabels.Of(order.Status)));
         }
 
-        var itemsWithoutResult = order.Items
-            .Where(i => order.Results.All(r => r.InspectionItemId != i.InspectionItemId))
-            .ToList();
-        if (itemsWithoutResult.Count > 0)
+        // 全項目の実績と、サンプリング数（下限）だけのサンプルがそろってから判定する
+        if (InspectionJudgmentPolicy.CheckReadyToJudge(order.Items, order.Results) is { } notReady)
         {
-            return Outcome<InspectionOrder>.Invalid(
-                ApiText.T("実績未登録の検査項目が {0} 件あります。全項目の実績登録後に判定してください。", itemsWithoutResult.Count));
+            return Outcome<InspectionOrder>.Invalid(notReady);
         }
 
         var pass = order.Results.All(r => r.Judgment == InspectionJudgment.Pass);
@@ -290,7 +286,7 @@ public sealed class InspectionService(
     public async Task<Outcome<InspectionOrder>> CorrectResultAsync(
         int orderId, int resultId, InspectionResultCorrectionRequest request, string? userId, CancellationToken ct)
     {
-        var order = await db.InspectionOrders.Include(o => o.TargetLot)
+        var order = await db.InspectionOrders.Include(o => o.TargetLot).Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == orderId, ct);
         if (order is null)
         {
@@ -306,6 +302,13 @@ public sealed class InspectionService(
         {
             return Outcome<InspectionOrder>.NotFound(ApiText.T("検査実績が存在しません。"));
         }
+        // 訂正後の合否も登録と同じ条件で決める（訂正が規格外品を合格にする抜け道にならないように）
+        var item = order.Items.Single(i => i.InspectionItemId == result.InspectionItemId);
+        var (judgment, invalid) = InspectionJudgmentPolicy.Resolve(item, request.MeasuredValue, request.Judgment);
+        if (invalid is not null)
+        {
+            return Outcome<InspectionOrder>.Invalid(invalid);
+        }
 
         var before = new { value = result.MeasuredValue, text = result.TextValue, judgment = result.Judgment };
 
@@ -320,14 +323,14 @@ public sealed class InspectionService(
             BeforeJudgment = result.Judgment,
             AfterMeasuredValue = request.MeasuredValue,
             AfterTextValue = request.TextValue,
-            AfterJudgment = request.Judgment,
+            AfterJudgment = judgment!.Value,
             Reason = request.Reason,
             CorrectedByUserId = userId,
         });
 
         result.MeasuredValue = request.MeasuredValue;
         result.TextValue = request.TextValue;
-        result.Judgment = request.Judgment;
+        result.Judgment = judgment.Value;
         result.CorrectionNote = string.IsNullOrEmpty(result.CorrectionNote)
             ? request.Reason
             : $"{result.CorrectionNote}\n{request.Reason}";
@@ -356,7 +359,7 @@ public sealed class InspectionService(
                 {
                     value = request.MeasuredValue,
                     text = request.TextValue,
-                    judgment = request.Judgment,
+                    judgment = judgment.Value,
                 },
                 reason = request.Reason,
             }, ct: ct);
@@ -422,23 +425,4 @@ public sealed class InspectionService(
         return Outcome<InspectionOrder>.Ok(order);
     }
 
-    /// <summary>
-    /// 規格値との照合による自動判定（下限≦測定値≦上限）。判定不能ならnull。
-    /// 基準はマスタの現在値ではなく、指示発行時点のスナップショットを使う
-    /// </summary>
-    private static InspectionJudgment? Judge(
-        InspectionOrderItem item, decimal? measuredValue, InspectionJudgment? explicitJudgment)
-    {
-        if (explicitJudgment is not null)
-        {
-            return explicitJudgment;
-        }
-        if (measuredValue is null || (item.LowerLimit is null && item.UpperLimit is null))
-        {
-            return null;
-        }
-        var pass = (item.LowerLimit is null || measuredValue >= item.LowerLimit)
-                   && (item.UpperLimit is null || measuredValue <= item.UpperLimit);
-        return pass ? InspectionJudgment.Pass : InspectionJudgment.Fail;
-    }
 }
