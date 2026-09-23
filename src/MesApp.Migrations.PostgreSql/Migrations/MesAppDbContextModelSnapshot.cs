@@ -3122,8 +3122,8 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("ControlItems")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");

@@ -2943,7 +2943,7 @@ namespace MesApp.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ControlItems")
-                        .HasMaxLength(500)
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset>("CreatedAt")

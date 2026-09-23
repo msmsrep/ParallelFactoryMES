@@ -57,7 +57,7 @@ public record RoutingStepRequest(
     int? RequiredSkillId,
     int? EquipmentId,
     int? ToolId,
-    string? ControlItems,
+    [MaxLength(1000)] string? ControlItems,
     int? ChecklistId,
     int? WorkCenterId = null,
     /// <summary>候補設備（B-10-20-02）。空なら差立で設備を限定しない</summary>

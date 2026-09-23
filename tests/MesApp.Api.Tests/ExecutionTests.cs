@@ -728,6 +728,29 @@ public class ExecutionTests
         Assert.Equal(HttpStatusCode.OK, unrestricted.StatusCode);
     }
 
+    [Fact]
+    public async Task 工順に登録できる長さの工程管理項目はそのまま作業指示へ展開できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "加工");
+
+        // 上限を超える記述は工順の登録で止める（展開まで持ち越すと実DBで保存に失敗する）
+        var tooLong = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, new string('あ', 1001), null) });
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+
+        // 上限いっぱいの記述は作業指示へ欠けずに写る（作業指示側の列が工順側より短いと展開に失敗していた）
+        var longest = new string('あ', 1000);
+        (await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, longest, null) }))
+            .EnsureSuccessStatusCode();
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, product.Id, 10m);
+        Assert.Equal(longest, order.WorkOrders.Single().ControlItems);
+    }
+
     private static async Task<MesApp.Core.Contracts.Masters.EquipmentResponse> CreateEquipmentAsync(
         HttpClient admin, string assetNo, string name)
     {

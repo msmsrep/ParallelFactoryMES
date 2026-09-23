@@ -1120,7 +1120,7 @@ public sealed partial class MasterCsvService
                 var toolId = reader.Reference("ToolCode", null, toolIds, "治工具");
                 var checklistId = reader.Reference("ChecklistCode", null, checklistIds, "チェックリスト");
                 var workCenterId = reader.Reference("WorkCenterCode", null, workCenterIds, "作業区");
-                var controlItems = reader.Text("ControlItems", null, 500);
+                var controlItems = reader.Text("ControlItems", null, 1000);
                 var workProcedureId = reader.Reference("WorkProcedureNo", null, workProcedureIds, "作業手順書");
                 if (sequence is null && !reader.Failed)
                 {
