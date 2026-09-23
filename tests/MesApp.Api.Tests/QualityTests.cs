@@ -97,6 +97,43 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 工程内検査の基準は対象品目と対象工程の両方が合うものだけが選ばれる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var other = await MasterTests.CreateProductAsync(admin, "FG-99", "別の完成品", ProductType.Product);
+        var otherProcess = await MasterTests.CreateProcessAsync(admin, "PR-99", "別工程");
+        async Task<int> CreateItemAsync(string code, int? productId, int? processId)
+        {
+            var response = await admin.PostAsJsonAsync("/api/inspection-items",
+                new InspectionItemRequest(code, code, productId, processId, InspectionType.InProcess,
+                    null, null, null, null, null));
+            response.EnsureSuccessStatusCode();
+            return (await response.Content.ReadFromJsonAsync<InspectionItemResponse>())!.Id;
+        }
+        await CreateItemAsync("INS-A", ctx.ProductId, ctx.ProcessId);   // この品目のこの工程
+        await CreateItemAsync("INS-B", ctx.ProductId, null);            // この品目のどの工程でも
+        await CreateItemAsync("INS-C", null, ctx.ProcessId);            // この工程ならどの品目でも
+        var otherProductItem = await CreateItemAsync("INS-D", other.Id, ctx.ProcessId);   // 別品目の同じ工程
+        await CreateItemAsync("INS-E", ctx.ProductId, otherProcess.Id); // 同じ品目の別工程
+
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var workOrderId = order.WorkOrders[0].Id;
+        var created = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.InProcess, null, workOrderId, null, null));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var inspection = await created.Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        Assert.Equal(["INS-A", "INS-B", "INS-C"], inspection!.Items.Select(i => i.Code).Order());
+
+        // 指定した基準も同じ条件で確かめる（別品目の基準では検査させない）
+        var manual = await admin.PostAsJsonAsync("/api/inspection-orders",
+            new InspectionOrderCreateRequest(InspectionOrderType.InProcess, null, workOrderId, [otherProductItem], null));
+        Assert.Equal(HttpStatusCode.BadRequest, manual.StatusCode);
+        Assert.Contains("INS-D", await manual.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task 検査指示を取消すと検査待ちのロットが解放され承認済みは取消せない()
     {
         using var factory = new ApiFactory();

@@ -24,7 +24,8 @@ public sealed class InspectionService(
 {
     /// <summary>
     /// 検査指示（依頼）の発行（C-20-10-02 ほか）。検査項目未指定時は種別・対象品目/工程に
-    /// 合致する有効な検査基準を自動選択する。対象ロットは検査待ちになる（サンプル検査を除く）。
+    /// 合致する有効な検査基準を自動選択する（<see cref="InspectionItemPolicy.Applicable"/>）。
+    /// 検査項目を指定した場合も同じ条件に合わない基準は拒否する。対象ロットは検査待ちになる（サンプル検査を除く）。
     /// </summary>
     public async Task<Outcome<InspectionOrder>> CreateAsync(
         InspectionOrderCreateRequest request, string? userId, CancellationToken ct)
@@ -58,7 +59,9 @@ public sealed class InspectionService(
             }
         }
 
-        // 検査項目セットの決定
+        // 検査項目セットの決定：種別（再検査は完成品基準）＋対象品目/工程に「かつ」で合う有効な基準（C-10-10）
+        var applicable = InspectionItemPolicy.Applicable(
+            InspectionItemPolicy.ItemTypeOf(request.Type), lot?.ProductId ?? workOrder!.ProductId, workOrder?.ProcessId);
         List<InspectionItem> items;
         if (request.ItemIds is { Count: > 0 })
         {
@@ -70,24 +73,17 @@ public sealed class InspectionService(
             {
                 return Outcome<InspectionOrder>.Invalid(ApiText.T("存在しない検査項目IDが含まれています。"));
             }
+            // 指定した基準も自動選択と同じ条件で確かめる（無効な基準や他品目の基準で判定させない）
+            var isApplicable = applicable.Compile();
+            if (items.FirstOrDefault(i => !isApplicable(i)) is { } unusable)
+            {
+                return Outcome<InspectionOrder>.Invalid(ApiText.T(
+                    "検査項目 '{0}' はこの検査に使えません（無効、検査種別が違う、または対象の品目・工程が合いません）。", unusable.Code));
+            }
         }
         else
         {
-            // 自動選択：種別（再検査は完成品基準）＋対象品目/工程に合致する有効な基準（C-10-10）
-            var itemType = request.Type switch
-            {
-                InspectionOrderType.Receiving => InspectionType.Receiving,
-                InspectionOrderType.InProcess => InspectionType.InProcess,
-                InspectionOrderType.Sample => InspectionType.Sample,
-                _ => InspectionType.FinalProduct,
-            };
-            var productId = lot?.ProductId ?? workOrder!.ProductId;
-            var processId = workOrder?.ProcessId;
-            items = await db.InspectionItems.AsNoTracking()
-                .Where(i => i.IsActive && i.Type == itemType &&
-                            (i.TargetProductId == productId ||
-                             (processId != null && i.TargetProcessId == processId)))
-                .ToListAsync(ct);
+            items = await db.InspectionItems.AsNoTracking().Where(applicable).ToListAsync(ct);
             if (items.Count == 0)
             {
                 return Outcome<InspectionOrder>.Invalid(

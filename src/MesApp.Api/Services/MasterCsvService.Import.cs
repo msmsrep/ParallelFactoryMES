@@ -680,9 +680,11 @@ public sealed partial class MasterCsvService
             var method = reader.Text("Method", item.Method, 200);
             var sampling = reader.IntOrNull("SamplingCount", item.SamplingCount, 0);
             var isActive = reader.Bool("IsActive", item.IsActive);
-            if (lower is not null && upper is not null && lower > upper)
+            // 判定条件は単票APIと共通（片方だけ通る状態を作らない。Spec.md 7.4）
+            if (!reader.Failed
+                && InspectionItemPolicy.CheckDefinition(type, productId, processId, lower, upper, standard) is { } invalid)
             {
-                reader.Fail(ApiText.T("規格値の下限が上限を超えています。"));
+                reader.Fail(invalid);
             }
             if (reader.Failed)
             {

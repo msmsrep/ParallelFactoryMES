@@ -333,9 +333,13 @@ public class MasterCsvTests
         using var factory = new ApiFactory();
         using var client = await TestAuth.CreateAdminClientAsync(factory);
 
+        Assert.True((await ImportAsync(client, "processes", """
+            Code,Name,Category
+            PR-01,加工,InHouse
+            """)).Succeeded);
         Assert.True((await ImportAsync(client, "inspection-items", """
-            Code,Name,Type,LowerLimit,UpperLimit,StandardValue,Method,SamplingCount
-            INS-01,外径測定,InProcess,9.5,10.5,10,ノギス,5
+            Code,Name,TargetProcessCode,Type,LowerLimit,UpperLimit,StandardValue,Method,SamplingCount
+            INS-01,外径測定,PR-01,InProcess,9.5,10.5,10,ノギス,5
             """)).Succeeded);
 
         // 名称だけの変更では版数は上がらない
@@ -354,13 +358,19 @@ public class MasterCsvTests
         items = await client.GetFromJsonAsync<List<InspectionItemResponse>>("/api/inspection-items");
         Assert.Equal(2, items!.Single().Version);
 
-        // 下限が上限を超える行はエラー
+        // 単票APIと同じ条件で弾く：下限＞上限・基準値が規格外・工程内検査以外で工程を指定・対象なし
         var invalid = await ImportAsync(client, "inspection-items", """
-            Code,Name,LowerLimit,UpperLimit
-            INS-02,逆転,10,1
+            Code,Name,TargetProcessCode,Type,LowerLimit,UpperLimit,StandardValue
+            INS-02,逆転,PR-01,InProcess,10,1,
+            INS-03,基準値外,PR-01,InProcess,1,2,3
+            INS-04,受入に工程,PR-01,Receiving,,,
+            INS-05,対象なし,,InProcess,,,
             """);
         Assert.False(invalid.Succeeded);
-        Assert.Contains(invalid.Errors, e => e.Message.Contains("下限"));
+        Assert.Contains(invalid.Errors, e => e.Line == 2 && e.Message.Contains("下限"));
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("基準値"));
+        Assert.Contains(invalid.Errors, e => e.Line == 4 && e.Message.Contains("工程内検査の基準だけ"));
+        Assert.Contains(invalid.Errors, e => e.Line == 5 && e.Message.Contains("対象品目か対象工程"));
     }
 
     [Fact]

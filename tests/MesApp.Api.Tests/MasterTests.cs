@@ -310,8 +310,9 @@ public class MasterTests
             new LocationRequest("LOC-01", LocationAreaType.MaterialWarehouse, "A-1-1"));
         Assert.Equal(HttpStatusCode.Created, location.StatusCode);
 
+        var process = await CreateProcessAsync(client, "PR-01", "加工");
         var inspection = await client.PostAsJsonAsync("/api/inspection-items",
-            new InspectionItemRequest("INS-01", "外径測定", null, null, InspectionType.InProcess,
+            new InspectionItemRequest("INS-01", "外径測定", null, process.Id, InspectionType.InProcess,
                 9.5m, 10.5m, 10m, "ノギス", 5));
         Assert.Equal(HttpStatusCode.Created, inspection.StatusCode);
 
@@ -325,7 +326,7 @@ public class MasterTests
         // 検査項目の更新で版数が上がる（C-10-10-03）
         var inspectionBody = await inspection.Content.ReadFromJsonAsync<InspectionItemResponse>();
         var updated = await client.PutAsJsonAsync($"/api/inspection-items/{inspectionBody!.Id}",
-            new InspectionItemRequest("INS-01", "外径測定", null, null, InspectionType.InProcess,
+            new InspectionItemRequest("INS-01", "外径測定", null, process.Id, InspectionType.InProcess,
                 9.0m, 11.0m, 10m, "マイクロメータ", 10));
         var updatedBody = await updated.Content.ReadFromJsonAsync<InspectionItemResponse>();
         Assert.Equal(2, updatedBody!.Version);

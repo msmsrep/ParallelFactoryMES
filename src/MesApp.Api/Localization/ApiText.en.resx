@@ -2016,4 +2016,19 @@
   <data name="工程管理項目 '{0}' は品目 {1} の工順から紐付けられているため無効化できません。" xml:space="preserve">
     <value>Control item '{0}' cannot be deactivated because it is linked from the routing of item {1}.</value>
   </data>
+  <data name="基準値が規格値の範囲の外にあります。" xml:space="preserve">
+    <value>The standard value is outside the specification limits.</value>
+  </data>
+  <data name="工程内検査の基準には対象品目か対象工程を指定してください。" xml:space="preserve">
+    <value>Specify a target item or a target process for an in-process inspection criterion.</value>
+  </data>
+  <data name="対象工程を指定できるのは工程内検査の基準だけです。" xml:space="preserve">
+    <value>Only in-process inspection criteria can specify a target process.</value>
+  </data>
+  <data name="受入・完成品・サンプル検査の基準には対象品目を指定してください。" xml:space="preserve">
+    <value>Specify a target item for receiving, final product, and sample inspection criteria.</value>
+  </data>
+  <data name="検査項目 '{0}' はこの検査に使えません（無効、検査種別が違う、または対象の品目・工程が合いません）。" xml:space="preserve">
+    <value>Inspection item '{0}' cannot be used for this inspection (it is inactive, has a different inspection type, or its target item or process does not match).</value>
+  </data>
 </root>
