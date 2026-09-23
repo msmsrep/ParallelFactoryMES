@@ -1,0 +1,3 @@
+﻿SampleNo,LotNumber,Quantity,StorageLocationCode,RetainUntil,Note,Close
+SMP-SP-001,FG1000-S001,1,WH-S01,2027-09-30,完成品の保管サンプル,
+SMP-SP-002,R3004-260901,2,WH-S01,2026-09-30,Oリングの受入保管サンプル（再試験で使用）,Consumed

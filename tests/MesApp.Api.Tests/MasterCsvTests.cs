@@ -1487,7 +1487,7 @@ public class MasterCsvTests
         // 実績は同じ種別を番号違いで複数含む（05_consumptions と 07_consumptions）
         var actualResult = await PostBundleAsync(client, "actuals", actuals);
         Assert.True(actualResult.Succeeded, Describe(actualResult));
-        Assert.Equal(27, actualResult.Files.Count);
+        Assert.Equal(29, actualResult.Files.Count);
         // 保全：突発依頼の実績で消耗品が引き落とされ、計画保全は指示のまま残る
         var maintenance = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.MaintenanceOrderResponse>>(
             "/api/maintenance-orders?pageSize=100"))!.Items;
@@ -1518,6 +1518,13 @@ public class MasterCsvTests
             "/api/inventory/warehouse-progress?from=2026-01-01"))!;
         Assert.True(progress.Rows.Single(r => r.Kind == "在庫移動").OpenCount > 0);
         Assert.True(progress.Rows.Single(r => r.Kind == "棚卸").CompletedCount > 0);
+        // 不適合：受入検査で自動起票された R3001-260902 の不適合は、ロット番号で指して承認まで進んでいる
+        var sampleNcs = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Quality.NonconformanceResponse>>(
+            "/api/nonconformances?pageSize=100"))!.Items;
+        Assert.Equal(NonconformanceStatus.Closed, sampleNcs.Single(n => n.LotNumber == "R3001-260902").Status);
+        Assert.Equal(NonconformanceStatus.ActionInstructed, sampleNcs.Single(n => n.ReportNo == "SMP-NC-001").Status);
+        var samples = (await client.GetFromJsonAsync<List<Core.Contracts.Inventory.SampleStorageResponse>>("/api/sample-storages"))!;
+        Assert.Equal(2, samples.Count);
         // 出荷は判定を承認した SMP-SH-001 だけが出荷まで進み、保留の SMP-SH-002 は指示のまま残る
         var shipping = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.ShippingOrderResponse>>(
             "/api/shipping-orders"))!.Items;

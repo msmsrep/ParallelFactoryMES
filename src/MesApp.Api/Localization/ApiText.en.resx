@@ -2433,4 +2433,109 @@
   <data name="空欄なら全ロケーション。作成時点の現在庫が明細になる" xml:space="preserve">
     <value>Blank means all locations. The stock at the time of creation becomes the lines</value>
   </data>
+  <data name="不適合の対応指示・承認は品質管理の担当者だけが登録できます。" xml:space="preserve">
+    <value>Only quality control staff can register nonconformance action instructions and approvals.</value>
+  </data>
+  <data name="ReportNo（不適合番号）か LotNumber（ロット番号）のどちらかが必要です。" xml:space="preserve">
+    <value>Either ReportNo (nonconformance number) or LotNumber (lot number) is required.</value>
+  </data>
+  <data name="不適合を起票する行には Content（内容）が必要です。" xml:space="preserve">
+    <value>A row that raises a nonconformance needs Content.</value>
+  </data>
+  <data name="ロット &#x27;{0}&#x27; に未完了の不適合はありません。" xml:space="preserve">
+    <value>Lot '{0}' has no open nonconformance.</value>
+  </data>
+  <data name="ロット &#x27;{0}&#x27; に未完了の不適合が {1} 件あります。ReportNo で指定してください。" xml:space="preserve">
+    <value>Lot '{0}' has {1} open nonconformances. Specify one with ReportNo.</value>
+  </data>
+  <data name="サンプルを採取する行には LotNumber・Quantity・StorageLocationCode が必要です。" xml:space="preserve">
+    <value>A row that collects a sample needs LotNumber, Quantity and StorageLocationCode.</value>
+  </data>
+  <data name="サンプル番号 &#x27;{0}&#x27; は既に存在します。" xml:space="preserve">
+    <value>Sample number '{0}' already exists.</value>
+  </data>
+  <data name="サンプル番号 &#x27;{0}&#x27; は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Sample number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="サンプルが見つかりません。" xml:space="preserve">
+    <value>Sample not found.</value>
+  </data>
+  <data name="Consumed（払出）/ Disposed（廃棄）。書くと保管を終える（在庫は動かさない）" xml:space="preserve">
+    <value>Consumed / Disposed. Writing it ends the storage (stock does not move)</value>
+  </data>
+  <data name="true で承認してクローズする（特採ならロットを正常へ戻す）。品質管理の担当者のみ" xml:space="preserve">
+    <value>true approves and closes it (special acceptance returns the lot to normal). Quality control staff only</value>
+  </data>
+  <data name="サンプル品保管" xml:space="preserve">
+    <value>Sample storage</value>
+  </data>
+  <data name="不適合" xml:space="preserve">
+    <value>Nonconformances</value>
+  </data>
+  <data name="不適合番号" xml:space="preserve">
+    <value>Nonconformance number</value>
+  </data>
+  <data name="保管の終了" xml:space="preserve">
+    <value>End of storage</value>
+  </data>
+  <data name="保管場所のロケーションコード" xml:space="preserve">
+    <value>Storage location code</value>
+  </data>
+  <data name="保管期限" xml:space="preserve">
+    <value>Retain until</value>
+  </data>
+  <data name="原因の詳細" xml:space="preserve">
+    <value>Cause details</value>
+  </data>
+  <data name="原因区分" xml:space="preserve">
+    <value>Cause category</value>
+  </data>
+  <data name="対応" xml:space="preserve">
+    <value>Action</value>
+  </data>
+  <data name="対応の実施記録" xml:space="preserve">
+    <value>Action record</value>
+  </data>
+  <data name="対応指示の内容" xml:space="preserve">
+    <value>Action instruction</value>
+  </data>
+  <data name="採取のときは必須。0より大きい数値" xml:space="preserve">
+    <value>Required when collecting. A number greater than 0</value>
+  </data>
+  <data name="採取のときは必須。保管棚は引当の対象にならない" xml:space="preserve">
+    <value>Required when collecting. Storage shelves are not used for allocation</value>
+  </data>
+  <data name="採取のときは必須。在庫の多いロケーションから抜く" xml:space="preserve">
+    <value>Required when collecting. Taken from the location with the most stock</value>
+  </data>
+  <data name="書くと対応実績を記録する（対応指示済みであること）" xml:space="preserve">
+    <value>Writing it records the action performed (the action must have been instructed)</value>
+  </data>
+  <data name="書くと対応指示を出す。Rework（リワーク）/ Hold（保留）/ Discard（廃棄）/ SpecialAcceptance（特採）。品質管理の担当者のみ" xml:space="preserve">
+    <value>Writing it issues an action instruction. Rework / Hold / Discard / SpecialAcceptance. Quality control staff only</value>
+  </data>
+  <data name="未登録なら採取、登録済みなら保管の終了（Close）だけを行う。SPで始まる番号は自動採番用のため使えない" xml:space="preserve">
+    <value>Collects the sample if unregistered; if registered, only ends the storage (Close). Numbers starting with SP are reserved for automatic numbering</value>
+  </data>
+  <data name="発生元" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="登録済みならその不適合を指し、未登録なら新規に起票する（NCで始まる番号は自動採番用のため使えない）。空欄なら LotNumber で指す" xml:space="preserve">
+    <value>Refers to the nonconformance if registered, otherwise raises a new one (numbers starting with NC are reserved for automatic numbering). If blank, LotNumber is used</value>
+  </data>
+  <data name="起票では対象ロット。ReportNo が空欄の行では、そのロットの未完了の不適合（1件だけのとき）を指す" xml:space="preserve">
+    <value>The target lot when raising. On a row with a blank ReportNo, refers to the lot's open nonconformance (only when there is exactly one)</value>
+  </data>
+  <data name="起票で作業指示に紐づける場合（工程順序と合わせて指す）" xml:space="preserve">
+    <value>To link a raised nonconformance to a work order (specify with the routing sequence)</value>
+  </data>
+  <data name="起票のとき" xml:space="preserve">
+    <value>When raising</value>
+  </data>
+  <data name="起票のとき。Production（生産実績）/ Inspection（検査）/ Receiving（受入）。省略時は生産実績" xml:space="preserve">
+    <value>When raising. Production / Inspection / Receiving. Defaults to Production</value>
+  </data>
+  <data name="起票のときは必須" xml:space="preserve">
+    <value>Required when raising</value>
+  </data>
 </root>

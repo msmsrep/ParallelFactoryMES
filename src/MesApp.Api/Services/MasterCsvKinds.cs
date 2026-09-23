@@ -327,6 +327,25 @@ public static class CsvEnumLabels
         ("可", ShipmentJudgmentResult.Approved), ("保留", ShipmentJudgmentResult.Hold),
         ("特採", ShipmentJudgmentResult.SpecialAcceptance), ("特別採用", ShipmentJudgmentResult.SpecialAcceptance));
 
+    public static readonly IReadOnlyDictionary<string, NonconformanceSource> NonconformanceSources = Build(
+        ("生産実績", NonconformanceSource.Production), ("生産", NonconformanceSource.Production),
+        ("検査", NonconformanceSource.Inspection), ("受入", NonconformanceSource.Receiving));
+
+    public static readonly IReadOnlyDictionary<string, NonconformanceAction> NonconformanceActions = Build(
+        ("リワーク", NonconformanceAction.Rework), ("保留", NonconformanceAction.Hold),
+        ("廃棄", NonconformanceAction.Discard), ("特採", NonconformanceAction.SpecialAcceptance),
+        ("特別採用", NonconformanceAction.SpecialAcceptance));
+
+    /// <summary>サンプルの保管の終わらせ方（保管中 Stored は指定できないので含めない）</summary>
+    public static readonly IReadOnlyDictionary<string, SampleStorageStatus> SampleCloseStatuses =
+        new Dictionary<string, SampleStorageStatus>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Consumed"] = SampleStorageStatus.Consumed, ["払出"] = SampleStorageStatus.Consumed,
+            ["払出済"] = SampleStorageStatus.Consumed,
+            ["Disposed"] = SampleStorageStatus.Disposed, ["廃棄"] = SampleStorageStatus.Disposed,
+            ["廃棄済"] = SampleStorageStatus.Disposed,
+        };
+
     public static readonly IReadOnlyDictionary<string, PickingOrderType> PickingOrderTypes = Build(
         ("工程払出", PickingOrderType.ProcessIssue), ("出荷", PickingOrderType.Shipping));
 

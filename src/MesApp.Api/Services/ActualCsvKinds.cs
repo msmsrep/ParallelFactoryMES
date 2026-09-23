@@ -41,6 +41,8 @@ public static class ActualCsvKinds
     public const string PickingOrders = "picking-orders";
     public const string Stocktakes = "stocktakes";
     public const string StocktakeCounts = "stocktake-counts";
+    public const string Nonconformances = "nonconformances";
+    public const string SampleStorages = "sample-storages";
 
     private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
     private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
@@ -302,6 +304,35 @@ public static class ActualCsvKinds
             new("CountedQuantity", "実棚数量", true, "0以上"),
             new("Finalize", "確定する", false, "true で実棚数の登録に続けて確定し、差異を在庫へ反映する（まとまりの最初の行の値）"),
         ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(Nonconformances, "不適合", false,
+        [
+            new("ReportNo", "不適合番号", false,
+                "登録済みならその不適合を指し、未登録なら新規に起票する（NCで始まる番号は自動採番用のため使えない）。空欄なら LotNumber で指す"),
+            new("LotNumber", "ロット番号", false,
+                "起票では対象ロット。ReportNo が空欄の行では、そのロットの未完了の不適合（1件だけのとき）を指す"),
+            new("Source", "発生元", false, "起票のとき。Production（生産実績）/ Inspection（検査）/ Receiving（受入）。省略時は生産実績"),
+            new("Content", "内容", false, "起票のときは必須"),
+            new("OrderNo", "指図番号", false, "起票で作業指示に紐づける場合（工程順序と合わせて指す）"),
+            new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
+            new("CauseCategory", "原因区分", false, "起票のとき"),
+            new("CauseDetail", "原因の詳細", false, "起票のとき"),
+            new("Action", "対応", false,
+                "書くと対応指示を出す。Rework（リワーク）/ Hold（保留）/ Discard（廃棄）/ SpecialAcceptance（特採）。品質管理の担当者のみ"),
+            new("ActionInstruction", "対応指示の内容", false, null),
+            new("ActionRecord", "対応の実施記録", false, "書くと対応実績を記録する（対応指示済みであること）"),
+            new("Approve", "承認する", false, "true で承認してクローズする（特採ならロットを正常へ戻す）。品質管理の担当者のみ"),
+        ]), AnyRole),
+        new(new CsvKindInfo(SampleStorages, "サンプル品保管", false,
+        [
+            new("SampleNo", "サンプル番号", true,
+                "未登録なら採取、登録済みなら保管の終了（Close）だけを行う。SPで始まる番号は自動採番用のため使えない"),
+            new("LotNumber", "ロット番号", false, "採取のときは必須。在庫の多いロケーションから抜く"),
+            new("Quantity", "数量", false, "採取のときは必須。0より大きい数値"),
+            new("StorageLocationCode", "保管場所のロケーションコード", false, "採取のときは必須。保管棚は引当の対象にならない"),
+            new("RetainUntil", "保管期限", false, "yyyy-MM-dd。空欄なら期限の判定を行わない"),
+            new("Note", "備考", false, null),
+            new("Close", "保管の終了", false, "Consumed（払出）/ Disposed（廃棄）。書くと保管を終える（在庫は動かさない）"),
+        ]), MesRoleGroups.QualityManage),
     ];
 
     /// <summary>

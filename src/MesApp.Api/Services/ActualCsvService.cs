@@ -37,6 +37,8 @@ public sealed partial class ActualCsvService(
     TransferOrderService transfers,
     PickingService picking,
     StocktakeService stocktakes,
+    NonconformanceService nonconformances,
+    SampleStorageService samples,
     IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
@@ -87,6 +89,8 @@ public sealed partial class ActualCsvService(
             ActualCsvKinds.PickingOrders => await ImportPickingOrdersAsync(table, errors, userId, ct),
             ActualCsvKinds.Stocktakes => await ImportStocktakesAsync(table, errors, userId, ct),
             ActualCsvKinds.StocktakeCounts => await ImportStocktakeCountsAsync(table, errors, userId, ct),
+            ActualCsvKinds.Nonconformances => await ImportNonconformancesAsync(table, errors, userId, ct),
+            ActualCsvKinds.SampleStorages => await ImportSampleStoragesAsync(table, errors, userId, ct),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
         if (errors.Count == 0)
