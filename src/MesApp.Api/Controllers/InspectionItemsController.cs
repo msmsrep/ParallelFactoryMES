@@ -1,4 +1,5 @@
 ﻿using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Entities;
@@ -12,6 +13,7 @@ namespace MesApp.Api.Controllers;
 /// <summary>
 /// 検査項目・基準マスタ（Spec.md 5.1 InspectionItem。C-10-10）。
 /// 基準の更新（C-10-10-03）では版数を自動インクリメントする。
+/// 対象品目・対象工程の意味と組み合わせの制約は <see cref="InspectionItemPolicy"/>。
 /// </summary>
 [ApiController]
 [Route("api/inspection-items")]
@@ -134,11 +136,9 @@ public class InspectionItemsController(MesAppDbContext db, IAuditLogger auditLog
         {
             return ApiText.T("存在しない対象工程IDです。");
         }
-        if (request.LowerLimit is not null && request.UpperLimit is not null && request.LowerLimit > request.UpperLimit)
-        {
-            return ApiText.T("規格値の下限が上限を超えています。");
-        }
-        return null;
+        // 判定条件はマスタCSV取込と共通（片方だけ通る状態を作らない。Spec.md 7.4）
+        return InspectionItemPolicy.CheckDefinition(request.Type, request.TargetProductId, request.TargetProcessId,
+            request.LowerLimit, request.UpperLimit, request.StandardValue);
     }
 
     /// <summary>
