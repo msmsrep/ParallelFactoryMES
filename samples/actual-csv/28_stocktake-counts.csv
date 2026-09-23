@@ -1,0 +1,3 @@
+﻿StocktakeNo,LotNumber,LocationCode,CountedQuantity,Finalize
+SMP-ST-001,MP9002-260901,WH-S01,2,true
+SMP-ST-001,MP9003-260901,WH-S01,1,

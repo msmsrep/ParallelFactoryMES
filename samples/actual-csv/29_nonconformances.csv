@@ -1,0 +1,3 @@
+﻿ReportNo,LotNumber,Source,Content,OrderNo,Sequence,CauseCategory,CauseDetail,Action,ActionInstruction,ActionRecord,Approve
+,R3001-260902,,,,,,,Discard,サプライヤーへ返送のうえ廃棄する,返品伝票 RT-0001 で返送した,true
+SMP-NC-001,SF2000-S001,Production,組立前の外観確認で内径の擦り傷を2個発見,SMP-FG-001,10,加工,工程10の治具の当たり,SpecialAcceptance,機能に影響が無いため特採とする,,false

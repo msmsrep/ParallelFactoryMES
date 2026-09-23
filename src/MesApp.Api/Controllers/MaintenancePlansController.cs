@@ -60,27 +60,15 @@ public class MaintenancePlansController(
     public async Task<ActionResult<MaintenancePlanResponse>> Create(
         MaintenancePlanRequest request, CancellationToken ct)
     {
-        var equipment = await db.Equipments.FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
-        if (equipment is null || !equipment.IsActive)
+        // 判定・保存は実績CSV取込と共通（MaintenanceOrderService）
+        var outcome = await maintenanceOrders.CreatePlanAsync(
+            request, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        if (outcome.Failed)
         {
-            return this.BadRequestProblem(ApiText.T("存在しない（または無効な）設備IDです。"));
+            return this.BadRequestProblem(outcome.Error!);
         }
-
-        var plan = new MaintenancePlan
-        {
-            EquipmentId = request.EquipmentId,
-            Category = request.Category,
-            PlanYear = request.PlanYear,
-            ScheduledDate = request.ScheduledDate,
-            CycleDays = request.CycleDays,
-            Note = request.Note,
-            CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-        };
-        db.MaintenancePlans.Add(plan);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Maintenance", "PlanCreate", nameof(MaintenancePlan), plan.Id.ToString(),
-            detail: $"equipment={equipment.AssetNo}, year={plan.PlanYear}", ct: ct);
-        return CreatedAtAction(nameof(Get), new { id = plan.Id }, await GetResponseAsync(plan.Id, ct));
+        var id = outcome.Value!.Id;
+        return CreatedAtAction(nameof(Get), new { id }, await GetResponseAsync(id, ct));
     }
 
     /// <summary>計画の変更（E-30-10-03。指示発行前のみ）</summary>

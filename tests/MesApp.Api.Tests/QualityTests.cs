@@ -299,6 +299,149 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 不適合をCSVで起票しロット番号で指して承認まで進められる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lotA = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 10m, ctx.MaterialLocationId, lotNumber: "RM-A");
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 10m, ctx.MaterialLocationId, lotNumber: "RM-B");
+        // 番号の分からない不適合（自動起票と同じく自動採番）
+        (await admin.PostAsJsonAsync("/api/nonconformances", new NonconformanceCreateRequest(
+            NonconformanceSource.Receiving, lotA.Id, null, null, "外観不良", null, null))).EnsureSuccessStatusCode();
+
+        // 作業者は起票できるが、対応指示は品質管理だけ。1行でも誤りがあれば起票も取り消す
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "op1", "Passw0rd123", MesRoles.Operator);
+        var denied = await Phase3TestData.ImportActualCsvAsync(operator_, "nonconformances", """
+            ReportNo,LotNumber,Content,Action
+            CSV-NC-1,RM-B,寸法不良,
+            ,RM-A,,Hold
+            """);
+        Assert.False(denied.Succeeded);
+        Assert.Contains(denied.Errors, e => e.Line == 3 && e.Message.Contains("品質管理"));
+        Assert.Single((await admin.GetFromJsonAsync<PagedResult<NonconformanceResponse>>("/api/nonconformances"))!.Items);
+
+        // 番号の分からない不適合をロット番号で指し、対応指示→対応記録→承認まで1行で進める（保留でロットは保留になる）
+        var imported = await Phase3TestData.ImportActualCsvAsync(admin, "nonconformances", """
+            ReportNo,LotNumber,Source,Content,Action,ActionInstruction,ActionRecord,Approve
+            ,RM-A,,,保留,再検査まで保留,再検査で合格,true
+            CSV-NC-1,RM-B,受入,寸法不良,,,,
+            CSV-NC-2,RM-B,受入,外観不良,,,,
+            """);
+        Assert.True(imported.Succeeded, string.Join(" / ", imported.Errors.Select(e => $"{e.Line} {e.Message}")));
+        var reports = (await admin.GetFromJsonAsync<PagedResult<NonconformanceResponse>>("/api/nonconformances"))!.Items;
+        var closed = reports.Single(r => r.LotNumber == "RM-A");
+        Assert.Equal(NonconformanceStatus.Closed, closed.Status);
+        Assert.Equal(NonconformanceAction.Hold, closed.Action);
+        Assert.Equal("再検査で合格", closed.ActionRecord);
+        Assert.Contains(reports, r => r.ReportNo == "CSV-NC-1" && r.Status == NonconformanceStatus.Open);
+
+        // 同じロットに未完了の不適合が2件あると、ロット番号ではどれか決まらない。自動採番の形式（NC〜）の番号も拒否する
+        var ambiguous = await Phase3TestData.ImportActualCsvAsync(admin, "nonconformances", """
+            ReportNo,LotNumber,Content,Action
+            ,RM-B,,Hold
+            NC-9,RM-B,外観不良,
+            """);
+        Assert.False(ambiguous.Succeeded);
+        Assert.Contains(ambiguous.Errors, e => e.Line == 2 && e.Message.Contains("2 件"));
+        Assert.Contains(ambiguous.Errors, e => e.Line == 3 && e.Message.Contains("自動採番"));
+
+        // 番号で指せば、既存の不適合を進められる
+        var byNumber = await Phase3TestData.ImportActualCsvAsync(admin, "nonconformances", """
+            ReportNo,Action,ActionInstruction
+            CSV-NC-2,Discard,廃棄する
+            """);
+        Assert.True(byNumber.Succeeded, string.Join(" / ", byNumber.Errors.Select(e => e.Message)));
+        var lotB = (await admin.GetFromJsonAsync<PagedResult<MesApp.Core.Contracts.Inventory.StockResponse>>("/api/inventory/stocks?pageSize=100"))!
+            .Items.Single(s => s.LotNumber == "RM-B");
+        Assert.Equal(LotStockStatus.ToBeDiscarded, lotB.LotStatus);
+    }
+
+    [Fact]
+    public async Task サンプル品をCSVで採取すると在庫から抜かれ保管を終えられる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 10m, ctx.ProductLocationId, lotNumber: "FG-A");
+
+        // 在庫を超える採取があれば、正しい行も取り消す
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "sample-storages", """
+            SampleNo,LotNumber,Quantity,StorageLocationCode,RetainUntil,Close
+            CSV-SP-1,FG-A,1,LOC-M,2027-09-30,
+            CSV-SP-2,FG-A,99,LOC-M,,
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3);
+        Assert.Equal(10m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        var imported = await Phase3TestData.ImportActualCsvAsync(admin, "sample-storages", """
+            SampleNo,LotNumber,Quantity,StorageLocationCode,RetainUntil,Close
+            CSV-SP-1,FG-A,1,LOC-M,2027-09-30,
+            CSV-SP-2,FG-A,2,LOC-M,,払出
+            """);
+        Assert.True(imported.Succeeded, string.Join(" / ", imported.Errors.Select(e => e.Message)));
+        Assert.Equal(7m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+        var samples = (await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Inventory.SampleStorageResponse>>("/api/sample-storages"))!;
+        Assert.Equal(SampleStorageStatus.Stored, samples.Single(s => s.SampleNo == "CSV-SP-1").Status);
+        Assert.Equal(SampleStorageStatus.Consumed, samples.Single(s => s.SampleNo == "CSV-SP-2").Status);
+
+        // 登録済みの番号は保管の終了だけ。在庫は動かさない
+        var closed = await Phase3TestData.ImportActualCsvAsync(admin, "sample-storages", """
+            SampleNo,Close
+            CSV-SP-1,Disposed
+            """);
+        Assert.True(closed.Succeeded, string.Join(" / ", closed.Errors.Select(e => e.Message)));
+        Assert.Equal(7m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 品質管理の権限（作業者は取り込めない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "op1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(operator_, "sample-storages",
+            "SampleNo,Close\nCSV-SP-1,Disposed\n")).StatusCode);
+    }
+
+    [Fact]
+    public async Task 校正をCSVで記録すると検査機の次回期限が更新される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var created = await admin.PostAsJsonAsync("/api/inspection-devices",
+            new InspectionDeviceRequest("MD-OLD", "期限切れノギス", null, null,
+                new DateOnly(2025, 1, 10), new DateOnly(2026, 1, 10), 365, null));
+        created.EnsureSuccessStatusCode();
+        var device = (await created.Content.ReadFromJsonAsync<InspectionDeviceResponse>())!;
+
+        // 未登録の検査機の行があれば、正しい行も記録しない
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "calibrations", """
+            DeviceCode,CalibratedOn,NextDueOn,Result
+            MD-OLD,2026-09-02,,合格
+            MD-X,2026-09-02,,合格
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("MD-X"));
+        Assert.Equal(new DateOnly(2026, 1, 10),
+            (await admin.GetFromJsonAsync<InspectionDeviceResponse>($"/api/inspection-devices/{device.Id}"))!.CalibrationDueOn);
+
+        // 次回期限を省略すると校正周期から決まる（単票の校正記録と同じ）。履歴も1件残る
+        var imported = await Phase3TestData.ImportActualCsvAsync(admin, "calibrations", """
+            DeviceCode,CalibratedOn,NextDueOn,Result
+            MD-OLD,2026-09-02,,合格
+            """);
+        Assert.True(imported.Succeeded, string.Join(" / ", imported.Errors.Select(e => e.Message)));
+        var updated = (await admin.GetFromJsonAsync<InspectionDeviceResponse>($"/api/inspection-devices/{device.Id}"))!;
+        Assert.Equal(new DateOnly(2026, 9, 2), updated.CalibratedOn);
+        Assert.Equal(new DateOnly(2027, 9, 2), updated.CalibrationDueOn);
+        var history = (await admin.GetFromJsonAsync<List<InspectionDeviceCalibrationResponse>>(
+            $"/api/inspection-devices/{device.Id}/calibrations"))!;
+        Assert.Equal("合格", Assert.Single(history).Result);
+
+        // 校正の記録は品質管理の権限（作業者は取り込めない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "op1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(operator_, "calibrations",
+            "DeviceCode,CalibratedOn\nMD-OLD,2026-09-03\n")).StatusCode);
+    }
+
+    [Fact]
     public async Task 校正期限切れの検査機では検査実績を登録できない()
     {
         using var factory = new ApiFactory();

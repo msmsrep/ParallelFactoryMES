@@ -2064,4 +2064,523 @@
   <data name="取消済みの検査は訂正できません。" xml:space="preserve">
     <value>A canceled inspection cannot be corrected.</value>
   </data>
+  <data name="ピッキング番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Picking number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="ピッキング番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Picking number '{0}' already exists.</value>
+  </data>
+  <data name="棚卸番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Stocktake number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="棚卸番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Stocktake number '{0}' already exists.</value>
+  </data>
+  <data name="不適合番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Nonconformance number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="不適合番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Nonconformance number '{0}' already exists.</value>
+  </data>
+  <data name="保全指示番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Maintenance order number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="保全指示番号 '{0}' は既に存在します。" xml:space="preserve">
+    <value>Maintenance order number '{0}' already exists.</value>
+  </data>
+  <data name="保全手順書" xml:space="preserve">
+    <value>Maintenance procedures</value>
+  </data>
+  <data name="対象設備の資産番号" xml:space="preserve">
+    <value>Target equipment asset number</value>
+  </data>
+  <data name="設備用の手順書。空欄で解除" xml:space="preserve">
+    <value>For an equipment procedure. Leave blank to clear</value>
+  </data>
+  <data name="対象治工具コード" xml:space="preserve">
+    <value>Target tool code</value>
+  </data>
+  <data name="治工具メンテナンス用の手順書。空欄で解除" xml:space="preserve">
+    <value>For a tool maintenance procedure. Leave blank to clear</value>
+  </data>
+  <data name="保全実績の登録時に実施者と照合する。空欄で解除" xml:space="preserve">
+    <value>Checked against the performer when recording maintenance. Leave blank to clear</value>
+  </data>
+  <data name="1行に1ロット。在庫から引き落とす。設備の資産管理部品・消耗品の区分は単票と同じに判定する" xml:space="preserve">
+    <value>One lot per row, issued from stock. Asset parts and consumables of the equipment are judged the same way as on the screen</value>
+  </data>
+  <data name="Planned（計画）/ Spot（突発依頼）。省略時は突発依頼。計画は保全担当者だけが登録できる" xml:space="preserve">
+    <value>Planned / Spot (unplanned request). Defaults to Spot. Only maintenance staff can register Planned</value>
+  </data>
+  <data name="true で治工具の寿命カウンタをリセットする（治工具メンテナンスの指示のみ）" xml:space="preserve">
+    <value>true resets the tool life counter (tool maintenance orders only)</value>
+  </data>
+  <data name="yyyy-MM-dd HH:mm（工場の時刻）。+09:00 などのオフセット付きも可。まとまりの最初の行の値を使う" xml:space="preserve">
+    <value>yyyy-MM-dd HH:mm (factory time). An offset such as +09:00 is also accepted. The value on the first row of the group is used</value>
+  </data>
+  <data name="ロット &#x27;{0}&#x27; は登録されていません（PartLotNumber）。" xml:space="preserve">
+    <value>Lot '{0}' is not registered (PartLotNumber).</value>
+  </data>
+  <data name="予定日" xml:space="preserve">
+    <value>Scheduled date</value>
+  </data>
+  <data name="使用部品の補足" xml:space="preserve">
+    <value>Parts used (notes)</value>
+  </data>
+  <data name="依頼区分" xml:space="preserve">
+    <value>Request type</value>
+  </data>
+  <data name="保全実績" xml:space="preserve">
+    <value>Maintenance records</value>
+  </data>
+  <data name="保全手順書番号" xml:space="preserve">
+    <value>Maintenance procedure number</value>
+  </data>
+  <data name="保全指示・突発依頼" xml:space="preserve">
+    <value>Maintenance orders / unplanned requests</value>
+  </data>
+  <data name="保全指示番号" xml:space="preserve">
+    <value>Maintenance order number</value>
+  </data>
+  <data name="実施結果" xml:space="preserve">
+    <value>Result</value>
+  </data>
+  <data name="対象治工具コードとどちらか一方は必須" xml:space="preserve">
+    <value>Either this or the target tool code is required</value>
+  </data>
+  <data name="寿命をリセットする" xml:space="preserve">
+    <value>Reset tool life</value>
+  </data>
+  <data name="後続の保全実績CSVから指示を指す。MTで始まる番号は自動採番用のため使えない" xml:space="preserve">
+    <value>Referenced from the maintenance record CSV that follows. Numbers starting with MT are reserved for automatic numbering</value>
+  </data>
+  <data name="有効な保全手順書" xml:space="preserve">
+    <value>Active maintenance procedure</value>
+  </data>
+  <data name="治工具メンテナンスの指示のとき" xml:space="preserve">
+    <value>For a tool maintenance order</value>
+  </data>
+  <data name="消費数量" xml:space="preserve">
+    <value>Quantity consumed</value>
+  </data>
+  <data name="消費部材には PartLocationCode（払出元ロケーション）と PartQuantity（数量）が必要です。" xml:space="preserve">
+    <value>A consumed part needs PartLocationCode (issuing location) and PartQuantity (quantity).</value>
+  </data>
+  <data name="消費部材のロット番号" xml:space="preserve">
+    <value>Consumed part lot number</value>
+  </data>
+  <data name="消費部材を書くときは必須" xml:space="preserve">
+    <value>Required when a consumed part is written</value>
+  </data>
+  <data name="消費部材を書く行には PartLotNumber（部材のロット番号）が必要です。" xml:space="preserve">
+    <value>A row with a consumed part needs PartLotNumber (lot number of the part).</value>
+  </data>
+  <data name="登録済みで有効な保全手順書" xml:space="preserve">
+    <value>A registered, active maintenance procedure</value>
+  </data>
+  <data name="登録済みの保全指示（保全指示CSVの MaintenanceNo）。同じ番号の行を1件の実績にまとめ、登録で指示は完了する" xml:space="preserve">
+    <value>A registered maintenance order (MaintenanceNo in the maintenance order CSV). Rows with the same number form one record, and registering it completes the order</value>
+  </data>
+  <data name="自由記述（在庫を動かす部材は Part〜 の列に書く）" xml:space="preserve">
+    <value>Free text (write parts that move stock in the Part... columns)</value>
+  </data>
+  <data name="計画保全の指示は保全担当者だけが登録できます（突発依頼は誰でも登録できます）。" xml:space="preserve">
+    <value>Only maintenance staff can register planned maintenance orders (anyone can register unplanned requests).</value>
+  </data>
+  <data name="部材の備考" xml:space="preserve">
+    <value>Part note</value>
+  </data>
+  <data name="保全指示 &#x27;{0}&#x27; は登録されていません（MaintenanceNo）。" xml:space="preserve">
+    <value>Maintenance order '{0}' is not registered (MaintenanceNo).</value>
+  </data>
+  <data name="検査機が見つかりません。" xml:space="preserve">
+    <value>Inspection device not found.</value>
+  </data>
+  <data name="0以上の整数。使用時間とどちらかは0より大きいこと" xml:space="preserve">
+    <value>Integer of 0 or more. Either this or the usage hours must be greater than 0</value>
+  </data>
+  <data name="true で引当に続けて払出・受領確認まで進める（受領者は取り込んだユーザー）" xml:space="preserve">
+    <value>true continues from allocation to issue and receipt confirmation (the receiver is the importing user)</value>
+  </data>
+  <data name="true で返却まで進める（治工具は再び引当できるようになる）" xml:space="preserve">
+    <value>true continues to return (the tool can be allocated again)</value>
+  </data>
+  <data name="yyyy-MM-dd HH:mm（工場の時刻）。+09:00 などのオフセット付きも可。空欄なら取り込んだ時刻。寿命の累計はメンテナンスで寿命をリセットした時刻より後の記録だけを数える" xml:space="preserve">
+    <value>yyyy-MM-dd HH:mm (factory time). An offset such as +09:00 is also accepted. Blank means the import time. Tool life only counts records after the time the life was reset by maintenance</value>
+  </data>
+  <data name="yyyy-MM-dd。検査機の最終校正日になる" xml:space="preserve">
+    <value>yyyy-MM-dd. Becomes the device's last calibration date</value>
+  </data>
+  <data name="yyyy-MM-dd。空欄なら校正日＋校正周期（周期も無ければ期限なし）" xml:space="preserve">
+    <value>yyyy-MM-dd. Blank means calibration date + calibration cycle (no due date if there is no cycle)</value>
+  </data>
+  <data name="使用中・メンテナンス中・寿命到達の治工具は引き当てられない" xml:space="preserve">
+    <value>Tools in use, under maintenance or at end of life cannot be allocated</value>
+  </data>
+  <data name="使用回数" xml:space="preserve">
+    <value>Usage count</value>
+  </data>
+  <data name="使用時間" xml:space="preserve">
+    <value>Usage hours</value>
+  </data>
+  <data name="合格・調整後合格 など" xml:space="preserve">
+    <value>Pass, pass after adjustment, etc.</value>
+  </data>
+  <data name="払い出す" xml:space="preserve">
+    <value>Issue</value>
+  </data>
+  <data name="校正日" xml:space="preserve">
+    <value>Calibration date</value>
+  </data>
+  <data name="校正結果" xml:space="preserve">
+    <value>Calibration result</value>
+  </data>
+  <data name="検査機の校正" xml:space="preserve">
+    <value>Inspection device calibrations</value>
+  </data>
+  <data name="治工具の利用実績" xml:space="preserve">
+    <value>Tool usage records</value>
+  </data>
+  <data name="治工具の引当・払出" xml:space="preserve">
+    <value>Tool allocation / issue</value>
+  </data>
+  <data name="登録済みで有効な治工具" xml:space="preserve">
+    <value>A registered, active tool</value>
+  </data>
+  <data name="登録済みの検査機・測定器" xml:space="preserve">
+    <value>A registered inspection/measuring device</value>
+  </data>
+  <data name="記録日時" xml:space="preserve">
+    <value>Recorded at</value>
+  </data>
+  <data name="返却する" xml:space="preserve">
+    <value>Return</value>
+  </data>
+  <data name="有効な治工具" xml:space="preserve">
+    <value>Active tool</value>
+  </data>
+  <data name="操作 &#x27;{0}&#x27; には {1} が必要です。" xml:space="preserve">
+    <value>Operation '{0}' requires {1}.</value>
+  </data>
+  <data name="Quantity（数量）は0より大きい値にしてください。" xml:space="preserve">
+    <value>Quantity must be greater than 0.</value>
+  </data>
+  <data name="ロット &#x27;{0}&#x27; は登録されていません（{1}）。" xml:space="preserve">
+    <value>Lot '{0}' is not registered ({1}).</value>
+  </data>
+  <data name="Move（移動）/ Adjust（数量調整）/ Status（状態変更）/ Split（分割）/ Merge（統合）/ Transfer（振替）/ Discard（廃棄）/ Return（返品）/ IssueReturn（払出戻し）" xml:space="preserve">
+    <value>Move / Adjust (quantity adjustment) / Status (status change) / Split / Merge / Transfer / Discard / Return (return to supplier) / IssueReturn (return from issue)</value>
+  </data>
+  <data name="ロット番号" xml:space="preserve">
+    <value>Lot number</value>
+  </data>
+  <data name="分割・振替で作るロットの番号。空欄なら自動採番（後の行から指すなら指定する）" xml:space="preserve">
+    <value>Number of the lot created by split or transfer. Blank means automatic numbering (specify it to reference the lot from later rows)</value>
+  </data>
+  <data name="品目振替のとき。振替では振替先品目か新ロット番号のどちらかが必要" xml:space="preserve">
+    <value>For a product transfer. A transfer needs either the destination product or a new lot number</value>
+  </data>
+  <data name="在庫オペレーション" xml:space="preserve">
+    <value>Inventory operations</value>
+  </data>
+  <data name="在庫状態" xml:space="preserve">
+    <value>Stock status</value>
+  </data>
+  <data name="払出戻しで作業指示を記録する場合（工程順序と合わせて指す）" xml:space="preserve">
+    <value>To record the work order on a return from issue (specify with the routing sequence)</value>
+  </data>
+  <data name="振替先品目コード" xml:space="preserve">
+    <value>Destination product code</value>
+  </data>
+  <data name="操作" xml:space="preserve">
+    <value>Operation</value>
+  </data>
+  <data name="操作するロット（統合では統合元）。前の行で分割・振替したロットも指せる" xml:space="preserve">
+    <value>Lot to operate on (the source lot for a merge). Lots split or transferred on earlier rows can also be specified</value>
+  </data>
+  <data name="操作する在庫の場所（移動元・払出戻しの戻し先）。状態変更以外で必須" xml:space="preserve">
+    <value>Location of the stock (source of a move, destination of a return from issue). Required except for status changes</value>
+  </data>
+  <data name="数量" xml:space="preserve">
+    <value>Quantity</value>
+  </data>
+  <data name="数量調整で必須。状態変更・廃棄・返品では状態履歴・在庫履歴に残る" xml:space="preserve">
+    <value>Required for adjustments. For status changes, discards and returns it is kept in the status/stock history</value>
+  </data>
+  <data name="新ロット番号" xml:space="preserve">
+    <value>New lot number</value>
+  </data>
+  <data name="状態変更で必須。Normal（正常）/ OnHold（保留）/ AwaitingInspection（検査待ち）/ Defective（不良）/ ToBeDiscarded（廃棄予定）" xml:space="preserve">
+    <value>Required for status changes. Normal / OnHold / AwaitingInspection / Defective / ToBeDiscarded</value>
+  </data>
+  <data name="状態変更・統合以外で必須。数量調整では調整後の数量（0以上）、ほかは0より大きい数値" xml:space="preserve">
+    <value>Required except for status changes and merges. For adjustments, the quantity after adjustment (0 or more); otherwise a number greater than 0</value>
+  </data>
+  <data name="理由" xml:space="preserve">
+    <value>Reason</value>
+  </data>
+  <data name="移動で必須" xml:space="preserve">
+    <value>Required for moves</value>
+  </data>
+  <data name="移動先ロケーションコード" xml:space="preserve">
+    <value>Destination location code</value>
+  </data>
+  <data name="統合で必須。同じ品目・同じロケーションのロット" xml:space="preserve">
+    <value>Required for merges. A lot of the same product at the same location</value>
+  </data>
+  <data name="統合先ロット番号" xml:space="preserve">
+    <value>Merge target lot number</value>
+  </data>
+  <data name="Quantity（数量）は必須です。" xml:space="preserve">
+    <value>Quantity is required.</value>
+  </data>
+  <data name="出荷ピッキングには ShippingNo（出荷番号）が必要です。" xml:space="preserve">
+    <value>Shipping picking requires ShippingNo (shipping number).</value>
+  </data>
+  <data name="棚卸 &#x27;{0}&#x27; は登録されていません（StocktakeNo）。" xml:space="preserve">
+    <value>Stocktake '{0}' is not registered (StocktakeNo).</value>
+  </data>
+  <data name="CountedQuantity（実棚数量）は必須です。" xml:space="preserve">
+    <value>CountedQuantity (counted quantity) is required.</value>
+  </data>
+  <data name="棚卸 &#x27;{0}&#x27; にロット &#x27;{1}&#x27;・ロケーション &#x27;{2}&#x27; の明細はありません。" xml:space="preserve">
+    <value>Stocktake '{0}' has no line for lot '{1}' at location '{2}'.</value>
+  </data>
+  <data name="搬送指示が見つかりません。" xml:space="preserve">
+    <value>Transfer order not found.</value>
+  </data>
+  <data name="1行＝1明細。ロット・ロケーションは先入れ先出し（有効期限優先）で自動引当する" xml:space="preserve">
+    <value>One row is one line. Lots and locations are allocated automatically by first-in first-out (earliest expiry first)</value>
+  </data>
+  <data name="ProcessIssue（工程払出）/ Shipping（出荷）。省略時は工程払出。まとまりの最初の行の値を使う" xml:space="preserve">
+    <value>ProcessIssue (issue to process) / Shipping. Defaults to ProcessIssue. The value on the first row of the group is used</value>
+  </data>
+  <data name="true でピッキングを実行し在庫を引き落とす（まとまりの最初の行の値）" xml:space="preserve">
+    <value>true executes the picking and issues the stock (value on the first row of the group)</value>
+  </data>
+  <data name="true で実棚数の登録に続けて確定し、差異を在庫へ反映する（まとまりの最初の行の値）" xml:space="preserve">
+    <value>true finalizes after registering the counts and applies the differences to stock (value on the first row of the group)</value>
+  </data>
+  <data name="true で指示に続けて在庫を移動し完了にする。空欄なら指示のまま残る" xml:space="preserve">
+    <value>true moves the stock and completes the order. Blank leaves it as instructed</value>
+  </data>
+  <data name="ピッキング指示" xml:space="preserve">
+    <value>Picking orders</value>
+  </data>
+  <data name="ピッキング番号" xml:space="preserve">
+    <value>Picking number</value>
+  </data>
+  <data name="出荷ピッキングで必須" xml:space="preserve">
+    <value>Required for shipping picking</value>
+  </data>
+  <data name="同じ番号の行を1件の指示にまとめる。PKで始まる番号は自動採番用のため使えない" xml:space="preserve">
+    <value>Rows with the same number form one order. Numbers starting with PK are reserved for automatic numbering</value>
+  </data>
+  <data name="実棚数" xml:space="preserve">
+    <value>Stocktake counts</value>
+  </data>
+  <data name="実棚数量" xml:space="preserve">
+    <value>Counted quantity</value>
+  </data>
+  <data name="対象ロケーションコード" xml:space="preserve">
+    <value>Target location code</value>
+  </data>
+  <data name="工程払出で必須" xml:space="preserve">
+    <value>Required for issue to process</value>
+  </data>
+  <data name="工程払出で必須（工程順序と合わせて払出先の作業指示を指す）" xml:space="preserve">
+    <value>Required for issue to process (specifies the destination work order together with the routing sequence)</value>
+  </data>
+  <data name="後続の実棚数CSVから指示を指す。STで始まる番号は自動採番用のため使えない" xml:space="preserve">
+    <value>Referenced from the stocktake count CSV that follows. Numbers starting with ST are reserved for automatic numbering</value>
+  </data>
+  <data name="払出区分" xml:space="preserve">
+    <value>Issue type</value>
+  </data>
+  <data name="搬送するロット" xml:space="preserve">
+    <value>Lot to transfer</value>
+  </data>
+  <data name="搬送指示" xml:space="preserve">
+    <value>Transfer orders</value>
+  </data>
+  <data name="棚卸の明細のロケーション" xml:space="preserve">
+    <value>Location of the stocktake line</value>
+  </data>
+  <data name="棚卸の明細のロット" xml:space="preserve">
+    <value>Lot of the stocktake line</value>
+  </data>
+  <data name="棚卸指示" xml:space="preserve">
+    <value>Stocktakes</value>
+  </data>
+  <data name="棚卸番号" xml:space="preserve">
+    <value>Stocktake number</value>
+  </data>
+  <data name="登録済みで有効なロケーション" xml:space="preserve">
+    <value>A registered, active location</value>
+  </data>
+  <data name="登録済みの棚卸（棚卸指示CSVの StocktakeNo）。同じ番号の行をまとめて登録する" xml:space="preserve">
+    <value>A registered stocktake (StocktakeNo in the stocktake CSV). Rows with the same number are registered together</value>
+  </data>
+  <data name="確定する" xml:space="preserve">
+    <value>Finalize</value>
+  </data>
+  <data name="移動を実行する" xml:space="preserve">
+    <value>Execute the move</value>
+  </data>
+  <data name="移動元ロケーションコード" xml:space="preserve">
+    <value>Source location code</value>
+  </data>
+  <data name="空欄なら全ロケーション。作成時点の現在庫が明細になる" xml:space="preserve">
+    <value>Blank means all locations. The stock at the time of creation becomes the lines</value>
+  </data>
+  <data name="不適合の対応指示・承認は品質管理の担当者だけが登録できます。" xml:space="preserve">
+    <value>Only quality control staff can register nonconformance action instructions and approvals.</value>
+  </data>
+  <data name="ReportNo（不適合番号）か LotNumber（ロット番号）のどちらかが必要です。" xml:space="preserve">
+    <value>Either ReportNo (nonconformance number) or LotNumber (lot number) is required.</value>
+  </data>
+  <data name="不適合を起票する行には Content（内容）が必要です。" xml:space="preserve">
+    <value>A row that raises a nonconformance needs Content.</value>
+  </data>
+  <data name="ロット &#x27;{0}&#x27; に未完了の不適合はありません。" xml:space="preserve">
+    <value>Lot '{0}' has no open nonconformance.</value>
+  </data>
+  <data name="ロット &#x27;{0}&#x27; に未完了の不適合が {1} 件あります。ReportNo で指定してください。" xml:space="preserve">
+    <value>Lot '{0}' has {1} open nonconformances. Specify one with ReportNo.</value>
+  </data>
+  <data name="サンプルを採取する行には LotNumber・Quantity・StorageLocationCode が必要です。" xml:space="preserve">
+    <value>A row that collects a sample needs LotNumber, Quantity and StorageLocationCode.</value>
+  </data>
+  <data name="サンプル番号 &#x27;{0}&#x27; は既に存在します。" xml:space="preserve">
+    <value>Sample number '{0}' already exists.</value>
+  </data>
+  <data name="サンプル番号 &#x27;{0}&#x27; は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+    <value>Sample number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
+  </data>
+  <data name="サンプルが見つかりません。" xml:space="preserve">
+    <value>Sample not found.</value>
+  </data>
+  <data name="Consumed（払出）/ Disposed（廃棄）。書くと保管を終える（在庫は動かさない）" xml:space="preserve">
+    <value>Consumed / Disposed. Writing it ends the storage (stock does not move)</value>
+  </data>
+  <data name="true で承認してクローズする（特採ならロットを正常へ戻す）。品質管理の担当者のみ" xml:space="preserve">
+    <value>true approves and closes it (special acceptance returns the lot to normal). Quality control staff only</value>
+  </data>
+  <data name="サンプル品保管" xml:space="preserve">
+    <value>Sample storage</value>
+  </data>
+  <data name="不適合" xml:space="preserve">
+    <value>Nonconformances</value>
+  </data>
+  <data name="不適合番号" xml:space="preserve">
+    <value>Nonconformance number</value>
+  </data>
+  <data name="保管の終了" xml:space="preserve">
+    <value>End of storage</value>
+  </data>
+  <data name="保管場所のロケーションコード" xml:space="preserve">
+    <value>Storage location code</value>
+  </data>
+  <data name="保管期限" xml:space="preserve">
+    <value>Retain until</value>
+  </data>
+  <data name="原因の詳細" xml:space="preserve">
+    <value>Cause details</value>
+  </data>
+  <data name="原因区分" xml:space="preserve">
+    <value>Cause category</value>
+  </data>
+  <data name="対応" xml:space="preserve">
+    <value>Action</value>
+  </data>
+  <data name="対応の実施記録" xml:space="preserve">
+    <value>Action record</value>
+  </data>
+  <data name="対応指示の内容" xml:space="preserve">
+    <value>Action instruction</value>
+  </data>
+  <data name="採取のときは必須。0より大きい数値" xml:space="preserve">
+    <value>Required when collecting. A number greater than 0</value>
+  </data>
+  <data name="採取のときは必須。保管棚は引当の対象にならない" xml:space="preserve">
+    <value>Required when collecting. Storage shelves are not used for allocation</value>
+  </data>
+  <data name="採取のときは必須。在庫の多いロケーションから抜く" xml:space="preserve">
+    <value>Required when collecting. Taken from the location with the most stock</value>
+  </data>
+  <data name="書くと対応実績を記録する（対応指示済みであること）" xml:space="preserve">
+    <value>Writing it records the action performed (the action must have been instructed)</value>
+  </data>
+  <data name="書くと対応指示を出す。Rework（リワーク）/ Hold（保留）/ Discard（廃棄）/ SpecialAcceptance（特採）。品質管理の担当者のみ" xml:space="preserve">
+    <value>Writing it issues an action instruction. Rework / Hold / Discard / SpecialAcceptance. Quality control staff only</value>
+  </data>
+  <data name="未登録なら採取、登録済みなら保管の終了（Close）だけを行う。SPで始まる番号は自動採番用のため使えない" xml:space="preserve">
+    <value>Collects the sample if unregistered; if registered, only ends the storage (Close). Numbers starting with SP are reserved for automatic numbering</value>
+  </data>
+  <data name="発生元" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="登録済みならその不適合を指し、未登録なら新規に起票する（NCで始まる番号は自動採番用のため使えない）。空欄なら LotNumber で指す" xml:space="preserve">
+    <value>Refers to the nonconformance if registered, otherwise raises a new one (numbers starting with NC are reserved for automatic numbering). If blank, LotNumber is used</value>
+  </data>
+  <data name="起票では対象ロット。ReportNo が空欄の行では、そのロットの未完了の不適合（1件だけのとき）を指す" xml:space="preserve">
+    <value>The target lot when raising. On a row with a blank ReportNo, refers to the lot's open nonconformance (only when there is exactly one)</value>
+  </data>
+  <data name="起票で作業指示に紐づける場合（工程順序と合わせて指す）" xml:space="preserve">
+    <value>To link a raised nonconformance to a work order (specify with the routing sequence)</value>
+  </data>
+  <data name="起票のとき" xml:space="preserve">
+    <value>When raising</value>
+  </data>
+  <data name="起票のとき。Production（生産実績）/ Inspection（検査）/ Receiving（受入）。省略時は生産実績" xml:space="preserve">
+    <value>When raising. Production / Inspection / Receiving. Defaults to Production</value>
+  </data>
+  <data name="起票のときは必須" xml:space="preserve">
+    <value>Required when raising</value>
+  </data>
+  <data name="保全計画から作る指示の依頼区分は計画にしてください。" xml:space="preserve">
+    <value>An order created from a maintenance plan must have the request type Planned.</value>
+  </data>
+  <data name="保全計画から作る指示には EquipmentAssetNo（設備）と ScheduledDate（予定日）が必要です。" xml:space="preserve">
+    <value>An order created from a maintenance plan needs EquipmentAssetNo (equipment) and ScheduledDate (scheduled date).</value>
+  </data>
+  <data name="設備と予定日 {0} が一致する未指示の保全計画はありません。" xml:space="preserve">
+    <value>There is no uninstructed maintenance plan matching the equipment and scheduled date {0}.</value>
+  </data>
+  <data name="設備と予定日 {0} が一致する未指示の保全計画が {1} 件あります。予定日を分けてください。" xml:space="preserve">
+    <value>There are {1} uninstructed maintenance plans matching the equipment and scheduled date {0}. Give them different scheduled dates.</value>
+  </data>
+  <data name="PlanYear（計画年度）か ScheduledDate（予定日）のどちらかが必要です。" xml:space="preserve">
+    <value>Either PlanYear (plan year) or ScheduledDate (scheduled date) is required.</value>
+  </data>
+  <data name="Periodic（定期）/ Unplanned（計画外）。省略時は定期" xml:space="preserve">
+    <value>Periodic / Unplanned. Defaults to Periodic</value>
+  </data>
+  <data name="true で、設備と予定日が一致する未指示の保全計画（1件だけのとき）から作り、計画を指示済みにする。依頼区分は計画になる" xml:space="preserve">
+    <value>true creates the order from the uninstructed maintenance plan matching the equipment and scheduled date (only when there is exactly one) and marks the plan as ordered. The request type becomes Planned</value>
+  </data>
+  <data name="yyyy-MM-dd。保全指示CSVの FromPlan はこの日付と設備で計画を指すので、同じ設備の計画は予定日を分ける" xml:space="preserve">
+    <value>yyyy-MM-dd. FromPlan in the maintenance order CSV refers to a plan by this date and the equipment, so give plans for the same equipment different dates</value>
+  </data>
+  <data name="保全種別" xml:space="preserve">
+    <value>Maintenance category</value>
+  </data>
+  <data name="保全計画" xml:space="preserve">
+    <value>Maintenance plans</value>
+  </data>
+  <data name="保全計画から作る" xml:space="preserve">
+    <value>Create from maintenance plan</value>
+  </data>
+  <data name="周期（日）" xml:space="preserve">
+    <value>Cycle (days)</value>
+  </data>
+  <data name="定期保全の周期" xml:space="preserve">
+    <value>Cycle of periodic maintenance</value>
+  </data>
+  <data name="省略時は予定日の年。予定日も無ければ必須" xml:space="preserve">
+    <value>Defaults to the year of the scheduled date. Required if there is no scheduled date</value>
+  </data>
+  <data name="計画年度" xml:space="preserve">
+    <value>Plan year</value>
+  </data>
 </root>

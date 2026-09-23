@@ -19,9 +19,12 @@ public sealed class PickingService(
     NumberingService numbering,
     IAuditLogger auditLogger)
 {
-    /// <summary>ピッキング指示の作成（払出先＝作業指示または出荷指示。FEFOで自動引当）</summary>
+    /// <summary>
+    /// ピッキング指示の作成（払出先＝作業指示または出荷指示。FEFOで自動引当）。
+    /// pickingNo を渡すとその番号で登録する（CSV取込で後続の行から指示を指すため。空なら自動採番）
+    /// </summary>
     public async Task<Outcome<PickingOrder>> CreateAsync(
-        PickingOrderCreateRequest request, string? userId, CancellationToken ct)
+        PickingOrderCreateRequest request, string? pickingNo, string? userId, CancellationToken ct)
     {
         if (request.Lines.Count == 0)
         {
@@ -41,9 +44,23 @@ public sealed class PickingService(
             return Outcome<PickingOrder>.Invalid(ApiText.T("出荷ピッキングには有効な出荷指示ID（shippingOrderId）が必要です。"));
         }
 
+        if (string.IsNullOrWhiteSpace(pickingNo))
+        {
+            pickingNo = await numbering.NextPickingNoAsync(ct);
+        }
+        else if (NumberingService.IsAutoNumberFormat(pickingNo, NumberingService.PickingNoPrefix))
+        {
+            return Outcome<PickingOrder>.Invalid(
+                ApiText.T("ピッキング番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", pickingNo, NumberingService.PickingNoPrefix));
+        }
+        else if (await db.PickingOrders.AnyAsync(x => x.OrderNo == pickingNo, ct))
+        {
+            return Outcome<PickingOrder>.Conflict(ApiText.T("ピッキング番号 '{0}' は既に存在します。", pickingNo));
+        }
+
         var order = new PickingOrder
         {
-            OrderNo = await numbering.NextPickingNoAsync(ct),
+            OrderNo = pickingNo,
             Type = request.Type,
             WorkOrderId = request.Type == PickingOrderType.ProcessIssue ? request.WorkOrderId : null,
             ShippingOrderId = request.Type == PickingOrderType.Shipping ? request.ShippingOrderId : null,

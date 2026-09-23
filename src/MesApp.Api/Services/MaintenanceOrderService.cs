@@ -26,9 +26,18 @@ public sealed class MaintenanceOrderService(
     IBusinessDateService businessDate,
     IAuditLogger auditLogger)
 {
-    /// <summary>保全指示の作成。保全計画から作る場合は計画を「指示済み」にする</summary>
+    /// <summary>
+    /// 計画保全の指示を作れるロール（突発依頼は全ユーザーが起票できる。E-30-30-01）。
+    /// 単票APIとCSV取込で同じ定数を使う
+    /// </summary>
+    public const string PlannedOrderRoles = MesRoleGroups.MaintenanceManage;
+
+    /// <summary>
+    /// 保全指示の作成。保全計画から作る場合は計画を「指示済み」にする。
+    /// maintenanceNo を渡すとその番号で登録する（CSV取込で後続の行から指示を指すため。空なら自動採番）
+    /// </summary>
     public async Task<Outcome<MaintenanceOrder>> CreateAsync(
-        MaintenanceOrderCreateRequest request, string? userId, CancellationToken ct)
+        MaintenanceOrderCreateRequest request, string? maintenanceNo, string? userId, CancellationToken ct)
     {
         if ((request.EquipmentId is null) == (request.ToolId is null))
         {
@@ -49,6 +58,20 @@ public sealed class MaintenanceOrderService(
             return Outcome<MaintenanceOrder>.Invalid(ApiText.T("存在しない（または無効な）手順書IDです。"));
         }
 
+        if (string.IsNullOrWhiteSpace(maintenanceNo))
+        {
+            maintenanceNo = await numbering.NextMaintenanceNoAsync(ct);
+        }
+        else if (NumberingService.IsAutoNumberFormat(maintenanceNo, NumberingService.MaintenanceNoPrefix))
+        {
+            return Outcome<MaintenanceOrder>.Invalid(
+                ApiText.T("保全指示番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", maintenanceNo, NumberingService.MaintenanceNoPrefix));
+        }
+        else if (await db.MaintenanceOrders.AnyAsync(x => x.OrderNo == maintenanceNo, ct))
+        {
+            return Outcome<MaintenanceOrder>.Conflict(ApiText.T("保全指示番号 '{0}' は既に存在します。", maintenanceNo));
+        }
+
         MaintenancePlan? plan = null;
         if (request.MaintenancePlanId is int planId)
         {
@@ -66,7 +89,7 @@ public sealed class MaintenanceOrderService(
 
         var order = new MaintenanceOrder
         {
-            OrderNo = await numbering.NextMaintenanceNoAsync(ct),
+            OrderNo = maintenanceNo,
             EquipmentId = request.EquipmentId,
             ToolId = request.ToolId,
             MaintenancePlanId = plan?.Id,
@@ -229,6 +252,33 @@ public sealed class MaintenanceOrderService(
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Maintenance", "OrderCancel", nameof(MaintenanceOrder), orderId.ToString(), ct: ct);
         return Outcome<MaintenanceOrder>.Ok(order);
+    }
+
+    /// <summary>保全計画の作成（E-30-10-01）。単票API（<c>MaintenancePlansController</c>）と実績CSV取込で共通</summary>
+    public async Task<Outcome<MaintenancePlan>> CreatePlanAsync(
+        MaintenancePlanRequest request, string? userId, CancellationToken ct)
+    {
+        var equipment = await db.Equipments.FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
+        if (equipment is null || !equipment.IsActive)
+        {
+            return Outcome<MaintenancePlan>.Invalid(ApiText.T("存在しない（または無効な）設備IDです。"));
+        }
+
+        var plan = new MaintenancePlan
+        {
+            EquipmentId = request.EquipmentId,
+            Category = request.Category,
+            PlanYear = request.PlanYear,
+            ScheduledDate = request.ScheduledDate,
+            CycleDays = request.CycleDays,
+            Note = request.Note,
+            CreatedByUserId = userId,
+        };
+        db.MaintenancePlans.Add(plan);
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Maintenance", "PlanCreate", nameof(MaintenancePlan), plan.Id.ToString(),
+            detail: $"equipment={equipment.AssetNo}, year={plan.PlanYear}", ct: ct);
+        return Outcome<MaintenancePlan>.Ok(plan);
     }
 
     /// <summary>保全計画の取消（E-30-10）</summary>

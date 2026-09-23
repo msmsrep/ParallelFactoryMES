@@ -46,7 +46,7 @@ public class StocktakesController(
     public async Task<ActionResult<StocktakeResponse>> Create(
         StocktakeCreateRequest request, CancellationToken ct)
     {
-        var outcome = await stocktakes.CreateAsync(request, CurrentUserId, ct);
+        var outcome = await stocktakes.CreateAsync(request, null, CurrentUserId, ct);
         if (outcome.Failed)
         {
             return ToProblem(outcome);

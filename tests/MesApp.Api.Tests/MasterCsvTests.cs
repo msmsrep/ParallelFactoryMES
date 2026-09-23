@@ -941,6 +941,78 @@ public class MasterCsvTests
     }
 
     [Fact]
+    public async Task 保全手順書をCSVで登録し取り込み直すと版数が上がる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(admin, "equipments", """
+            AssetNo,Name,Status,MaintenanceType
+            EQ-01,プレス機,Available,None
+            """)).Succeeded);
+        Assert.True((await ImportAsync(admin, "tools", """
+            Code,Name,ToolType,Status
+            T-01,金型A,型,使用可能
+            """)).Succeeded);
+        Assert.True((await ImportAsync(admin, "skills", """
+            Code,Name,Type
+            SK-MT,保全技能,Skill
+            """)).Succeeded);
+
+        const string csv = """
+            ProcedureNo,Title,TargetEquipmentAssetNo,TargetToolCode,RequiredSkillCode,Steps,IsActive
+            MP-01,プレス機点検,EQ-01,,SK-MT,"1. 油圧を確認する
+            2. 異音を確認する",true
+            MP-02,金型研磨,,T-01,,1. 研磨する,true
+            """;
+        var created = await ImportAsync(admin, "maintenance-procedures", csv);
+        Assert.True(created.Succeeded, string.Join(" / ", created.Errors.Select(e => e.Message)));
+        Assert.Equal(2, created.Created);
+        var saved = (await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Maintenance.MaintenanceProcedureResponse>>(
+            "/api/maintenance-procedures"))!;
+        var press = saved.Single(p => p.ProcedureNo == "MP-01");
+        Assert.Equal("プレス機", press.TargetEquipmentName);
+        Assert.Equal("保全技能", press.RequiredSkillName);
+        Assert.Contains("異音", press.Steps);
+        Assert.Equal("金型A", saved.Single(p => p.ProcedureNo == "MP-02").TargetToolName);
+
+        // 取り込み直しても件数は増えず、単票の更新と同じく版数が上がる
+        var again = await ImportAsync(admin, "maintenance-procedures", csv);
+        Assert.Equal((0, 2), (again.Created, again.Updated));
+        saved = (await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Maintenance.MaintenanceProcedureResponse>>(
+            "/api/maintenance-procedures"))!;
+        Assert.Equal(2, saved.Count);
+        Assert.All(saved, p => Assert.Equal(2, p.Version));
+
+        // 出力は設備・治工具・スキルをコードで書き、そのまま取り込める
+        var exported = await admin.GetStringAsync("/api/masters/csv/maintenance-procedures");
+        Assert.Contains("MP-01,プレス機点検,EQ-01,,SK-MT,", exported);
+
+        // 未登録の設備・手順の無い行は行番号付きで拒否し、正しい行も登録しない
+        var invalid = await ImportAsync(admin, "maintenance-procedures", """
+            ProcedureNo,Title,TargetEquipmentAssetNo,Steps
+            MP-03,正しい行,EQ-01,1. 点検する
+            MP-04,未登録の設備,EQ-99,1. 点検する
+            MP-05,手順なし,EQ-01,
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("EQ-99"));
+        Assert.Contains(invalid.Errors, e => e.Line == 4 && e.Message.Contains("Steps"));
+        Assert.Equal(2, (await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Maintenance.MaintenanceProcedureResponse>>(
+            "/api/maintenance-procedures"))!.Count);
+
+        // 取込の権限は単票と同じ保全の権限（マスタ更新権限の生産管理担当者は取り込めない）
+        using var maintenance = await TestAuth.CreateUserClientAsync(
+            factory, admin, "mt1", "Passw0rd123", MesRoles.Maintenance);
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "manager1", "Passw0rd123", MesRoles.ProductionManager);
+        const string deactivate = "ProcedureNo,Title,Steps,IsActive\nMP-02,金型研磨,1. 研磨する,false\n";
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostCsvAsync(manager, "maintenance-procedures", deactivate)).StatusCode);
+        Assert.True((await ImportAsync(maintenance, "maintenance-procedures", deactivate)).Succeeded);
+        Assert.DoesNotContain((await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Maintenance.MaintenanceProcedureResponse>>(
+            "/api/maintenance-procedures"))!, p => p.ProcedureNo == "MP-02");
+    }
+
+    [Fact]
     public async Task 作業手順書をCSVで登録し工順から番号で紐付けできる()
     {
         using var factory = new ApiFactory();
@@ -1403,7 +1475,7 @@ public class MasterCsvTests
         // 検証のみでは何も残らない
         var dry = await PostBundleAsync(client, "masters", masters, dryRun: true);
         Assert.True(dry.Succeeded, Describe(dry));
-        Assert.Equal(19, dry.Files.Count);
+        Assert.Equal(20, dry.Files.Count);
         Assert.Empty((await client.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!);
 
         var imported = await PostBundleAsync(client, "masters", masters);
@@ -1415,12 +1487,81 @@ public class MasterCsvTests
         // 実績は同じ種別を番号違いで複数含む（05_consumptions と 07_consumptions）
         var actualResult = await PostBundleAsync(client, "actuals", actuals);
         Assert.True(actualResult.Succeeded, Describe(actualResult));
-        Assert.Equal(15, actualResult.Files.Count);
+        Assert.Equal(30, actualResult.Files.Count);
+        // 保全：突発依頼の実績で消耗品が引き落とされ、計画保全は指示のまま残る
+        var maintenance = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.MaintenanceOrderResponse>>(
+            "/api/maintenance-orders?pageSize=100"))!.Items;
+        Assert.Equal(MaintenanceOrderStatus.Completed, maintenance.Single(o => o.OrderNo == "SMP-MT-001").Status);
+        Assert.Equal(MaintenanceOrderStatus.Instructed, maintenance.Single(o => o.OrderNo == "SMP-MT-003").Status);
+        // 保全計画：SMP-MT-003 は設備と予定日で指した計画から発行され、その計画は指示済み、残りは計画のまま
+        var plans = (await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.MaintenancePlanResponse>>("/api/maintenance-plans"))!;
+        Assert.Equal(3, plans.Count);
+        Assert.Equal(MaintenancePlanStatus.Ordered,
+            plans.Single(p => p.Id == maintenance.Single(o => o.OrderNo == "SMP-MT-003").MaintenancePlanId).Status);
+        Assert.Equal(2, plans.Count(p => p.Status == MaintenancePlanStatus.Planned));
+        var consumption = (await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.MaintenancePartConsumptionRow>>(
+            "/api/maintenance-orders/parts-consumption"))!;
+        Assert.Contains(consumption, r => r.ProductCode == "MP-9002" && r.Quantity == 1m);
+        // 治工具：TL-01 は利用実績で寿命の警告に入り、払い出したままの TL-03 は使用中
+        var life = (await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.ToolLifeStatusRow>>("/api/tool-usages/life-status"))!;
+        Assert.True(life.Single(t => t.ToolCode == "TL-01").IsWarning);
+        Assert.Equal(ToolStatus.InUse, life.Single(t => t.ToolCode == "TL-03").Status);
+        // 校正：期限切れだった DV-03 は校正の記録で次回期限が延びる
+        var devices = (await client.GetFromJsonAsync<List<InspectionDeviceResponse>>("/api/inspection-devices"))!;
+        Assert.Equal(new DateOnly(2027, 9, 2), devices.Single(d => d.Code == "DV-03").CalibrationDueOn);
+        // 在庫オペレーション：分割したロットが同じファイルの後の行で組立ラインへ移動している
+        var stocks = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.StockResponse>>(
+            "/api/inventory/stocks?pageSize=200"))!.Items;
+        Assert.Contains(stocks, s => s.LotNumber == "R3005-260901-L" && s.LocationCode == "WIP-02" && s.Quantity == 100m);
+        // 物流：工程払出のピッキングは期限切れの R3006-250801 を引き当てず、棚卸の確定で差異が在庫に反映される
+        var pickings = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.PickingOrderResponse>>(
+            "/api/picking-orders?pageSize=100"))!.Items;
+        var processIssue = pickings.Single(p => p.OrderNo == "SMP-PK-001");
+        Assert.Equal(PickingOrderStatus.Completed, processIssue.Status);
+        Assert.DoesNotContain(processIssue.Lines, l => l.LotNumber == "R3006-250801");
+        Assert.Contains(stocks, s => s.LotNumber == "MP9002-260901" && s.Quantity == 2m);
+        var progress = (await client.GetFromJsonAsync<Core.Contracts.Inventory.WarehouseProgressResponse>(
+            "/api/inventory/warehouse-progress?from=2026-01-01"))!;
+        Assert.True(progress.Rows.Single(r => r.Kind == "在庫移動").OpenCount > 0);
+        Assert.True(progress.Rows.Single(r => r.Kind == "棚卸").CompletedCount > 0);
+        // 不適合：受入検査で自動起票された R3001-260902 の不適合は、ロット番号で指して承認まで進んでいる
+        var sampleNcs = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Quality.NonconformanceResponse>>(
+            "/api/nonconformances?pageSize=100"))!.Items;
+        Assert.Equal(NonconformanceStatus.Closed, sampleNcs.Single(n => n.LotNumber == "R3001-260902").Status);
+        Assert.Equal(NonconformanceStatus.ActionInstructed, sampleNcs.Single(n => n.ReportNo == "SMP-NC-001").Status);
+        var samples = (await client.GetFromJsonAsync<List<Core.Contracts.Inventory.SampleStorageResponse>>("/api/sample-storages"))!;
+        Assert.Equal(2, samples.Count);
+        // 画面専用だった記録がどれもサンプルだけで入っている（CSV-08。各画面の一覧が空でない）
+        Assert.NotEmpty((await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.MaintenanceProcedureResponse>>("/api/maintenance-procedures"))!);
+        Assert.NotEmpty((await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.ToolUsageResponse>>("/api/tool-usages"))!.Items);
+        Assert.NotEmpty((await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.ToolIssueResponse>>("/api/tool-issues"))!);
+        Assert.NotEmpty((await client.GetFromJsonAsync<List<InspectionDeviceCalibrationResponse>>(
+            $"/api/inspection-devices/{devices.Single(d => d.Code == "DV-03").Id}/calibrations"))!);
+        Assert.NotEmpty((await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Execution.TransferOrderResponse>>("/api/transfer-orders"))!.Items);
+        Assert.NotEmpty((await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.StocktakeResponse>>("/api/stocktakes"))!.Items);
         // 出荷は判定を承認した SMP-SH-001 だけが出荷まで進み、保留の SMP-SH-002 は指示のまま残る
         var shipping = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.ShippingOrderResponse>>(
             "/api/shipping-orders"))!.Items;
         Assert.Equal(ShippingOrderStatus.Completed, shipping.Single(s => s.ShippingNo == "SMP-SH-001").Status);
         Assert.Equal(ShippingOrderStatus.Instructed, shipping.Single(s => s.ShippingNo == "SMP-SH-002").Status);
+        // 少量のサンプルだけでも稼働監視を試せる（故障・停止を含む設備稼働記録）
+        var logs = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.EquipmentLogResponse>>(
+            "/api/equipment-logs?pageSize=100"))!.Items;
+        Assert.Contains(logs, l => l.Status == EquipmentLogStatus.Failure && l.StopCause != null);
+        // リワーク指図は元指図 SMP-FG-001 を指し、承認まで進んでいる
+        var orders = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Production.ManufacturingOrderResponse>>(
+            "/api/manufacturing-orders?pageSize=100"))!.Items;
+        var rework = orders.Single(o => o.OrderNo == "SMP-RW-001");
+        Assert.Equal(ManufacturingOrderType.Rework, rework.OrderType);
+        Assert.Equal(orders.Single(o => o.OrderNo == "SMP-FG-001").Id, rework.SourceOrderId);
+        Assert.Equal(ManufacturingOrderStatus.Approved, rework.Status);
+        // 受入検査の不合格：ロットは不良になり、不適合が自動で起票されている
+        var ncs = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Quality.NonconformanceResponse>>(
+            "/api/nonconformances?pageSize=100"))!.Items;
+        Assert.Contains(ncs, n => n.Source == NonconformanceSource.Inspection && n.LotNumber == "R3001-260902");
+        // 期限切れのロットは、取り込んだ日によらず期限アラートに出る
+        var expiring = (await client.GetFromJsonAsync<List<Core.Contracts.Inventory.StockResponse>>("/api/inventory/expiring"))!;
+        Assert.Contains(expiring, s => s.LotNumber == "R3006-250801");
 
         // マスタと実績が混ざったZIPはどちらの一括取込でも受け付けない
         var mixed = ZipFiles(("01_processes.csv", "Code,Name\nPR-99,検査\n"), ("02_receiving.csv", "ProductCode,Quantity,LocationCode\nRM-3001,1,WH-M01\n"));
@@ -1518,9 +1659,9 @@ public class MasterCsvTests
         }
         var names = EntryNames(exported);
         // 生産計画はマスタではないので、計画があっても一括出力には入らない
-        Assert.Equal(19, names.Count);
+        Assert.Equal(20, names.Count);
         Assert.Equal("01_work-centers.csv", names[0]);
-        Assert.Equal("19_user-skills.csv", names[^1]);
+        Assert.Equal("20_maintenance-procedures.csv", names[^1]);
 
         // パスワードは出力しないため、ユーザー系を除けば空のDBへそのまま取り込める
         using var target = new ApiFactory();

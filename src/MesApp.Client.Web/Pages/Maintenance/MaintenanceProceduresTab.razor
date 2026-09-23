@@ -54,6 +54,10 @@
     </div>
 </AuthorizeView>
 
+@* 取込の権限は単票の登録と同じ MaintenanceManage（Spec.md 3.8） *@
+<CsvIoPanel Kind="maintenance-procedures" Label="@L["保全手順書"]" KeyLabel="@L["手順書番号"]"
+            Roles="@MesRoleGroups.MaintenanceManage" OnImported="LoadProceduresAsync" />
+
 <div class="card">
     @if (_procedures.Count == 0)
     {

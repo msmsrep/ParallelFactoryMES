@@ -10,8 +10,10 @@ namespace MesApp.Api.Services;
 
 /// <summary>
 /// 現場からの記録のうち作業指示の実行に属さないもの：作業時間（B-30-30-02、F-30-20-01）、
-/// 製造トラブル報告（B-40-10-06、B-60-10）、設備の稼働・停止の記録（B-40-20、E-20-10-01）。
-/// 単票API（<c>WorkTimeRecordsController</c>・<c>TroubleReportsController</c>・<c>EquipmentLogsController</c>）と
+/// 製造トラブル報告（B-40-10-06、B-60-10）、設備の稼働・停止の記録（B-40-20、E-20-10-01）、
+/// 治工具の利用実績（E-60-20-01）。
+/// 単票API（<c>WorkTimeRecordsController</c>・<c>TroubleReportsController</c>・<c>EquipmentLogsController</c>・
+/// <c>ToolUsagesController</c>）と
 /// 実績CSV取込の両方から呼ぶ。
 /// 保存と監査ログまで行う。トランザクションは呼び出し側が張る。
 /// </summary>
@@ -129,5 +131,46 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
                 stopCause = log.StopCause,
             }, ct: ct);
         return Outcome<EquipmentLog>.Ok(log);
+    }
+
+    /// <summary>
+    /// 治工具の利用実績（E-60-20-01。寿命の累計に使う）。記録はロールで絞らない（現場作業者も記録できる）。
+    /// recordedAt は省略すると登録時刻（CSV取込で過去の利用実績を入れるときだけ指定する）
+    /// </summary>
+    public async Task<Outcome<ToolUsage>> AddToolUsageAsync(
+        ToolUsageRequest request, DateTimeOffset? recordedAt, string? userId, CancellationToken ct)
+    {
+        var tool = await db.Tools.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.ToolId, ct);
+        if (tool is null || !tool.IsActive)
+        {
+            return Outcome<ToolUsage>.Invalid(ApiText.T("存在しない（または無効な）治工具IDです。"));
+        }
+        if (request.WorkOrderId is int workOrderId
+            && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
+        {
+            return Outcome<ToolUsage>.Invalid(ApiText.T("存在しない作業指示IDです。"));
+        }
+        if (request.UsageCount <= 0 && (request.UsageHours is null or <= 0))
+        {
+            return Outcome<ToolUsage>.Invalid(ApiText.T("使用回数または使用時間のどちらかを記録してください。"));
+        }
+
+        var usage = new ToolUsage
+        {
+            ToolId = request.ToolId,
+            WorkOrderId = request.WorkOrderId,
+            UsageCount = request.UsageCount,
+            UsageHours = request.UsageHours,
+            RecordedByUserId = userId,
+        };
+        if (recordedAt is { } at)
+        {
+            usage.RecordedAt = at;
+        }
+        db.ToolUsages.Add(usage);
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Equipment", "ToolUsage", nameof(ToolUsage), usage.Id.ToString(),
+            detail: new { toolId = usage.ToolId, count = usage.UsageCount, hours = usage.UsageHours }, ct: ct);
+        return Outcome<ToolUsage>.Ok(usage);
     }
 }

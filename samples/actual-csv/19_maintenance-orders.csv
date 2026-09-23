@@ -1,0 +1,5 @@
+﻿MaintenanceNo,EquipmentAssetNo,ToolCode,RequestType,ProcedureNo,ScheduledDate,Note,FromPlan
+SMP-MT-001,EQ-01,,Spot,MNT-EQ01-01,2026-09-02,夜勤中の故障（主軸ベルトの滑り）の点検
+SMP-MT-002,EQ-04,,Spot,MNT-EQ04-01,2026-09-03,シールヒーター温度上昇待ちの停止の点検
+SMP-MT-003,EQ-01,,Planned,MNT-EQ01-01,2026-09-30,月次の定期点検（18 の計画から発行。実績は未登録のまま）,true
+SMP-MT-004,,TL-01,Spot,MNT-TL01-01,2026-09-03,エンドミルの刃先の欠け

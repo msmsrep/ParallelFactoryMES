@@ -101,6 +101,9 @@ public static class MesAppHost
         builder.Services.AddScoped<InspectionService>();
         builder.Services.AddScoped<MaintenanceOrderService>();
         builder.Services.AddScoped<ShopFloorReportService>();
+        builder.Services.AddScoped<InspectionDeviceService>();
+        builder.Services.AddScoped<TransferOrderService>();
+        builder.Services.AddScoped<SampleStorageService>();
         builder.Services.AddScoped<ActualCsvService>();
 
         builder.Services

@@ -1,0 +1,9 @@
+﻿Operation,LotNumber,LocationCode,ToLocationCode,Quantity,NewLotNumber,TargetLotNumber,ProductCode,Status,OrderNo,Sequence,Reason
+Split,R3005-260901,WH-M02,,100,R3005-260901-L,,,,,,組立ラインへ出す分を分ける
+Move,R3005-260901-L,WH-M02,WIP-02,100,,,,,,,組立ラインの定数補充
+Adjust,R3007-260901,WH-M02,,37,,,,,,,実数確認で1個不足（落下品の廃棄漏れ）
+Status,R3003-260901,,,,,,,OnHold,,,外観の抜き取り確認待ち
+Status,R3003-260901,,,,,,,Normal,,,抜き取り確認で問題なし
+Discard,R3006-260901,WH-M02,,0.5,,,,,,,計量時のこぼれ
+Return,R3002-260901,WH-M01,,2,,,,,,,外観不良のためサプライヤーへ返品
+IssueReturn,R3001-260901,WH-M01,,1,,,,,SMP-SF-001,10,投入の数え違いによる戻し

@@ -29,9 +29,6 @@ public sealed class ManufacturingOrderService(
     WorkOrderStatusService workOrderStatus,
     IAuditLogger auditLogger)
 {
-    /// <summary>自動採番の指図番号の接頭辞（手入力の番号と衝突させないため、手入力では使わせない）</summary>
-    public const string AutoOrderNoPrefix = "MO";
-
     /// <summary>
     /// 指図登録（A-20-10-01 手動登録、B-10-10-04 突発、B-70-10-01 リワーク）。
     /// orderNo を渡すとその番号で登録する（CSV取込で後続の実績から指図を指すため。空なら自動採番）
@@ -67,11 +64,10 @@ public sealed class ManufacturingOrderService(
         {
             orderNo = await numbering.NextOrderNoAsync(ct);
         }
-        else if (orderNo.StartsWith(AutoOrderNoPrefix, StringComparison.OrdinalIgnoreCase))
+        else if (NumberingService.IsAutoNumberFormat(orderNo, NumberingService.OrderNoPrefix))
         {
-            // 自動採番の連番は採番テーブルで管理しており、同じ形式の手入力番号があると後で衝突する
             return OrderOutcome.Invalid(
-                ApiText.T("指図番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", orderNo, AutoOrderNoPrefix));
+                ApiText.T("指図番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。", orderNo, NumberingService.OrderNoPrefix));
         }
         else if (await db.ManufacturingOrders.AnyAsync(o => o.OrderNo == orderNo, ct))
         {

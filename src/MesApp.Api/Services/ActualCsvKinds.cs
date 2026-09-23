@@ -31,6 +31,19 @@ public static class ActualCsvKinds
     public const string ShippingOrders = "shipping-orders";
     public const string ShipmentJudgments = "shipment-judgments";
     public const string Shipments = "shipments";
+    public const string MaintenancePlans = "maintenance-plans";
+    public const string MaintenanceOrders = "maintenance-orders";
+    public const string MaintenanceRecords = "maintenance-records";
+    public const string ToolUsages = "tool-usages";
+    public const string ToolIssues = "tool-issues";
+    public const string Calibrations = "calibrations";
+    public const string InventoryOperations = "inventory-operations";
+    public const string TransferOrders = "transfer-orders";
+    public const string PickingOrders = "picking-orders";
+    public const string Stocktakes = "stocktakes";
+    public const string StocktakeCounts = "stocktake-counts";
+    public const string Nonconformances = "nonconformances";
+    public const string SampleStorages = "sample-storages";
 
     private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
     private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
@@ -186,6 +199,153 @@ public static class ActualCsvKinds
             new("LocationCode", "出荷元ロケーションコード", true, null),
             new("Quantity", "出荷数量", true, "0より大きい数値。出荷済みと合わせて指示数量を超えられない"),
         ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(MaintenancePlans, "保全計画", false,
+        [
+            new("EquipmentAssetNo", "設備の資産番号", true, "登録済みで有効な設備"),
+            new("Category", "保全種別", false, "Periodic（定期）/ Unplanned（計画外）。省略時は定期"),
+            new("PlanYear", "計画年度", false, "省略時は予定日の年。予定日も無ければ必須"),
+            new("ScheduledDate", "予定日", false,
+                "yyyy-MM-dd。保全指示CSVの FromPlan はこの日付と設備で計画を指すので、同じ設備の計画は予定日を分ける"),
+            new("CycleDays", "周期（日）", false, "定期保全の周期"),
+            new("Note", "備考", false, null),
+        ]), MesRoleGroups.MaintenanceManage),
+        new(new CsvKindInfo(MaintenanceOrders, "保全指示・突発依頼", false,
+        [
+            new("MaintenanceNo", "保全指示番号", true,
+                "後続の保全実績CSVから指示を指す。MTで始まる番号は自動採番用のため使えない"),
+            new("EquipmentAssetNo", "対象設備の資産番号", false, "対象治工具コードとどちらか一方は必須"),
+            new("ToolCode", "対象治工具コード", false, "治工具メンテナンスの指示のとき"),
+            new("RequestType", "依頼区分", false,
+                "Planned（計画）/ Spot（突発依頼）。省略時は突発依頼。計画は保全担当者だけが登録できる"),
+            new("ProcedureNo", "保全手順書番号", false, "登録済みで有効な保全手順書"),
+            new("ScheduledDate", "予定日", false, "yyyy-MM-dd"),
+            new("Note", "備考", false, null),
+            new("FromPlan", "保全計画から作る", false,
+                "true で、設備と予定日が一致する未指示の保全計画（1件だけのとき）から作り、計画を指示済みにする。依頼区分は計画になる"),
+        ]), AnyRole),
+        new(new CsvKindInfo(MaintenanceRecords, "保全実績", false,
+        [
+            new("MaintenanceNo", "保全指示番号", true,
+                "登録済みの保全指示（保全指示CSVの MaintenanceNo）。同じ番号の行を1件の実績にまとめ、登録で指示は完了する"),
+            new("StartedAt", "開始日時", true, DateTimeNote + "。まとまりの最初の行の値を使う"),
+            new("EndedAt", "終了日時", false, DateTimeNote),
+            new("Result", "実施結果", false, null),
+            new("PartsUsed", "使用部品の補足", false, "自由記述（在庫を動かす部材は Part〜 の列に書く）"),
+            new("Note", "備考", false, null),
+            new("ResetToolLife", "寿命をリセットする", false, "true で治工具の寿命カウンタをリセットする（治工具メンテナンスの指示のみ）"),
+            new("PartLotNumber", "消費部材のロット番号", false,
+                "1行に1ロット。在庫から引き落とす。設備の資産管理部品・消耗品の区分は単票と同じに判定する"),
+            new("PartLocationCode", "払出元ロケーションコード", false, "消費部材を書くときは必須"),
+            new("PartQuantity", "消費数量", false, "消費部材を書くときは必須"),
+            new("PartNote", "部材の備考", false, null),
+        ]), AnyRole),
+        new(new CsvKindInfo(ToolUsages, "治工具の利用実績", false,
+        [
+            new("ToolCode", "治工具コード", true, "登録済みで有効な治工具"),
+            new("OrderNo", "指図番号", false, "作業指示に紐づける場合（工程順序と合わせて指す）"),
+            new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
+            new("UsageCount", "使用回数", false, "0以上の整数。使用時間とどちらかは0より大きいこと"),
+            new("UsageHours", "使用時間", false, "0以上"),
+            new("RecordedAt", "記録日時", false,
+                DateTimeNote + "。空欄なら取り込んだ時刻。寿命の累計はメンテナンスで寿命をリセットした時刻より後の記録だけを数える"),
+        ]), AnyRole),
+        new(new CsvKindInfo(ToolIssues, "治工具の引当・払出", false,
+        [
+            new("ToolCode", "治工具コード", true, "使用中・メンテナンス中・寿命到達の治工具は引き当てられない"),
+            new("OrderNo", "指図番号", true, OrderNoNote),
+            new("Sequence", "工程順序", true, SequenceNote),
+            new("Issue", "払い出す", false, "true で引当に続けて払出・受領確認まで進める（受領者は取り込んだユーザー）"),
+            new("Return", "返却する", false, "true で返却まで進める（治工具は再び引当できるようになる）"),
+            new("Note", "備考", false, null),
+        ]), MesRoleGroups.ProductionManage),
+        new(new CsvKindInfo(Calibrations, "検査機の校正", false,
+        [
+            new("DeviceCode", "検査機コード", true, "登録済みの検査機・測定器"),
+            new("CalibratedOn", "校正日", true, "yyyy-MM-dd。検査機の最終校正日になる"),
+            new("NextDueOn", "次回校正期限", false, "yyyy-MM-dd。空欄なら校正日＋校正周期（周期も無ければ期限なし）"),
+            new("Result", "校正結果", false, "合格・調整後合格 など"),
+        ]), MesRoleGroups.QualityManage),
+        new(new CsvKindInfo(InventoryOperations, "在庫オペレーション", false,
+        [
+            new("Operation", "操作", true,
+                "Move（移動）/ Adjust（数量調整）/ Status（状態変更）/ Split（分割）/ Merge（統合）/ Transfer（振替）/ Discard（廃棄）/ Return（返品）/ IssueReturn（払出戻し）"),
+            new("LotNumber", "ロット番号", true, "操作するロット（統合では統合元）。前の行で分割・振替したロットも指せる"),
+            new("LocationCode", "ロケーションコード", false, "操作する在庫の場所（移動元・払出戻しの戻し先）。状態変更以外で必須"),
+            new("ToLocationCode", "移動先ロケーションコード", false, "移動で必須"),
+            new("Quantity", "数量", false, "状態変更・統合以外で必須。数量調整では調整後の数量（0以上）、ほかは0より大きい数値"),
+            new("NewLotNumber", "新ロット番号", false, "分割・振替で作るロットの番号。空欄なら自動採番（後の行から指すなら指定する）"),
+            new("TargetLotNumber", "統合先ロット番号", false, "統合で必須。同じ品目・同じロケーションのロット"),
+            new("ProductCode", "振替先品目コード", false, "品目振替のとき。振替では振替先品目か新ロット番号のどちらかが必要"),
+            new("Status", "在庫状態", false,
+                "状態変更で必須。Normal（正常）/ OnHold（保留）/ AwaitingInspection（検査待ち）/ Defective（不良）/ ToBeDiscarded（廃棄予定）"),
+            new("OrderNo", "指図番号", false, "払出戻しで作業指示を記録する場合（工程順序と合わせて指す）"),
+            new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
+            new("Reason", "理由", false, "数量調整で必須。状態変更・廃棄・返品では状態履歴・在庫履歴に残る"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(TransferOrders, "搬送指示", false,
+        [
+            new("LotNumber", "ロット番号", true, "搬送するロット"),
+            new("FromLocationCode", "移動元ロケーションコード", true, null),
+            new("ToLocationCode", "移動先ロケーションコード", true, "登録済みで有効なロケーション"),
+            new("Quantity", "数量", true, "0より大きい数値"),
+            new("Execute", "移動を実行する", false, "true で指示に続けて在庫を移動し完了にする。空欄なら指示のまま残る"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(PickingOrders, "ピッキング指示", false,
+        [
+            new("PickingNo", "ピッキング番号", true,
+                "同じ番号の行を1件の指示にまとめる。PKで始まる番号は自動採番用のため使えない"),
+            new("Type", "払出区分", false,
+                "ProcessIssue（工程払出）/ Shipping（出荷）。省略時は工程払出。まとまりの最初の行の値を使う"),
+            new("OrderNo", "指図番号", false, "工程払出で必須（工程順序と合わせて払出先の作業指示を指す）"),
+            new("Sequence", "工程順序", false, "工程払出で必須"),
+            new("ShippingNo", "出荷番号", false, "出荷ピッキングで必須"),
+            new("ProductCode", "品目コード", true, "1行＝1明細。ロット・ロケーションは先入れ先出し（有効期限優先）で自動引当する"),
+            new("Quantity", "数量", true, "0より大きい数値"),
+            new("Execute", "払い出す", false, "true でピッキングを実行し在庫を引き落とす（まとまりの最初の行の値）"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(Stocktakes, "棚卸指示", false,
+        [
+            new("StocktakeNo", "棚卸番号", true,
+                "後続の実棚数CSVから指示を指す。STで始まる番号は自動採番用のため使えない"),
+            new("LocationCode", "対象ロケーションコード", false, "空欄なら全ロケーション。作成時点の現在庫が明細になる"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(StocktakeCounts, "実棚数", false,
+        [
+            new("StocktakeNo", "棚卸番号", true, "登録済みの棚卸（棚卸指示CSVの StocktakeNo）。同じ番号の行をまとめて登録する"),
+            new("LotNumber", "ロット番号", true, "棚卸の明細のロット"),
+            new("LocationCode", "ロケーションコード", true, "棚卸の明細のロケーション"),
+            new("CountedQuantity", "実棚数量", true, "0以上"),
+            new("Finalize", "確定する", false, "true で実棚数の登録に続けて確定し、差異を在庫へ反映する（まとまりの最初の行の値）"),
+        ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(Nonconformances, "不適合", false,
+        [
+            new("ReportNo", "不適合番号", false,
+                "登録済みならその不適合を指し、未登録なら新規に起票する（NCで始まる番号は自動採番用のため使えない）。空欄なら LotNumber で指す"),
+            new("LotNumber", "ロット番号", false,
+                "起票では対象ロット。ReportNo が空欄の行では、そのロットの未完了の不適合（1件だけのとき）を指す"),
+            new("Source", "発生元", false, "起票のとき。Production（生産実績）/ Inspection（検査）/ Receiving（受入）。省略時は生産実績"),
+            new("Content", "内容", false, "起票のときは必須"),
+            new("OrderNo", "指図番号", false, "起票で作業指示に紐づける場合（工程順序と合わせて指す）"),
+            new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
+            new("CauseCategory", "原因区分", false, "起票のとき"),
+            new("CauseDetail", "原因の詳細", false, "起票のとき"),
+            new("Action", "対応", false,
+                "書くと対応指示を出す。Rework（リワーク）/ Hold（保留）/ Discard（廃棄）/ SpecialAcceptance（特採）。品質管理の担当者のみ"),
+            new("ActionInstruction", "対応指示の内容", false, null),
+            new("ActionRecord", "対応の実施記録", false, "書くと対応実績を記録する（対応指示済みであること）"),
+            new("Approve", "承認する", false, "true で承認してクローズする（特採ならロットを正常へ戻す）。品質管理の担当者のみ"),
+        ]), AnyRole),
+        new(new CsvKindInfo(SampleStorages, "サンプル品保管", false,
+        [
+            new("SampleNo", "サンプル番号", true,
+                "未登録なら採取、登録済みなら保管の終了（Close）だけを行う。SPで始まる番号は自動採番用のため使えない"),
+            new("LotNumber", "ロット番号", false, "採取のときは必須。在庫の多いロケーションから抜く"),
+            new("Quantity", "数量", false, "採取のときは必須。0より大きい数値"),
+            new("StorageLocationCode", "保管場所のロケーションコード", false, "採取のときは必須。保管棚は引当の対象にならない"),
+            new("RetainUntil", "保管期限", false, "yyyy-MM-dd。空欄なら期限の判定を行わない"),
+            new("Note", "備考", false, null),
+            new("Close", "保管の終了", false, "Consumed（払出）/ Disposed（廃棄）。書くと保管を終える（在庫は動かさない）"),
+        ]), MesRoleGroups.QualityManage),
     ];
 
     /// <summary>

@@ -1,4 +1,5 @@
 ﻿using MesApp.Api.Localization;
+using MesApp.Api.Services;
 using System.Security.Claims;
 using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
@@ -21,7 +22,8 @@ namespace MesApp.Api.Controllers;
 [Route("api/inspection-devices")]
 [Authorize]
 public class InspectionDevicesController(
-    MesAppDbContext db, IAuditLogger auditLogger, IBusinessDateService businessDate) : ControllerBase
+    MesAppDbContext db, IAuditLogger auditLogger, IBusinessDateService businessDate,
+    InspectionDeviceService devices) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<InspectionDeviceResponse>>> List(
@@ -127,38 +129,13 @@ public class InspectionDevicesController(
     public async Task<ActionResult<InspectionDeviceCalibrationResponse>> AddCalibration(
         int id, InspectionDeviceCalibrationRequest request, CancellationToken ct)
     {
-        var device = await db.InspectionDevices.FindAsync([id], ct);
-        if (device is null)
+        // 判定・保存は実績CSV取込と共通（InspectionDeviceService）
+        var outcome = await devices.AddCalibrationAsync(id, request, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        if (outcome.Failed)
         {
             return NotFound();
         }
-
-        var nextDue = request.NextDueOn
-                      ?? (device.CalibrationCycleDays is { } cycle
-                          ? request.CalibratedOn.AddDays(cycle)
-                          : null);
-        var calibration = new InspectionDeviceCalibration
-        {
-            InspectionDeviceId = id,
-            CalibratedOn = request.CalibratedOn,
-            NextDueOn = nextDue,
-            Result = request.Result,
-            PerformedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-        };
-        db.InspectionDeviceCalibrations.Add(calibration);
-
-        var before = new { device.CalibratedOn, device.CalibrationDueOn };
-        device.CalibratedOn = request.CalibratedOn;
-        device.CalibrationDueOn = nextDue;
-        await db.SaveChangesAsync(ct);
-
-        await auditLogger.LogAsync("Master", "Calibrate", nameof(InspectionDevice), id.ToString(),
-            detail: new
-            {
-                before,
-                after = new { device.CalibratedOn, device.CalibrationDueOn },
-                reason = request.Result,
-            }, ct: ct);
+        var calibration = outcome.Value!;
 
         return new InspectionDeviceCalibrationResponse(
             calibration.Id, id, calibration.CalibratedOn, calibration.NextDueOn,

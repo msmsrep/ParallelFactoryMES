@@ -1,0 +1,3 @@
+﻿ToolCode,OrderNo,Sequence,Issue,Return,Note
+TL-02,SMP-FG-001,10,true,true,組立治具を払い出して返却
+TL-03,SMP-FG-001,20,true,false,返却待ち（治工具は使用中のまま残る）

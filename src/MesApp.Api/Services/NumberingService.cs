@@ -26,9 +26,27 @@ namespace MesApp.Api.Services;
 /// </remarks>
 public class NumberingService(MesAppDbContext db, IBusinessDateService businessDate)
 {
+    // 自動採番の接頭辞。手入力の番号（CSV取込で後続の行から指すため）ではこれで始めさせない（IsAutoNumberFormat）
+    public const string OrderNoPrefix = "MO";
+    public const string PickingNoPrefix = "PK";
+    public const string ShippingNoPrefix = "SH";
+    public const string StocktakeNoPrefix = "ST";
+    public const string InspectionNoPrefix = "IN";
+    public const string NonconformanceNoPrefix = "NC";
+    public const string MaintenanceNoPrefix = "MT";
+    public const string JudgmentNoPrefix = "SJ";
+    public const string SampleNoPrefix = "SP";
+
+    /// <summary>
+    /// 手入力の番号が自動採番の形式（接頭辞）と重なるか。
+    /// 自動採番の連番は採番テーブルで管理しており、同じ形式の手入力番号があると後で払い出す番号と衝突する
+    /// </summary>
+    public static bool IsAutoNumberFormat(string number, string prefix) =>
+        number.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+
     public async Task<string> NextOrderNoAsync(CancellationToken ct = default)
     {
-        var prefix = $"MO{businessDate.Today:yyyyMMdd}-";
+        var prefix = $"{OrderNoPrefix}{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.ManufacturingOrders.Where(o => o.OrderNo.StartsWith(prefix)).Select(o => o.OrderNo),
             prefix, ct);
@@ -46,7 +64,7 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
 
     public async Task<string> NextPickingNoAsync(CancellationToken ct = default)
     {
-        var prefix = $"PK{businessDate.Today:yyyyMMdd}-";
+        var prefix = $"{PickingNoPrefix}{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.PickingOrders.Where(p => p.OrderNo.StartsWith(prefix)).Select(p => p.OrderNo),
             prefix, ct);
@@ -55,7 +73,7 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
 
     public async Task<string> NextShippingNoAsync(CancellationToken ct = default)
     {
-        var prefix = $"SH{businessDate.Today:yyyyMMdd}-";
+        var prefix = $"{ShippingNoPrefix}{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.ShippingOrders.Where(s => s.ShippingNo.StartsWith(prefix)).Select(s => s.ShippingNo),
             prefix, ct);
@@ -64,7 +82,7 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
 
     public async Task<string> NextStocktakeNoAsync(CancellationToken ct = default)
     {
-        var prefix = $"ST{businessDate.Today:yyyyMMdd}-";
+        var prefix = $"{StocktakeNoPrefix}{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.Stocktakes.Where(s => s.StocktakeNo.StartsWith(prefix)).Select(s => s.StocktakeNo),
             prefix, ct);
@@ -73,7 +91,7 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
 
     public async Task<string> NextInspectionNoAsync(CancellationToken ct = default)
     {
-        var prefix = $"IN{businessDate.Today:yyyyMMdd}-";
+        var prefix = $"{InspectionNoPrefix}{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.InspectionOrders.Where(i => i.OrderNo.StartsWith(prefix)).Select(i => i.OrderNo),
             prefix, ct);
@@ -82,7 +100,7 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
 
     public async Task<string> NextNonconformanceNoAsync(CancellationToken ct = default)
     {
-        var prefix = $"NC{businessDate.Today:yyyyMMdd}-";
+        var prefix = $"{NonconformanceNoPrefix}{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.NonconformanceReports.Where(n => n.ReportNo.StartsWith(prefix)).Select(n => n.ReportNo),
             prefix, ct);
@@ -91,7 +109,7 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
 
     public async Task<string> NextMaintenanceNoAsync(CancellationToken ct = default)
     {
-        var prefix = $"MT{businessDate.Today:yyyyMMdd}-";
+        var prefix = $"{MaintenanceNoPrefix}{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.MaintenanceOrders.Where(m => m.OrderNo.StartsWith(prefix)).Select(m => m.OrderNo),
             prefix, ct);
@@ -100,7 +118,7 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
 
     public async Task<string> NextJudgmentNoAsync(CancellationToken ct = default)
     {
-        var prefix = $"SJ{businessDate.Today:yyyyMMdd}-";
+        var prefix = $"{JudgmentNoPrefix}{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.ShipmentJudgments.Where(j => j.JudgmentNo.StartsWith(prefix)).Select(j => j.JudgmentNo),
             prefix, ct);
@@ -109,7 +127,7 @@ public class NumberingService(MesAppDbContext db, IBusinessDateService businessD
 
     public async Task<string> NextSampleNoAsync(CancellationToken ct = default)
     {
-        var prefix = $"SP{businessDate.Today:yyyyMMdd}-";
+        var prefix = $"{SampleNoPrefix}{businessDate.Today:yyyyMMdd}-";
         var seq = await NextSequenceAsync(
             db.SampleStorages.Where(x => x.SampleNo.StartsWith(prefix)).Select(x => x.SampleNo),
             prefix, ct);

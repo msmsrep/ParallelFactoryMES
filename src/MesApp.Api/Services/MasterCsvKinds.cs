@@ -25,6 +25,7 @@ public static class MasterCsvKinds
     public const string Bom = "bom";
     public const string Routing = "routing";
     public const string WorkProcedures = "work-procedures";
+    public const string MaintenanceProcedures = "maintenance-procedures";
     public const string Shifts = "shifts";
     public const string InspectionDevices = "inspection-devices";
     public const string Users = "users";
@@ -189,6 +190,20 @@ public static class MasterCsvKinds
             new("Reference", "手順書の所在", false, "別システムの文書番号・URLなど。手順ステップを書かない場合は必須"),
             new("IsActive", "有効", false, "true / false"),
         ]),
+        // 保全手順書（E-10-20）。単票の api/maintenance-procedures と同じく保全の権限で取り込む
+        new(MaintenanceProcedures, "保全手順書", false,
+        [
+            new("ProcedureNo", "手順書番号", true, "既存と一致すれば更新（版数+1）、無ければ新規登録"),
+            new("Title", "表題", true, null),
+            new("TargetEquipmentAssetNo", "対象設備の資産番号", false, "設備用の手順書。空欄で解除"),
+            new("TargetToolCode", "対象治工具コード", false, "治工具メンテナンス用の手順書。空欄で解除"),
+            new("RequiredSkillCode", "必要スキル・資格コード", false, "保全実績の登録時に実施者と照合する。空欄で解除"),
+            new("Steps", "手順ステップ", true, null),
+            new("IsActive", "有効", false, "true / false"),
+        ])
+        {
+            WriteRoles = MesRoleGroups.MaintenanceManage,
+        },
         new(Shifts, "勤務シフト（直）", true,
         [
             new("Code", "シフトコード", true, "既存と一致すれば更新、無ければ新規登録"),
@@ -256,7 +271,7 @@ public static class MasterCsvKinds
     [
         WorkCenters, Processes, Locations, Products, Skills, Shifts, Equipments, EquipmentParts, Tools,
         Checklists, DefectReasons, InspectionItems, ControlItems, InspectionDevices, Bom, WorkProcedures,
-        Routing, Users, UserSkills,
+        Routing, Users, UserSkills, MaintenanceProcedures,
     ];
 
     /// <summary>
@@ -311,6 +326,40 @@ public static class CsvEnumLabels
     public static readonly IReadOnlyDictionary<string, ShipmentJudgmentResult> ShipmentJudgmentResults = Build(
         ("可", ShipmentJudgmentResult.Approved), ("保留", ShipmentJudgmentResult.Hold),
         ("特採", ShipmentJudgmentResult.SpecialAcceptance), ("特別採用", ShipmentJudgmentResult.SpecialAcceptance));
+
+    public static readonly IReadOnlyDictionary<string, NonconformanceSource> NonconformanceSources = Build(
+        ("生産実績", NonconformanceSource.Production), ("生産", NonconformanceSource.Production),
+        ("検査", NonconformanceSource.Inspection), ("受入", NonconformanceSource.Receiving));
+
+    public static readonly IReadOnlyDictionary<string, NonconformanceAction> NonconformanceActions = Build(
+        ("リワーク", NonconformanceAction.Rework), ("保留", NonconformanceAction.Hold),
+        ("廃棄", NonconformanceAction.Discard), ("特採", NonconformanceAction.SpecialAcceptance),
+        ("特別採用", NonconformanceAction.SpecialAcceptance));
+
+    /// <summary>サンプルの保管の終わらせ方（保管中 Stored は指定できないので含めない）</summary>
+    public static readonly IReadOnlyDictionary<string, SampleStorageStatus> SampleCloseStatuses =
+        new Dictionary<string, SampleStorageStatus>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Consumed"] = SampleStorageStatus.Consumed, ["払出"] = SampleStorageStatus.Consumed,
+            ["払出済"] = SampleStorageStatus.Consumed,
+            ["Disposed"] = SampleStorageStatus.Disposed, ["廃棄"] = SampleStorageStatus.Disposed,
+            ["廃棄済"] = SampleStorageStatus.Disposed,
+        };
+
+    public static readonly IReadOnlyDictionary<string, PickingOrderType> PickingOrderTypes = Build(
+        ("工程払出", PickingOrderType.ProcessIssue), ("出荷", PickingOrderType.Shipping));
+
+    public static readonly IReadOnlyDictionary<string, LotStockStatus> LotStockStatuses = Build(
+        ("正常", LotStockStatus.Normal), ("保留", LotStockStatus.OnHold),
+        ("検査待ち", LotStockStatus.AwaitingInspection), ("不良", LotStockStatus.Defective),
+        ("廃棄予定", LotStockStatus.ToBeDiscarded));
+
+    public static readonly IReadOnlyDictionary<string, MaintenanceCategory> MaintenanceCategories = Build(
+        ("定期", MaintenanceCategory.Periodic), ("計画外", MaintenanceCategory.Unplanned));
+
+    public static readonly IReadOnlyDictionary<string, MaintenanceRequestType> MaintenanceRequestTypes = Build(
+        ("計画", MaintenanceRequestType.Planned), ("計画保全", MaintenanceRequestType.Planned),
+        ("突発", MaintenanceRequestType.Spot), ("突発依頼", MaintenanceRequestType.Spot));
 
     public static readonly IReadOnlyDictionary<string, MakeOrBuy> MakeOrBuys = Build(
         ("内製", MakeOrBuy.InHouse), ("外注", MakeOrBuy.Outsourced));

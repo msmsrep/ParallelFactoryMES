@@ -61,7 +61,7 @@ public class NonconformanceController(
     public async Task<ActionResult<NonconformanceResponse>> Create(
         NonconformanceCreateRequest request, CancellationToken ct)
     {
-        var outcome = await nonconformances.CreateAsync(request, CurrentUserId, ct);
+        var outcome = await nonconformances.CreateAsync(request, null, CurrentUserId, ct);
         if (outcome.Failed)
         {
             return ToProblem(outcome);

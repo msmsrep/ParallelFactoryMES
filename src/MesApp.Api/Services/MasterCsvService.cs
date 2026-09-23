@@ -43,6 +43,7 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.Bom => await ExportBomAsync(ct),
             MasterCsvKinds.Routing => await ExportRoutingAsync(ct),
             MasterCsvKinds.WorkProcedures => await ExportWorkProceduresAsync(includeInactive, ct),
+            MasterCsvKinds.MaintenanceProcedures => await ExportMaintenanceProceduresAsync(includeInactive, ct),
             MasterCsvKinds.Shifts => await ExportShiftsAsync(includeInactive, ct),
             MasterCsvKinds.InspectionDevices => await ExportInspectionDevicesAsync(includeInactive, ct),
             MasterCsvKinds.Users => await ExportUsersAsync(includeInactive, ct),
@@ -252,6 +253,19 @@ public sealed partial class MasterCsvService(
         return [.. items.Select(p => new string?[]
         {
             p.ProcedureNo, p.Title, p.Steps, p.Reference, Bool(p.IsActive),
+        })];
+    }
+
+    private async Task<List<string?[]>> ExportMaintenanceProceduresAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.MaintenanceProcedures.AsNoTracking()
+            .Include(p => p.TargetEquipment).Include(p => p.TargetTool).Include(p => p.RequiredSkill)
+            .Where(p => includeInactive || p.IsActive)
+            .OrderBy(p => p.ProcedureNo).ToListAsync(ct);
+        return [.. items.Select(p => new string?[]
+        {
+            p.ProcedureNo, p.Title, p.TargetEquipment?.AssetNo, p.TargetTool?.Code, p.RequiredSkill?.Code,
+            p.Steps, Bool(p.IsActive),
         })];
     }
 

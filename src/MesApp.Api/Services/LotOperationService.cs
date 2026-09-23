@@ -310,8 +310,11 @@ public sealed class LotOperationService(
         db.Lots.Add(newLot);
 
         // newLot.Idの確定に一度SaveChangesが要るため保存が2回に分かれる。
-        // 途中で失敗すると元ロットから減った在庫が新ロットに入らず消えるので、トランザクションでまとめる
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        // 途中で失敗すると元ロットから減った在庫が新ロットに入らず消えるので、トランザクションでまとめる。
+        // 呼び出し側が既に張っていれば（実績CSVの取込）それに乗る（入れ子のトランザクションは張れない）
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
         try
         {
             await inventory.RemoveAsync(lot, locationId, quantity,
@@ -327,7 +330,10 @@ public sealed class LotOperationService(
         }
         await db.SaveChangesAsync(ct);
         await audit(newLot);
-        await transaction.CommitAsync(ct);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(ct);
+        }
         return Outcome<Lot>.Ok(newLot);
     }
 

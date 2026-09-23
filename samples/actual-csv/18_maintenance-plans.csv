@@ -1,0 +1,4 @@
+﻿EquipmentAssetNo,Category,PlanYear,ScheduledDate,CycleDays,Note
+EQ-01,Periodic,2026,2026-09-30,30,マシニングセンタの月次点検（19 で指示を発行する）
+EQ-01,Periodic,2026,2026-10-30,30,マシニングセンタの月次点検（翌月分。指示は未発行）
+EQ-04,Periodic,2026,2026-12-15,90,真空包装機のシール部の四半期点検
