@@ -176,7 +176,7 @@ public record LeadTimeOrderRow(
     DateOnly? DueDate,
     /// <summary>納期に対する遅れ（日）。完了の製造日−納期。0以下は納期内。納期なしはnull</summary>
     int? DelayDays,
-    /// <summary>異常値（第3四分位＋1.5×四分位範囲を超える）。個別に原因を調べる対象</summary>
+    /// <summary>異常値（第3四分位＋1.5×四分位範囲を超える。四分位範囲は1日を下限にする）。個別に原因を調べる対象</summary>
     bool IsOutlier);
 
 /// <summary>リードタイムの度数分布の1区切り（日数ごとの完了件数。うち納期遅れの件数）</summary>

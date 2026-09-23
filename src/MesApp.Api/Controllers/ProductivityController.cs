@@ -291,7 +291,10 @@ public class ProductivityController(MesAppDbContext db, IBusinessDateService bus
         return new StandardTimeReviewResponse(threshold, minSamples, rows);
     }
 
-    /// <summary>リードタイムの要約・度数分布・異常値（四分位は最近順位法。4件未満では異常値を判定しない）</summary>
+    /// <summary>
+    /// リードタイムの要約・度数分布・異常値（四分位は最近順位法。4件未満では異常値を判定しない。
+    /// 四分位範囲は1日を下限にする）
+    /// </summary>
     private static LeadTimeResponse LeadTimeStatistics(List<LeadTimeOrderRow> rows)
     {
         if (rows.Count == 0)
@@ -303,7 +306,11 @@ public class ProductivityController(MesAppDbContext db, IBusinessDateService bus
         var median = days.Count % 2 == 1
             ? days[days.Count / 2]
             : (days[days.Count / 2 - 1] + days[days.Count / 2]) / 2m;
-        decimal? threshold = days.Count >= 4 ? Rank(0.75m) + 1.5m * (Rank(0.75m) - Rank(0.25m)) : null;
+        // 日数は整数なので、四分位範囲が1日未満（多くの指図が同じ日数）でも1日として扱う。
+        // 0のままだと、そろった日数から1日長いだけの指図まで異常値になる
+        decimal? threshold = days.Count >= 4
+            ? Rank(0.75m) + 1.5m * Math.Max(Rank(0.75m) - Rank(0.25m), 1)
+            : null;
 
         var marked = rows
             .Select(r => r with { IsOutlier = threshold is { } t && r.LeadTimeDays > t })

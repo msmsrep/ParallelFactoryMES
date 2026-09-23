@@ -825,6 +825,19 @@ public class ProductionTests
         var outlier = Assert.Single(withOutlier.Orders, o => o.IsOutlier);
         Assert.Equal(slow.Order.OrderNo, outlier.OrderNo);
         Assert.Equal(10, withOutlier.MaxDays);
+
+        // 0日を6件足して [0×9,1,2,10] にすると Q1=Q3=0。四分位範囲は1日を下限にするので
+        // しきい値は 0+1.5×1=1.5 日で、1日のBは異常値にならない（範囲0のままだと1日でも異常値になる）
+        for (var i = 0; i < 6; i++)
+        {
+            var same = await OrderAsync(null);
+            await RecordAsync(same.WorkOrders[0].Id, Noon(12));
+            await RecordAsync(same.WorkOrders[1].Id, Noon(12), ctx.ProductLocationId);
+        }
+        var concentrated = await admin.GetFromJsonAsync<LeadTimeResponse>("/api/productivity/lead-time");
+        Assert.Equal(1.5m, concentrated!.OutlierThresholdDays);
+        Assert.False(Assert.Single(concentrated.Orders, o => o.OrderNo == b.Order.OrderNo).IsOutlier);
+        Assert.True(Assert.Single(concentrated.Orders, o => o.OrderNo == a.Order.OrderNo).IsOutlier);
     }
 
     [Fact]
