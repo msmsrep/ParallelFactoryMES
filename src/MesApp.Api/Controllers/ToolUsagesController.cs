@@ -1,9 +1,8 @@
-﻿using MesApp.Api.Localization;
+﻿using MesApp.Api.Services;
 using MesApp.Core.Abstractions;
 using System.Security.Claims;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Maintenance;
-using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +22,7 @@ namespace MesApp.Api.Controllers;
 [Route("api/tool-usages")]
 [Authorize]
 public class ToolUsagesController(
-    MesAppDbContext db, IAuditLogger auditLogger, IBusinessDateService businessDate) : ControllerBase
+    MesAppDbContext db, ShopFloorReportService reports, IBusinessDateService businessDate) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ToolUsageResponse>>> List(
@@ -52,33 +51,14 @@ public class ToolUsagesController(
     [HttpPost]
     public async Task<ActionResult<ToolUsageResponse>> Create(ToolUsageRequest request, CancellationToken ct)
     {
-        var tool = await db.Tools.FirstOrDefaultAsync(t => t.Id == request.ToolId, ct);
-        if (tool is null || !tool.IsActive)
+        // 判定・保存は実績CSV取込と共通（ShopFloorReportService）
+        var outcome = await reports.AddToolUsageAsync(
+            request, null, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        if (outcome.Failed)
         {
-            return this.BadRequestProblem(ApiText.T("存在しない（または無効な）治工具IDです。"));
+            return this.BadRequestProblem(outcome.Error!);
         }
-        if (request.WorkOrderId is int workOrderId
-            && !await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, ct))
-        {
-            return this.BadRequestProblem(ApiText.T("存在しない作業指示IDです。"));
-        }
-        if (request.UsageCount <= 0 && (request.UsageHours is null or <= 0))
-        {
-            return this.BadRequestProblem(ApiText.T("使用回数または使用時間のどちらかを記録してください。"));
-        }
-
-        var usage = new ToolUsage
-        {
-            ToolId = request.ToolId,
-            WorkOrderId = request.WorkOrderId,
-            UsageCount = request.UsageCount,
-            UsageHours = request.UsageHours,
-            RecordedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-        };
-        db.ToolUsages.Add(usage);
-        await db.SaveChangesAsync(ct);
-        await auditLogger.LogAsync("Equipment", "ToolUsage", nameof(ToolUsage), usage.Id.ToString(),
-            detail: new { toolId = usage.ToolId, count = usage.UsageCount, hours = usage.UsageHours }, ct: ct);
+        var usage = outcome.Value!;
 
         return await db.ToolUsages.AsNoTracking()
             .Where(u => u.Id == usage.Id)

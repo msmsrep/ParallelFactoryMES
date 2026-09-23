@@ -1487,7 +1487,7 @@ public class MasterCsvTests
         // 実績は同じ種別を番号違いで複数含む（05_consumptions と 07_consumptions）
         var actualResult = await PostBundleAsync(client, "actuals", actuals);
         Assert.True(actualResult.Succeeded, Describe(actualResult));
-        Assert.Equal(19, actualResult.Files.Count);
+        Assert.Equal(22, actualResult.Files.Count);
         // 保全：突発依頼の実績で消耗品が引き落とされ、計画保全は指示のまま残る
         var maintenance = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.MaintenanceOrderResponse>>(
             "/api/maintenance-orders?pageSize=100"))!.Items;
@@ -1496,6 +1496,13 @@ public class MasterCsvTests
         var consumption = (await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.MaintenancePartConsumptionRow>>(
             "/api/maintenance-orders/parts-consumption"))!;
         Assert.Contains(consumption, r => r.ProductCode == "MP-9002" && r.Quantity == 1m);
+        // 治工具：TL-01 は利用実績で寿命の警告に入り、払い出したままの TL-03 は使用中
+        var life = (await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.ToolLifeStatusRow>>("/api/tool-usages/life-status"))!;
+        Assert.True(life.Single(t => t.ToolCode == "TL-01").IsWarning);
+        Assert.Equal(ToolStatus.InUse, life.Single(t => t.ToolCode == "TL-03").Status);
+        // 校正：期限切れだった DV-03 は校正の記録で次回期限が延びる
+        var devices = (await client.GetFromJsonAsync<List<InspectionDeviceResponse>>("/api/inspection-devices"))!;
+        Assert.Equal(new DateOnly(2027, 9, 2), devices.Single(d => d.Code == "DV-03").CalibrationDueOn);
         // 出荷は判定を承認した SMP-SH-001 だけが出荷まで進み、保留の SMP-SH-002 は指示のまま残る
         var shipping = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.ShippingOrderResponse>>(
             "/api/shipping-orders"))!.Items;

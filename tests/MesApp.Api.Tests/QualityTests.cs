@@ -299,6 +299,47 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 校正をCSVで記録すると検査機の次回期限が更新される()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var created = await admin.PostAsJsonAsync("/api/inspection-devices",
+            new InspectionDeviceRequest("MD-OLD", "期限切れノギス", null, null,
+                new DateOnly(2025, 1, 10), new DateOnly(2026, 1, 10), 365, null));
+        created.EnsureSuccessStatusCode();
+        var device = (await created.Content.ReadFromJsonAsync<InspectionDeviceResponse>())!;
+
+        // 未登録の検査機の行があれば、正しい行も記録しない
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "calibrations", """
+            DeviceCode,CalibratedOn,NextDueOn,Result
+            MD-OLD,2026-09-02,,合格
+            MD-X,2026-09-02,,合格
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("MD-X"));
+        Assert.Equal(new DateOnly(2026, 1, 10),
+            (await admin.GetFromJsonAsync<InspectionDeviceResponse>($"/api/inspection-devices/{device.Id}"))!.CalibrationDueOn);
+
+        // 次回期限を省略すると校正周期から決まる（単票の校正記録と同じ）。履歴も1件残る
+        var imported = await Phase3TestData.ImportActualCsvAsync(admin, "calibrations", """
+            DeviceCode,CalibratedOn,NextDueOn,Result
+            MD-OLD,2026-09-02,,合格
+            """);
+        Assert.True(imported.Succeeded, string.Join(" / ", imported.Errors.Select(e => e.Message)));
+        var updated = (await admin.GetFromJsonAsync<InspectionDeviceResponse>($"/api/inspection-devices/{device.Id}"))!;
+        Assert.Equal(new DateOnly(2026, 9, 2), updated.CalibratedOn);
+        Assert.Equal(new DateOnly(2027, 9, 2), updated.CalibrationDueOn);
+        var history = (await admin.GetFromJsonAsync<List<InspectionDeviceCalibrationResponse>>(
+            $"/api/inspection-devices/{device.Id}/calibrations"))!;
+        Assert.Equal("合格", Assert.Single(history).Result);
+
+        // 校正の記録は品質管理の権限（作業者は取り込めない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "op1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(operator_, "calibrations",
+            "DeviceCode,CalibratedOn\nMD-OLD,2026-09-03\n")).StatusCode);
+    }
+
+    [Fact]
     public async Task 校正期限切れの検査機では検査実績を登録できない()
     {
         using var factory = new ApiFactory();

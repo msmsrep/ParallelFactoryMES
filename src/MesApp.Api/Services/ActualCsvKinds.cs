@@ -33,6 +33,9 @@ public static class ActualCsvKinds
     public const string Shipments = "shipments";
     public const string MaintenanceOrders = "maintenance-orders";
     public const string MaintenanceRecords = "maintenance-records";
+    public const string ToolUsages = "tool-usages";
+    public const string ToolIssues = "tool-issues";
+    public const string Calibrations = "calibrations";
 
     private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
     private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
@@ -216,6 +219,32 @@ public static class ActualCsvKinds
             new("PartQuantity", "消費数量", false, "消費部材を書くときは必須"),
             new("PartNote", "部材の備考", false, null),
         ]), AnyRole),
+        new(new CsvKindInfo(ToolUsages, "治工具の利用実績", false,
+        [
+            new("ToolCode", "治工具コード", true, "登録済みで有効な治工具"),
+            new("OrderNo", "指図番号", false, "作業指示に紐づける場合（工程順序と合わせて指す）"),
+            new("Sequence", "工程順序", false, "指図番号を書いたときは必須"),
+            new("UsageCount", "使用回数", false, "0以上の整数。使用時間とどちらかは0より大きいこと"),
+            new("UsageHours", "使用時間", false, "0以上"),
+            new("RecordedAt", "記録日時", false,
+                DateTimeNote + "。空欄なら取り込んだ時刻。寿命の累計はメンテナンスで寿命をリセットした時刻より後の記録だけを数える"),
+        ]), AnyRole),
+        new(new CsvKindInfo(ToolIssues, "治工具の引当・払出", false,
+        [
+            new("ToolCode", "治工具コード", true, "使用中・メンテナンス中・寿命到達の治工具は引き当てられない"),
+            new("OrderNo", "指図番号", true, OrderNoNote),
+            new("Sequence", "工程順序", true, SequenceNote),
+            new("Issue", "払い出す", false, "true で引当に続けて払出・受領確認まで進める（受領者は取り込んだユーザー）"),
+            new("Return", "返却する", false, "true で返却まで進める（治工具は再び引当できるようになる）"),
+            new("Note", "備考", false, null),
+        ]), MesRoleGroups.ProductionManage),
+        new(new CsvKindInfo(Calibrations, "検査機の校正", false,
+        [
+            new("DeviceCode", "検査機コード", true, "登録済みの検査機・測定器"),
+            new("CalibratedOn", "校正日", true, "yyyy-MM-dd。検査機の最終校正日になる"),
+            new("NextDueOn", "次回校正期限", false, "yyyy-MM-dd。空欄なら校正日＋校正周期（周期も無ければ期限なし）"),
+            new("Result", "校正結果", false, "合格・調整後合格 など"),
+        ]), MesRoleGroups.QualityManage),
     ];
 
     /// <summary>

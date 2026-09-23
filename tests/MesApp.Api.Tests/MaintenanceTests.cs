@@ -35,6 +35,61 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 治工具の利用実績と引当をCSVで取り込める()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var tool = await CreateToolAsync(admin, lifeCount: 1000);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var orderNo = order.Order.OrderNo;
+
+        // 1行でも誤り（回数も時間も無い）があれば、正しい行も登録しない
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "tool-usages", $$"""
+            ToolCode,OrderNo,Sequence,UsageCount,UsageHours,RecordedAt
+            T-01,{{orderNo}},1,850,,2026-09-01 10:00
+            T-01,,,0,,
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("使用回数"));
+
+        // 作業指示に紐づけた利用実績が寿命の累計に入り、閾値の80%で警告になる
+        var usages = await Phase3TestData.ImportActualCsvAsync(admin, "tool-usages", $$"""
+            ToolCode,OrderNo,Sequence,UsageCount,UsageHours,RecordedAt
+            T-01,{{orderNo}},1,850,,2026-09-01 10:00
+            """);
+        Assert.True(usages.Succeeded, string.Join(" / ", usages.Errors.Select(e => e.Message)));
+        var saved = Assert.Single((await admin.GetFromJsonAsync<PagedResult<ToolUsageResponse>>("/api/tool-usages"))!.Items);
+        Assert.Equal(order.WorkOrders[0].Id, saved.WorkOrderId);
+        Assert.Equal(new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.FromHours(9)), saved.RecordedAt);
+        var life = (await admin.GetFromJsonAsync<List<ToolLifeStatusRow>>("/api/tool-usages/life-status"))!;
+        Assert.True(Assert.Single(life).IsWarning);
+
+        // 引当→払出まで1行で進める。使用中の治工具を別の作業指示へ引き当てる行は単票と同じく拒否する
+        var issues = await Phase3TestData.ImportActualCsvAsync(admin, "tool-issues", $$"""
+            ToolCode,OrderNo,Sequence,Issue,Return,Note
+            T-01,{{orderNo}},1,true,false,前段取りで使用
+            """);
+        Assert.True(issues.Succeeded, string.Join(" / ", issues.Errors.Select(e => e.Message)));
+        var issued = Assert.Single((await admin.GetFromJsonAsync<List<ToolIssueResponse>>("/api/tool-issues"))!);
+        Assert.Equal(ToolIssueStatus.Issued, issued.Status);
+        Assert.NotNull(issued.IssuedToName);
+
+        var inUse = await Phase3TestData.ImportActualCsvAsync(admin, "tool-issues", $$"""
+            ToolCode,OrderNo,Sequence,Issue,Return
+            T-01,{{orderNo}},2,true,true
+            """);
+        Assert.False(inUse.Succeeded);
+        Assert.Equal(2, Assert.Single(inUse.Errors).Line);
+        Assert.Single((await admin.GetFromJsonAsync<List<ToolIssueResponse>>("/api/tool-issues"))!);
+
+        // 引当は生産管理の権限（作業者は取り込めない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "op1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(operator_, "tool-issues",
+            "ToolCode,OrderNo,Sequence\nT-01,X,1\n")).StatusCode);
+    }
+
+    [Fact]
     public async Task 治工具を作業指示へ引き当てて払出し返却できる()
     {
         using var factory = new ApiFactory();
