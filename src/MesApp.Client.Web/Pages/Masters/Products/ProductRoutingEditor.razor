@@ -65,7 +65,7 @@
             <div class="form-field">
                 @* 候補設備（B-10-20-02）。複数選ぶと差立でその中から選ばせる。空なら限定しない *@
                 <label>@L["候補設備（Ctrl/Shiftで複数選択）"]</label>
-                <select multiple size="4" @onchange="OnCandidatesChanged">
+                <select multiple size="4" @key="_formVersion" @onchange="OnCandidatesChanged">
                     @foreach (var equipment in _equipments)
                     {
                         <option value="@equipment.Id" selected="@_equipmentIds.Contains(equipment.Id)">
@@ -107,7 +107,7 @@
             <div class="form-field">
                 @* 工程管理項目の紐付け（I-30-20-10）。展開時にこの工程の作業指示へ指示値・許容範囲を写す *@
                 <label>@L["工程管理項目（Ctrl/Shiftで複数選択）"]</label>
-                <select multiple size="4" @onchange="OnControlItemsChanged">
+                <select multiple size="4" @key="_formVersion" @onchange="OnControlItemsChanged">
                     @foreach (var item in _controlItemOptions)
                     {
                         <option value="@item.Id" selected="@_controlItemIds.Contains(item.Id)">
@@ -173,6 +173,11 @@
     private int _workCenterId;
     private string? _controlItems;
     private readonly List<int> _controlItemIds = [];
+    /// <summary>
+    /// 工程を追加するたびに上げ、複数選択の一覧を作り直す。
+    /// 利用者が選んだ選択状態は selected 属性を外しても画面に残るため、選択を空にしても表示だけが前の工程のままになる
+    /// </summary>
+    private int _formVersion;
 
     private string? _error;
     private string? _message;
@@ -242,6 +247,7 @@
         _controlItems = null;
         _equipmentIds.Clear();
         _controlItemIds.Clear();
+        _formVersion++;
     }
 
     /// <summary>複数選択の設備一覧から候補を取り込む</summary>
