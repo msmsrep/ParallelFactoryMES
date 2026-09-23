@@ -170,6 +170,127 @@ public class ProductivityController(MesAppDbContext db, IBusinessDateService bus
         return LeadTimeStatistics(rows);
     }
 
+    /// <summary>
+    /// 標準時間の見直し候補（B-60-10-05。ガイド 8.3.2(4)）。
+    /// <para>
+    /// 工順の工程ごとに、期間内の作業指示の実績（1個あたり実作業時間・1回あたり段取り時間）の中央値を
+    /// 工順マスタの現在値と比べ、件数が <paramref name="minSamples"/> 以上でずれが <paramref name="threshold"/>% 以上なら候補にする。
+    /// 比べる相手は作業指示のスナップショットではなくマスタの現在値（見直す対象そのものであり、
+    /// 期間中に改訂済みなら、改訂後の値に対してまだずれているかを見たい）。
+    /// マスタは書き換えない——標準を実績に寄せるか、作業のほうを直すかは業務の判断。
+    /// </para>
+    /// <para>
+    /// 作業時間を記録していない作業指示は0分として混ぜず、件数から外す（標準時間の予実と違い、
+    /// ここで0分を混ぜると標準が過大に見えてしまう）。期間は生産実績の開始時刻の製造日。リワーク指図は含めない。
+    /// </para>
+    /// </summary>
+    [HttpGet("standard-time-review")]
+    public async Task<ActionResult<StandardTimeReviewResponse>> StandardTimeReview(
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null,
+        [FromQuery] decimal threshold = 20m,
+        [FromQuery] int minSamples = 3,
+        CancellationToken ct = default)
+    {
+        if (threshold <= 0 || minSamples < 1)
+        {
+            return this.BadRequestProblem(ApiText.T("しきい値は0より大きく、件数は1以上で指定してください。"));
+        }
+        var fromStart = from is null ? (DateTimeOffset?)null : businessDate.GetRange(from.Value).Start;
+        var toEnd = to is null ? (DateTimeOffset?)null : businessDate.GetRange(to.Value).End;
+
+        var produced = (await db.ProductionRecords.AsNoTracking()
+                .Where(r => r.WorkOrder!.ManufacturingOrder!.OrderType != ManufacturingOrderType.Rework)
+                .Select(r => new { r.WorkOrderId, r.StartedAt, Quantity = r.GoodQuantity + r.DefectQuantity })
+                .ToListAsync(ct))
+            .Where(r => (fromStart is null || r.StartedAt >= fromStart)
+                        && (toEnd is null || r.StartedAt < toEnd))
+            .GroupBy(r => r.WorkOrderId)
+            .ToDictionary(g => g.Key, g => g.Sum(r => r.Quantity));
+        var workOrderIds = produced.Keys.ToList();
+
+        var workOrders = await db.WorkOrders.AsNoTracking()
+            .Where(w => workOrderIds.Contains(w.Id))
+            .Select(w => new { w.Id, w.ProductId, w.ProcessId, w.RoutingSequence })
+            .ToListAsync(ct);
+        // 所要時間の算出はSQLiteに載らないため、時刻のまま取り出してから分に直す
+        var directMinutes = (await db.WorkTimeRecords.AsNoTracking()
+                .Where(t => t.Type == WorkTimeType.Direct && t.EndedAt != null
+                            && t.WorkOrderId != null && workOrderIds.Contains(t.WorkOrderId.Value))
+                .Select(t => new { WorkOrderId = t.WorkOrderId!.Value, t.StartedAt, EndedAt = t.EndedAt!.Value })
+                .ToListAsync(ct))
+            .GroupBy(t => t.WorkOrderId)
+            .ToDictionary(g => g.Key, g => g.Sum(t => (decimal)(t.EndedAt - t.StartedAt).TotalMinutes));
+        var setupMinutes = (await db.SetupRecords.AsNoTracking()
+                .Where(s => s.EndedAt != null && workOrderIds.Contains(s.WorkOrderId))
+                .Select(s => new { s.WorkOrderId, s.StartedAt, EndedAt = s.EndedAt!.Value })
+                .ToListAsync(ct))
+            .GroupBy(s => s.WorkOrderId)
+            .ToDictionary(g => g.Key, g => g.Sum(s => (decimal)(s.EndedAt - s.StartedAt).TotalMinutes));
+
+        var productIds = workOrders.Select(w => w.ProductId).Distinct().ToList();
+        var routings = await db.Routings.AsNoTracking()
+            .Where(r => productIds.Contains(r.ProductId))
+            .Select(r => new
+            {
+                r.Id, r.ProductId, r.Sequence, r.ProcessId,
+                ProductCode = r.Product!.Code, ProductName = r.Product!.Name,
+                ProcessCode = r.Process!.Code, ProcessName = r.Process!.Name,
+                r.StandardWorkMinutes, r.StandardSetupMinutes,
+            })
+            .ToListAsync(ct);
+
+        static decimal? Median(List<decimal> values)
+        {
+            if (values.Count == 0)
+            {
+                return null;
+            }
+            values.Sort();
+            var mid = values.Count / 2;
+            return values.Count % 2 == 1 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+        }
+        static decimal? Deviation(decimal? median, decimal standard) =>
+            median is { } m && standard > 0 ? Math.Round((m - standard) / standard * 100, 1) : null;
+        bool Off(int samples, decimal? median, decimal? deviation, decimal standard) =>
+            samples >= minSamples && median is { } m
+            && (deviation is { } d ? Math.Abs(d) >= threshold : standard == 0 && m > 0);
+
+        var rows = routings
+            .Select(r =>
+            {
+                // 工順が変わって工程順序と工程が一致しない作業指示は、この工程の実績として数えない
+                var mine = workOrders
+                    .Where(w => w.ProductId == r.ProductId && w.RoutingSequence == r.Sequence && w.ProcessId == r.ProcessId)
+                    .ToList();
+                var work = mine
+                    .Where(w => directMinutes.GetValueOrDefault(w.Id) > 0 && produced[w.Id] > 0)
+                    .Select(w => directMinutes[w.Id] / produced[w.Id])
+                    .ToList();
+                var setup = mine
+                    .Where(w => setupMinutes.ContainsKey(w.Id))
+                    .Select(w => setupMinutes[w.Id])
+                    .ToList();
+                var workMedian = Median(work);
+                var setupMedian = Median(setup);
+                var workDeviation = Deviation(workMedian, r.StandardWorkMinutes);
+                var setupDeviation = Deviation(setupMedian, r.StandardSetupMinutes);
+                return new StandardTimeReviewRow(r.Id, r.ProductCode, r.ProductName, r.Sequence,
+                    r.ProcessCode, r.ProcessName,
+                    r.StandardWorkMinutes, work.Count, workMedian is { } wm ? Math.Round(wm, 2) : null, workDeviation,
+                    r.StandardSetupMinutes, setup.Count, setupMedian is { } sm ? Math.Round(sm, 2) : null, setupDeviation,
+                    Off(work.Count, workMedian, workDeviation, r.StandardWorkMinutes)
+                    || Off(setup.Count, setupMedian, setupDeviation, r.StandardSetupMinutes));
+            })
+            .Where(r => r.WorkSampleCount + r.SetupSampleCount > 0)
+            .OrderByDescending(r => r.IsCandidate)
+            .ThenByDescending(r => Math.Max(Math.Abs(r.WorkDeviationRate ?? 0), Math.Abs(r.SetupDeviationRate ?? 0)))
+            .ThenBy(r => r.ProductCode).ThenBy(r => r.Sequence)
+            .ToList();
+
+        return new StandardTimeReviewResponse(threshold, minSamples, rows);
+    }
+
     /// <summary>リードタイムの要約・度数分布・異常値（四分位は最近順位法。4件未満では異常値を判定しない）</summary>
     private static LeadTimeResponse LeadTimeStatistics(List<LeadTimeOrderRow> rows)
     {

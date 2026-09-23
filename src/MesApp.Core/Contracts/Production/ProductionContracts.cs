@@ -196,6 +196,39 @@ public record LeadTimeResponse(
     /// <summary>リードタイムの長い順</summary>
     List<LeadTimeOrderRow> Orders);
 
+// ---- 標準時間の見直し候補（B-60-10-05。ガイド 8.3.2(4) 業務ルールの定期的な再設計）----
+
+/// <summary>
+/// 工順の工程1つ分の標準時間と実績の比較。標準は工順マスタの現在値（見直す対象そのもの）、
+/// 実績は期間内の作業指示ごとの値の中央値（1件の極端な記録に引きずられないように）
+/// </summary>
+public record StandardTimeReviewRow(
+    int RoutingId, string ProductCode, string ProductName, int Sequence, string ProcessCode, string ProcessName,
+    /// <summary>標準作業時間（分/個。工順マスタの現在値）</summary>
+    decimal StandardWorkMinutes,
+    /// <summary>作業時間の実績がある作業指示の数（直接作業時間と産出数の両方があるもの）</summary>
+    int WorkSampleCount,
+    /// <summary>1個あたり実作業時間の中央値（分）＝ 直接作業時間 ÷（良品数＋不良数）</summary>
+    decimal? MedianWorkMinutes,
+    /// <summary>標準に対するずれ（%）。標準が0分ならnull</summary>
+    decimal? WorkDeviationRate,
+    /// <summary>標準段取り時間（分/回。工順マスタの現在値）</summary>
+    decimal StandardSetupMinutes,
+    int SetupSampleCount,
+    /// <summary>作業指示1件あたり段取り時間の中央値（分）</summary>
+    decimal? MedianSetupMinutes,
+    decimal? SetupDeviationRate,
+    /// <summary>見直し候補か（件数が足り、作業か段取りのずれがしきい値以上。標準0分で実績があるものも含む）</summary>
+    bool IsCandidate);
+
+public record StandardTimeReviewResponse(
+    /// <summary>候補とみなすずれ（%）</summary>
+    decimal ThresholdPercent,
+    /// <summary>候補とみなすのに必要な作業指示の数</summary>
+    int MinSamples,
+    /// <summary>候補を先に、ずれの大きい順</summary>
+    List<StandardTimeReviewRow> Rows);
+
 // ---- 遅延検知（A-30-20-01）----
 
 /// <summary>遅れの種類</summary>

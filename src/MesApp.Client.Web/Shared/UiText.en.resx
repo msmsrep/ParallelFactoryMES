@@ -4296,4 +4296,34 @@
   <data name="納期遅れ" xml:space="preserve">
     <value>Late</value>
   </data>
+  <data name="標準時間の見直し候補" xml:space="preserve">
+    <value>Standard time review candidates</value>
+  </data>
+  <data name="工順の工程ごとに、実績の中央値（1個あたり作業時間・1回あたり段取り時間）を工順マスタの現在値と比べる。作業時間を記録していない作業指示は数えない。標準を実績に合わせるか、作業のほうを改めるかは現場で判断する。" xml:space="preserve">
+    <value>For each routing step, the median of the actuals (work time per unit and setup time per setup) is compared with the current routing master. Work orders without recorded work time are not counted. Whether to align the standard with the actuals or to change the work itself is decided on the shop floor.</value>
+  </data>
+  <data name="対象期間に作業時間・段取りの記録がある作業指示はありません。" xml:space="preserve">
+    <value>No work orders with work time or setup records in the selected period.</value>
+  </data>
+  <data name="標準作業（分/個）" xml:space="preserve">
+    <value>Standard work (min/unit)</value>
+  </data>
+  <data name="実績の中央値" xml:space="preserve">
+    <value>Actual median</value>
+  </data>
+  <data name="ずれ" xml:space="preserve">
+    <value>Deviation</value>
+  </data>
+  <data name="標準段取り（分/回）" xml:space="preserve">
+    <value>Standard setup (min/setup)</value>
+  </data>
+  <data name="{0}（{1} 件）" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="見直し候補" xml:space="preserve">
+    <value>Review candidate</value>
+  </data>
+  <data name="ずれが {0}% 以上で、作業指示が {1} 件以上あるものを見直し候補とする。標準の変更はマスタ管理の工順で行う。" xml:space="preserve">
+    <value>Steps with a deviation of {0}% or more and at least {1} work orders are review candidates. Change the standards in the routing under master management.</value>
+  </data>
 </root>

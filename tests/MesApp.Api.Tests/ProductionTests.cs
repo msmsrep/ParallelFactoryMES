@@ -828,6 +828,57 @@ public class ProductionTests
     }
 
     [Fact]
+    public async Task 標準時間の見直し候補は実績の中央値が工順マスタから外れた工程を件数が足りるときだけ挙げる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var started = DateTimeOffset.Now.AddHours(-12);
+
+        // 工順1段目（標準 作業30分/個）を3指図で、1個あたり60分・60分・66分で行う → 中央値60分（+100%）
+        // 工順2段目は1指図だけ時間を記録する（件数不足で候補にしない）。時間を記録しない作業指示は件数に入れない
+        var minutes = new[] { 600, 600, 660 };
+        for (var i = 0; i < 3; i++)
+        {
+            var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+            var first = order.WorkOrders[0].Id;
+            (await admin.PostAsJsonAsync($"/api/work-orders/{first}/production-records",
+                new ProductionRecordRequest(10m, 0m, started, started.AddHours(1), null, false))).EnsureSuccessStatusCode();
+            (await admin.PostAsJsonAsync("/api/work-time-records",
+                new WorkTimeRequest(WorkTimeType.Direct, null, first, started, started.AddMinutes(minutes[i]), null)))
+                .EnsureSuccessStatusCode();
+            var second = order.WorkOrders[1].Id;
+            (await admin.PostAsJsonAsync($"/api/work-orders/{second}/production-records",
+                new ProductionRecordRequest(10m, 0m, started, started.AddHours(1), ctx.ProductLocationId, false))).EnsureSuccessStatusCode();
+            if (i == 0)
+            {
+                (await admin.PostAsJsonAsync("/api/work-time-records",
+                    new WorkTimeRequest(WorkTimeType.Direct, null, second, started, started.AddMinutes(500), null)))
+                    .EnsureSuccessStatusCode();
+            }
+        }
+
+        var review = await admin.GetFromJsonAsync<StandardTimeReviewResponse>("/api/productivity/standard-time-review");
+
+        var step1 = Assert.Single(review!.Rows, r => r.Sequence == 1);
+        Assert.True(step1.IsCandidate);
+        Assert.Equal(3, step1.WorkSampleCount);
+        Assert.Equal(60m, step1.MedianWorkMinutes);
+        Assert.Equal(100m, step1.WorkDeviationRate);
+        var step2 = Assert.Single(review.Rows, r => r.Sequence == 2);
+        Assert.False(step2.IsCandidate);
+        Assert.Equal(1, step2.WorkSampleCount);
+        Assert.Equal(step1.RoutingId, review.Rows[0].RoutingId); // 候補が先
+
+        // しきい値を上げれば候補から外れる。マスタは書き換えない
+        var loose = await admin.GetFromJsonAsync<StandardTimeReviewResponse>(
+            "/api/productivity/standard-time-review?threshold=150");
+        Assert.DoesNotContain(loose!.Rows, r => r.IsCandidate);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await admin.GetAsync("/api/productivity/standard-time-review?threshold=0")).StatusCode);
+    }
+
+    [Fact]
     public async Task 納期超過と標準時間超過の作業指示を遅延として拾える()
     {
         using var factory = new ApiFactory();

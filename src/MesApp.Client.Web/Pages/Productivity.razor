@@ -120,6 +120,56 @@ else
     </div>
 }
 
+@* 標準時間の見直し候補（ガイド 8.3.2(4)）。マスタは書き換えず、見直すきっかけだけを示す *@
+<div class="card">
+    <h2 style="margin-top:0;">@L["標準時間の見直し候補"]</h2>
+    <p class="text-muted">
+        @L["工順の工程ごとに、実績の中央値（1個あたり作業時間・1回あたり段取り時間）を工順マスタの現在値と比べる。作業時間を記録していない作業指示は数えない。標準を実績に合わせるか、作業のほうを改めるかは現場で判断する。"]
+    </p>
+    @if (_review is null)
+    {
+        <p class="text-muted">@L["読み込み中..."]</p>
+    }
+    else if (_review.Rows.Count == 0)
+    {
+        <p class="text-muted">@L["対象期間に作業時間・段取りの記録がある作業指示はありません。"]</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>@L["品目"]</th><th>@L["工程"]</th>
+                    <th>@L["標準作業（分/個）"]</th><th>@L["実績の中央値"]</th><th>@L["ずれ"]</th>
+                    <th>@L["標準段取り（分/回）"]</th><th>@L["実績の中央値"]</th><th>@L["ずれ"]</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _review.Rows)
+                {
+                    <tr>
+                        <td>@row.ProductCode @row.ProductName</td>
+                        <td>@row.Sequence. @row.ProcessCode @row.ProcessName</td>
+                        <td>@row.StandardWorkMinutes.ToString("0.##")</td>
+                        <td>@(row.MedianWorkMinutes is { } w ? L["{0}（{1} 件）", w.ToString("0.##"), row.WorkSampleCount].Value : "-")</td>
+                        <td>@Deviation(row.WorkDeviationRate)</td>
+                        <td>@row.StandardSetupMinutes.ToString("0.##")</td>
+                        <td>@(row.MedianSetupMinutes is { } s ? L["{0}（{1} 件）", s.ToString("0.##"), row.SetupSampleCount].Value : "-")</td>
+                        <td>@Deviation(row.SetupDeviationRate)</td>
+                        <td>
+                            @if (row.IsCandidate)
+                            {
+                                <span class="badge badge-warning">@L["見直し候補"]</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="text-muted">@L["ずれが {0}% 以上で、作業指示が {1} 件以上あるものを見直し候補とする。標準の変更はマスタ管理の工順で行う。", _review.ThresholdPercent.ToString("0.#"), _review.MinSamples]</p>
+    }
+</div>
+
 @* 製造リードタイムの分布（ガイド 8.3.2）。平均では見えないばらつきと異常値を、完了した指図の分布で見る *@
 <div class="card">
     <h2 style="margin-top:0;">@L["製造リードタイム"]</h2>
@@ -201,6 +251,9 @@ else
 @code {
     private ProductivitySummaryResponse? _summary;
     private LeadTimeResponse? _leadTime;
+    private StandardTimeReviewResponse? _review;
+
+    private static string Deviation(decimal? rate) => rate is { } r ? $"{r:+0.#;-0.#;0} %" : "-";
 
     /// <summary>分布の棒（納期内・納期なしと、納期遅れを積み上げる）</summary>
     private List<ChartSeries> LeadTimeBars => _leadTime is null ? [] :
@@ -227,5 +280,6 @@ else
         var suffix = query.Count > 0 ? "?" + string.Join("&", query) : string.Empty;
         _summary = await Http.GetFromJsonAsync<ProductivitySummaryResponse>("api/productivity" + suffix);
         _leadTime = await Http.GetFromJsonAsync<LeadTimeResponse>("api/productivity/lead-time" + suffix);
+        _review = await Http.GetFromJsonAsync<StandardTimeReviewResponse>("api/productivity/standard-time-review" + suffix);
     }
 }

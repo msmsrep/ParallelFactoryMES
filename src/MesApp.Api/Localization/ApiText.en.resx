@@ -2022,4 +2022,7 @@
   <data name="存在しない必要スキルIDです。" xml:space="preserve">
     <value>The required skill ID does not exist.</value>
   </data>
+  <data name="しきい値は0より大きく、件数は1以上で指定してください。" xml:space="preserve">
+    <value>Specify a threshold greater than 0 and a count of at least 1.</value>
+  </data>
 </root>
