@@ -101,7 +101,7 @@ internal sealed class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrde
             .WithMany()
             .HasForeignKey(x => x.ProcessId)
             .OnDelete(DeleteBehavior.Restrict);
-        e.Property(x => x.ControlItems).HasMaxLength(500);
+        e.Property(x => x.ControlItems).HasMaxLength(1000);
         e.HasOne(x => x.RequiredSkill)
             .WithMany()
             .HasForeignKey(x => x.RequiredSkillId)

@@ -139,8 +139,17 @@ public class Routing
     public int? ToolId { get; set; }
     public Tool? Tool { get; set; }
 
-    /// <summary>工程管理項目（温度・回転数など記録すべき製造条件の定義）</summary>
+    /// <summary>
+    /// 工程管理項目の補足（自由記述）。指示値・許容範囲を持つ条件は <see cref="ControlItemLinks"/> で紐付ける
+    /// </summary>
     public string? ControlItems { get; set; }
+
+    /// <summary>
+    /// この工程で記録する工程管理項目（I-30-20-10「BOPに登録された作業に工程管理条件を定義する」）。
+    /// 指図展開時にこの紐付けどおり作業指示へ指示値を写す。項目側に対象品目・工程を持たせて自動で選ぶと、
+    /// 品目を指定した項目がその品目の全工程に載り、同じ工程が2回ある工順を区別できないため
+    /// </summary>
+    public List<RoutingControlItem> ControlItemLinks { get; set; } = [];
 
     /// <summary>工程・段取りで実施するチェックリスト</summary>
     public int? ChecklistId { get; set; }
@@ -203,6 +212,21 @@ public class RoutingEquipment
 
     public int EquipmentId { get; set; }
     public Equipment? Equipment { get; set; }
+}
+
+/// <summary>
+/// 工順の工程管理項目（Spec.md 5.1 RoutingControlItem。I-30-20-10、B-30-30-04）。
+/// 工順の1工程で記録する製造条件を指す。工順の一括置換で工程ごと作り直す
+/// </summary>
+public class RoutingControlItem
+{
+    public int Id { get; set; }
+
+    public int RoutingId { get; set; }
+    public Routing? Routing { get; set; }
+
+    public int ControlItemId { get; set; }
+    public ControlItem? ControlItem { get; set; }
 }
 
 /// <summary>設備台帳/BOE（Spec.md 5.1 Equipment。E-10-10、I-10-20）</summary>
@@ -498,6 +522,11 @@ public class InspectionItem : IDeactivatableMaster
 /// 関係は「検査パラメータと検査結果」と同じ構造であり、判定の考え方も揃うため。
 /// 違いは、検査が結果を測るのに対し、こちらは作る前に与える条件だという点。
 /// </para>
+/// <para>
+/// 対象品目・対象工程は持たない。どの工程で記録するかは工順（BOP）側から紐付ける（<see cref="RoutingControlItem"/>）。
+/// 作業手順書（<see cref="WorkProcedure"/>）と同じ理由で、両側に対象を持たせると運用が割れる。
+/// 品目ごとに指示値が違う条件は、品目ごとに別の項目として登録する
+/// </para>
 /// </summary>
 public class ControlItem : IDeactivatableMaster
 {
@@ -510,14 +539,6 @@ public class ControlItem : IDeactivatableMaster
 
     /// <summary>単位（℃・rpm など）</summary>
     public string? Unit { get; set; }
-
-    /// <summary>対象品目（品目単位の条件の場合）</summary>
-    public int? TargetProductId { get; set; }
-    public Product? TargetProduct { get; set; }
-
-    /// <summary>対象工程（工程単位の条件の場合）</summary>
-    public int? TargetProcessId { get; set; }
-    public ProcessMaster? TargetProcess { get; set; }
 
     /// <summary>指示値（レシピ上の狙い値。例「600W」）</summary>
     public decimal? TargetValue { get; set; }

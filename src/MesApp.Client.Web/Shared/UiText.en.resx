@@ -1005,9 +1005,6 @@
   <data name="使用治工具" xml:space="preserve">
     <value>Tools used</value>
   </data>
-  <data name="例：温度、回転数" xml:space="preserve">
-    <value>e.g. temperature, speed</value>
-  </data>
   <data name="作業手順書（SOP）" xml:space="preserve">
     <value>Work procedure (SOP)</value>
   </data>
@@ -4166,5 +4163,20 @@
   </data>
   <data name="{0}（工順に無し）" xml:space="preserve">
     <value>{0} (not in routing)</value>
+  </data>
+  <data name="どの工程で記録するかは品目タブの工順で紐付けます。品目ごとに指示値が違う条件は、品目ごとに別の項目として登録してください。" xml:space="preserve">
+    <value>Link items to process steps in the routing on the Items tab. If the target value differs by item, register a separate control item for each item.</value>
+  </data>
+  <data name="補足" xml:space="preserve">
+    <value>Notes</value>
+  </data>
+  <data name="工程管理項目（Ctrl/Shiftで複数選択）" xml:space="preserve">
+    <value>Control items (Ctrl/Shift to select multiple)</value>
+  </data>
+  <data name="工程管理項目の補足" xml:space="preserve">
+    <value>Control item notes</value>
+  </data>
+  <data name="指示値の無い確認事項など" xml:space="preserve">
+    <value>Checks without target values, etc.</value>
   </data>
 </root>

@@ -103,7 +103,11 @@ public class ExecutionTests
             "CL-T,段取り確認,Setup,true,1,治具の確認,true\nCL-T,段取り確認,Setup,true,2,清掃,false\n");
         await ImportAsync("masters/csv/defect-reasons", "Code,Name,Category\nDR-01,寸法不良,Process\n");
         await ImportAsync("masters/csv/control-items",
-            "Code,Name,Unit,TargetProductCode,TargetValue,LowerLimit,UpperLimit\nCI-T,温度,℃,FG-01,100,90,110\n");
+            "Code,Name,Unit,TargetValue,LowerLimit,UpperLimit\nCI-T,温度,℃,100,90,110\n");
+        // 工程管理項目は工順の工程に紐付けたものだけが作業指示へ写る（1工程目にだけ紐付ける）
+        await ImportAsync("masters/csv/routing",
+            "ProductCode,Sequence,ProcessCode,StandardWorkMinutes,StandardSetupMinutes,ControlItemCodes\n" +
+            "FG-01,1,PR-01,30,10,CI-T\nFG-01,2,PR-01,15,5,\n");
         await ImportAsync("actuals/csv/receiving", "ProductCode,Quantity,LocationCode,LotNumber\nRM-01,100,LOC-M,RM-LOT-1\n");
         await ImportAsync("actuals/csv/manufacturing-orders",
             "OrderNo,ProductCode,Quantity,Approve,Expand\nORD-1,FG-01,10,true,true\n");
@@ -728,6 +732,29 @@ public class ExecutionTests
         Assert.Equal(HttpStatusCode.OK, unrestricted.StatusCode);
     }
 
+    [Fact]
+    public async Task 工順に登録できる長さの工程管理項目はそのまま作業指示へ展開できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+
+        var product = await MasterTests.CreateProductAsync(admin, "FG-01", "完成品", ProductType.Product);
+        var process = await MasterTests.CreateProcessAsync(admin, "PR-01", "加工");
+
+        // 上限を超える記述は工順の登録で止める（展開まで持ち越すと実DBで保存に失敗する）
+        var tooLong = await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, new string('あ', 1001), null) });
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+
+        // 上限いっぱいの記述は作業指示へ欠けずに写る（作業指示側の列が工順側より短いと展開に失敗していた）
+        var longest = new string('あ', 1000);
+        (await admin.PutAsJsonAsync($"/api/products/{product.Id}/routing",
+            new List<RoutingStepRequest> { new(1, process.Id, 30m, 10m, null, null, null, longest, null) }))
+            .EnsureSuccessStatusCode();
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, product.Id, 10m);
+        Assert.Equal(longest, order.WorkOrders.Single().ControlItems);
+    }
+
     private static async Task<MesApp.Core.Contracts.Masters.EquipmentResponse> CreateEquipmentAsync(
         HttpClient admin, string assetNo, string name)
     {
@@ -745,16 +772,22 @@ public class ExecutionTests
         using var admin = await TestAuth.CreateAdminClientAsync(factory);
         var ctx = await Phase3TestData.SetupAsync(admin);
 
-        // 指示（工程単位）を用意してから展開する。展開時点の値が作業指示へ写る
-        (await admin.PostAsJsonAsync("/api/control-items",
-            new Core.Contracts.Masters.ControlItemRequest(
-                "CI-01", "加熱温度", "℃", null, ctx.ProcessId, 180m, 175m, 185m)))
-            .EnsureSuccessStatusCode();
+        // 指示を用意して工順の1工程目に紐付けてから展開する。展開時点の値が作業指示へ写る
+        async Task<int> CreateItemAsync(Core.Contracts.Masters.ControlItemRequest request)
+        {
+            var created = await admin.PostAsJsonAsync("/api/control-items", request);
+            created.EnsureSuccessStatusCode();
+            return (await created.Content.ReadFromJsonAsync<Core.Contracts.Masters.ControlItemResponse>())!.Id;
+        }
+        var temperatureId = await CreateItemAsync(new("CI-01", "加熱温度", "℃", 180m, 175m, 185m));
         // 上下限を持たない項目は判定しない（記録だけが目的の条件）
-        (await admin.PostAsJsonAsync("/api/control-items",
-            new Core.Contracts.Masters.ControlItemRequest(
-                "CI-02", "作業者メモ", null, null, ctx.ProcessId, null, null, null)))
-            .EnsureSuccessStatusCode();
+        var memoId = await CreateItemAsync(new("CI-02", "作業者メモ", null, null, null, null));
+        (await admin.PutAsJsonAsync($"/api/products/{ctx.ProductId}/routing",
+            new List<RoutingStepRequest>
+            {
+                new(1, ctx.ProcessId, 30m, 10m, null, null, null, null, null, ControlItemIds: [temperatureId, memoId]),
+                new(2, ctx.ProcessId, 15m, 5m, null, null, null, null, null),
+            })).EnsureSuccessStatusCode();
 
         var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
         var workOrderId = order.WorkOrders[0].Id;

@@ -180,6 +180,7 @@ public class ProductsController(
         return await db.Routings.AsNoTracking()
             .Include(r => r.EquipmentCandidates).ThenInclude(c => c.Equipment)
             .Include(r => r.WorkProcedure)
+            .Include(r => r.ControlItemLinks).ThenInclude(l => l.ControlItem)
             .Where(r => r.ProductId == id)
             .OrderBy(r => r.Sequence)
             .Select(r => new RoutingStepResponse(
@@ -195,7 +196,11 @@ public class ProductsController(
                     .Select(c => c.EquipmentId).ToList(),
                 r.WorkProcedureId,
                 r.WorkProcedure != null ? r.WorkProcedure.ProcedureNo : null,
-                r.WorkProcedure != null ? r.WorkProcedure.Title : null))
+                r.WorkProcedure != null ? r.WorkProcedure.Title : null,
+                r.ControlItemLinks.OrderBy(l => l.ControlItem!.Code)
+                    .Select(l => l.ControlItemId).ToList(),
+                r.ControlItemLinks.OrderBy(l => l.ControlItem!.Code)
+                    .Select(l => l.ControlItem!.Code).ToList()))
             .ToListAsync(ct);
     }
 

@@ -121,6 +121,8 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
             (steps.Where(s => s.WorkProcedureId != null).Select(s => s.WorkProcedureId!.Value),
                 ProductStructurePolicy.AssignableWorkProcedures(db.WorkProcedures).Select(x => x.Id), ApiText.T("作業手順書")),
             (steps.SelectMany(s => s.EquipmentIds ?? []), db.Equipments.Select(x => x.Id), ApiText.T("候補設備")),
+            (steps.SelectMany(s => s.ControlItemIds ?? []),
+                ProductStructurePolicy.AssignableControlItems(db.ControlItems).Select(x => x.Id), ApiText.T("工程管理項目")),
             (steps.Where(s => s.WorkCenterId != null).Select(s => s.WorkCenterId!.Value),
                 ProductStructurePolicy.AssignableWorkCenters(db.WorkCenters).Select(x => x.Id), ApiText.T("作業区")),
         })
@@ -155,6 +157,10 @@ public sealed class ProductStructureService(MesAppDbContext db, IAuditLogger aud
             ToolId = s.ToolId,
             WorkCenterId = s.WorkCenterId,
             ControlItems = s.ControlItems,
+            ControlItemLinks =
+            [
+                .. (s.ControlItemIds ?? []).Distinct().Select(x => new RoutingControlItem { ControlItemId = x }),
+            ],
             ChecklistId = s.ChecklistId,
             WorkProcedureId = s.WorkProcedureId,
         }));

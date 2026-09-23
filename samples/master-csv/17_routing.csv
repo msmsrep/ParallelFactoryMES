@@ -1,6 +1,6 @@
-﻿ProductCode,Sequence,ProcessCode,StandardWorkMinutes,StandardSetupMinutes,RequiredSkillCode,EquipmentAssetNo,EquipmentAssetNos,ToolCode,WorkCenterCode,ChecklistCode,ControlItems,WorkProcedureNo
-SF-2000,10,PR-10,25,15,SK-01,EQ-01,EQ-01;EQ-05,TL-01,WC-MC1,CL-01,"主軸回転数, 送り速度",SOP-MC-001
-SF-2000,20,PR-20,0,0,,,,,,,外注（アルマイト処理）,
-FG-1000,10,PR-30,30,10,SK-04,EQ-02,,TL-02,WC-AS1,CL-02,締付トルク,SOP-AS-001
-FG-1000,20,PR-40,15,5,SK-03,EQ-03,,TL-03,WC-QC1,,試験圧力,
-FG-1000,30,PR-50,10,5,,EQ-04,,,WC-PK1,CL-03,,
+﻿ProductCode,Sequence,ProcessCode,StandardWorkMinutes,StandardSetupMinutes,RequiredSkillCode,EquipmentAssetNo,EquipmentAssetNos,ToolCode,WorkCenterCode,ChecklistCode,ControlItems,ControlItemCodes,WorkProcedureNo
+SF-2000,10,PR-10,25,15,SK-01,EQ-01,EQ-01;EQ-05,TL-01,WC-MC1,CL-01,,CI-01;CI-02,SOP-MC-001
+SF-2000,20,PR-20,0,0,,,,,,,外注（アルマイト処理）,,
+FG-1000,10,PR-30,30,10,SK-04,EQ-02,,TL-02,WC-AS1,CL-02,,CI-03,SOP-AS-001
+FG-1000,20,PR-40,15,5,SK-03,EQ-03,,TL-03,WC-QC1,,吐出音に異音が無いこと,CI-04,
+FG-1000,30,PR-50,10,5,,EQ-04,,,WC-PK1,CL-03,,,

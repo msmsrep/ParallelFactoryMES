@@ -77,6 +77,21 @@ internal sealed class RoutingEquipmentConfiguration : IEntityTypeConfiguration<R
     }
 }
 
+internal sealed class RoutingControlItemConfiguration : IEntityTypeConfiguration<RoutingControlItem>
+{
+    public void Configure(EntityTypeBuilder<RoutingControlItem> e)
+    {
+        // 同じ工程に同じ項目を二重に紐付けさせない（作業指示に同じ指示が2行出る）
+        e.HasIndex(x => new { x.RoutingId, x.ControlItemId }).IsUnique();
+        // 候補設備と同じく、工順を置き換えると紐付けも消える。逆側のナビゲーションを明示する
+        e.HasOne(x => x.Routing).WithMany(r => r.ControlItemLinks)
+            .HasForeignKey(x => x.RoutingId)
+            .OnDelete(DeleteBehavior.Cascade);
+        e.HasOne(x => x.ControlItem).WithMany().HasForeignKey(x => x.ControlItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class WorkProcedureConfiguration : IEntityTypeConfiguration<WorkProcedure>
 {
     public void Configure(EntityTypeBuilder<WorkProcedure> e)

@@ -8,6 +8,7 @@
         <h2 style="margin-top:0;">@(_editingId is null ? L["工程管理項目の登録"] : L["編集（{0}）", _code])</h2>
         <p class="text-muted">
             @L["温度・回転数など、製造時に記録すべき条件の定義と指示値・上下限。実績はこの範囲と照合する。"]
+            @L["どの工程で記録するかは品目タブの工順で紐付けます。品目ごとに指示値が違う条件は、品目ごとに別の項目として登録してください。"]
         </p>
         <div class="form-grid">
             <div class="form-field">
@@ -21,24 +22,6 @@
             <div class="form-field">
                 <label>@L["単位"]</label>
                 <input @bind="_unit" placeholder="@L["℃ / rpm など"]" />
-            </div>
-            <div class="form-field">
-                <label>@L["対象品目"]</label>
-                <OptionSelect TItem="ProductResponse" Endpoint="api/products/options"
-                              @bind-Value="_productId"
-                              EmptyLabel="@L["指定なし"]"
-                              ValueOf="p => p.Id"
-                              LabelOf='@(p => $"{p.Code} {p.Name}")' />
-            </div>
-            <div class="form-field">
-                <label>@L["対象工程"]</label>
-                <select @bind="_processId">
-                    <option value="0">@L["指定なし"]</option>
-                    @foreach (var process in _processes)
-                    {
-                        <option value="@process.Id">@process.Code @process.Name</option>
-                    }
-                </select>
             </div>
             <div class="form-field">
                 <label>@L["指示値"]</label>
@@ -74,7 +57,7 @@
     {
         <table class="table">
             <thead>
-                <tr><th>@L["コード"]</th><th>@L["名称"]</th><th>@L["単位"]</th><th>@L["対象"]</th><th>@L["指示値"]</th><th>@L["許容範囲"]</th><th>@L["版数"]</th><th>@L["状態"]</th><th></th></tr>
+                <tr><th>@L["コード"]</th><th>@L["名称"]</th><th>@L["単位"]</th><th>@L["指示値"]</th><th>@L["許容範囲"]</th><th>@L["版数"]</th><th>@L["状態"]</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var item in _items)
@@ -83,7 +66,6 @@
                         <td>@item.Code</td>
                         <td>@item.Name</td>
                         <td>@(item.Unit ?? "-")</td>
-                        <td>@(item.TargetProductCode ?? item.TargetProcessCode ?? "-")</td>
                         <td>@(item.TargetValue?.ToString() ?? "-")</td>
                         <td>@(item.LowerLimit?.ToString() ?? "-") 〜 @(item.UpperLimit?.ToString() ?? "-")</td>
                         <td>v@(item.Version)</td>
@@ -107,14 +89,11 @@
 
 @code {
     private List<ControlItemResponse>? _items;
-    private List<ProcessResponse> _processes = [];
 
     private int? _editingId;
     private string _code = string.Empty;
     private string _name = string.Empty;
     private string? _unit;
-    private int _productId;
-    private int _processId;
     private decimal? _target;
     private decimal? _lower;
     private decimal? _upper;
@@ -122,11 +101,7 @@
     private string? _message;
     private bool _busy;
 
-    protected override async Task OnInitializedAsync()
-    {
-        _processes = await Http.GetFromJsonAsync<List<ProcessResponse>>("api/processes") ?? [];
-        await LoadAsync();
-    }
+    protected override Task OnInitializedAsync() => LoadAsync();
 
     private async Task LoadAsync() =>
         _items = await Http.GetFromJsonAsync<List<ControlItemResponse>>("api/control-items?includeInactive=true");
@@ -137,8 +112,6 @@
         _code = item.Code;
         _name = item.Name;
         _unit = item.Unit;
-        _productId = item.TargetProductId ?? 0;
-        _processId = item.TargetProcessId ?? 0;
         _target = item.TargetValue;
         _lower = item.LowerLimit;
         _upper = item.UpperLimit;
@@ -150,8 +123,6 @@
         _code = string.Empty;
         _name = string.Empty;
         _unit = null;
-        _productId = 0;
-        _processId = 0;
         _target = null;
         _lower = null;
         _upper = null;
@@ -169,10 +140,7 @@
         _message = null;
         try
         {
-            var request = new ControlItemRequest(_code, _name, _unit,
-                _productId == 0 ? null : _productId,
-                _processId == 0 ? null : _processId,
-                _target, _lower, _upper);
+            var request = new ControlItemRequest(_code, _name, _unit, _target, _lower, _upper);
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/control-items", request)
                 : await Http.PutAsJsonAsync($"api/control-items/{_editingId}", request);

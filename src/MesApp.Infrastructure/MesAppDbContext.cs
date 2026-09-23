@@ -19,6 +19,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<ProcessMaster> Processes => Set<ProcessMaster>();
     public DbSet<Routing> Routings => Set<Routing>();
     public DbSet<RoutingEquipment> RoutingEquipments => Set<RoutingEquipment>();
+    public DbSet<RoutingControlItem> RoutingControlItems => Set<RoutingControlItem>();
     public DbSet<Equipment> Equipments => Set<Equipment>();
     public DbSet<EquipmentPart> EquipmentParts => Set<EquipmentPart>();
     public DbSet<Tool> Tools => Set<Tool>();

@@ -1,5 +1,5 @@
-﻿Code,Name,Unit,TargetProductCode,TargetProcessCode,TargetValue,LowerLimit,UpperLimit,IsActive
-CI-01,主軸回転数,rpm,SF-2000,PR-10,8000,7600,8400,true
-CI-02,送り速度,mm/min,SF-2000,PR-10,1200,1100,1300,true
-CI-03,締付トルク,N・m,FG-1000,PR-30,10,9,11,true
-CI-04,試験圧力,MPa,FG-1000,PR-40,0.5,0.48,0.52,true
+﻿Code,Name,Unit,TargetValue,LowerLimit,UpperLimit,IsActive
+CI-01,主軸回転数,rpm,8000,7600,8400,true
+CI-02,送り速度,mm/min,1200,1100,1300,true
+CI-03,締付トルク,N・m,10,9,11,true
+CI-04,試験圧力,MPa,0.5,0.48,0.52,true

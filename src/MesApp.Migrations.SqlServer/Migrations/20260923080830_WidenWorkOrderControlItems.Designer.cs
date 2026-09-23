@@ -4,6 +4,7 @@ using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MesApp.Migrations.SqlServer.Migrations
 {
     [DbContext(typeof(MesAppDbContext))]
-    partial class MesAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260923080830_WidenWorkOrderControlItems")]
+    partial class WidenWorkOrderControlItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -371,6 +374,12 @@ namespace MesApp.Migrations.SqlServer.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<int?>("TargetProcessId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TargetProductId")
+                        .HasColumnType("int");
+
                     b.Property<decimal?>("TargetValue")
                         .HasPrecision(18, 6)
                         .HasColumnType("decimal(18,6)");
@@ -390,6 +399,10 @@ namespace MesApp.Migrations.SqlServer.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("TargetProcessId");
+
+                    b.HasIndex("TargetProductId");
 
                     b.ToTable("ControlItems");
                 });
@@ -2359,30 +2372,6 @@ namespace MesApp.Migrations.SqlServer.Migrations
                     b.ToTable("Routings");
                 });
 
-            modelBuilder.Entity("MesApp.Core.Entities.RoutingControlItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ControlItemId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RoutingId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ControlItemId");
-
-                    b.HasIndex("RoutingId", "ControlItemId")
-                        .IsUnique();
-
-                    b.ToTable("RoutingControlItems");
-                });
-
             modelBuilder.Entity("MesApp.Core.Entities.RoutingEquipment", b =>
                 {
                     b.Property<int>("Id")
@@ -3634,6 +3623,21 @@ namespace MesApp.Migrations.SqlServer.Migrations
                     b.Navigation("ChecklistItem");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.ControlItem", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.ProcessMaster", "TargetProcess")
+                        .WithMany()
+                        .HasForeignKey("TargetProcessId");
+
+                    b.HasOne("MesApp.Core.Entities.Product", "TargetProduct")
+                        .WithMany()
+                        .HasForeignKey("TargetProductId");
+
+                    b.Navigation("TargetProcess");
+
+                    b.Navigation("TargetProduct");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.Equipment", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.WorkCenter", "WorkCenter")
@@ -4403,25 +4407,6 @@ namespace MesApp.Migrations.SqlServer.Migrations
                     b.Navigation("WorkProcedure");
                 });
 
-            modelBuilder.Entity("MesApp.Core.Entities.RoutingControlItem", b =>
-                {
-                    b.HasOne("MesApp.Core.Entities.ControlItem", "ControlItem")
-                        .WithMany()
-                        .HasForeignKey("ControlItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("MesApp.Core.Entities.Routing", "Routing")
-                        .WithMany("ControlItemLinks")
-                        .HasForeignKey("RoutingId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ControlItem");
-
-                    b.Navigation("Routing");
-                });
-
             modelBuilder.Entity("MesApp.Core.Entities.RoutingEquipment", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
@@ -4921,8 +4906,6 @@ namespace MesApp.Migrations.SqlServer.Migrations
 
             modelBuilder.Entity("MesApp.Core.Entities.Routing", b =>
                 {
-                    b.Navigation("ControlItemLinks");
-
                     b.Navigation("EquipmentCandidates");
                 });
 
