@@ -50,7 +50,10 @@ public static class InspectionItemPolicy
             : null;
     }
 
-    /// <summary>検査指示の種別に対応する基準の種別（再検査は完成品の基準を使う）</summary>
+    /// <summary>
+    /// 検査指示の種別に対応する基準の種別。再検査は元の検査の基準を引き継ぐため、
+    /// 呼び出し側（<c>InspectionService</c>）が元の検査の基準の種別に置き換える
+    /// </summary>
     public static InspectionType ItemTypeOf(InspectionOrderType orderType) => orderType switch
     {
         InspectionOrderType.Receiving => InspectionType.Receiving,

@@ -221,6 +221,45 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 再検査は直近の判定済みの検査の基準を引き継ぎ取消済みの検査は訂正できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var receivingItem = (await (await admin.PostAsJsonAsync("/api/inspection-items",
+            new InspectionItemRequest("INS-R", "受入寸法", ctx.MaterialId, null, InspectionType.Receiving,
+                9.5m, 10.5m, 10m, "ノギス", 1))).Content.ReadFromJsonAsync<InspectionItemResponse>())!;
+        async Task<HttpResponseMessage> IssueAsync(InspectionOrderType type, int lotId) =>
+            await admin.PostAsJsonAsync("/api/inspection-orders", new InspectionOrderCreateRequest(type, lotId, null, null, null));
+
+        // 判定済みの検査が無いロットは再検査できない
+        var fresh = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 10m, ctx.MaterialLocationId);
+        Assert.Equal(HttpStatusCode.BadRequest, (await IssueAsync(InspectionOrderType.Reinspection, fresh.Id)).StatusCode);
+
+        // 受入検査で不合格になった部材ロットの再検査は、受入の基準を引き継ぐ（完成品の基準を探さない）
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var first = (await (await IssueAsync(InspectionOrderType.Receiving, lot.Id)).Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+        await admin.PostAsJsonAsync($"/api/inspection-orders/{first.Id}/results",
+            new List<InspectionResultRequest> { new(receivingItem.Id, 1, 12.0m, null, null) });
+        (await admin.PostAsJsonAsync($"/api/inspection-orders/{first.Id}/judge", new InspectionJudgeRequest(null)))
+            .EnsureSuccessStatusCode();
+        var reinspection = await IssueAsync(InspectionOrderType.Reinspection, lot.Id);
+        Assert.Equal(HttpStatusCode.Created, reinspection.StatusCode);
+        var reinspectionOrder = (await reinspection.Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+        Assert.Equal(["INS-R"], reinspectionOrder.Items.Select(i => i.Code));
+
+        // 取り消した検査の実績は訂正できない
+        var recorded = (await (await admin.PostAsJsonAsync($"/api/inspection-orders/{reinspectionOrder.Id}/results",
+            new List<InspectionResultRequest> { new(receivingItem.Id, 1, 10.0m, null, null) }))
+            .Content.ReadFromJsonAsync<InspectionOrderResponse>())!;
+        (await admin.PostAsync($"/api/inspection-orders/{reinspectionOrder.Id}/cancel", null)).EnsureSuccessStatusCode();
+        var correction = await admin.PutAsJsonAsync(
+            $"/api/inspection-orders/{reinspectionOrder.Id}/results/{recorded.Results.Single().Id}",
+            new InspectionResultCorrectionRequest(10.1m, null, InspectionJudgment.Pass, "転記ミス"));
+        Assert.Equal(HttpStatusCode.Conflict, correction.StatusCode);
+    }
+
+    [Fact]
     public async Task 検査指示を取消すと検査待ちのロットが解放され承認済みは取消せない()
     {
         using var factory = new ApiFactory();

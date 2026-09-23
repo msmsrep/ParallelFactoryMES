@@ -2043,4 +2043,16 @@
   <data name="検査項目 '{0}' はサンプリング数 {1} に対して実績が {2} サンプルです。サンプリング数以上の実績を登録してから判定してください。" xml:space="preserve">
     <value>Inspection item '{0}' requires {1} samples but has results for {2}. Register results for at least the sampling count before judging.</value>
   </data>
+  <data name="取消済みの作業指示 {0} には工程内検査を発行できません。" xml:space="preserve">
+    <value>An in-process inspection cannot be issued for canceled work order {0}.</value>
+  </data>
+  <data name="ロット '{0}' は作業指示 {1} の品目のロットではありません。" xml:space="preserve">
+    <value>Lot '{0}' is not a lot of the item of work order {1}.</value>
+  </data>
+  <data name="ロット '{0}' には判定済みの検査が無いため再検査できません。" xml:space="preserve">
+    <value>Lot '{0}' cannot be reinspected because it has no judged inspection.</value>
+  </data>
+  <data name="取消済みの検査は訂正できません。" xml:space="preserve">
+    <value>A canceled inspection cannot be corrected.</value>
+  </data>
 </root>

@@ -44,6 +44,10 @@ public sealed class InspectionService(
             {
                 return Outcome<InspectionOrder>.Invalid(ApiText.T("存在しない作業指示IDです。"));
             }
+            if (workOrder.Status == WorkOrderStatus.Canceled)
+            {
+                return Outcome<InspectionOrder>.Conflict(ApiText.T("取消済みの作業指示 {0} には工程内検査を発行できません。", workOrder.WorkOrderNo));
+            }
         }
         else if (request.TargetLotId is null)
         {
@@ -56,6 +60,12 @@ public sealed class InspectionService(
             if (lot is null)
             {
                 return Outcome<InspectionOrder>.Invalid(ApiText.T("存在しないロットIDです。"));
+            }
+            // 工程内検査で指定したロットは、その作業指示の品目のロットであること（別品目のロットを拘束・判定させない）
+            if (workOrder is not null && lot.ProductId != workOrder.ProductId)
+            {
+                return Outcome<InspectionOrder>.Invalid(
+                    ApiText.T("ロット '{0}' は作業指示 {1} の品目のロットではありません。", lot.LotNumber, workOrder.WorkOrderNo));
             }
             // ロットを検査待ちで拘束する検査は、拘束してよい状態のときだけ発行する（サンプル検査は拘束しない）
             if (request.Type != InspectionOrderType.Sample)
@@ -72,9 +82,34 @@ public sealed class InspectionService(
             }
         }
 
-        // 検査項目セットの決定：種別（再検査は完成品基準）＋対象品目/工程に「かつ」で合う有効な基準（C-10-10）
-        var applicable = InspectionItemPolicy.Applicable(
-            InspectionItemPolicy.ItemTypeOf(request.Type), lot?.ProductId ?? workOrder!.ProductId, workOrder?.ProcessId);
+        // 検査項目セットの決定：種別＋対象品目/工程に「かつ」で合う有効な基準（C-10-10）
+        var itemType = InspectionItemPolicy.ItemTypeOf(request.Type);
+        var processId = workOrder?.ProcessId;
+        List<int>? inheritedItemIds = null;
+        if (request.Type == InspectionOrderType.Reinspection)
+        {
+            // 再検査（C-20-50-01）は、そのロットの直近の判定済みの検査をやり直すもの。基準はその検査の項目を引き継ぎ、
+            // 版はいまの基準を使う（受入ロットの再検査に完成品の基準を当てない）
+            var source = await db.InspectionOrders.AsNoTracking()
+                .Include(o => o.Items)
+                .Include(o => o.TargetWorkOrder)
+                .Where(o => o.TargetLotId == lot!.Id && o.Type != InspectionOrderType.Sample
+                            && (o.Status == InspectionOrderStatus.Judged || o.Status == InspectionOrderStatus.Approved))
+                .OrderByDescending(o => o.Id)
+                .FirstOrDefaultAsync(ct);
+            if (source is null)
+            {
+                return Outcome<InspectionOrder>.Invalid(
+                    ApiText.T("ロット '{0}' には判定済みの検査が無いため再検査できません。", lot!.LotNumber));
+            }
+            inheritedItemIds = [.. source.Items.Select(i => i.InspectionItemId)];
+            itemType = await db.InspectionItems.AsNoTracking()
+                .Where(i => inheritedItemIds.Contains(i.Id))
+                .Select(i => i.Type)
+                .FirstAsync(ct);
+            processId = source.TargetWorkOrder?.ProcessId;
+        }
+        var applicable = InspectionItemPolicy.Applicable(itemType, lot?.ProductId ?? workOrder!.ProductId, processId);
         List<InspectionItem> items;
         if (request.ItemIds is { Count: > 0 })
         {
@@ -96,7 +131,12 @@ public sealed class InspectionService(
         }
         else
         {
-            items = await db.InspectionItems.AsNoTracking().Where(applicable).ToListAsync(ct);
+            var candidates = db.InspectionItems.AsNoTracking().Where(applicable);
+            if (inheritedItemIds is not null)
+            {
+                candidates = candidates.Where(i => inheritedItemIds.Contains(i.Id));
+            }
+            items = await candidates.ToListAsync(ct);
             if (items.Count == 0)
             {
                 return Outcome<InspectionOrder>.Invalid(
@@ -295,6 +335,10 @@ public sealed class InspectionService(
         if (order.Status == InspectionOrderStatus.Approved)
         {
             return Outcome<InspectionOrder>.Conflict(ApiText.T("承認済みの検査は訂正できません。"));
+        }
+        if (order.Status == InspectionOrderStatus.Canceled)
+        {
+            return Outcome<InspectionOrder>.Conflict(ApiText.T("取消済みの検査は訂正できません。"));
         }
         var result = await db.InspectionResults
             .FirstOrDefaultAsync(r => r.Id == resultId && r.InspectionOrderId == orderId, ct);
