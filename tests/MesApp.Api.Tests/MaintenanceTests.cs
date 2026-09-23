@@ -250,6 +250,86 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 保全指示と保全実績をCSVで取り込み消費部材を引き落とせる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, consumable, lot, locationId) = await SetupConsumablePartAsync(admin, 10m);
+        // 資産管理部品（在庫引落しの対象外）も同じ設備に持たせる
+        var belt = await MasterTests.CreateProductAsync(admin, "PT-01", "主軸ベルト", ProductType.Material);
+        (await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}/parts", new List<EquipmentPartRequest>
+        {
+            new(consumable.Id, MaintenancePartCategory.Consumable, 2m, null),
+            new(belt.Id, MaintenancePartCategory.Asset, 1m, null),
+        })).EnsureSuccessStatusCode();
+        var beltLot = await Phase3TestData.ReceiveAsync(admin, belt.Id, 2m, locationId);
+        // 必要スキルつきの手順書（取り込む管理者はこのスキルを持たない）
+        Assert.True((await Phase3TestData.ImportCsvAsync(admin, "masters/csv/skills",
+            "Code,Name,Type\nSK-EL,電気工事,Certification\n")).Succeeded);
+        Assert.True((await Phase3TestData.ImportCsvAsync(admin, "masters/csv/maintenance-procedures",
+            "ProcedureNo,Title,TargetEquipmentAssetNo,RequiredSkillCode,Steps\nMP-EL,配線点検,EQ-01,SK-EL,1. 絶縁を測る\n")).Succeeded);
+
+        var orders = await Phase3TestData.ImportActualCsvAsync(admin, "maintenance-orders", """
+            MaintenanceNo,EquipmentAssetNo,RequestType,ProcedureNo,ScheduledDate,Note
+            CSV-MT-1,EQ-01,突発,,2026-09-02,Oリング交換
+            CSV-MT-2,EQ-01,Planned,,2026-09-30,
+            CSV-MT-3,EQ-01,Spot,MP-EL,,
+            """);
+        Assert.True(orders.Succeeded, string.Join(" / ", orders.Errors.Select(e => e.Message)));
+        Assert.Equal(3, orders.Created);
+
+        // 単票と同じ判定：計画保全は保全担当者だけ、自動採番の形式（MT〜）の番号は使えない。1行でも誤りがあれば全件取消
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "op1", "Passw0rd123", MesRoles.Operator);
+        var denied = await Phase3TestData.ImportActualCsvAsync(operator_, "maintenance-orders", """
+            MaintenanceNo,EquipmentAssetNo,RequestType
+            OP-MT-1,EQ-01,Spot
+            OP-MT-2,EQ-01,Planned
+            MT-1,EQ-01,Spot
+            """);
+        Assert.False(denied.Succeeded);
+        Assert.Contains(denied.Errors, e => e.Line == 3 && e.Message.Contains("保全担当者"));
+        Assert.Contains(denied.Errors, e => e.Line == 4 && e.Message.Contains("自動採番"));
+        Assert.Equal(3, (await admin.GetFromJsonAsync<PagedResult<MaintenanceOrderResponse>>(
+            "/api/maintenance-orders?pageSize=100"))!.Total);
+
+        // 資産管理部品を書いた行があると、正しい実績の行も含めて全件取り消す（在庫も戻る）
+        var withAsset = await Phase3TestData.ImportActualCsvAsync(admin, "maintenance-records", $"""
+            MaintenanceNo,StartedAt,EndedAt,Result,PartLotNumber,PartLocationCode,PartQuantity
+            CSV-MT-1,2026-09-02 08:30,2026-09-02 09:00,交換完了,{lot.LotNumber},LOC-M,3
+            CSV-MT-2,2026-09-02 10:00,,点検完了,{beltLot.LotNumber},LOC-M,1
+            """);
+        Assert.False(withAsset.Succeeded);
+        Assert.Contains(withAsset.Errors, e => e.Line == 3 && e.Message.Contains("資産管理部品"));
+        Assert.Equal(10m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+
+        // 同じ番号の行は1件の実績にまとまり、行ごとの消費部材を引き落とす。部材の無い実績も書ける
+        var records = await Phase3TestData.ImportActualCsvAsync(admin, "maintenance-records", $"""
+            MaintenanceNo,StartedAt,EndedAt,Result,PartLotNumber,PartLocationCode,PartQuantity,PartNote
+            CSV-MT-1,2026-09-02 08:30,2026-09-02 09:00,交換完了,{lot.LotNumber},LOC-M,3,
+            CSV-MT-1,,,,{lot.LotNumber},LOC-M,2,予備も交換
+            CSV-MT-2,2026-09-02 10:00,,点検完了,,,,
+            """);
+        Assert.True(records.Succeeded, string.Join(" / ", records.Errors.Select(e => e.Message)));
+        Assert.Equal(2, records.Created);
+        Assert.Equal(5m, await Phase3TestData.GetStockQuantityAsync(admin, lot.Id));
+        var saved = (await admin.GetFromJsonAsync<PagedResult<MaintenanceOrderResponse>>(
+            "/api/maintenance-orders?pageSize=100"))!.Items;
+        var first = saved.Single(o => o.OrderNo == "CSV-MT-1");
+        Assert.Equal(MaintenanceOrderStatus.Completed, first.Status);
+        Assert.Equal(2, Assert.Single(first.Records).Parts.Count);
+
+        // 手順書の必要スキルは取り込んだユーザーと照合する。完了した指示に2件目の実績は入らない
+        var rejected = await Phase3TestData.ImportActualCsvAsync(admin, "maintenance-records", """
+            MaintenanceNo,StartedAt
+            CSV-MT-3,2026-09-02 11:00
+            CSV-MT-2,2026-09-02 12:00
+            """);
+        Assert.False(rejected.Succeeded);
+        Assert.Contains(rejected.Errors, e => e.Line == 2 && e.Message.Contains("電気工事"));
+        Assert.Contains(rejected.Errors, e => e.Line == 3);
+    }
+
+    [Fact]
     public async Task 保全実績の消費部材で在庫が引き落とされ消耗材モニタリングに集計される()
     {
         using var factory = new ApiFactory();

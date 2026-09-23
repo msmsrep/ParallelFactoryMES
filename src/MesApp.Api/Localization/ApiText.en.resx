@@ -2106,4 +2106,91 @@
   <data name="保全実績の登録時に実施者と照合する。空欄で解除" xml:space="preserve">
     <value>Checked against the performer when recording maintenance. Leave blank to clear</value>
   </data>
+  <data name="1行に1ロット。在庫から引き落とす。設備の資産管理部品・消耗品の区分は単票と同じに判定する" xml:space="preserve">
+    <value>One lot per row, issued from stock. Asset parts and consumables of the equipment are judged the same way as on the screen</value>
+  </data>
+  <data name="Planned（計画）/ Spot（突発依頼）。省略時は突発依頼。計画は保全担当者だけが登録できる" xml:space="preserve">
+    <value>Planned / Spot (unplanned request). Defaults to Spot. Only maintenance staff can register Planned</value>
+  </data>
+  <data name="true で治工具の寿命カウンタをリセットする（治工具メンテナンスの指示のみ）" xml:space="preserve">
+    <value>true resets the tool life counter (tool maintenance orders only)</value>
+  </data>
+  <data name="yyyy-MM-dd HH:mm（工場の時刻）。+09:00 などのオフセット付きも可。まとまりの最初の行の値を使う" xml:space="preserve">
+    <value>yyyy-MM-dd HH:mm (factory time). An offset such as +09:00 is also accepted. The value on the first row of the group is used</value>
+  </data>
+  <data name="ロット &#x27;{0}&#x27; は登録されていません（PartLotNumber）。" xml:space="preserve">
+    <value>Lot '{0}' is not registered (PartLotNumber).</value>
+  </data>
+  <data name="予定日" xml:space="preserve">
+    <value>Scheduled date</value>
+  </data>
+  <data name="使用部品の補足" xml:space="preserve">
+    <value>Parts used (notes)</value>
+  </data>
+  <data name="依頼区分" xml:space="preserve">
+    <value>Request type</value>
+  </data>
+  <data name="保全実績" xml:space="preserve">
+    <value>Maintenance records</value>
+  </data>
+  <data name="保全手順書番号" xml:space="preserve">
+    <value>Maintenance procedure number</value>
+  </data>
+  <data name="保全指示・突発依頼" xml:space="preserve">
+    <value>Maintenance orders / unplanned requests</value>
+  </data>
+  <data name="保全指示番号" xml:space="preserve">
+    <value>Maintenance order number</value>
+  </data>
+  <data name="実施結果" xml:space="preserve">
+    <value>Result</value>
+  </data>
+  <data name="対象治工具コードとどちらか一方は必須" xml:space="preserve">
+    <value>Either this or the target tool code is required</value>
+  </data>
+  <data name="寿命をリセットする" xml:space="preserve">
+    <value>Reset tool life</value>
+  </data>
+  <data name="後続の保全実績CSVから指示を指す。MTで始まる番号は自動採番用のため使えない" xml:space="preserve">
+    <value>Referenced from the maintenance record CSV that follows. Numbers starting with MT are reserved for automatic numbering</value>
+  </data>
+  <data name="有効な保全手順書" xml:space="preserve">
+    <value>Active maintenance procedure</value>
+  </data>
+  <data name="治工具メンテナンスの指示のとき" xml:space="preserve">
+    <value>For a tool maintenance order</value>
+  </data>
+  <data name="消費数量" xml:space="preserve">
+    <value>Quantity consumed</value>
+  </data>
+  <data name="消費部材には PartLocationCode（払出元ロケーション）と PartQuantity（数量）が必要です。" xml:space="preserve">
+    <value>A consumed part needs PartLocationCode (issuing location) and PartQuantity (quantity).</value>
+  </data>
+  <data name="消費部材のロット番号" xml:space="preserve">
+    <value>Consumed part lot number</value>
+  </data>
+  <data name="消費部材を書くときは必須" xml:space="preserve">
+    <value>Required when a consumed part is written</value>
+  </data>
+  <data name="消費部材を書く行には PartLotNumber（部材のロット番号）が必要です。" xml:space="preserve">
+    <value>A row with a consumed part needs PartLotNumber (lot number of the part).</value>
+  </data>
+  <data name="登録済みで有効な保全手順書" xml:space="preserve">
+    <value>A registered, active maintenance procedure</value>
+  </data>
+  <data name="登録済みの保全指示（保全指示CSVの MaintenanceNo）。同じ番号の行を1件の実績にまとめ、登録で指示は完了する" xml:space="preserve">
+    <value>A registered maintenance order (MaintenanceNo in the maintenance order CSV). Rows with the same number form one record, and registering it completes the order</value>
+  </data>
+  <data name="自由記述（在庫を動かす部材は Part〜 の列に書く）" xml:space="preserve">
+    <value>Free text (write parts that move stock in the Part... columns)</value>
+  </data>
+  <data name="計画保全の指示は保全担当者だけが登録できます（突発依頼は誰でも登録できます）。" xml:space="preserve">
+    <value>Only maintenance staff can register planned maintenance orders (anyone can register unplanned requests).</value>
+  </data>
+  <data name="部材の備考" xml:space="preserve">
+    <value>Part note</value>
+  </data>
+  <data name="保全指示 &#x27;{0}&#x27; は登録されていません（MaintenanceNo）。" xml:space="preserve">
+    <value>Maintenance order '{0}' is not registered (MaintenanceNo).</value>
+  </data>
 </root>

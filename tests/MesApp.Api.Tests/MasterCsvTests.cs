@@ -1487,7 +1487,15 @@ public class MasterCsvTests
         // 実績は同じ種別を番号違いで複数含む（05_consumptions と 07_consumptions）
         var actualResult = await PostBundleAsync(client, "actuals", actuals);
         Assert.True(actualResult.Succeeded, Describe(actualResult));
-        Assert.Equal(17, actualResult.Files.Count);
+        Assert.Equal(19, actualResult.Files.Count);
+        // 保全：突発依頼の実績で消耗品が引き落とされ、計画保全は指示のまま残る
+        var maintenance = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.MaintenanceOrderResponse>>(
+            "/api/maintenance-orders?pageSize=100"))!.Items;
+        Assert.Equal(MaintenanceOrderStatus.Completed, maintenance.Single(o => o.OrderNo == "SMP-MT-001").Status);
+        Assert.Equal(MaintenanceOrderStatus.Instructed, maintenance.Single(o => o.OrderNo == "SMP-MT-003").Status);
+        var consumption = (await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.MaintenancePartConsumptionRow>>(
+            "/api/maintenance-orders/parts-consumption"))!;
+        Assert.Contains(consumption, r => r.ProductCode == "MP-9002" && r.Quantity == 1m);
         // 出荷は判定を承認した SMP-SH-001 だけが出荷まで進み、保留の SMP-SH-002 は指示のまま残る
         var shipping = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Inventory.ShippingOrderResponse>>(
             "/api/shipping-orders"))!.Items;

@@ -27,6 +27,12 @@ public sealed class MaintenanceOrderService(
     IAuditLogger auditLogger)
 {
     /// <summary>
+    /// 計画保全の指示を作れるロール（突発依頼は全ユーザーが起票できる。E-30-30-01）。
+    /// 単票APIとCSV取込で同じ定数を使う
+    /// </summary>
+    public const string PlannedOrderRoles = MesRoleGroups.MaintenanceManage;
+
+    /// <summary>
     /// 保全指示の作成。保全計画から作る場合は計画を「指示済み」にする。
     /// maintenanceNo を渡すとその番号で登録する（CSV取込で後続の行から指示を指すため。空なら自動採番）
     /// </summary>

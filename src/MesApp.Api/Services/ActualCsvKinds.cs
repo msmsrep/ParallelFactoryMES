@@ -31,6 +31,8 @@ public static class ActualCsvKinds
     public const string ShippingOrders = "shipping-orders";
     public const string ShipmentJudgments = "shipment-judgments";
     public const string Shipments = "shipments";
+    public const string MaintenanceOrders = "maintenance-orders";
+    public const string MaintenanceRecords = "maintenance-records";
 
     private const string OrderNoNote = "登録済みの指図番号（製造指図CSVの OrderNo）";
     private const string SequenceNote = "工順の工程順序。指図番号と合わせて作業指示を指す（展開済みであること）";
@@ -186,6 +188,34 @@ public static class ActualCsvKinds
             new("LocationCode", "出荷元ロケーションコード", true, null),
             new("Quantity", "出荷数量", true, "0より大きい数値。出荷済みと合わせて指示数量を超えられない"),
         ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(MaintenanceOrders, "保全指示・突発依頼", false,
+        [
+            new("MaintenanceNo", "保全指示番号", true,
+                "後続の保全実績CSVから指示を指す。MTで始まる番号は自動採番用のため使えない"),
+            new("EquipmentAssetNo", "対象設備の資産番号", false, "対象治工具コードとどちらか一方は必須"),
+            new("ToolCode", "対象治工具コード", false, "治工具メンテナンスの指示のとき"),
+            new("RequestType", "依頼区分", false,
+                "Planned（計画）/ Spot（突発依頼）。省略時は突発依頼。計画は保全担当者だけが登録できる"),
+            new("ProcedureNo", "保全手順書番号", false, "登録済みで有効な保全手順書"),
+            new("ScheduledDate", "予定日", false, "yyyy-MM-dd"),
+            new("Note", "備考", false, null),
+        ]), AnyRole),
+        new(new CsvKindInfo(MaintenanceRecords, "保全実績", false,
+        [
+            new("MaintenanceNo", "保全指示番号", true,
+                "登録済みの保全指示（保全指示CSVの MaintenanceNo）。同じ番号の行を1件の実績にまとめ、登録で指示は完了する"),
+            new("StartedAt", "開始日時", true, DateTimeNote + "。まとまりの最初の行の値を使う"),
+            new("EndedAt", "終了日時", false, DateTimeNote),
+            new("Result", "実施結果", false, null),
+            new("PartsUsed", "使用部品の補足", false, "自由記述（在庫を動かす部材は Part〜 の列に書く）"),
+            new("Note", "備考", false, null),
+            new("ResetToolLife", "寿命をリセットする", false, "true で治工具の寿命カウンタをリセットする（治工具メンテナンスの指示のみ）"),
+            new("PartLotNumber", "消費部材のロット番号", false,
+                "1行に1ロット。在庫から引き落とす。設備の資産管理部品・消耗品の区分は単票と同じに判定する"),
+            new("PartLocationCode", "払出元ロケーションコード", false, "消費部材を書くときは必須"),
+            new("PartQuantity", "消費数量", false, "消費部材を書くときは必須"),
+            new("PartNote", "部材の備考", false, null),
+        ]), AnyRole),
     ];
 
     /// <summary>

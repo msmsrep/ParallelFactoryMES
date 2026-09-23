@@ -73,8 +73,7 @@ public class MaintenanceOrdersController(
     {
         // 計画保全の作成は保全ロールのみ。突発依頼（Spot）は現場からも起票できる
         if (request.RequestType == MaintenanceRequestType.Planned
-            && !User.IsInRole(Core.Constants.MesRoles.SystemAdmin)
-            && !User.IsInRole(Core.Constants.MesRoles.Maintenance))
+            && !Core.Constants.MesRoleGroups.IsInGroup(User, MaintenanceOrderService.PlannedOrderRoles))
         {
             return Forbid();
         }
