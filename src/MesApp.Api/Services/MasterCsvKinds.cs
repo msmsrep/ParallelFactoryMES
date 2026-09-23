@@ -354,6 +354,9 @@ public static class CsvEnumLabels
         ("検査待ち", LotStockStatus.AwaitingInspection), ("不良", LotStockStatus.Defective),
         ("廃棄予定", LotStockStatus.ToBeDiscarded));
 
+    public static readonly IReadOnlyDictionary<string, MaintenanceCategory> MaintenanceCategories = Build(
+        ("定期", MaintenanceCategory.Periodic), ("計画外", MaintenanceCategory.Unplanned));
+
     public static readonly IReadOnlyDictionary<string, MaintenanceRequestType> MaintenanceRequestTypes = Build(
         ("計画", MaintenanceRequestType.Planned), ("計画保全", MaintenanceRequestType.Planned),
         ("突発", MaintenanceRequestType.Spot), ("突発依頼", MaintenanceRequestType.Spot));

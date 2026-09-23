@@ -31,6 +31,7 @@ public static class ActualCsvKinds
     public const string ShippingOrders = "shipping-orders";
     public const string ShipmentJudgments = "shipment-judgments";
     public const string Shipments = "shipments";
+    public const string MaintenancePlans = "maintenance-plans";
     public const string MaintenanceOrders = "maintenance-orders";
     public const string MaintenanceRecords = "maintenance-records";
     public const string ToolUsages = "tool-usages";
@@ -198,6 +199,16 @@ public static class ActualCsvKinds
             new("LocationCode", "出荷元ロケーションコード", true, null),
             new("Quantity", "出荷数量", true, "0より大きい数値。出荷済みと合わせて指示数量を超えられない"),
         ]), MesRoleGroups.InventoryManage),
+        new(new CsvKindInfo(MaintenancePlans, "保全計画", false,
+        [
+            new("EquipmentAssetNo", "設備の資産番号", true, "登録済みで有効な設備"),
+            new("Category", "保全種別", false, "Periodic（定期）/ Unplanned（計画外）。省略時は定期"),
+            new("PlanYear", "計画年度", false, "省略時は予定日の年。予定日も無ければ必須"),
+            new("ScheduledDate", "予定日", false,
+                "yyyy-MM-dd。保全指示CSVの FromPlan はこの日付と設備で計画を指すので、同じ設備の計画は予定日を分ける"),
+            new("CycleDays", "周期（日）", false, "定期保全の周期"),
+            new("Note", "備考", false, null),
+        ]), MesRoleGroups.MaintenanceManage),
         new(new CsvKindInfo(MaintenanceOrders, "保全指示・突発依頼", false,
         [
             new("MaintenanceNo", "保全指示番号", true,
@@ -209,6 +220,8 @@ public static class ActualCsvKinds
             new("ProcedureNo", "保全手順書番号", false, "登録済みで有効な保全手順書"),
             new("ScheduledDate", "予定日", false, "yyyy-MM-dd"),
             new("Note", "備考", false, null),
+            new("FromPlan", "保全計画から作る", false,
+                "true で、設備と予定日が一致する未指示の保全計画（1件だけのとき）から作り、計画を指示済みにする。依頼区分は計画になる"),
         ]), AnyRole),
         new(new CsvKindInfo(MaintenanceRecords, "保全実績", false,
         [

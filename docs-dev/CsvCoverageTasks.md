@@ -40,7 +40,7 @@
 | CSV-06 | 搬送・ピッキング・棚卸 | L1 | 完了 |
 | CSV-07 | 不適合・サンプル品保管 | L1 | 完了 |
 | CSV-08 | サンプルの通し取込とユーザーガイドの見直し | L2 | 完了 |
-| （保留） | 保全計画 `maintenance-plans` | L1 | 保留 |
+| （保留→実施） | 保全計画 `maintenance-plans` | L1 | 完了 |
 
 ### 各カード共通のDoD
 
@@ -173,7 +173,9 @@
 
 ## 保留
 
-### 保全計画 `maintenance-plans`（2026-09-23 利用者の判断で実装保留）
+### 保全計画 `maintenance-plans`（2026-09-23 利用者の判断で実装保留 → 2026-09-24 実施。Spec.md 改訂143）
+
+- 実施結果：計画の指し方は**設備＋予定日**（未指示の計画が1件だけのとき。0件・2件以上は行エラー）。保全指示CSVの `FromPlan=true` で指し、依頼区分は計画になる。登録は `MaintenanceOrderService.CreatePlanAsync` に移した。計画年度は省略すると予定日の年。サンプルは `18_maintenance-plans.csv` を足し、以降を 19〜30 に繰り下げた
 
 - 方針だけ決めてある：**実績CSV（常に新規登録）**。列は `EquipmentAssetNo` / `Category` / `PlanYear` / `ScheduledDate` / `CycleDays` / `Note`
 - マスタCSV（キーで上書き）にしない理由：設備×年×区分でも同じ設備に同じ区分の計画が複数ありうるので、自然なキーが無い

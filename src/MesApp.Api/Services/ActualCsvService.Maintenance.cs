@@ -33,7 +33,10 @@ public sealed partial class ActualCsvService
             var maintenanceNo = reader.RequiredText("MaintenanceNo", 50);
             var equipmentId = reader.Reference("EquipmentAssetNo", null, equipmentIds, "設備");
             var toolId = reader.Reference("ToolCode", null, toolIds, "治工具");
-            var requestType = reader.Enum("RequestType", MaintenanceRequestType.Spot, CsvEnumLabels.MaintenanceRequestTypes);
+            var fromPlan = reader.Bool("FromPlan", false);
+            // 計画から作る指示は計画保全（依頼区分の省略時も計画として扱う）
+            var requestType = reader.Enum("RequestType",
+                fromPlan ? MaintenanceRequestType.Planned : MaintenanceRequestType.Spot, CsvEnumLabels.MaintenanceRequestTypes);
             var procedureId = reader.Reference("ProcedureNo", null, procedureIds, "有効な保全手順書");
             var scheduledDate = reader.DateOrNull("ScheduledDate", null);
             var note = reader.Text("Note", null, 1000);
@@ -41,14 +44,89 @@ public sealed partial class ActualCsvService
             {
                 reader.Fail(ApiText.T("計画保全の指示は保全担当者だけが登録できます（突発依頼は誰でも登録できます）。"));
             }
+            if (fromPlan && requestType != MaintenanceRequestType.Planned && !reader.Failed)
+            {
+                reader.Fail(ApiText.T("保全計画から作る指示の依頼区分は計画にしてください。"));
+            }
+            var planId = fromPlan && !reader.Failed ? await FindPlanAsync(reader, equipmentId, scheduledDate, ct) : null;
             if (reader.Failed)
             {
                 continue;
             }
 
             var outcome = await maintenanceOrders.CreateAsync(
-                new MaintenanceOrderCreateRequest(equipmentId, toolId, null, procedureId, scheduledDate, requestType, note),
+                new MaintenanceOrderCreateRequest(equipmentId, toolId, planId, procedureId, scheduledDate, requestType, note),
                 maintenanceNo, userId, ct);
+            if (outcome.Failed)
+            {
+                FailRow(reader, outcome.Error!);
+                continue;
+            }
+            created++;
+        }
+        return created;
+    }
+
+    /// <summary>
+    /// 保全計画を指す。計画には番号が無いので、同じ設備・同じ予定日の未指示の計画が1件だけのときに限る
+    /// （0件・2件以上は行エラー。どの計画かを推測で決めない）
+    /// </summary>
+    private async Task<int?> FindPlanAsync(
+        CsvRowReader reader, int? equipmentId, DateOnly? scheduledDate, CancellationToken ct)
+    {
+        if (equipmentId is null || scheduledDate is null)
+        {
+            reader.Fail(ApiText.T("保全計画から作る指示には EquipmentAssetNo（設備）と ScheduledDate（予定日）が必要です。"));
+            return null;
+        }
+        var plans = await db.MaintenancePlans
+            .Where(p => p.EquipmentId == equipmentId && p.ScheduledDate == scheduledDate
+                        && p.Status == MaintenancePlanStatus.Planned)
+            .Select(p => p.Id).ToListAsync(ct);
+        if (plans.Count != 1)
+        {
+            reader.Fail(plans.Count == 0
+                ? ApiText.T("設備と予定日 {0} が一致する未指示の保全計画はありません。", scheduledDate)
+                : ApiText.T("設備と予定日 {0} が一致する未指示の保全計画が {1} 件あります。予定日を分けてください。", scheduledDate, plans.Count));
+            return null;
+        }
+        return plans[0];
+    }
+
+    /// <summary>
+    /// 保全計画（E-30-10-01）。1行＝1件の計画で、常に新規登録（自然なキーが無いため上書きしない）。
+    /// 計画から保全指示を作るときは、保全指示CSVの FromPlan で設備＋予定日から指す
+    /// </summary>
+    private async Task<int> ImportMaintenancePlansAsync(
+        CsvTable table, List<CsvImportError> errors, string? userId, CancellationToken ct)
+    {
+        var equipmentIds = await db.Equipments.AsNoTracking().Where(e => e.IsActive)
+            .ToDictionaryAsync(e => e.AssetNo, e => e.Id, StringComparer.Ordinal, ct);
+
+        var created = 0;
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            reader.RequiredText("EquipmentAssetNo");
+            var equipmentId = reader.Reference("EquipmentAssetNo", null, equipmentIds, "有効な設備");
+            var category = reader.Enum("Category", MaintenanceCategory.Periodic, CsvEnumLabels.MaintenanceCategories);
+            var scheduledDate = reader.DateOrNull("ScheduledDate", null);
+            // 省略時は予定日の年（予定日も無ければ必須）
+            var planYear = reader.IntOrNull("PlanYear", null, 2000) ?? scheduledDate?.Year;
+            var cycleDays = reader.IntOrNull("CycleDays", null, 1);
+            var note = reader.Text("Note", null, 1000);
+            if (planYear is null && !reader.Failed)
+            {
+                reader.Fail(ApiText.T("PlanYear（計画年度）か ScheduledDate（予定日）のどちらかが必要です。"));
+            }
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            var outcome = await maintenanceOrders.CreatePlanAsync(
+                new MaintenancePlanRequest(equipmentId!.Value, category, planYear!.Value, scheduledDate, cycleDays, note),
+                userId, ct);
             if (outcome.Failed)
             {
                 FailRow(reader, outcome.Error!);

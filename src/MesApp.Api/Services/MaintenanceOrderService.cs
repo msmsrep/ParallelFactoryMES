@@ -254,6 +254,33 @@ public sealed class MaintenanceOrderService(
         return Outcome<MaintenanceOrder>.Ok(order);
     }
 
+    /// <summary>保全計画の作成（E-30-10-01）。単票API（<c>MaintenancePlansController</c>）と実績CSV取込で共通</summary>
+    public async Task<Outcome<MaintenancePlan>> CreatePlanAsync(
+        MaintenancePlanRequest request, string? userId, CancellationToken ct)
+    {
+        var equipment = await db.Equipments.FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
+        if (equipment is null || !equipment.IsActive)
+        {
+            return Outcome<MaintenancePlan>.Invalid(ApiText.T("存在しない（または無効な）設備IDです。"));
+        }
+
+        var plan = new MaintenancePlan
+        {
+            EquipmentId = request.EquipmentId,
+            Category = request.Category,
+            PlanYear = request.PlanYear,
+            ScheduledDate = request.ScheduledDate,
+            CycleDays = request.CycleDays,
+            Note = request.Note,
+            CreatedByUserId = userId,
+        };
+        db.MaintenancePlans.Add(plan);
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Maintenance", "PlanCreate", nameof(MaintenancePlan), plan.Id.ToString(),
+            detail: $"equipment={equipment.AssetNo}, year={plan.PlanYear}", ct: ct);
+        return Outcome<MaintenancePlan>.Ok(plan);
+    }
+
     /// <summary>保全計画の取消（E-30-10）</summary>
     public async Task<Outcome<MaintenancePlan>> CancelPlanAsync(int planId, CancellationToken ct)
     {

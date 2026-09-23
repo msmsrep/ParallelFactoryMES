@@ -2538,4 +2538,49 @@
   <data name="起票のときは必須" xml:space="preserve">
     <value>Required when raising</value>
   </data>
+  <data name="保全計画から作る指示の依頼区分は計画にしてください。" xml:space="preserve">
+    <value>An order created from a maintenance plan must have the request type Planned.</value>
+  </data>
+  <data name="保全計画から作る指示には EquipmentAssetNo（設備）と ScheduledDate（予定日）が必要です。" xml:space="preserve">
+    <value>An order created from a maintenance plan needs EquipmentAssetNo (equipment) and ScheduledDate (scheduled date).</value>
+  </data>
+  <data name="設備と予定日 {0} が一致する未指示の保全計画はありません。" xml:space="preserve">
+    <value>There is no uninstructed maintenance plan matching the equipment and scheduled date {0}.</value>
+  </data>
+  <data name="設備と予定日 {0} が一致する未指示の保全計画が {1} 件あります。予定日を分けてください。" xml:space="preserve">
+    <value>There are {1} uninstructed maintenance plans matching the equipment and scheduled date {0}. Give them different scheduled dates.</value>
+  </data>
+  <data name="PlanYear（計画年度）か ScheduledDate（予定日）のどちらかが必要です。" xml:space="preserve">
+    <value>Either PlanYear (plan year) or ScheduledDate (scheduled date) is required.</value>
+  </data>
+  <data name="Periodic（定期）/ Unplanned（計画外）。省略時は定期" xml:space="preserve">
+    <value>Periodic / Unplanned. Defaults to Periodic</value>
+  </data>
+  <data name="true で、設備と予定日が一致する未指示の保全計画（1件だけのとき）から作り、計画を指示済みにする。依頼区分は計画になる" xml:space="preserve">
+    <value>true creates the order from the uninstructed maintenance plan matching the equipment and scheduled date (only when there is exactly one) and marks the plan as ordered. The request type becomes Planned</value>
+  </data>
+  <data name="yyyy-MM-dd。保全指示CSVの FromPlan はこの日付と設備で計画を指すので、同じ設備の計画は予定日を分ける" xml:space="preserve">
+    <value>yyyy-MM-dd. FromPlan in the maintenance order CSV refers to a plan by this date and the equipment, so give plans for the same equipment different dates</value>
+  </data>
+  <data name="保全種別" xml:space="preserve">
+    <value>Maintenance category</value>
+  </data>
+  <data name="保全計画" xml:space="preserve">
+    <value>Maintenance plans</value>
+  </data>
+  <data name="保全計画から作る" xml:space="preserve">
+    <value>Create from maintenance plan</value>
+  </data>
+  <data name="周期（日）" xml:space="preserve">
+    <value>Cycle (days)</value>
+  </data>
+  <data name="定期保全の周期" xml:space="preserve">
+    <value>Cycle of periodic maintenance</value>
+  </data>
+  <data name="省略時は予定日の年。予定日も無ければ必須" xml:space="preserve">
+    <value>Defaults to the year of the scheduled date. Required if there is no scheduled date</value>
+  </data>
+  <data name="計画年度" xml:space="preserve">
+    <value>Plan year</value>
+  </data>
 </root>

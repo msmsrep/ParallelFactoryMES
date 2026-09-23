@@ -1487,12 +1487,18 @@ public class MasterCsvTests
         // 実績は同じ種別を番号違いで複数含む（05_consumptions と 07_consumptions）
         var actualResult = await PostBundleAsync(client, "actuals", actuals);
         Assert.True(actualResult.Succeeded, Describe(actualResult));
-        Assert.Equal(29, actualResult.Files.Count);
+        Assert.Equal(30, actualResult.Files.Count);
         // 保全：突発依頼の実績で消耗品が引き落とされ、計画保全は指示のまま残る
         var maintenance = (await client.GetFromJsonAsync<Core.Contracts.Common.PagedResult<Core.Contracts.Maintenance.MaintenanceOrderResponse>>(
             "/api/maintenance-orders?pageSize=100"))!.Items;
         Assert.Equal(MaintenanceOrderStatus.Completed, maintenance.Single(o => o.OrderNo == "SMP-MT-001").Status);
         Assert.Equal(MaintenanceOrderStatus.Instructed, maintenance.Single(o => o.OrderNo == "SMP-MT-003").Status);
+        // 保全計画：SMP-MT-003 は設備と予定日で指した計画から発行され、その計画は指示済み、残りは計画のまま
+        var plans = (await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.MaintenancePlanResponse>>("/api/maintenance-plans"))!;
+        Assert.Equal(3, plans.Count);
+        Assert.Equal(MaintenancePlanStatus.Ordered,
+            plans.Single(p => p.Id == maintenance.Single(o => o.OrderNo == "SMP-MT-003").MaintenancePlanId).Status);
+        Assert.Equal(2, plans.Count(p => p.Status == MaintenancePlanStatus.Planned));
         var consumption = (await client.GetFromJsonAsync<List<Core.Contracts.Maintenance.MaintenancePartConsumptionRow>>(
             "/api/maintenance-orders/parts-consumption"))!;
         Assert.Contains(consumption, r => r.ProductCode == "MP-9002" && r.Quantity == 1m);

@@ -305,6 +305,70 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 保全計画をCSVで取り込み設備と予定日で指して指示を発行できる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+
+        // 1行でも誤り（未登録の設備）があれば全件取り消す
+        var invalid = await Phase3TestData.ImportActualCsvAsync(admin, "maintenance-plans", """
+            EquipmentAssetNo,Category,PlanYear,ScheduledDate,CycleDays,Note
+            EQ-01,Periodic,,2026-09-30,30,
+            EQ-99,Periodic,2026,,,
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("EQ-99"));
+        Assert.Empty((await admin.GetFromJsonAsync<List<MaintenancePlanResponse>>("/api/maintenance-plans"))!);
+
+        // 常に新規登録。計画年度を省略すると予定日の年
+        var plans = await Phase3TestData.ImportActualCsvAsync(admin, "maintenance-plans", """
+            EquipmentAssetNo,Category,PlanYear,ScheduledDate,CycleDays,Note
+            EQ-01,定期,,2026-09-30,30,月次点検
+            EQ-01,Periodic,2026,2026-10-30,30,
+            EQ-01,Unplanned,2026,2026-10-30,,
+            """);
+        Assert.True(plans.Succeeded, string.Join(" / ", plans.Errors.Select(e => e.Message)));
+        var saved = (await admin.GetFromJsonAsync<List<MaintenancePlanResponse>>("/api/maintenance-plans"))!;
+        Assert.Equal(3, saved.Count);
+        Assert.Equal(2026, saved.Single(p => p.Note == "月次点検").PlanYear);
+
+        // 設備と予定日が一致する未指示の計画が1件なら、その計画から指示を作り、計画は指示済みになる。
+        // 2件あればどれか決まらないので行エラー（全件取り消し）
+        var ambiguous = await Phase3TestData.ImportActualCsvAsync(admin, "maintenance-orders", """
+            MaintenanceNo,EquipmentAssetNo,ScheduledDate,FromPlan
+            PM-1,EQ-01,2026-09-30,true
+            PM-2,EQ-01,2026-10-30,true
+            """);
+        Assert.False(ambiguous.Succeeded);
+        Assert.Contains(ambiguous.Errors, e => e.Line == 3 && e.Message.Contains("2 件"));
+
+        var ordered = await Phase3TestData.ImportActualCsvAsync(admin, "maintenance-orders", """
+            MaintenanceNo,EquipmentAssetNo,ScheduledDate,FromPlan
+            PM-1,EQ-01,2026-09-30,true
+            """);
+        Assert.True(ordered.Succeeded, string.Join(" / ", ordered.Errors.Select(e => e.Message)));
+        var planId = saved.Single(p => p.ScheduledDate == new DateOnly(2026, 9, 30)).Id;
+        var order = (await admin.GetFromJsonAsync<PagedResult<MaintenanceOrderResponse>>("/api/maintenance-orders"))!.Items.Single();
+        Assert.Equal(planId, order.MaintenancePlanId);
+        Assert.Equal(MaintenanceRequestType.Planned, order.RequestType);
+        Assert.Equal(MaintenancePlanStatus.Ordered,
+            (await admin.GetFromJsonAsync<MaintenancePlanResponse>($"/api/maintenance-plans/{planId}"))!.Status);
+
+        // 指示済みになった計画はもう指せない
+        var again = await Phase3TestData.ImportActualCsvAsync(admin, "maintenance-orders", """
+            MaintenanceNo,EquipmentAssetNo,ScheduledDate,FromPlan
+            PM-3,EQ-01,2026-09-30,true
+            """);
+        Assert.False(again.Succeeded);
+
+        // 計画の登録は単票と同じく保全の権限（作業者は取り込めない）
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "op1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Phase3TestData.PostActualCsvAsync(operator_, "maintenance-plans",
+            "EquipmentAssetNo,PlanYear\nEQ-01,2026\n")).StatusCode);
+    }
+
+    [Fact]
     public async Task 保全指示と保全実績をCSVで取り込み消費部材を引き落とせる()
     {
         using var factory = new ApiFactory();

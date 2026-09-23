@@ -79,6 +79,7 @@ public sealed partial class ActualCsvService(
             ActualCsvKinds.ShippingOrders => await ImportShippingOrdersAsync(table, errors, userId, ct),
             ActualCsvKinds.ShipmentJudgments => await ImportShipmentJudgmentsAsync(table, errors, userId!, ct),
             ActualCsvKinds.Shipments => await ImportShipmentsAsync(table, errors, userId, ct),
+            ActualCsvKinds.MaintenancePlans => await ImportMaintenancePlansAsync(table, errors, userId, ct),
             ActualCsvKinds.MaintenanceOrders => await ImportMaintenanceOrdersAsync(table, errors, userId, ct),
             ActualCsvKinds.MaintenanceRecords => await ImportMaintenanceRecordsAsync(table, errors, userId!, ct),
             ActualCsvKinds.ToolUsages => await ImportToolUsagesAsync(table, errors, userId, ct),
