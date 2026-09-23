@@ -262,7 +262,7 @@ MBOMは、実績入力の**バックフラッシュ**（部材の自動消費）
 製造指図から出荷まで一通り試せる状態になります。
 
 **[samples-master-csv.zip](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)**
-（作業区・工程・ロケーション・品目・スキル・勤務シフト・設備・保全部品・治工具・チェックリスト・不良理由・検査項目・工程管理項目・検査機・MBOM・作業手順書・工順・ユーザー）。
+（作業区・工程・ロケーション・品目・スキル・勤務シフト・設備・保全部品・治工具・チェックリスト・不良理由・検査項目・工程管理項目・検査機・MBOM・作業手順書・工順・ユーザー・保全手順書）。
 下の「ZIPでまとめて取り込む」にそのまま渡せます。中身のCSVは [samples/master-csv](https://github.com/msmsrep/ParallelFactoryMES/tree/main/samples/master-csv) でも見られます。
 
 まずはこのサンプルを取り込んで動きを確認し、エクスポートしたCSVを自社の内容に

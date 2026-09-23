@@ -941,6 +941,78 @@ public class MasterCsvTests
     }
 
     [Fact]
+    public async Task 保全手順書をCSVで登録し取り込み直すと版数が上がる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(admin, "equipments", """
+            AssetNo,Name,Status,MaintenanceType
+            EQ-01,プレス機,Available,None
+            """)).Succeeded);
+        Assert.True((await ImportAsync(admin, "tools", """
+            Code,Name,ToolType,Status
+            T-01,金型A,型,使用可能
+            """)).Succeeded);
+        Assert.True((await ImportAsync(admin, "skills", """
+            Code,Name,Type
+            SK-MT,保全技能,Skill
+            """)).Succeeded);
+
+        const string csv = """
+            ProcedureNo,Title,TargetEquipmentAssetNo,TargetToolCode,RequiredSkillCode,Steps,IsActive
+            MP-01,プレス機点検,EQ-01,,SK-MT,"1. 油圧を確認する
+            2. 異音を確認する",true
+            MP-02,金型研磨,,T-01,,1. 研磨する,true
+            """;
+        var created = await ImportAsync(admin, "maintenance-procedures", csv);
+        Assert.True(created.Succeeded, string.Join(" / ", created.Errors.Select(e => e.Message)));
+        Assert.Equal(2, created.Created);
+        var saved = (await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Maintenance.MaintenanceProcedureResponse>>(
+            "/api/maintenance-procedures"))!;
+        var press = saved.Single(p => p.ProcedureNo == "MP-01");
+        Assert.Equal("プレス機", press.TargetEquipmentName);
+        Assert.Equal("保全技能", press.RequiredSkillName);
+        Assert.Contains("異音", press.Steps);
+        Assert.Equal("金型A", saved.Single(p => p.ProcedureNo == "MP-02").TargetToolName);
+
+        // 取り込み直しても件数は増えず、単票の更新と同じく版数が上がる
+        var again = await ImportAsync(admin, "maintenance-procedures", csv);
+        Assert.Equal((0, 2), (again.Created, again.Updated));
+        saved = (await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Maintenance.MaintenanceProcedureResponse>>(
+            "/api/maintenance-procedures"))!;
+        Assert.Equal(2, saved.Count);
+        Assert.All(saved, p => Assert.Equal(2, p.Version));
+
+        // 出力は設備・治工具・スキルをコードで書き、そのまま取り込める
+        var exported = await admin.GetStringAsync("/api/masters/csv/maintenance-procedures");
+        Assert.Contains("MP-01,プレス機点検,EQ-01,,SK-MT,", exported);
+
+        // 未登録の設備・手順の無い行は行番号付きで拒否し、正しい行も登録しない
+        var invalid = await ImportAsync(admin, "maintenance-procedures", """
+            ProcedureNo,Title,TargetEquipmentAssetNo,Steps
+            MP-03,正しい行,EQ-01,1. 点検する
+            MP-04,未登録の設備,EQ-99,1. 点検する
+            MP-05,手順なし,EQ-01,
+            """);
+        Assert.False(invalid.Succeeded);
+        Assert.Contains(invalid.Errors, e => e.Line == 3 && e.Message.Contains("EQ-99"));
+        Assert.Contains(invalid.Errors, e => e.Line == 4 && e.Message.Contains("Steps"));
+        Assert.Equal(2, (await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Maintenance.MaintenanceProcedureResponse>>(
+            "/api/maintenance-procedures"))!.Count);
+
+        // 取込の権限は単票と同じ保全の権限（マスタ更新権限の生産管理担当者は取り込めない）
+        using var maintenance = await TestAuth.CreateUserClientAsync(
+            factory, admin, "mt1", "Passw0rd123", MesRoles.Maintenance);
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "manager1", "Passw0rd123", MesRoles.ProductionManager);
+        const string deactivate = "ProcedureNo,Title,Steps,IsActive\nMP-02,金型研磨,1. 研磨する,false\n";
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostCsvAsync(manager, "maintenance-procedures", deactivate)).StatusCode);
+        Assert.True((await ImportAsync(maintenance, "maintenance-procedures", deactivate)).Succeeded);
+        Assert.DoesNotContain((await admin.GetFromJsonAsync<List<MesApp.Core.Contracts.Maintenance.MaintenanceProcedureResponse>>(
+            "/api/maintenance-procedures"))!, p => p.ProcedureNo == "MP-02");
+    }
+
+    [Fact]
     public async Task 作業手順書をCSVで登録し工順から番号で紐付けできる()
     {
         using var factory = new ApiFactory();
@@ -1403,7 +1475,7 @@ public class MasterCsvTests
         // 検証のみでは何も残らない
         var dry = await PostBundleAsync(client, "masters", masters, dryRun: true);
         Assert.True(dry.Succeeded, Describe(dry));
-        Assert.Equal(19, dry.Files.Count);
+        Assert.Equal(20, dry.Files.Count);
         Assert.Empty((await client.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!);
 
         var imported = await PostBundleAsync(client, "masters", masters);
@@ -1536,9 +1608,9 @@ public class MasterCsvTests
         }
         var names = EntryNames(exported);
         // 生産計画はマスタではないので、計画があっても一括出力には入らない
-        Assert.Equal(19, names.Count);
+        Assert.Equal(20, names.Count);
         Assert.Equal("01_work-centers.csv", names[0]);
-        Assert.Equal("19_user-skills.csv", names[^1]);
+        Assert.Equal("20_maintenance-procedures.csv", names[^1]);
 
         // パスワードは出力しないため、ユーザー系を除けば空のDBへそのまま取り込める
         using var target = new ApiFactory();

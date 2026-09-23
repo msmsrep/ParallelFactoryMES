@@ -25,6 +25,7 @@ public static class MasterCsvKinds
     public const string Bom = "bom";
     public const string Routing = "routing";
     public const string WorkProcedures = "work-procedures";
+    public const string MaintenanceProcedures = "maintenance-procedures";
     public const string Shifts = "shifts";
     public const string InspectionDevices = "inspection-devices";
     public const string Users = "users";
@@ -189,6 +190,20 @@ public static class MasterCsvKinds
             new("Reference", "手順書の所在", false, "別システムの文書番号・URLなど。手順ステップを書かない場合は必須"),
             new("IsActive", "有効", false, "true / false"),
         ]),
+        // 保全手順書（E-10-20）。単票の api/maintenance-procedures と同じく保全の権限で取り込む
+        new(MaintenanceProcedures, "保全手順書", false,
+        [
+            new("ProcedureNo", "手順書番号", true, "既存と一致すれば更新（版数+1）、無ければ新規登録"),
+            new("Title", "表題", true, null),
+            new("TargetEquipmentAssetNo", "対象設備の資産番号", false, "設備用の手順書。空欄で解除"),
+            new("TargetToolCode", "対象治工具コード", false, "治工具メンテナンス用の手順書。空欄で解除"),
+            new("RequiredSkillCode", "必要スキル・資格コード", false, "保全実績の登録時に実施者と照合する。空欄で解除"),
+            new("Steps", "手順ステップ", true, null),
+            new("IsActive", "有効", false, "true / false"),
+        ])
+        {
+            WriteRoles = MesRoleGroups.MaintenanceManage,
+        },
         new(Shifts, "勤務シフト（直）", true,
         [
             new("Code", "シフトコード", true, "既存と一致すれば更新、無ければ新規登録"),
@@ -256,7 +271,7 @@ public static class MasterCsvKinds
     [
         WorkCenters, Processes, Locations, Products, Skills, Shifts, Equipments, EquipmentParts, Tools,
         Checklists, DefectReasons, InspectionItems, ControlItems, InspectionDevices, Bom, WorkProcedures,
-        Routing, Users, UserSkills,
+        Routing, Users, UserSkills, MaintenanceProcedures,
     ];
 
     /// <summary>

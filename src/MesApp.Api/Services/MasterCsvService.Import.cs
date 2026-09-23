@@ -95,6 +95,9 @@ public sealed partial class MasterCsvService
             case MasterCsvKinds.WorkProcedures:
                 await ImportWorkProceduresAsync(table, errors, counter, ct);
                 break;
+            case MasterCsvKinds.MaintenanceProcedures:
+                await ImportMaintenanceProceduresAsync(table, errors, counter, ct);
+                break;
             case MasterCsvKinds.InspectionDevices:
                 await ImportInspectionDevicesAsync(table, errors, counter, ct);
                 break;
@@ -1081,6 +1084,67 @@ public sealed partial class MasterCsvService
             else
             {
                 procedure.Version++; // 取込による改訂も版数を上げる（I-30-40-02）
+                counter.Updated++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 保全手順書（E-10-20）。更新は版数を上げる（単票APIの更新と同じ。E-20-30-06）。
+    /// 単票APIは無効化を制限していないため、ここでも参照中の手順書の無効化を拒否しない
+    /// （保全指示は手順書を版数ごと固定せず、無効な手順書は新しい指示で選べなくなるだけ）
+    /// </summary>
+    private async Task ImportMaintenanceProceduresAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var byNo = await db.MaintenanceProcedures.ToDictionaryAsync(p => p.ProcedureNo, StringComparer.Ordinal, ct);
+        var equipmentIds = await db.Equipments.AsNoTracking()
+            .ToDictionaryAsync(e => e.AssetNo, e => e.Id, StringComparer.Ordinal, ct);
+        var toolIds = await db.Tools.AsNoTracking()
+            .ToDictionaryAsync(t => t.Code, t => t.Id, StringComparer.Ordinal, ct);
+        var skillIds = await db.Skills.AsNoTracking()
+            .ToDictionaryAsync(s => s.Code, s => s.Id, StringComparer.Ordinal, ct);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var procedureNo = reader.RequiredText("ProcedureNo", 50);
+            if (reader.Failed || !CheckUnique(reader, seen, procedureNo, "手順書番号"))
+            {
+                continue;
+            }
+
+            var isNew = !byNo.TryGetValue(procedureNo, out var procedure);
+            procedure ??= new MaintenanceProcedure { ProcedureNo = procedureNo };
+
+            var title = reader.RequiredText("Title", 200);
+            var equipmentId = reader.Reference("TargetEquipmentAssetNo", procedure.TargetEquipmentId, equipmentIds, "設備");
+            var toolId = reader.Reference("TargetToolCode", procedure.TargetToolId, toolIds, "治工具");
+            var skillId = reader.Reference("RequiredSkillCode", procedure.RequiredSkillId, skillIds, "スキル・資格");
+            var steps = reader.RequiredText("Steps", 4000);
+            var isActive = reader.Bool("IsActive", procedure.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            procedure.Title = title;
+            procedure.TargetEquipmentId = equipmentId;
+            procedure.TargetToolId = toolId;
+            procedure.RequiredSkillId = skillId;
+            procedure.Steps = steps;
+            procedure.IsActive = isActive;
+
+            if (isNew)
+            {
+                db.MaintenanceProcedures.Add(procedure);
+                byNo[procedureNo] = procedure;
+                counter.Created++;
+            }
+            else
+            {
+                procedure.Version++; // 取込による見直しも版数を上げる（E-20-30-06）
                 counter.Updated++;
             }
         }

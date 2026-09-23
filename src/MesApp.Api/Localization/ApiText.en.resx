@@ -2088,4 +2088,22 @@
   <data name="保全指示番号 '{0}' は既に存在します。" xml:space="preserve">
     <value>Maintenance order number '{0}' already exists.</value>
   </data>
+  <data name="保全手順書" xml:space="preserve">
+    <value>Maintenance procedures</value>
+  </data>
+  <data name="対象設備の資産番号" xml:space="preserve">
+    <value>Target equipment asset number</value>
+  </data>
+  <data name="設備用の手順書。空欄で解除" xml:space="preserve">
+    <value>For an equipment procedure. Leave blank to clear</value>
+  </data>
+  <data name="対象治工具コード" xml:space="preserve">
+    <value>Target tool code</value>
+  </data>
+  <data name="治工具メンテナンス用の手順書。空欄で解除" xml:space="preserve">
+    <value>For a tool maintenance procedure. Leave blank to clear</value>
+  </data>
+  <data name="保全実績の登録時に実施者と照合する。空欄で解除" xml:space="preserve">
+    <value>Checked against the performer when recording maintenance. Leave blank to clear</value>
+  </data>
 </root>
