@@ -134,6 +134,52 @@ public class QualityTests
     }
 
     [Fact]
+    public async Task 保留ロットや判定前の指示があるロットには発行できず再検査の取消で不良に戻る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var item = await CreateFinalInspectionItemAsync(admin, ctx.ProductId);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.ProductId, 100m, ctx.ProductLocationId);
+        async Task<HttpResponseMessage> IssueAsync(InspectionOrderType type) =>
+            await admin.PostAsJsonAsync("/api/inspection-orders",
+                new InspectionOrderCreateRequest(type, lot.Id, null, null, null));
+        async Task<LotStockStatus> LotStatusAsync() =>
+            (await admin.GetFromJsonAsync<Core.Contracts.Inventory.LotResponse>($"/api/inventory/lots/{lot.Id}"))!.StockStatus;
+
+        // 保留中のロットには発行できない（発行→取消で保留が外れてしまう）
+        (await admin.PostAsJsonAsync("/api/inventory/status",
+            new Core.Contracts.Inventory.LotStatusRequest(lot.Id, LotStockStatus.OnHold, "調査中"))).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Conflict, (await IssueAsync(InspectionOrderType.FinalProduct)).StatusCode);
+        Assert.Equal(LotStockStatus.OnHold, await LotStatusAsync());
+        (await admin.PostAsJsonAsync("/api/inventory/status",
+            new Core.Contracts.Inventory.LotStatusRequest(lot.Id, LotStockStatus.Normal, "調査完了"))).EnsureSuccessStatusCode();
+
+        // 判定前の指示があるロットには重ねて発行できない（先に合格した方でロットが正常になってしまう）
+        var first = await (await IssueAsync(InspectionOrderType.FinalProduct)).Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        var duplicated = await IssueAsync(InspectionOrderType.FinalProduct);
+        Assert.Equal(HttpStatusCode.Conflict, duplicated.StatusCode);
+        Assert.Contains(first!.OrderNo, await duplicated.Content.ReadAsStringAsync());
+        // サンプル検査はロットを拘束しないので重ねてよい
+        (await admin.PostAsJsonAsync("/api/inspection-items",
+            new InspectionItemRequest("INS-S", "保管サンプル外観", ctx.ProductId, null, InspectionType.Sample,
+                null, null, null, "目視", 1))).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Created, (await IssueAsync(InspectionOrderType.Sample)).StatusCode);
+
+        // 不合格で不良になったロットは再検査だけ発行でき、再検査を取り消すと不良に戻る（正常にしない）
+        await admin.PostAsJsonAsync($"/api/inspection-orders/{first.Id}/results",
+            new List<InspectionResultRequest> { new(item.Id, 1, 12.0m, null, null) });
+        (await admin.PostAsJsonAsync($"/api/inspection-orders/{first.Id}/judge", new InspectionJudgeRequest(null)))
+            .EnsureSuccessStatusCode();
+        Assert.Equal(LotStockStatus.Defective, await LotStatusAsync());
+        Assert.Equal(HttpStatusCode.Conflict, (await IssueAsync(InspectionOrderType.FinalProduct)).StatusCode);
+        var reinspection = await (await IssueAsync(InspectionOrderType.Reinspection)).Content.ReadFromJsonAsync<InspectionOrderResponse>();
+        Assert.Equal(LotStockStatus.AwaitingInspection, await LotStatusAsync());
+        (await admin.PostAsync($"/api/inspection-orders/{reinspection!.Id}/cancel", null)).EnsureSuccessStatusCode();
+        Assert.Equal(LotStockStatus.Defective, await LotStatusAsync());
+    }
+
+    [Fact]
     public async Task 検査指示を取消すと検査待ちのロットが解放され承認済みは取消せない()
     {
         using var factory = new ApiFactory();

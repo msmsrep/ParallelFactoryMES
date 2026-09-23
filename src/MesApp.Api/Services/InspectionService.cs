@@ -57,6 +57,19 @@ public sealed class InspectionService(
             {
                 return Outcome<InspectionOrder>.Invalid(ApiText.T("存在しないロットIDです。"));
             }
+            // ロットを検査待ちで拘束する検査は、拘束してよい状態のときだけ発行する（サンプル検査は拘束しない）
+            if (request.Type != InspectionOrderType.Sample)
+            {
+                var pending = await db.InspectionOrders.AsNoTracking()
+                    .Where(o => o.TargetLotId == lot.Id && o.Type != InspectionOrderType.Sample
+                                && (o.Status == InspectionOrderStatus.Instructed || o.Status == InspectionOrderStatus.InProgress))
+                    .Select(o => o.OrderNo)
+                    .FirstOrDefaultAsync(ct);
+                if (InspectionLotPolicy.CheckIssuable(lot, request.Type, pending) is { } blocked)
+                {
+                    return Outcome<InspectionOrder>.Conflict(blocked);
+                }
+            }
         }
 
         // 検査項目セットの決定：種別（再検査は完成品基準）＋対象品目/工程に「かつ」で合う有効な基準（C-10-10）
@@ -371,7 +384,10 @@ public sealed class InspectionService(
         return Outcome<InspectionOrder>.Ok(order);
     }
 
-    /// <summary>検査指示の取消。承認済み・取消済み以外を取り消し、検査待ちで拘束していたロットを解放する</summary>
+    /// <summary>
+    /// 検査指示の取消。承認済み・取消済み以外を取り消し、検査待ちで拘束していたロットを**発行前のステータスへ戻す**。
+    /// 一律に正常へ戻すと、不良ロットの再検査を取り消しただけで不良が解除されてしまう
+    /// </summary>
     public async Task<Outcome<InspectionOrder>> CancelAsync(int orderId, string? userId, CancellationToken ct)
     {
         var order = await db.InspectionOrders.Include(o => o.TargetLot)
@@ -385,11 +401,21 @@ public sealed class InspectionService(
             return Outcome<InspectionOrder>.Conflict(ApiText.T("状態 '{0}' の検査指示は取消できません。", EnumLabels.Of(order.Status)));
         }
         order.Status = InspectionOrderStatus.Canceled;
-        // 検査待ちで拘束していたロットを解放する
-        if (order.TargetLot is { StockStatus: LotStockStatus.AwaitingInspection })
+        // 検査待ちで拘束していたロットを、この指示が拘束する前のステータスへ戻す（状態履歴の最初の拘束から引く）
+        if (order.TargetLot is { StockStatus: LotStockStatus.AwaitingInspection } lot)
         {
-            lotStatus.ChangeStatus(order.TargetLot, LotStockStatus.Normal, LotStatusChangeSource.Inspection,
-                $"検査指示 {order.OrderNo} の取消による拘束解除", userId, inspectionOrderId: order.Id);
+            var before = await db.LotStatusHistories.AsNoTracking()
+                .Where(h => h.LotId == lot.Id && h.InspectionOrderId == order.Id
+                            && h.ToStatus == LotStockStatus.AwaitingInspection)
+                .OrderBy(h => h.Id)
+                .Select(h => (LotStockStatus?)h.FromStatus)
+                .FirstOrDefaultAsync(ct);
+            // 履歴が無いのは発行前から検査待ちだった場合。そのままにする
+            if (before is not null)
+            {
+                lotStatus.ChangeStatus(lot, before.Value, LotStatusChangeSource.Inspection,
+                    $"検査指示 {order.OrderNo} の取消による拘束解除", userId, inspectionOrderId: order.Id);
+            }
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Quality", "InspectionCancel", nameof(InspectionOrder), orderId.ToString(), ct: ct);

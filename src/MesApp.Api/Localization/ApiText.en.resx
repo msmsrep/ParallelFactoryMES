@@ -2031,4 +2031,10 @@
   <data name="検査項目 '{0}' はこの検査に使えません（無効、検査種別が違う、または対象の品目・工程が合いません）。" xml:space="preserve">
     <value>Inspection item '{0}' cannot be used for this inspection (it is inactive, has a different inspection type, or its target item or process does not match).</value>
   </data>
+  <data name="ロット '{0}' には判定前の検査指示 {1} があります。判定するか取り消してから発行してください。" xml:space="preserve">
+    <value>Lot '{0}' already has inspection order {1} awaiting judgment. Judge or cancel it before issuing another.</value>
+  </data>
+  <data name="在庫ステータスが「{0}」のロット '{1}' には検査指示を発行できません（不良ロットは再検査のみ。保留は不適合の処置で解除してください）。" xml:space="preserve">
+    <value>An inspection order cannot be issued for lot '{1}' with stock status "{0}" (defective lots allow reinspection only; release holds through nonconformance disposition).</value>
+  </data>
 </root>
