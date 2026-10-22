@@ -238,7 +238,7 @@ public static class ActualCsvKinds
             new("PartLocationCode", "払出元ロケーションコード", false, "消費部材を書くときは必須"),
             new("PartQuantity", "消費数量", false, "消費部材を書くときは必須"),
             new("PartNote", "部材の備考", false, null),
-        ]), AnyRole),
+        ]), MesRoleGroups.MaintenanceManage),
         new(new CsvKindInfo(ToolUsages, "治工具の利用実績", false,
         [
             new("ToolCode", "治工具コード", true, "登録済みで有効な治工具"),
