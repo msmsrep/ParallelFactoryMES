@@ -627,6 +627,39 @@ public class MasterCsvTests
     }
 
     [Fact]
+    public async Task CSV出力は数式とみなされる値に印を付け_取り込み直すと元の値に戻る()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        var result = await ImportAsync(client, "defect-reasons", """
+            Code,Name,Category,IsActive
+            DF-01,"=HYPERLINK(""http://example.invalid"",""x"")",Process,true
+            DF-02,@SUM(A1),Process,true
+            DF-03,-A1+1,Process,true
+            DF-04,-5,Process,true
+            DF-05,寸法外れ,Process,true
+            """);
+        Assert.Empty(result.Errors);
+
+        // Excel等で開いたときに数式として実行されないよう ' を前に付ける。負の数・通常の文字列には付けない
+        var exported = Encoding.UTF8.GetString(
+            await (await client.GetAsync("/api/masters/csv/defect-reasons")).Content.ReadAsByteArrayAsync());
+        Assert.Contains("DF-01,\"'=HYPERLINK(\"\"http://example.invalid\"\",\"\"x\"\")\",Process", exported);
+        Assert.Contains("DF-02,'@SUM(A1),Process", exported);
+        Assert.Contains("DF-03,'-A1+1,Process", exported);
+        Assert.Contains("DF-04,-5,Process", exported);
+        Assert.Contains("DF-05,寸法外れ,Process", exported);
+
+        // 出力したCSVをそのまま取り込み直しても、印は外れて元の値のまま
+        var again = await ImportAsync(client, "defect-reasons", exported.TrimStart('﻿'));
+        Assert.Empty(again.Errors);
+        var reasons = (await client.GetFromJsonAsync<List<DefectReasonResponse>>("/api/defect-reasons"))!;
+        Assert.Equal("=HYPERLINK(\"http://example.invalid\",\"x\")", reasons.Single(r => r.Code == "DF-01").Name);
+        Assert.Equal("@SUM(A1)", reasons.Single(r => r.Code == "DF-02").Name);
+        Assert.Equal("-A1+1", reasons.Single(r => r.Code == "DF-03").Name);
+    }
+
+    [Fact]
     public async Task ユーザーCSVで最後のシステム管理者を降格できない()
     {
         using var factory = new ApiFactory();

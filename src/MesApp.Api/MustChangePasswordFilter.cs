@@ -15,8 +15,8 @@ namespace MesApp.Api;
 /// リクエストごとのDB参照はしない。
 /// </para>
 /// <para>
-/// 管理者によるパスワードリセット直後など、既に発行済みのトークンにはこのクレームが付かない。
-/// 反映は次回のトークン発行時（ロール変更と同じ扱い）。
+/// 管理者によるパスワードリセットでは、セキュリティスタンプが変わって発行済みのトークンが失効する
+/// （<see cref="AccessTokenValidation"/>）。再ログインで発行し直したトークンにこのクレームが付く。
 /// </para>
 /// </summary>
 public sealed class MustChangePasswordFilter : IAuthorizationFilter
