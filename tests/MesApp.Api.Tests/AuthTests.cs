@@ -351,6 +351,62 @@ public class AuthTests
     /// プロキシ（remoteAddress）から、HTTPSで受けた ClientAddress のリクエストを転送された形でログインする。
     /// HttpClient経由では接続元IPを指定できないため、TestServerに直接HttpContextを組み立てて渡す
     /// </summary>
+    [Fact]
+    public async Task ロール変更で発行済みのアクセストークンは失効しリフレッシュで新しいロールになる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        using var worker = await TestAuth.CreateUserClientAsync(factory, admin, "worker1", "Passw0rd123", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.OK, (await worker.GetAsync("/api/locations")).StatusCode);
+
+        var id = await UserIdAsync(admin, "worker1");
+        (await admin.PutAsJsonAsync($"/api/users/{id}",
+            new UpdateUserRequest("worker1", [MesRoles.ProductionManager], IsActive: true))).EnsureSuccessStatusCode();
+
+        // 古いロールのトークンは有効期限を待たずに使えなくなる
+        Assert.Equal(HttpStatusCode.Unauthorized, (await worker.GetAsync("/api/locations")).StatusCode);
+
+        // リフレッシュトークンは生きているので、取り直せば新しいロールで操作を続けられる
+        var refresh = await worker.PostAsync("/api/auth/refresh", null);
+        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
+        var token = (await refresh.Content.ReadFromJsonAsync<TokenResponse>())!;
+        Assert.Equal([MesRoles.ProductionManager], token.User.Roles);
+        worker.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await worker.GetAsync("/api/locations")).StatusCode);
+
+        // 表示名だけの更新ではトークンを失効させない
+        (await admin.PutAsJsonAsync($"/api/users/{id}",
+            new UpdateUserRequest("作業者1", [MesRoles.ProductionManager], IsActive: true))).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.OK, (await worker.GetAsync("/api/locations")).StatusCode);
+    }
+
+    [Fact]
+    public async Task 無効化とパスワードリセットで発行済みのアクセストークンは即時に失効する()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        using var retired = await TestAuth.CreateUserClientAsync(factory, admin, "retired1", "Passw0rd123", MesRoles.Operator);
+        using var reset = await TestAuth.CreateUserClientAsync(factory, admin, "reset1", "Passw0rd123", MesRoles.Operator);
+
+        // 無効化：アクセストークンもリフレッシュも使えない
+        (await admin.PutAsJsonAsync($"/api/users/{await UserIdAsync(admin, "retired1")}",
+            new UpdateUserRequest("retired1", [MesRoles.Operator], IsActive: false))).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await retired.GetAsync("/api/locations")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await retired.PostAsync("/api/auth/refresh", null)).StatusCode);
+
+        // 管理者によるパスワードリセット
+        (await admin.PostAsJsonAsync($"/api/users/{await UserIdAsync(admin, "reset1")}/reset-password",
+            new ResetPasswordRequest("NewPassw0rd456"))).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await reset.GetAsync("/api/locations")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await reset.PostAsync("/api/auth/refresh", null)).StatusCode);
+
+        // 他のユーザー（管理者）のトークンには影響しない
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/api/locations")).StatusCode);
+    }
+
+    private static async Task<string> UserIdAsync(HttpClient admin, string userName) =>
+        (await admin.GetFromJsonAsync<List<UserSummaryResponse>>("/api/users"))!.Single(u => u.UserName == userName).Id;
+
     private static Task<HttpContext> LoginViaProxyAsync(ApiFactory factory, string remoteAddress) =>
         factory.Server.SendAsync(context =>
         {
