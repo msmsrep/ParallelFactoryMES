@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace MesApp.Api.Services;
@@ -85,7 +86,7 @@ public static class CsvFile
 
         void EndRecord()
         {
-            fields.Add(field.ToString());
+            fields.Add(Unprotect(field.ToString()));
             field.Clear();
             if (fields.Count > 1 || fields[0].Trim().Length > 0)
             {
@@ -128,7 +129,7 @@ public static class CsvFile
                     inQuotes = true;
                     break;
                 case ',':
-                    fields.Add(field.ToString());
+                    fields.Add(Unprotect(field.ToString()));
                     field.Clear();
                     break;
                 case '\r':
@@ -172,9 +173,34 @@ public static class CsvFile
         {
             return string.Empty;
         }
+        if (IsFormulaLike(value))
+        {
+            value = FormulaGuard + value;
+        }
         var needsQuotes = value.AsSpan().IndexOfAny(',', '"', '\n') >= 0
             || value.Contains('\r')
             || value[0] == ' ' || value[^1] == ' ';
         return needsQuotes ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
     }
+
+    /// <summary>
+    /// 数式とみなされる値の前に付ける印。Excel等の表計算ソフトで開いたとき、利用者が入力した品目名や備考が
+    /// 数式（<c>=HYPERLINK(...)</c> やDDE）として実行されないようにする（CSVインジェクション対策。Spec.md 3.8）
+    /// </summary>
+    private const char FormulaGuard = '\'';
+
+    /// <summary>
+    /// 表計算ソフトが数式として解釈する先頭文字か。<c>+</c>・<c>-</c> は数値（<c>-5</c>・<c>+1.5</c>）なら数式にならないので除く
+    /// （数量・座標の負値に印が付くと、表計算での集計や取り込み直しで数値として扱えなくなる）
+    /// </summary>
+    private static bool IsFormulaLike(string value) => value[0] switch
+    {
+        '=' or '@' or '\t' or '\r' => true,
+        '+' or '-' => !decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _),
+        _ => false,
+    };
+
+    /// <summary>出力時に付けた印を外す（出力したCSVをそのまま取り込み直しても元の値に戻るようにする）</summary>
+    private static string Unprotect(string value) =>
+        value.Length >= 2 && value[0] == FormulaGuard && IsFormulaLike(value[1..]) ? value[1..] : value;
 }

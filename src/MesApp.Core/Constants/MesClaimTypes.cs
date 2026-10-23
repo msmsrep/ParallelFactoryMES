@@ -13,4 +13,10 @@ public static class MesClaimTypes
     /// （初期パスワードのまま業務APIを叩けないようにするため）
     /// </summary>
     public const string MustChangePassword = "must_change_password";
+
+    /// <summary>
+    /// 発行時点のセキュリティスタンプ（Identity の SecurityStamp）。無効化・ロール変更・パスワード変更で
+    /// DB側の値が変わると、発行済みのアクセストークンは有効期限を待たずに使えなくなる
+    /// </summary>
+    public const string SecurityStamp = "security_stamp";
 }

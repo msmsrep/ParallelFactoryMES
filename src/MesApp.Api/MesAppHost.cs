@@ -71,7 +71,10 @@ public static class MesAppHost
             })
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<MesAppDbContext>()
-            .AddSignInManager();
+            .AddSignInManager()
+            // 管理者によるパスワードリセット（ユーザーCSVの InitialPassword・初期管理者の再生成を含む）は
+            // リセット用トークンを発行してから使う。プロバイダが無いと発行で例外になる
+            .AddDefaultTokenProviders();
 
         // JWT認証（アクセストークン。リフレッシュはRefreshTokenService＋HttpOnly Cookie）
         builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
@@ -128,6 +131,8 @@ public static class MesAppHost
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.FromMinutes(1),
                 };
+                // 無効化・ロール変更・パスワード変更を発行済みトークンにも即時に効かせる（Spec.md 7.4）
+                options.Events = new JwtBearerEvents { OnTokenValidated = AccessTokenValidation.ValidateAsync };
             });
 
         builder.Services.AddAuthorization();
