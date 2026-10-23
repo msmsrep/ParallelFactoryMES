@@ -1,0 +1,51 @@
+# 依存パッケージの更新確認（週1回）。更新があれば dev 向けの PR を作る
+# PR は担当者に自分を割り当て、GitHub の通知（Inbox）と「Assigned」の一覧に出す
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    assignees:
+      - msmsrep
+    commit-message:
+      prefix: "依存更新"
+    groups:
+      # Microsoft.* / System.* は同じサービシングで揃えて上げる（版がずれると NU1605 の格下げエラーになる）
+      dotnet:
+        patterns:
+          - "Microsoft.*"
+          - "System.*"
+        update-types:
+          - minor
+          - patch
+      others:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "Microsoft.*"
+          - "System.*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    assignees:
+      - msmsrep
+    commit-message:
+      prefix: "依存更新"
+    groups:
+      actions:
+        patterns:
+          - "*"
