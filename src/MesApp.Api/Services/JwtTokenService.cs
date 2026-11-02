@@ -22,6 +22,8 @@ public class JwtTokenService(SigningKeyProvider keyProvider, IOptions<JwtOptions
             new(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new(MesClaimTypes.DisplayName, user.DisplayName),
+            // 検証時にDBの値と照合する（AccessTokenValidation）
+            new(MesClaimTypes.SecurityStamp, user.SecurityStamp ?? string.Empty),
         };
         // 初期パスワードのままのトークンには印を付ける（MustChangePasswordFilterが業務APIを止める）
         if (user.MustChangePassword)
