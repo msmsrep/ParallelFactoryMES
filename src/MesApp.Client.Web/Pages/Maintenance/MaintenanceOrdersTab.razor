@@ -121,8 +121,10 @@
                     <Pager TItem="MaintenanceOrderResponse" Result="_orders" OnPageChanged="LoadMaintenanceOrdersAsync" />
                 }
 
+                @* 保全実績の登録・取消は保全ロールだけ（APIと同じ定数。突発依頼の起票は全ロールに開いている） *@
                 @if (order.Status == MaintenanceOrderStatus.Instructed)
                 {
+                    <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage" Context="mtRecord">
                     <div class="form-grid mt-2">
                         <div class="form-field">
                             <label>@L["開始時刻"]</label>
@@ -184,10 +186,9 @@
 
                     <div class="actions">
                         <button class="btn" disabled="@_busy" @onclick="() => AddRecordAsync(order)">@L["保全実績を登録"]</button>
-                        <AuthorizeView Roles="@MesRoleGroups.MaintenanceManage" Context="mtCancel">
-                            <button class="btn btn-danger" disabled="@_busy" @onclick="() => CancelOrderAsync(order.Id)">@L["取消"]</button>
-                        </AuthorizeView>
+                        <button class="btn btn-danger" disabled="@_busy" @onclick="() => CancelOrderAsync(order.Id)">@L["取消"]</button>
                     </div>
+                    </AuthorizeView>
                 }
             </div>
         }

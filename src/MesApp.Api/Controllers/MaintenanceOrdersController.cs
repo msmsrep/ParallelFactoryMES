@@ -89,8 +89,10 @@ public class MaintenanceOrdersController(
     /// <summary>
     /// 保全実績の登録（E-40-30-01）。登録と同時に指示は完了。元計画は完了、
     /// 治工具メンテでresetToolLife指定時は寿命カウンタをリセットする（E-60-30）。
+    /// 在庫の引落し・設備の復帰・寿命のリセットまで動かすため、突発依頼と違い保全ロールに限る（Spec.md 7.4）。
     /// </summary>
     [HttpPost("{id:int}/record")]
+    [Authorize(Roles = MesRoleGroups.MaintenanceManage)]
     public async Task<ActionResult<MaintenanceOrderResponse>> AddRecord(
         int id, MaintenanceRecordRequest request, CancellationToken ct)
     {

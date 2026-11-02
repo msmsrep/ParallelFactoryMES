@@ -972,7 +972,7 @@ public class MaintenanceTests
     }
 
     [Fact]
-    public async Task 突発の保全依頼は作業者も起票できるが計画保全は保全ロールのみ()
+    public async Task 突発の保全依頼は作業者も起票できるが計画保全と保全実績は保全ロールのみ()
     {
         using var factory = new ApiFactory();
         using var admin = await TestAuth.CreateAdminClientAsync(factory);
@@ -996,6 +996,19 @@ public class MaintenanceTests
         var plan = await operator_.PostAsJsonAsync("/api/maintenance-plans",
             new MaintenancePlanRequest(equipment.Id, MaintenanceCategory.Periodic, 2026, null, null, null));
         Assert.Equal(HttpStatusCode.Forbidden, plan.StatusCode);
+
+        // 保全実績の登録は保全ロールのみ（在庫の引落し・設備の復帰・寿命のリセットを動かすため）。単票もCSVも同じ
+        var order = await spot.Content.ReadFromJsonAsync<MaintenanceOrderResponse>();
+        var record = await operator_.PostAsJsonAsync($"/api/maintenance-orders/{order!.Id}/record",
+            new MaintenanceRecordRequest(DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now, null, "点検完了", null));
+        Assert.Equal(HttpStatusCode.Forbidden, record.StatusCode);
+        var csv = await Phase3TestData.PostActualCsvAsync(operator_, "maintenance-records", $"""
+            MaintenanceNo,StartedAt
+            {order.OrderNo},2026-09-24 09:00
+            """);
+        Assert.Equal(HttpStatusCode.Forbidden, csv.StatusCode);
+        var unchanged = await admin.GetFromJsonAsync<MaintenanceOrderResponse>($"/api/maintenance-orders/{order.Id}");
+        Assert.Equal(MaintenanceOrderStatus.Instructed, unchanged!.Status);
     }
 
     [Fact]
