@@ -1543,11 +1543,19 @@ public sealed partial class MasterCsvService
             }
             await userManager.UpdateAsync(user);
 
+            var rolesChanged = false;
             if (roles is not null)
             {
                 var currentRoles = await userManager.GetRolesAsync(user);
+                rolesChanged = !currentRoles.ToHashSet().SetEquals(roles);
                 await userManager.RemoveFromRolesAsync(user, currentRoles.Except(roles));
                 await userManager.AddToRolesAsync(user, roles.Except(currentRoles));
+            }
+            // 単票APIと同じく、無効化・ロール変更は発行済みのアクセストークンにも即時に効かせる（Spec.md 7.4。
+            // パスワードの指定は ResetPasswordAsync がスタンプを更新する）
+            if (deactivated || rolesChanged)
+            {
+                await userManager.UpdateSecurityStampAsync(user);
             }
             if (password is not null)
             {

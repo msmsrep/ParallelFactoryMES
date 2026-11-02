@@ -159,6 +159,12 @@ public class UsersController(
         await userManager.RemoveFromRolesAsync(user, currentRoles.Except(request.Roles));
         await userManager.AddToRolesAsync(user, request.Roles.Except(currentRoles));
 
+        // 無効化・ロール変更は発行済みのアクセストークンにも即時に効かせる（Spec.md 7.4）。
+        // ロール変更だけならリフレッシュトークンは生きているので、クライアントは新しいロールで取り直す
+        if (deactivated || !currentRoles.ToHashSet().SetEquals(request.Roles))
+        {
+            await userManager.UpdateSecurityStampAsync(user);
+        }
         if (deactivated)
         {
             // 無効化されたユーザーのセッションを止める（Spec.md 7.4）
