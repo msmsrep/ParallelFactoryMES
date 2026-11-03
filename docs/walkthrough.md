@@ -9,6 +9,8 @@ next_url: masters.html
 next_title: マスタ管理
 ---
 
+先に動きで流れをつかみたいときは、[工場模型で見る 製造から出荷まで](factory-tour.html) をご覧ください。このページはその詳細編です。
+
 <div class="tip">
 <p><strong>このページの内容は、そのまま手元で再現できます。</strong>
 <code>samples/master-csv</code> と <code>samples/actual-csv</code> のCSVをそれぞれZIPにまとめ、
@@ -210,7 +212,7 @@ MBOMと工順の登録方法は、[マスタ管理の品目・MBOM・工順](mas
 
 <figure class="shot">
 <img src="assets/walkthrough/inventory.webp" width="1440" height="939" alt="在庫照会画面。部材ロット、半製品ロット SF2000-S001、製品ロット FG1000-S001 がロケーション別に並んでいる" loading="lazy">
-<figcaption>在庫照会（物流・在庫 → 在庫照会・操作）。この写真は出荷まで終えた後の状態で、鋳造品は50個から20個使って残り30個になっている</figcaption>
+<figcaption>在庫照会（物流・在庫 → 在庫照会・操作）。この写真は出荷まで終えた時点の、物語に関わるロットの状態で、鋳造品は50個から20個使って残り30個になっている。サンプルを全部取り込むと、追加入荷のロットや <code>16</code> 以降の在庫操作が加わるので、一覧と数量はこの写真と異なる（たとえば鋳造品は払出戻しで31個、ギアポンプは保管サンプルで3台）</figcaption>
 </figure>
 
 詳しくは [物流・在庫管理の受入](logistics.html#receiving) をご覧ください。
@@ -429,7 +431,7 @@ MBOMと工順の登録方法は、[マスタ管理の品目・MBOM・工順](mas
 <text class="m" x="700" y="232">明細の「出荷済」が5になり、指示は完了</text>
 </svg>
 </div>
-<figcaption>図8　出荷の4つの手順。判定が「保留」や未承認のままだと、④で止まる</figcaption>
+<figcaption>図8　出荷の4つの手順。判定が「保留」や未承認のままだと、④で止まる。「9台 → 4台」は出荷を実行した時点の数量で、サンプルを全部取り込むと、後の保管サンプルで3台になる</figcaption>
 </figure>
 
 <figure class="shot">
@@ -476,7 +478,7 @@ MBOMと工順の登録方法は、[マスタ管理の品目・MBOM・工順](mas
 <g class="m" text-anchor="middle"><text x="300" y="326">◀ トレースバック：製品から、使った部材へさかのぼる</text><text x="760" y="326">トレースフォワード：部材から製品・出荷へ ▶</text></g>
 </svg>
 </div>
-<figcaption>図9　FG1000-S001 のつながり。鋳造品のロットまで2段さかのぼれる</figcaption>
+<figcaption>図9　FG1000-S001 のつながり。鋳造品のロットまで2段さかのぼれる。「残り4台」は出荷を実行した時点の数量</figcaption>
 </figure>
 
 <figure class="shot">
