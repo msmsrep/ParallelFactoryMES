@@ -146,12 +146,23 @@
 }
 .tour-noscript { margin: 16px; }
 .tour-when { font-size: 13px; color: var(--text-muted); }
-.tour-bridge {
-  font-size: 12.5px;
-  color: var(--text-muted);
-  border-left: 3px solid var(--border);
-  padding-left: 8px;
+.tour-gauges { margin: 8px 0; }
+.tour-gauge-name { font-size: 13px; }
+.tour-gauge { position: relative; height: 14px; margin: 2px 0 8px; background: var(--bg-alt); border-radius: 7px; }
+.tour-gauge-band { position: absolute; left: 25%; width: 50%; top: 2px; bottom: 2px; background: var(--i-product-top); border-radius: 5px; }
+.tour-gauge-dot {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%;
+  background: var(--r-qc);
+  border: 1.5px solid var(--bg);
+  transition: opacity .35s;
 }
+.tour-gauges.is-pending .tour-gauge-dot { opacity: 0; }
+.tour-trace-mode { margin: 8px 0 6px; flex-wrap: wrap; }
 .tour-section { margin: 0 -8px; padding: 0 8px 2px; border-radius: 6px; transition: background-color .2s; }
 .tour-section.is-lit { background: var(--accent-soft); }
 .tour-who.role-pm { color: var(--r-pm); }
@@ -203,7 +214,7 @@
 
 .tour-rail {
   display: flex;
-  flex: 1 1 240px;
+  flex: 1 1 390px; /* 15場面の丸が1列に収まる幅。足りなければ次の行へ回る */
   align-items: center;
   justify-content: space-between;
   gap: 2px;
@@ -353,6 +364,14 @@
 }
 .signal-dot { fill: var(--accent); }
 
+/* トレースの光 */
+.trace-glow, .trace-line { fill: none; stroke: var(--accent); stroke-dasharray: 1; stroke-dashoffset: 0; }
+.trace-glow { stroke-opacity: .22; }
+.trace-end { fill: var(--accent); }
+.trace-glow.is-drawing, .trace-line.is-drawing { animation: tour-trace .7s ease-out backwards; }
+.tour-ledger-mo td:first-child { font-weight: 600; }
+
+@keyframes tour-trace { from { stroke-dashoffset: 1; } }
 @keyframes tour-terminal { from { opacity: .55; } to { opacity: 1; } }
 @keyframes tour-alert { from { fill-opacity: .55; } to { fill-opacity: 1; } }
 @keyframes tour-run { from { transform: translateY(0); } to { transform: translateY(-1.2px); } }
@@ -376,6 +395,8 @@
 .label-stock text { font-size: 11px; font-weight: 700; }
 .label-stock rect { stroke: none; }
 .label-moving text { font-size: 11px; font-weight: 600; }
+.label-trace text { font-size: 11px; font-weight: 700; fill: var(--accent); }
+.label-trace rect { stroke: var(--accent); }
 .label-alert text { font-size: 11px; font-weight: 700; fill: var(--r-ng); }
 .label-alert rect { fill: var(--r-ng-bg); stroke: var(--r-ng); }
 .label.is-hidden { display: none; }
@@ -412,6 +433,11 @@
   .tour-rail { flex-basis: 100%; }
   /* 下端は異常のラベルが来るので、狭い画面では上端に置く */
   .tour-legend { top: 6px; bottom: auto; font-size: 10px; gap: 0 8px; }
+}
+
+/* スマホ幅では場面の列が1列に収まらないので折り返す。押せる範囲は 24px のまま */
+@media (max-width: 439.98px) {
+  .tour-rail { flex-wrap: wrap; justify-content: flex-start; background: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

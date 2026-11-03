@@ -374,7 +374,7 @@
   function updateLabelVisibility(scale) {
     var narrow = isNarrow();
     svg.classList.toggle('is-overview', !camera.codes && scale < MIN_LABEL_SCALE);
-    var scene = current >= 0 ? shown[current] : null;
+    var scene = current >= 0 ? scenes[current] : null;
     labels.forEach(function (l) {
       var hide = false;
       if (labelMode === 'part') {
@@ -393,7 +393,7 @@
     var zone = l.g.getAttribute('data-zone');
     if (zone === 'MES') return true;
     if (!scene) return classes.contains('label-zone');
-    if (classes.contains('label-alert')) return true;
+    if (classes.contains('label-alert') || classes.contains('label-trace')) return true;
     if (classes.contains('label-flow')) return false;
     if (classes.contains('label-equipment')) return l.text.textContent === scene.equipment;
     if (classes.contains('label-person')) {
@@ -436,7 +436,6 @@
   // ---------- 場面の畳み込み（台帳も模型の物も、1場面目から足し直して作る） ----------
 
   var scenes = data.scenes;
-  var shown = scenes.filter(function (s) { return !s.stub; });
   var lotByCode = {};
   data.lots.forEach(function (l) { lotByCode[l.lot] = l; });
 
@@ -456,7 +455,12 @@
       if (m.to) addStock(state.stock, m.to, m.as || m.item, m.qty);
     });
     (scene.effects || []).forEach(function (e) {
-      if (e.lot) state.lots[e.lot] = round((state.lots[e.lot] || 0) + e.delta);
+      if (e.lot && e.delta !== undefined) {
+        state.lots[e.lot] = round((state.lots[e.lot] || 0) + e.delta);
+        state.lotStatus[e.lot] = state.lotStatus[e.lot] || '正常';
+      }
+      if (e.lot && e.status) state.lotStatus[e.lot] = e.status;
+      if (e.mo) state.mos[e.mo] = e.status;
       if (e.wo) state.orders[e.wo] = e.status;
     });
     (scene.actors || []).forEach(function (a) { state.people[a.user] = a.at; });
@@ -464,7 +468,7 @@
 
   // count 番目までの場面を足した状態。stateAt(0) は開始前
   function stateAt(count) {
-    var state = { stock: {}, lots: {}, orders: {}, people: {} };
+    var state = { stock: {}, lots: {}, lotStatus: {}, mos: {}, orders: {}, people: {} };
     scenes.slice(0, count).forEach(function (s) { applyScene(state, s); });
     return state;
   }
@@ -536,6 +540,11 @@
       var p = a.labelAt ? project(a.labelAt[0], a.labelAt[1], 0) : project(z.x + z.w, z.y + z.d, 0);
       added.push(addLabel(a.text, p[0], p[1] + (a.labelAt ? 0 : 24), 'label-alert', a.at, true));
     });
+    traceLinks(scene).forEach(function (link) {
+      var c = traceCurve(link);
+      var mid = link.labelAt ? project(link.labelAt[0], link.labelAt[1], 0) : [(c.a[0] + 2 * c.c[0] + c.b[0]) / 4, (c.a[1] + 2 * c.c[1] + c.b[1]) / 4];
+      added.push(addLabel(link.tag, mid[0], mid[1], 'label-trace', 'TRACE', true));
+    });
     added.forEach(measureLabel);
     applyCamera();
   }
@@ -573,7 +582,10 @@
     function add(code) { if (code && codes.indexOf(code) < 0) codes.push(code); }
     add(scene.station);
     (scene.actors || []).forEach(function (a) { add(a.at); });
-    (scene.moves || []).forEach(function (m) { add(m.from); add(m.to); add(m.via); });
+    (scene.moves || []).forEach(function (m) {
+      add(m.from); add(m.to); add(m.via);
+      (m.route || []).forEach(add);
+    });
     return codes;
   }
 
@@ -584,7 +596,7 @@
 
   // ---------- 台帳 ----------
 
-  var ledger = { lots: {}, orders: {} };
+  var ledger = { lots: {}, mos: {}, orders: {} };
   var bandEl = document.querySelector('.tour-band');
   var ledgerEl = document.querySelector('.tour-ledger');
   var ledgerNote;
@@ -604,10 +616,24 @@
       cell(tr, l.lot);
       cell(tr, l.name);
       cell(tr, l.at);
-      ledger.lots[l.lot] = { tr: tr, value: cell(tr, '―', 'num') };
+      ledger.lots[l.lot] = { tr: tr, value: cell(tr, '―', 'num'), status: cell(tr, '―') };
       lotBody.appendChild(tr);
     });
+    var statusHead = document.createElement('th');
+    statusHead.textContent = '状態';
+    lotBody.closest('table').tHead.rows[0].appendChild(statusHead);
+
     var orderBody = document.getElementById('tour-ledger-orders');
+    var orderCol = orderBody.closest('.tour-ledger-col');
+    orderCol.querySelector('h2').textContent = '製造指図・作業指示の状態';
+    orderBody.closest('table').tHead.rows[0].cells[0].textContent = '指図・作業指示';
+    data.manufacturingOrders.forEach(function (mo) {
+      var tr = document.createElement('tr');
+      tr.className = 'tour-ledger-mo';
+      cell(tr, mo);
+      ledger.mos[mo] = { tr: tr, value: cell(tr, '―') };
+      orderBody.appendChild(tr);
+    });
     data.orders.forEach(function (wo) {
       var tr = document.createElement('tr');
       cell(tr, wo);
@@ -616,7 +642,7 @@
     });
     ledgerNote = document.createElement('p');
     ledgerNote.className = 'text-note tour-ledger-note';
-    orderBody.closest('.tour-ledger-col').appendChild(ledgerNote);
+    orderCol.appendChild(ledgerNote);
 
     // 狭い画面では全行を畳む。変わった行は変化の帯に出ている
     var toggle = document.createElement('button');
@@ -635,12 +661,21 @@
 
   function lotText(lot, qty) { return qty + ' ' + lotByCode[lot].unit; }
 
-  // その場面で変わった行
-  function changesOf(before, after) {
+  // その場面で変わった行。ロットの状態は、場面の中で一度なった状態（from）があればそこからの変化として見せる
+  function changesOf(before, after, scene) {
     var list = [];
     data.lots.forEach(function (l) {
       var from = before.lots[l.lot], to = after.lots[l.lot];
       if (from !== to) list.push({ row: ledger.lots[l.lot], text: l.lot + ' ' + l.name + '：' + (from === undefined ? '新規 ' + lotText(l.lot, to) : from + ' → ' + lotText(l.lot, to)) });
+      (scene.effects || []).forEach(function (e) {
+        if (e.lot === l.lot && e.status) {
+          list.push({ row: ledger.lots[l.lot], text: l.lot + ' ' + l.name + '：' + (e.from || before.lotStatus[l.lot]) + ' → ' + e.status });
+        }
+      });
+    });
+    data.manufacturingOrders.forEach(function (mo) {
+      var from = before.mos[mo], to = after.mos[mo];
+      if (from !== to) list.push({ row: ledger.mos[mo], text: mo + '：' + (from === undefined ? to : from + ' → ' + to) });
     });
     data.orders.forEach(function (wo) {
       var from = before.orders[wo], to = after.orders[wo];
@@ -653,7 +688,13 @@
     data.lots.forEach(function (l) {
       var row = ledger.lots[l.lot], qty = state.lots[l.lot];
       row.value.textContent = qty === undefined ? '―' : lotText(l.lot, qty);
+      row.status.textContent = state.lotStatus[l.lot] || '―';
       row.tr.classList.toggle('is-absent', qty === undefined);
+    });
+    data.manufacturingOrders.forEach(function (mo) {
+      var row = ledger.mos[mo], status = state.mos[mo];
+      row.value.textContent = status === undefined ? '―' : status;
+      row.tr.classList.toggle('is-absent', status === undefined);
     });
     data.orders.forEach(function (wo) {
       var row = ledger.orders[wo], status = state.orders[wo];
@@ -661,6 +702,7 @@
       row.tr.classList.toggle('is-absent', status === undefined);
     });
     var all = data.lots.map(function (l) { return ledger.lots[l.lot]; })
+      .concat(data.manufacturingOrders.map(function (mo) { return ledger.mos[mo]; }))
       .concat(data.orders.map(function (wo) { return ledger.orders[wo]; }));
     all.forEach(function (row) {
       row.tr.classList.remove('is-changed', 'is-flash');
@@ -703,9 +745,9 @@
     bandEl.appendChild(heading);
     var list = document.createElement('ul');
     list.className = revealed ? 'is-flash' : 'is-pending';
-    changes.forEach(function (c) {
+    changeTexts(scene, changes).forEach(function (text) {
       var li = document.createElement('li');
-      li.textContent = c.text;
+      li.textContent = text;
       list.appendChild(li);
     });
     bandEl.appendChild(list);
@@ -717,9 +759,48 @@
     }
   }
 
+  // 台帳の行の変化と、台帳の行が変わらない記録の変化
+  function changeTexts(scene, changes) {
+    return changes.map(function (c) { return c.text; }).concat(scene.changeNotes || []);
+  }
+
   function revealBand() {
     var list = bandEl.querySelector('ul');
     if (list) list.className = 'is-flash';
+  }
+
+  // ---------- トレース ----------
+
+  var traceDirection = 'back';
+
+  function traceLinks(scene) {
+    return scene && scene.trace ? scene.trace[traceDirection].links : [];
+  }
+
+  // 模型の上を弧でつなぐ（SVG の座標）
+  function traceCurve(link) {
+    var from = zoneCenter(link.from), to = zoneCenter(link.to);
+    var a = project(from[0], from[1], 0), b = project(to[0], to[1], 0);
+    return { a: a, b: b, c: [(a[0] + b[0]) / 2, Math.min(a[1], b[1]) - 46] };
+  }
+
+  // 光の線。線の長さを1にして、描かれていく動きを CSS で付ける（動きを減らす設定では最初から全部出る）
+  function renderTrace(scene, animate) {
+    clearLayer(layers.trace);
+    traceLinks(scene).forEach(function (link, i) {
+      var c = traceCurve(link);
+      var d = 'M' + c.a[0].toFixed(1) + ' ' + c.a[1].toFixed(1) + ' Q' + c.c[0].toFixed(1) + ' ' + c.c[1].toFixed(1) + ' ' + c.b[0].toFixed(1) + ' ' + c.b[1].toFixed(1);
+      ['trace-glow', 'trace-line'].forEach(function (cls, layer) {
+        var path = el('path', {
+          class: cls + (animate ? ' is-drawing' : ''),
+          d: d,
+          pathLength: 1,
+          'stroke-width': (layer ? 3 : 9) * camera.k
+        }, layers.trace);
+        path.style.animationDelay = (i * 180) + 'ms';
+      });
+      el('circle', { class: 'trace-end', cx: c.b[0], cy: c.b[1], r: 4.5 * camera.k }, layers.trace);
+    });
   }
 
   // ---------- 説明欄 ----------
@@ -744,13 +825,6 @@
     sideStartHtml = sideBody.innerHTML;
   }
 
-  // 表示する場面の前にある stub（前の表示場面より後のもの）
-  function stubsBefore(scene) {
-    var list = [];
-    for (var i = scenes.indexOf(scene) - 1; i >= 0 && scenes[i].stub; i--) list.unshift(scenes[i]);
-    return list;
-  }
-
   function renderSide(scene, changes) {
     sideEl.scrollTop = 0;
     if (!scene) {
@@ -761,9 +835,6 @@
     node('p', 'tour-count', '場面 ' + scene.no + '／' + scenes.length, sideBody);
     node('h1', '', scene.title, sideBody);
     if (scene.when) node('p', 'tour-when', scene.when, sideBody);
-    stubsBefore(scene).forEach(function (stub) {
-      node('p', 'tour-bridge', 'この前に：' + stub.title + '（場面' + stub.no + 'で追加）', sideBody);
-    });
 
     node('h2', '', '現場で起きること', sideBody);
     node('p', '', scene.floor, sideBody);
@@ -771,6 +842,8 @@
       var alerts = node('ul', 'tour-alerts', undefined, sideBody);
       scene.alerts.forEach(function (a) { node('li', '', a.text, alerts); });
     }
+    if (scene.gauges) renderGauges(scene.gauges);
+    if (scene.trace) renderTraceChoice(scene);
 
     var input = node('div', 'tour-section tour-section-input', undefined, sideBody);
     node('h2', '', '誰がどの画面に', input);
@@ -784,7 +857,7 @@
     var effects = node('div', 'tour-section tour-section-effects', undefined, sideBody);
     node('h2', '', 'MES で変わること', effects);
     var list = node('ul', 'tour-effects', undefined, effects);
-    changes.forEach(function (c) { node('li', '', c.text, list); });
+    changeTexts(scene, changes).forEach(function (text) { node('li', '', text, list); });
 
     if (scene.note) {
       node('h2', '', '見どころ', sideBody);
@@ -804,6 +877,51 @@
     }
   }
 
+  // 測定値と規格の帯。帯の左右に余白を取り、規格の外の値も置けるようにする
+  function renderGauges(gauges) {
+    var box = node('div', 'tour-gauges', undefined, sideBody);
+    gauges.forEach(function (g) {
+      node('p', 'tour-gauge-name', g.name + '　' + g.values.join('・') + ' ' + g.unit + '（規格 ' + g.min + '〜' + g.max + '）', box);
+      var bar = node('div', 'tour-gauge', undefined, box);
+      bar.setAttribute('aria-hidden', 'true');
+      node('i', 'tour-gauge-band', undefined, bar);
+      g.values.forEach(function (v) {
+        var dot = node('b', 'tour-gauge-dot', undefined, bar);
+        dot.style.left = (25 + (v - g.min) / (g.max - g.min) * 50) + '%';
+      });
+    });
+  }
+
+  function setGaugesPending(on) {
+    var box = sideBody.querySelector('.tour-gauges');
+    if (box) box.classList.toggle('is-pending', on);
+  }
+
+  // トレースの向きの切替と、たどったロットの一覧
+  function renderTraceChoice(scene) {
+    var group = node('div', 'tour-label-mode tour-trace-mode', undefined, sideBody);
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'たどる向き');
+    var list = node('ul', 'tour-effects', undefined, sideBody);
+    var choices = Object.keys(scene.trace).map(function (key) {
+      var button = node('button', '', scene.trace[key].name, group);
+      button.type = 'button';
+      button.addEventListener('click', function () {
+        traceDirection = key;
+        sync();
+        renderTrace(scene, true);
+        renderField(stateAfter(scene), scene);
+      });
+      return { key: key, button: button };
+    });
+    function sync() {
+      choices.forEach(function (c) { c.button.setAttribute('aria-pressed', String(c.key === traceDirection)); });
+      list.textContent = '';
+      traceLinks(scene).forEach(function (link) { node('li', '', link.text, list); });
+    }
+    sync();
+  }
+
   function lightSection(name, on) {
     var section = sideBody.querySelector('.tour-section-' + name);
     if (section) section.classList.toggle('is-lit', on);
@@ -821,7 +939,7 @@
 
   var BEAT = { move: 1300, stagger: 130, input: 900, signal: 850, flash: 1000, dwell: 5000 };
 
-  var current = -1;      // shown の位置。-1 は開始前
+  var current = -1;      // scenes の位置。-1 は開始前
   var playing = false;   // 自動再生
   var running = false;   // 4拍の途中
   var run = { token: 0, timers: [], dwell: null };
@@ -864,8 +982,10 @@
   // 場面の最終状態をアニメーションなしで表示する
   function renderFinal(scene) {
     var after = stateAfter(scene);
-    var changes = changesOf(stateBefore(scene), after);
+    var changes = changesOf(stateBefore(scene), after, scene);
+    traceDirection = 'back';
     setSceneCamera(scene);
+    renderTrace(scene, false);
     renderPeople(after);
     markZones(scene);
     renderField(after, scene);
@@ -880,6 +1000,7 @@
     current = -1;
     var empty = stateAt(0);
     setSceneCamera(null);
+    renderTrace(null, false);
     renderPeople(empty);
     markZones(null);
     renderField(empty, null);
@@ -893,7 +1014,7 @@
   function showFinal(index) {
     cancelRun();
     current = index;
-    renderFinal(shown[index]);
+    renderFinal(scenes[index]);
     syncHash();
     updateControls();
   }
@@ -902,7 +1023,7 @@
     cancelRun();
     current = index;
     syncHash();
-    var scene = shown[index];
+    var scene = scenes[index];
     if (reducedMotion()) {
       renderFinal(scene);
       finishScene();
@@ -912,13 +1033,16 @@
     running = true;
     var before = stateBefore(scene);
     var after = stateAfter(scene);
-    var changes = changesOf(before, after);
+    var changes = changesOf(before, after, scene);
+    traceDirection = 'back';
     setSceneCamera(scene);
+    renderTrace(scene, true);
     renderPeople(before);
     markZones(scene);
     renderLedger(before, scene, [], false);
     renderBand(scene, changes, false);
     renderSide(scene, changes);
+    setGaugesPending(true);
     announce(scene);
     updateControls();
 
@@ -929,8 +1053,10 @@
     startEquipment(scene, true);
     var moves = scene.moves || [];
     moves.forEach(function (m, i) { flyPiece(m, before, after, i * BEAT.stagger); });
+    (scene.papers || []).forEach(function (zone, i) { flyPaper(scene.station, zone, i * BEAT.stagger); });
     walkPeople(scene, before, after);
-    var moveTime = BEAT.move + Math.max(0, moves.length - 1) * BEAT.stagger;
+    var moveTime = BEAT.move + Math.max(0, (scene.papers || []).length - 1) * BEAT.stagger;
+    moves.forEach(function (m, i) { moveTime = Math.max(moveTime, moveDuration(m) + i * BEAT.stagger); });
 
     later(moveTime, function () {
       clearLayer(layers.moving);
@@ -940,6 +1066,7 @@
       // 第2拍：人が入力する
       setTerminals(scene, true);
       lightSection('input', true);
+      setGaugesPending(false);
 
       later(BEAT.input, function () {
         // 第3拍：信号が飛ぶ
@@ -971,7 +1098,7 @@
   // 4拍の後。自動再生なら、読む時間を置いて次へ進む。最後の場面で止まる
   function finishScene() {
     if (!playing) return;
-    if (current >= shown.length - 1) {
+    if (current >= scenes.length - 1) {
       playing = false;
       return;
     }
@@ -982,6 +1109,24 @@
     if (!scene.equipment) return;
     var g = layers.things.querySelector('[data-code="' + scene.equipment + '"]');
     if (g) g.classList.toggle('is-running', on);
+  }
+
+  // 途中の持ち場を通る物は、その分だけ時間をかける
+  function moveDuration(move) {
+    return BEAT.move * (1 + (move.route || []).length * 0.6);
+  }
+
+  // 作業指示の紙を事務所から持ち場へ飛ばす
+  function flyPaper(fromZone, toZone, delay) {
+    var a = zoneCenter(fromZone), b = zoneCenter(toZone);
+    var g = el('g', { class: 'moving-piece' }, layers.moving);
+    box(g, -0.3, -0.22, 0, 0.6, 0.44, 0.03, 'tone-light');
+    g.style.visibility = 'hidden';
+    tween(BEAT.move, delay, function (t) {
+      if (t > 0) g.style.visibility = '';
+      var p = project(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, Math.sin(t * Math.PI) * 1.6);
+      g.setAttribute('transform', 'translate(' + p[0].toFixed(1) + ' ' + p[1].toFixed(1) + ')');
+    });
   }
 
   // 物を置場から置場へ飛ばす。as のある物は途中で変わらず、到着後の描き直しで変わる
@@ -999,10 +1144,14 @@
     var size = text.getBBox();
     el2attrs(bg, { x: -size.width / 2 - 5, y: -size.height / 2 - 2, width: size.width + 10, height: size.height + 4 });
     g.style.visibility = 'hidden';
-    tween(BEAT.move, delay, function (t) {
+    var stops = [a].concat((move.route || []).map(zoneCenter), [b]);
+    tween(moveDuration(move), delay, function (t) {
       if (t > 0) g.style.visibility = '';
       var lift = Math.sin(t * Math.PI) * 0.7;
-      var p = project(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t + lift);
+      var at = (stops.length - 1) * t;
+      var i = Math.min(Math.floor(at), stops.length - 2);
+      var r = at - i, s = stops[i], e = stops[i + 1];
+      var p = project(s[0] + (e[0] - s[0]) * r, s[1] + (e[1] - s[1]) * r, s[2] + (e[2] - s[2]) * r + lift);
       g.setAttribute('transform', 'translate(' + p[0].toFixed(1) + ' ' + p[1].toFixed(1) + ')');
       tag.setAttribute('transform', 'translate(0 -16) scale(' + camera.k.toFixed(3) + ')');
     });
@@ -1068,7 +1217,7 @@
     buttons.next.addEventListener('click', goNext);
 
     var rail = document.getElementById('tour-rail');
-    shown.forEach(function (scene, index) {
+    scenes.forEach(function (scene, index) {
       var li = document.createElement('li');
       var button = document.createElement('button');
       button.type = 'button';
@@ -1086,7 +1235,7 @@
     document.addEventListener('keydown', onKey);
     window.addEventListener('hashchange', onHashChange);
     window.matchMedia(NARROW).addEventListener('change', function () {
-      setSceneCamera(current >= 0 ? shown[current] : null);
+      setSceneCamera(current >= 0 ? scenes[current] : null);
     });
   }
 
@@ -1130,7 +1279,7 @@
   function updateControls() {
     buttons.prev.disabled = current <= 0;
     buttons.again.disabled = current < 0;
-    buttons.next.disabled = current >= shown.length - 1;
+    buttons.next.disabled = current >= scenes.length - 1;
     buttons.play.textContent = '';
     node('span', '', playing ? '❚❚ ' : '▶ ', buttons.play).setAttribute('aria-hidden', 'true');
     buttons.play.appendChild(document.createTextNode(playing ? '一時停止' : '再生'));
@@ -1142,7 +1291,7 @@
   }
 
   function goNext() {
-    if (current < shown.length - 1) playScene(current + 1);
+    if (current < scenes.length - 1) playScene(current + 1);
   }
 
   function goPrev() {
@@ -1160,7 +1309,7 @@
       return;
     }
     playing = true;
-    if (current >= shown.length - 1) { playScene(0); return; }
+    if (current >= scenes.length - 1) { playScene(0); return; }
     if (running) { updateControls(); return; }
     playScene(current + 1);
   }
@@ -1178,7 +1327,7 @@
 
   // 手で移動したときは履歴に積み、自動再生中は積まない
   function syncHash() {
-    var hash = '#' + shown[current].id;
+    var hash = '#' + scenes[current].id;
     if (location.hash === hash) return;
     if (playing) history.replaceState(null, '', hash);
     else history.pushState(null, '', hash);
@@ -1186,7 +1335,7 @@
 
   function indexOfHash() {
     var id = location.hash.slice(1);
-    for (var i = 0; i < shown.length; i++) if (shown[i].id === id) return i;
+    for (var i = 0; i < scenes.length; i++) if (scenes[i].id === id) return i;
     return -1;
   }
 
@@ -1203,6 +1352,7 @@
     layers.things = el('g', { class: 'layer-things' }, svg);
     layers.stock = el('g', { class: 'layer-stock' }, svg);
     layers.people = el('g', { class: 'layer-people' }, svg);
+    layers.trace = el('g', { class: 'layer-trace' }, svg);
     layers.moving = el('g', { class: 'layer-moving' }, svg);
     layers.signal = el('g', { class: 'layer-signal' }, svg);
     layers.labels = el('g', { class: 'layer-labels' }, svg);
@@ -1246,7 +1396,7 @@
     zones: function () { return Object.keys(zoneByCode); },
     // 場面 id までを足し直した状態（省略すると今の場面）
     state: function (id) {
-      var scene = id ? scenes.filter(function (s) { return s.id === id; })[0] : shown[current];
+      var scene = id ? scenes.filter(function (s) { return s.id === id; })[0] : scenes[current];
       return scene ? stateAfter(scene) : stateAt(0);
     }
   };

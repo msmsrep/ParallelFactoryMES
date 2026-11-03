@@ -16,7 +16,7 @@ window.TOUR_DATA = {
     { code: 'WH-M01', name: '部材倉庫', x: 5, y: 2.5, w: 3.5, d: 3.3, kind: 'warehouse', spot: [5.7, 5.3], slots: [[6.6, 3], [5.9, 3.7], [6.6, 4.6]] },
     { code: 'WH-M02', name: '部材倉庫', x: 5, y: 6.2, w: 3.5, d: 3.3, kind: 'warehouse', spot: [5.7, 9], labelAt: [4.3, 6.2], slots: [[6.6, 6.7], [5.6, 7.7], [6.6, 8.2], [5.6, 9.2]] },
     { code: 'WC-MC1', name: 'マシニング加工', x: 10, y: 3.5, w: 9.5, d: 5, kind: 'workcenter', spot: [10.5, 7.2], labelNarrow: [14, 3.5], slots: [[18.6, 7.6]] },
-    { code: 'WIP-01', name: '', x: 16.6, y: 4, w: 2.4, d: 2.4, kind: 'wip', parent: 'WC-MC1', label: 'center' },
+    { code: 'WIP-01', name: '', x: 16.6, y: 4, w: 2.4, d: 2.4, kind: 'wip', parent: 'WC-MC1', label: 'center', spot: [16.4, 7.4] },
     { code: 'DOCK', name: '搬出口', x: 21.5, y: 3.5, w: 4.5, d: 5, kind: 'yard', spot: [22.2, 7.8] },
     { code: 'OUTSIDE', name: '外注先（工場の外）', x: 29, y: 3.5, w: 4.5, d: 5, kind: 'outside' },
 
@@ -106,6 +106,7 @@ window.TOUR_DATA = {
     { lot: 'SF2000-S001', name: 'ハウジング加工品', at: 'WIP-02', unit: '個' },
     { lot: 'FG1000-S001', name: 'ギアポンプ組立品', at: 'WH-P01', unit: '個' }
   ],
+  manufacturingOrders: ['SMP-SF-001', 'SMP-FG-001'],
   orders: ['SMP-SF-001-10', 'SMP-SF-001-20', 'SMP-FG-001-10', 'SMP-FG-001-20', 'SMP-FG-001-30'],
 
   // 場面。各場面は差分だけを持ち、tour.js が1場面目から足し直して表示する（docs-dev/FactoryTour.md「場面データの形」）
@@ -113,7 +114,10 @@ window.TOUR_DATA = {
   // alerts の labelAt は異常のラベルを置く床の座標（既定は区画の手前の角）
   // around は moves に出ない前後の工程の持ち場（部分表示でラベルを出す）
   // note は説明欄の「見どころ」、ledgerNote は台帳に添える数字の見方。equipment は第1拍で動かす設備
-  // stub は未実装の場面。足し直しの対象にするが、場面の列と前後の移動では飛ばす
+  // moves の route は、途中で通る持ち場（外注先への往復など）。papers は作業指示の紙が事務所から飛ぶ先の持ち場
+  // effects の { lot, status, from } はロットの状態の変化。from は場面の中で一度なった状態（検査待ちなど）で、足し直しには使わない
+  // changeNotes は台帳の行が変わらない記録の変化。gauges は説明欄に出す測定値と規格の帯
+  // trace は模型の上でたどるロットのつながり（back／forward を説明欄で切り替える）。labelAt はラベルを置く床の座標（既定は弧の中央）
   scenes: [
     {
       id: 'receiving',
@@ -146,22 +150,73 @@ window.TOUR_DATA = {
       ledgerNote: '受入で、ロットごとの在庫ができる。',
       detail: { href: 'walkthrough.html#receiving', image: null }
     },
-    { id: 'receiving-inspection', no: 2, title: '受入検査で鋳造品が合格', stub: true, moves: [], effects: [] },
+    {
+      id: 'receiving-inspection',
+      no: 2,
+      title: '受入検査で鋳造品が合格',
+      station: 'WH-M01',
+      around: ['YARD-IN', 'WC-MC1'],
+      actors: [{ user: 'qc001', role: 'qc', at: 'WH-M01' }],
+      floor: 'qc001 が鋳造品 R3001-260901 の外観を目視で確かめ、巣や欠けがないことを確認します。',
+      input: [{ who: 'qc001', menu: '品質 → 検査管理', record: '検査指示の発行・INS-03 外観「巣・欠けなし」・総合判定' }],
+      effects: [{ lot: 'R3001-260901', status: '正常', from: '検査待ち' }],
+      note: '検査指示を発行するとロットは「検査待ち」になり、工程へ払い出せません。合格すると「正常」に戻ります。',
+      ledgerNote: '数量は変わらず、ロットの状態だけが動く。',
+      detail: {
+        href: 'walkthrough.html#inspection',
+        image: 'assets/walkthrough/inspections.webp',
+        alt: '検査管理画面。受入・工程内・完成品の3件の検査指示が、承認済・合格で並んでいる'
+      }
+    },
     {
       id: 'order',
       no: 3,
-      title: '製造指図から作業指示5件を作成',
-      stub: true,
-      moves: [],
+      title: '製造指図から作業指示へ',
+      station: 'OFFICE',
+      around: ['WC-MC1', 'DOCK', 'WC-AS1', 'WC-QC1', 'WC-PK1'],
+      actors: [{ user: 'pm001', role: 'pm', at: 'OFFICE' }],
+      papers: ['WC-MC1', 'DOCK', 'WC-AS1', 'WC-QC1', 'WC-PK1'],
+      floor: 'pm001 が SMP-SF-001（20個）と SMP-FG-001（10台）を登録・承認し、工程展開します。工程ごとの作業指示が現場へ届きます。',
+      input: [{ who: 'pm001', menu: '生産・製造実行 → 製造指図', record: '品目・数量・納期の登録、承認、工程展開' }],
       effects: [
+        { mo: 'SMP-SF-001', status: '展開済' },
+        { mo: 'SMP-FG-001', status: '展開済' },
         { wo: 'SMP-SF-001-10', status: '未配布' },
         { wo: 'SMP-SF-001-20', status: '未配布' },
         { wo: 'SMP-FG-001-10', status: '未配布' },
         { wo: 'SMP-FG-001-20', status: '未配布' },
         { wo: 'SMP-FG-001-30', status: '未配布' }
-      ]
+      ],
+      note: '工順に沿って、工程ごとの作業指示ができます。産出ロット（SF2000-S001・FG1000-S001）と予定材料もここで決まります。',
+      ledgerNote: '指図と作業指示の状態がここから動く。在庫はまだ変わらない。',
+      detail: {
+        href: 'walkthrough.html#order',
+        image: 'assets/walkthrough/order-detail.webp',
+        alt: '製造指図 SMP-FG-001 の詳細画面。予定材料7品目と、工程展開でできた作業指示3件が表示されている'
+      }
     },
-    { id: 'dispatch', no: 4, title: '差立（画面で行う操作）', stub: true, moves: [], effects: [] },
+    {
+      id: 'dispatch',
+      no: 4,
+      title: '差立（画面で行う操作）',
+      station: 'OFFICE',
+      around: ['WC-AS1'],
+      actors: [{ user: 'pm001', role: 'pm', at: 'OFFICE' }],
+      papers: ['WC-AS1'],
+      floor: 'pm001 が作業指示ごとに、作業者・設備・着手順を割り当てます。ここでは例として、SMP-FG-002 を画面で工程展開し、-10 を op002・EQ-02 へ割り当てます。',
+      input: [
+        { who: 'pm001', menu: '生産・製造実行 → 製造指図', record: 'SMP-FG-002 の工程展開' },
+        { who: 'pm001', menu: '生産・製造実行 → 差立', record: 'SMP-FG-002-10 の作業者 op002・設備 EQ-02・着手順' }
+      ],
+      changeNotes: ['例の SMP-FG-002-10 が配布済になる（台帳の行は変わらない）'],
+      note: 'サンプルの CSV は差立を取り込まないので、画面で試せる操作です。SMP-FG-001 は差立を省いて、未配布のまま着手できます。作業者のスキルも照合するので、SK-04（組立作業）を持たない人や資格の期限が切れた人は割り当てられません。',
+      ledgerNote: '台帳は変わらない。このあとの物語は未配布のまま着手して進む。',
+      detail: {
+        href: 'walkthrough.html#order',
+        image: 'assets/walkthrough/dispatch.webp',
+        alt: '差立画面。SMP-FG-002 の作業指示2件が未配布で並び、作業者・設備・着手順を選べる'
+      }
+    },
     {
       id: 'machining',
       no: 5,
@@ -183,17 +238,43 @@ window.TOUR_DATA = {
       ledgerNote: '部材は作業指示への投入で減る。在庫に入るのは最終工程の良品だけ。',
       detail: { href: 'walkthrough.html#execution', image: null }
     },
-    { id: 'in-process-inspection', no: 6, title: '工程内検査で合格', stub: true, moves: [], effects: [] },
+    {
+      id: 'in-process-inspection',
+      no: 6,
+      title: '工程内検査で合格',
+      station: 'WC-MC1',
+      around: ['DOCK'],
+      actors: [{ user: 'qc001', role: 'qc', at: 'WIP-01' }],
+      floor: 'qc001 がノギスでハウジングの内径を2個測り、外観にキズがないことを確かめます。',
+      input: [{ who: 'qc001', menu: '品質 → 検査管理', record: '工程内検査（SMP-SF-001-10）・INS-01 内径・INS-02 外観「キズなし」・総合判定' }],
+      gauges: [{ name: 'INS-01 ハウジング内径', min: 49.95, max: 50.05, unit: 'mm', values: [50.01, 49.98] }],
+      changeNotes: ['SMP-SF-001-10 の工程内検査が合格で確定する（台帳の行は変わらない）'],
+      note: '測定値を入れると、規格と照合して合否が自動で決まります。',
+      ledgerNote: '工程内検査は作業指示が対象なので、ロットの状態は動かない。',
+      detail: {
+        href: 'walkthrough.html#inspection',
+        image: 'assets/walkthrough/inspections.webp',
+        alt: '検査管理画面。受入・工程内・完成品の3件の検査指示が、承認済・合格で並んでいる'
+      }
+    },
     {
       id: 'outsourcing',
       no: 7,
-      title: '表面処理で 19 個が WIP-02 へ',
-      stub: true,
+      title: '外注で表面処理',
+      when: '9/2 8:00〜12:00（昼勤 D）',
+      station: 'DOCK',
+      actors: [{ user: 'op001', role: 'op', at: 'DOCK' }],
       moves: [
-        { item: 'machined', qty: 19, from: 'WC-MC1', to: 'WIP-02' },
-        { item: 'machined', qty: 1, from: 'WC-MC1' }
+        { item: 'machined', qty: 19, from: 'WC-MC1', to: 'WIP-02', route: ['DOCK', 'OUTSIDE'] },
+        { item: 'machined', qty: 1, from: 'WC-MC1', via: 'OUTSIDE', route: ['DOCK'] }
       ],
-      effects: [{ lot: 'SF2000-S001', delta: 19 }, { wo: 'SMP-SF-001-20', status: '完了' }]
+      floor: 'トラックで加工品20個を外注先へ運びます。表面処理から戻った19個は WIP-02 へ入り、op001 が戻りを確かめて実績を入力します。',
+      input: [{ who: 'op001', menu: '生産・製造実行 → 作業指示 → 実績入力', record: '良品数・不良と不良内容・入庫先 WIP-02' }],
+      effects: [{ lot: 'SF2000-S001', delta: 19 }, { wo: 'SMP-SF-001-20', status: '完了' }],
+      alerts: [{ at: 'DOCK', tag: '不良', labelAt: [24.5, 8.8], text: '不良：1個（DR-01 鋳巣）を廃棄。WIP-02 へは入らない' }],
+      note: '表面処理は SF-2000 の最終工程なので、良品19個がここで SF2000-S001 として在庫に入ります。',
+      ledgerNote: '最終工程の良品だけが在庫に入る。不良の1個は入らない。',
+      detail: { href: 'walkthrough.html#execution', image: null }
     },
     {
       id: 'assembly',
@@ -237,9 +318,18 @@ window.TOUR_DATA = {
       id: 'final-test',
       no: 9,
       title: '最終検査の工程で 10 台を確認',
-      stub: true,
+      when: '9/3 12:30〜13:00（昼勤 D）',
+      station: 'WC-QC1',
+      around: ['WC-AS1', 'WC-PK1'],
+      equipment: 'EQ-03',
+      actors: [{ user: 'op001', role: 'op', at: 'WC-QC1' }],
       moves: [{ item: 'assembled', qty: 10, from: 'WC-AS1', to: 'WC-QC1' }],
-      effects: [{ wo: 'SMP-FG-001-20', status: '完了' }]
+      floor: 'op001 が EQ-03 で10台を試験します。試験圧力は 0.5 MPa で、吐出音に異音はありません。',
+      input: [{ who: 'op001', menu: '生産・製造実行 → 作業指示 → 実績入力', record: '良品数・試験圧力・吐出音' }],
+      effects: [{ wo: 'SMP-FG-001-20', status: '完了' }],
+      note: '作業指示の工程なので、qc001 ではなく SK-03 を持つ現場作業者が入力します。ロットを検査する完成品検査（場面12）とは別物です。',
+      ledgerNote: '途中の工程の良品は、在庫に増えない。',
+      detail: { href: 'walkthrough.html#execution', image: null }
     },
     {
       id: 'packing',
@@ -264,9 +354,68 @@ window.TOUR_DATA = {
       ledgerNote: '最終工程の良品だけが在庫に入る。不良の1台は入らない。',
       detail: { href: 'walkthrough.html#execution', image: null }
     },
-    { id: 'completion-approval', no: 11, title: '完了承認（画面で行う操作）', stub: true, moves: [], effects: [] },
-    { id: 'final-inspection', no: 12, title: '完成品検査で FG1000-S001 が合格', stub: true, moves: [], effects: [] },
-    { id: 'shipment-judgment', no: 13, title: '出荷指示を作り、出荷判定「可」を承認', stub: true, moves: [], effects: [] },
+    {
+      id: 'completion-approval',
+      no: 11,
+      title: '完了承認（画面で行う操作）',
+      station: 'OFFICE',
+      actors: [{ user: 'pm001', role: 'pm', at: 'OFFICE' }],
+      floor: 'pm001 が実績を確かめ、完了した作業指示を1件ずつ承認します。',
+      input: [{ who: 'pm001', menu: '生産・製造実行 → 作業指示 → 実績入力（製造完了承認）', record: '作業指示ごとの承認' }],
+      effects: [
+        { wo: 'SMP-SF-001-10', status: '承認済' },
+        { wo: 'SMP-SF-001-20', status: '承認済' },
+        { mo: 'SMP-SF-001', status: '完了' },
+        { wo: 'SMP-FG-001-10', status: '承認済' },
+        { wo: 'SMP-FG-001-20', status: '承認済' },
+        { wo: 'SMP-FG-001-30', status: '承認済' },
+        { mo: 'SMP-FG-001', status: '完了' }
+      ],
+      note: 'サンプルの CSV には入らない、画面で行う操作です。全工程を承認すると、製造指図が完了になります。',
+      ledgerNote: 'CSV の取込では作業指示は完了、指図は展開済のまま。この先の状態欄は、画面で承認した場合の値。',
+      detail: { href: 'walkthrough.html#order', image: null }
+    },
+    {
+      id: 'final-inspection',
+      no: 12,
+      title: '完成品検査で FG1000-S001 が合格',
+      station: 'WH-P01',
+      around: ['WC-PK1'],
+      actors: [{ user: 'qc001', role: 'qc', at: 'WH-P01' }],
+      floor: 'qc001 が FG1000-S001 の吐出量を流量計で測り、気密試験で漏れがないことを確かめます。',
+      input: [{ who: 'qc001', menu: '品質 → 検査管理', record: '検査指示の発行・INS-04 吐出量・INS-05 気密試験「漏れなし」・総合判定（グレード A）' }],
+      gauges: [{ name: 'INS-04 吐出量', min: 19, max: 21, unit: 'L/min', values: [20.3] }],
+      effects: [{ lot: 'FG1000-S001', status: '正常', from: '検査待ち' }],
+      note: '検査待ちの間、このロットは出荷できません。合格・グレード A で「正常」に戻ります。',
+      ledgerNote: '数量は変わらず、ロットの状態だけが動く。',
+      detail: {
+        href: 'walkthrough.html#inspection',
+        image: 'assets/walkthrough/inspections.webp',
+        alt: '検査管理画面。受入・工程内・完成品の3件の検査指示が、承認済・合格で並んでいる'
+      }
+    },
+    {
+      id: 'shipment-judgment',
+      no: 13,
+      title: '出荷指示と出荷判定',
+      when: '10/16 出荷予定',
+      station: 'SHIP-01',
+      around: ['WH-P01'],
+      actors: [{ user: 'lg001', role: 'lg', at: 'SHIP-01' }, { user: 'qc001', role: 'qc', at: 'WC-QC1' }],
+      floor: 'lg001 がサンプル商事へ5台の出荷指示 SMP-SH-001 を作り、qc001 が FG1000-S001 に判定「可」を出して承認します。',
+      input: [
+        { who: 'lg001', menu: '物流・在庫 → 出荷管理', record: '出荷先・予定日・品目・数量' },
+        { who: 'qc001', menu: '品質 → 出荷判定', record: '対象の出荷指示とロット、判定「可」、承認' }
+      ],
+      changeNotes: ['SMP-SH-001 の出荷判定が「可」で承認済になる（台帳の行は変わらない）'],
+      note: '比較：別の出荷指示 SMP-SH-002 は判定が「保留」のままで、出荷実行に進めません。',
+      ledgerNote: '指示と判定では、在庫は動かない。',
+      detail: {
+        href: 'walkthrough.html#shipping',
+        image: 'assets/walkthrough/shipment-judgments.webp',
+        alt: '出荷判定画面。SMP-SH-001 と FG1000-S001 を対象にした判定「可」が承認済、SMP-SH-002 の判定「保留」が未承認で並んでいる'
+      }
+    },
     {
       id: 'shipment',
       no: 14,
@@ -287,6 +436,43 @@ window.TOUR_DATA = {
         alt: '出荷管理画面。SMP-SH-001 が完了（指示数5・出荷済5）、SMP-SH-002 が指示のまま'
       }
     },
-    { id: 'trace', no: 15, title: 'トレース', stub: true, moves: [], effects: [] }
+    {
+      id: 'trace',
+      no: 15,
+      title: 'トレースでロットをたどる',
+      station: 'WH-P01',
+      camera: 'all',
+      around: ['WIP-02', 'WH-M01', 'WH-M02', 'SHIP-01'],
+      actors: [{ user: 'qc001', role: 'qc', at: 'WC-QC1' }],
+      floor: 'qc001 が FG1000-S001 を追跡すると、使った半製品と部材のロットまで、記録がつながってたどれます。',
+      input: [{ who: 'qc001', menu: '品質 → トレーサビリティ', record: '追跡するロット番号' }],
+      changeNotes: ['参照するだけなので、記録は変わらない'],
+      trace: {
+        back: {
+          name: '製品から部材へ',
+          links: [
+            { from: 'WH-P01', to: 'WIP-02', tag: 'SF2000-S001', text: 'FG1000-S001 ← SF2000-S001 10個' },
+            { from: 'WIP-02', to: 'WH-M01', tag: 'R3001-260901', text: 'SF2000-S001 ← R3001-260901 20個' },
+            { from: 'WH-P01', to: 'WH-M01', tag: 'R3002・R3003', labelAt: [8.9, 9.3], text: 'FG1000-S001 ← R3002-260901 10セット・R3003-260901 10本' },
+            { from: 'WH-P01', to: 'WH-M02', tag: 'R3004 ほか3件', labelAt: [5.2, 10.7], text: 'FG1000-S001 ← R3004-260901 18個・R3007-260901 2個・R3005-260901 40本・R3006-260901 0.5 L' }
+          ]
+        },
+        forward: {
+          name: '鋳造品から製品・出荷へ',
+          links: [
+            { from: 'WH-M01', to: 'WIP-02', tag: 'SF2000-S001', text: 'R3001-260901 → SF2000-S001' },
+            { from: 'WIP-02', to: 'WH-P01', tag: 'FG1000-S001', text: 'SF2000-S001 → FG1000-S001' },
+            { from: 'WH-P01', to: 'SHIP-01', tag: '出荷 5', labelAt: [2.2, 18], text: 'FG1000-S001 → サンプル商事へ5台（SMP-SH-001）' }
+          ]
+        }
+      },
+      note: '「鋳造品に鋳巣が多い」と分かったときは、鋳造品から製品・出荷へたどれば、影響する製品と出荷先がすぐに分かります。',
+      ledgerNote: 'どの記録もロット番号でつながっている。',
+      detail: {
+        href: 'walkthrough.html#trace',
+        image: 'assets/walkthrough/trace.webp',
+        alt: 'トレーサビリティ画面。FG1000-S001 のトレースバックに、SF2000-S001 とその下の R3001-260901、ほか6件の部材ロットがツリーで並んでいる'
+      }
+    }
   ]
 };
