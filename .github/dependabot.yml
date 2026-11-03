@@ -14,6 +14,11 @@ updates:
       - msmsrep
     commit-message:
       prefix: "依存更新"
+    ignore:
+      # Microsoft.AspNetCore.OpenApi 10.x は Microsoft.OpenApi 3.0 未満に制限している。.NET 11 へ移行するときに外す
+      - dependency-name: Microsoft.OpenApi
+        update-types:
+          - version-update:semver-major
     groups:
       # Microsoft.* / System.* は同じサービシングで揃えて上げる（版がずれると NU1605 の格下げエラーになる）
       dotnet:
