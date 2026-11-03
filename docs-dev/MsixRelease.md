@@ -55,17 +55,18 @@ Partner Center でアプリ名を予約すると「製品管理 → 製品ID」�
 ## 3. ローカルで動作確認する
 
 ```powershell
-./build/Pack-Msix.ps1 -SelfSign
+./build/Pack-Msix.ps1
 ```
+
+スクリプトは常に自己署名した1つのパッケージを作る。動作確認にも提出（4節）にも同じものを使う。
 
 **`-AllowUnsigned` は使えない。** フルトラストのデスクトップアプリを含むパッケージは
 開発者モードが有効でも未署名ではインストールできない
 （`0x80073D2B`：未署名のパッケージに実行可能ファイルのアクティブ化を含めることはできません）。
 署名が必須。
 
-`-SelfSign` は提出用パッケージを書き換えず、`..._signed.msix` を別に作る。
 発行元（`CN=5E0CB4C9-...`）が一致する有効な証明書が `Cert:\CurrentUser\My` にあれば
-それを再利用し、無いときだけ新規作成する（検証のたびに証明書が増えないようにするため）。
+それを再利用し、無いときだけ新規作成する（作成のたびに証明書が増えないようにするため）。
 
 証明書が `Cert:\LocalMachine\TrustedPeople` に未登録のときだけ、スクリプトが登録コマンドを表示する。
 その場合は**管理者権限の PowerShell** で実行する（MSIXのサイドロードでは
@@ -74,7 +75,7 @@ Partner Center でアプリ名を予約すると「製品管理 → 製品ID」�
 インストール（管理者権限は不要）:
 
 ```powershell
-Add-AppxPackage -Path 'artifacts\msix\ParallelFactoryMES_1.0.0.0_x64_signed.msix'
+Add-AppxPackage -Path 'artifacts\msix\ParallelFactoryMES_1.0.0.0_x64.msix'
 ```
 
 **同じバージョンの入れ直しはブロックされる**（`0x80073CFB`：同じIDで内容が異なるパッケージ）。
@@ -149,7 +150,7 @@ Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
 ./build/Pack-Msix.ps1 -Architecture arm64
 ```
 
-`-SelfSign` を付けない＝**未署名**。署名は Microsoft Store が行うため、これで正しい。
+**自己署名付き**のパッケージをそのまま提出する。アップロードすると Microsoft Store の署名に置き換わる。
 
 出力先は `artifacts/msix/ParallelFactoryMES_<版>_<アーキテクチャ>.msix`。
 
@@ -160,6 +161,7 @@ Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
    （`.br`/`.gz` は `MapStaticAssets` 向けの事前圧縮で、本構成の `UseStaticFiles` では配信されない）
 3. `Package.appxmanifest` のプレースホルダーを `msix-identity.json` の値で置換して `AppxManifest.xml` を生成
 4. `makeappx pack`
+5. `signtool sign` で自己署名（証明書の扱いは3節）
 
 ---
 
