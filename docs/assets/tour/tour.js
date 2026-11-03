@@ -576,7 +576,7 @@
     });
   }
 
-  // カメラは狭い画面だけ寄せる。範囲は station・actors・moves の置場をすべて含む
+  // カメラは画面の幅によらず寄せる。範囲は station・actors・moves の置場をすべて含む
   function sceneCodes(scene) {
     var codes = [];
     function add(code) { if (code && codes.indexOf(code) < 0) codes.push(code); }
@@ -590,7 +590,7 @@
   }
 
   function setSceneCamera(scene) {
-    camera.codes = scene && isNarrow() && scene.camera !== 'all' ? sceneCodes(scene) : null;
+    camera.codes = scene && scene.camera !== 'all' ? sceneCodes(scene) : null;
     applyCamera();
   }
 
