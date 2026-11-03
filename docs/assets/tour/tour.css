@@ -28,6 +28,11 @@
   --m-led: #e8ebee;
   --m-flow: #8b929a;
   --m-label-bg: rgba(255, 255, 255, .9);
+  /* 物の色。部材・半製品・製品・再作業待ちを面の濃さごとに持つ（明暗で共通） */
+  --i-material-top: #eeb84f; --i-material-l: #cf962d; --i-material-r: #b07d1f;
+  --i-semi-top: #66abee; --i-semi-l: #3d88d4; --i-semi-r: #2c6fb5;
+  --i-product-top: #4fc78b; --i-product-l: #2fa469; --i-product-r: #238856;
+  --i-rework-top: #ee7a6f; --i-rework-l: #d25549; --i-rework-r: #b2433a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -93,10 +98,30 @@
 }
 
 .tour-model {
+  position: relative;
   background: var(--m-ground);
   overflow: hidden;
   min-height: 0;
 }
+.tour-legend {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--m-label-bg);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.tour-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.tour-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+.swatch-material { background: var(--i-material-top); }
+.swatch-semi { background: var(--i-semi-top); }
+.swatch-product { background: var(--i-product-top); }
+.swatch-rework { background: var(--i-rework-top); }
 #tour-svg { display: block; width: 100%; height: 100%; }
 
 .tour-side {
@@ -120,6 +145,26 @@
   white-space: nowrap;
 }
 .tour-noscript { margin: 16px; }
+.tour-when { font-size: 13px; color: var(--text-muted); }
+.tour-bridge {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  border-left: 3px solid var(--border);
+  padding-left: 8px;
+}
+.tour-section { margin: 0 -8px; padding: 0 8px 2px; border-radius: 6px; transition: background-color .2s; }
+.tour-section.is-lit { background: var(--accent-soft); }
+.tour-who.role-pm { color: var(--r-pm); }
+.tour-who.role-op { color: var(--r-op); }
+.tour-who.role-lg { color: var(--r-lg); }
+.tour-who.role-qc { color: var(--r-qc); }
+.tour-side ul { margin: 0 0 6px; padding-left: 18px; }
+.tour-side li { margin: 0 0 2px; }
+.tour-effects { font-size: 13px; }
+.tour-alerts { margin-top: 6px; color: var(--r-ng); font-weight: 600; font-size: 13px; }
+.tour-detail { display: inline-block; margin-top: 10px; }
+.tour-photo { display: block; margin-top: 6px; }
+.tour-photo img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 6px; }
 
 /* ---------- 操作 ---------- */
 .tour-controls {
@@ -142,6 +187,20 @@
 }
 .tour-buttons button:disabled { color: var(--text-muted); cursor: default; opacity: .7; }
 
+.tour-label-mode { display: flex; align-items: center; font-size: 13px; }
+.tour-label-mode-name { margin-right: 6px; color: var(--text-muted); }
+.tour-label-mode button {
+  font: inherit;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text);
+  cursor: pointer;
+}
+.tour-label-mode button:first-of-type { border-radius: 6px 0 0 6px; }
+.tour-label-mode button:last-of-type { border-radius: 0 6px 6px 0; border-left: 0; }
+.tour-label-mode button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
 .tour-rail {
   display: flex;
   flex: 1 1 240px;
@@ -155,16 +214,29 @@
   background: linear-gradient(var(--border), var(--border)) center / 100% 2px no-repeat;
 }
 .tour-rail li { margin: 0; line-height: 0; }
+/* 押せる範囲は 24px 取り、見た目の丸は ::before で小さく描く */
 .tour-rail button {
-  width: 14px;
-  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border: 2px solid var(--border);
-  border-radius: 50%;
-  background: var(--bg);
+  border: 0;
+  background: none;
   cursor: pointer;
 }
-.tour-rail button:disabled { cursor: default; }
+.tour-rail button::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid var(--text-muted);
+  border-radius: 50%;
+  background: var(--bg);
+}
+.tour-rail button.is-past::before { background: var(--text-muted); }
+.tour-rail button[aria-current]::before { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 /* ---------- 台帳 ---------- */
 .tour-ledger {
@@ -183,7 +255,28 @@
 .tour-ledger td { padding: 2px 8px; border: 0; border-bottom: 1px solid var(--border); text-align: left; line-height: 1.5; }
 .tour-ledger thead th { position: sticky; top: 0; z-index: 1; background: var(--bg-alt); }
 .tour-ledger tbody tr:nth-child(even) td { background: none; }
-.tour-ledger .num { text-align: right; }
+.tour-ledger .num { text-align: right; white-space: nowrap; }
+.tour-ledger tr.is-absent td { opacity: .45; }
+.tour-ledger tbody tr.is-changed td { background: var(--accent-soft); font-weight: 600; }
+.tour-ledger tr.is-flash td { animation: tour-flash 1s ease-out; }
+.tour-ledger-note { flex: none; margin-top: 4px; font-size: 12px; }
+.tour-ledger-toggle { display: none; }
+
+@keyframes tour-flash {
+  0%, 60% { background: var(--r-lg-bg); box-shadow: inset 0 0 0 1px var(--r-lg); }
+  100% { background: var(--accent-soft); box-shadow: none; }
+}
+
+/* ---------- 変化の帯（幅 1000px 未満） ---------- */
+.tour-band h2 { font-size: 13px; margin: 0 0 4px; color: var(--text-muted); border: 0; padding: 0; }
+.tour-band ul { margin: 0 0 4px; padding-left: 18px; font-size: 13px; }
+.tour-band li { margin: 0; }
+.tour-band ul.is-pending { visibility: hidden; }
+.tour-band ul.is-flash { animation: tour-band-flash 1s ease-out; border-radius: 4px; }
+@keyframes tour-band-flash {
+  0%, 60% { background: var(--r-lg-bg); }
+  100% { background: none; }
+}
 
 /* ---------- 模型 ---------- */
 .slab { fill: var(--m-slab); stroke: var(--m-zone-line); stroke-width: .6; }
@@ -214,6 +307,18 @@
 .tone-tire .f-top,
 .tone-tire .f-left,
 .tone-tire .f-right { fill: var(--m-tire); }
+.tone-material .f-top { fill: var(--i-material-top); }
+.tone-material .f-left { fill: var(--i-material-l); }
+.tone-material .f-right { fill: var(--i-material-r); }
+.tone-semi .f-top { fill: var(--i-semi-top); }
+.tone-semi .f-left { fill: var(--i-semi-l); }
+.tone-semi .f-right { fill: var(--i-semi-r); }
+.tone-product .f-top { fill: var(--i-product-top); }
+.tone-product .f-left { fill: var(--i-product-l); }
+.tone-product .f-right { fill: var(--i-product-r); }
+.tone-rework .f-top { fill: var(--i-rework-top); }
+.tone-rework .f-left { fill: var(--i-rework-l); }
+.tone-rework .f-right { fill: var(--i-rework-r); }
 .window { fill: var(--m-window); opacity: .85; }
 .server-led { fill: var(--m-led); }
 
@@ -229,6 +334,29 @@
 .role-lg .person-body, .role-lg .person-head { fill: var(--r-lg); }
 .role-qc .person-body, .role-qc .person-head { fill: var(--r-qc); }
 .terminal { fill: var(--m-dark-l); stroke: var(--bg); stroke-width: .8; }
+.terminal.is-lit { fill: var(--accent); stroke: var(--accent); animation: tour-terminal .45s ease-in-out infinite alternate; }
+
+/* 場面の強調 */
+.zone.is-station { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
+.zone.is-alert { fill: var(--r-ng-bg); stroke: var(--r-ng); stroke-width: 2; animation: tour-alert 1.2s ease-in-out infinite alternate; }
+.is-running { animation: tour-run .16s linear infinite alternate; }
+.is-receiving .server-led { fill: var(--accent); }
+
+/* 信号。太さはカメラの寄りによらず一定にする */
+.signal {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 6;
+  vector-effect: non-scaling-stroke;
+  animation: tour-signal .45s linear infinite;
+}
+.signal-dot { fill: var(--accent); }
+
+@keyframes tour-terminal { from { opacity: .55; } to { opacity: 1; } }
+@keyframes tour-alert { from { fill-opacity: .55; } to { fill-opacity: 1; } }
+@keyframes tour-run { from { transform: translateY(0); } to { transform: translateY(-1.2px); } }
+@keyframes tour-signal { to { stroke-dashoffset: -11; } }
 
 /* ラベルは tour.js が縮尺を打ち消すので、ここの文字の大きさがそのまま画面上の大きさになる */
 .label text { font-size: 12px; fill: var(--text); }
@@ -245,6 +373,11 @@
 .label-person.role-lg text { fill: var(--r-lg); }
 .label-person.role-qc text { fill: var(--r-qc); }
 .label-pin text { font-size: 11px; font-weight: 600; }
+.label-stock text { font-size: 11px; font-weight: 700; }
+.label-stock rect { stroke: none; }
+.label-moving text { font-size: 11px; font-weight: 600; }
+.label-alert text { font-size: 11px; font-weight: 700; fill: var(--r-ng); }
+.label-alert rect { fill: var(--r-ng-bg); stroke: var(--r-ng); }
 .label.is-hidden { display: none; }
 /* スマホの全景は小さすぎてラベルが読めないので出さない（カメラを寄せて読む） */
 .is-overview .label { display: none; }
@@ -263,8 +396,22 @@
   .tour-side { overflow: visible; }
   .tour-ledger { grid-template-columns: minmax(0, 1fr); }
   .tour-ledger-scroll { overflow: visible; }
+  .tour-ledger-toggle {
+    display: block;
+    font: inherit;
+    font-size: 13px;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-alt);
+    color: var(--text);
+    cursor: pointer;
+    justify-self: start;
+  }
+  .tour-ledger.is-collapsed .tour-ledger-col { display: none; }
   .tour-rail { flex-basis: 100%; }
-  .tour-rail button { width: 12px; height: 12px; }
+  /* 下端は異常のラベルが来るので、狭い画面では上端に置く */
+  .tour-legend { top: 6px; bottom: auto; font-size: 10px; gap: 0 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
