@@ -1,0 +1,445 @@
+/* 工場模型のページ（docs-dev/FactoryTour.md）。ガイドの style.css の変数を使い、このページだけのレイアウトと模型の色を足す */
+
+:root {
+  color-scheme: light dark;
+  /* 模型の本体は無彩色。面の濃さで立体に見せる */
+  --m-ground: #eef0f2;
+  --m-slab: #fbfbfc;
+  --m-slab-side-l: #c9ced4;
+  --m-slab-side-r: #b6bcc3;
+  --m-road: #dfe2e6;
+  --m-zone: #eceef1;
+  --m-zone-line: #a9b0b8;
+  --m-yard: #f2f3f5;
+  --m-body-top: #e4e7ea;
+  --m-body-l: #c4c9cf;
+  --m-body-r: #a9afb6;
+  --m-dark-top: #a3a9b0;
+  --m-dark-l: #80868d;
+  --m-dark-r: #6a7077;
+  --m-light-top: #f6f7f8;
+  --m-light-l: #dfe2e6;
+  --m-light-r: #ccd0d5;
+  --m-wall-top: #dadde1;
+  --m-wall-l: #eceef0;
+  --m-wall-r: #e3e5e8;
+  --m-tire: #4c5157;
+  --m-window: #f8fafc;
+  --m-led: #e8ebee;
+  --m-flow: #8b929a;
+  --m-label-bg: rgba(255, 255, 255, .9);
+  /* 物の色。部材・半製品・製品・再作業待ちを面の濃さごとに持つ（明暗で共通） */
+  --i-material-top: #eeb84f; --i-material-l: #cf962d; --i-material-r: #b07d1f;
+  --i-semi-top: #66abee; --i-semi-l: #3d88d4; --i-semi-r: #2c6fb5;
+  --i-product-top: #4fc78b; --i-product-l: #2fa469; --i-product-r: #238856;
+  --i-rework-top: #ee7a6f; --i-rework-l: #d25549; --i-rework-r: #b2433a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --m-ground: #0b0e12;
+    --m-slab: #1a1f26;
+    --m-slab-side-l: #2a3038;
+    --m-slab-side-r: #20262d;
+    --m-road: #181c22;
+    --m-zone: #2a313a;
+    --m-zone-line: #4b535e;
+    --m-yard: #1f242b;
+    --m-body-top: #5a626d;
+    --m-body-l: #454c55;
+    --m-body-r: #373d45;
+    --m-dark-top: #3b424b;
+    --m-dark-l: #2c323a;
+    --m-dark-r: #23282f;
+    --m-light-top: #7a828c;
+    --m-light-l: #626a74;
+    --m-light-r: #525962;
+    --m-wall-top: #363c45;
+    --m-wall-l: #262b32;
+    --m-wall-r: #2c3239;
+    --m-tire: #0d0f12;
+    --m-window: #8b95a1;
+    --m-led: #7c8794;
+    --m-flow: #7c8590;
+    --m-label-bg: rgba(15, 18, 22, .88);
+  }
+}
+
+/* ---------- レイアウト ---------- */
+.tour-page { line-height: 1.6; }
+
+.tour {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-rows: minmax(300px, 1fr) auto 216px;
+  grid-template-areas:
+    "model side"
+    "controls side"
+    "ledger ledger";
+  gap: 10px;
+  padding: 10px 16px 12px;
+  height: calc(100vh - 52px);
+  height: calc(100dvh - 52px);
+  min-height: 640px;
+}
+.tour-model { grid-area: model; }
+.tour-controls { grid-area: controls; }
+.tour-side { grid-area: side; }
+.tour-ledger { grid-area: ledger; }
+.tour-band { display: none; }
+
+.tour-model,
+.tour-side,
+.tour-ledger,
+.tour-band {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.tour-model {
+  position: relative;
+  background: var(--m-ground);
+  overflow: hidden;
+  min-height: 0;
+}
+.tour-legend {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--m-label-bg);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.tour-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.tour-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+.swatch-material { background: var(--i-material-top); }
+.swatch-semi { background: var(--i-semi-top); }
+.swatch-product { background: var(--i-product-top); }
+.swatch-rework { background: var(--i-rework-top); }
+#tour-svg { display: block; width: 100%; height: 100%; }
+
+.tour-side {
+  background: var(--bg);
+  padding: 12px 16px;
+  overflow-y: auto;
+  font-size: 14px;
+  min-height: 0;
+}
+.tour-side h1 { font-size: 18px; line-height: 1.4; margin: 0 0 8px; border: 0; padding: 0; }
+.tour-side h2 { font-size: 13px; margin: 14px 0 4px; color: var(--text-muted); border: 0; padding: 0; }
+.tour-side p { margin: 0 0 6px; }
+.tour-count { font-size: 12px; color: var(--text-muted); }
+.text-note { color: var(--text-muted); font-size: 13px; margin: 0; }
+.tour-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.tour-noscript { margin: 16px; }
+.tour-when { font-size: 13px; color: var(--text-muted); }
+.tour-gauges { margin: 8px 0; }
+.tour-gauge-name { font-size: 13px; }
+.tour-gauge { position: relative; height: 14px; margin: 2px 0 8px; background: var(--bg-alt); border-radius: 7px; }
+.tour-gauge-band { position: absolute; left: 25%; width: 50%; top: 2px; bottom: 2px; background: var(--i-product-top); border-radius: 5px; }
+.tour-gauge-dot {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%;
+  background: var(--r-qc);
+  border: 1.5px solid var(--bg);
+  transition: opacity .35s;
+}
+.tour-gauges.is-pending .tour-gauge-dot { opacity: 0; }
+.tour-trace-mode { margin: 8px 0 6px; flex-wrap: wrap; }
+.tour-section { margin: 0 -8px; padding: 0 8px 2px; border-radius: 6px; transition: background-color .2s; }
+.tour-section.is-lit { background: var(--accent-soft); }
+.tour-who.role-pm { color: var(--r-pm); }
+.tour-who.role-op { color: var(--r-op); }
+.tour-who.role-lg { color: var(--r-lg); }
+.tour-who.role-qc { color: var(--r-qc); }
+.tour-side ul { margin: 0 0 6px; padding-left: 18px; }
+.tour-side li { margin: 0 0 2px; }
+.tour-effects { font-size: 13px; }
+.tour-alerts { margin-top: 6px; color: var(--r-ng); font-weight: 600; font-size: 13px; }
+.tour-detail { display: inline-block; margin-top: 10px; }
+.tour-photo { display: block; margin-top: 6px; }
+.tour-photo img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 6px; }
+
+/* ---------- 操作 ---------- */
+.tour-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  min-width: 0;
+}
+.tour-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.tour-buttons button {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-alt);
+  color: var(--text);
+  cursor: pointer;
+}
+.tour-buttons button:disabled { color: var(--text-muted); cursor: default; opacity: .7; }
+
+.tour-label-mode { display: flex; align-items: center; font-size: 13px; }
+.tour-label-mode-name { margin-right: 6px; color: var(--text-muted); }
+.tour-label-mode button {
+  font: inherit;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text);
+  cursor: pointer;
+}
+.tour-label-mode button:first-of-type { border-radius: 6px 0 0 6px; }
+.tour-label-mode button:last-of-type { border-radius: 0 6px 6px 0; border-left: 0; }
+.tour-label-mode button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+.tour-rail {
+  display: flex;
+  flex: 1 1 390px; /* 15場面の丸が1列に収まる幅。足りなければ次の行へ回る */
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  background: linear-gradient(var(--border), var(--border)) center / 100% 2px no-repeat;
+}
+.tour-rail li { margin: 0; line-height: 0; }
+/* 押せる範囲は 24px 取り、見た目の丸は ::before で小さく描く */
+.tour-rail button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.tour-rail button::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid var(--text-muted);
+  border-radius: 50%;
+  background: var(--bg);
+}
+.tour-rail button.is-past::before { background: var(--text-muted); }
+.tour-rail button[aria-current]::before { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ---------- 台帳 ---------- */
+.tour-ledger {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+  padding: 8px 12px;
+  min-height: 0;
+  background: var(--bg);
+}
+.tour-ledger-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tour-ledger h2 { font-size: 13px; margin: 0 0 4px; color: var(--text-muted); border: 0; padding: 0; }
+.tour-ledger-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.tour-ledger table { width: 100%; margin: 0; font-size: 12.5px; display: table; border-collapse: collapse; }
+.tour-ledger th,
+.tour-ledger td { padding: 2px 8px; border: 0; border-bottom: 1px solid var(--border); text-align: left; line-height: 1.5; }
+.tour-ledger thead th { position: sticky; top: 0; z-index: 1; background: var(--bg-alt); }
+.tour-ledger tbody tr:nth-child(even) td { background: none; }
+.tour-ledger .num { text-align: right; white-space: nowrap; }
+.tour-ledger tr.is-absent td { opacity: .45; }
+.tour-ledger tbody tr.is-changed td { background: var(--accent-soft); font-weight: 600; }
+.tour-ledger tr.is-flash td { animation: tour-flash 1s ease-out; }
+.tour-ledger-note { flex: none; margin-top: 4px; font-size: 12px; }
+.tour-ledger-toggle { display: none; }
+
+@keyframes tour-flash {
+  0%, 60% { background: var(--r-lg-bg); box-shadow: inset 0 0 0 1px var(--r-lg); }
+  100% { background: var(--accent-soft); box-shadow: none; }
+}
+
+/* ---------- 変化の帯（幅 1000px 未満） ---------- */
+.tour-band h2 { font-size: 13px; margin: 0 0 4px; color: var(--text-muted); border: 0; padding: 0; }
+.tour-band ul { margin: 0 0 4px; padding-left: 18px; font-size: 13px; }
+.tour-band li { margin: 0; }
+.tour-band ul.is-pending { visibility: hidden; }
+.tour-band ul.is-flash { animation: tour-band-flash 1s ease-out; border-radius: 4px; }
+@keyframes tour-band-flash {
+  0%, 60% { background: var(--r-lg-bg); }
+  100% { background: none; }
+}
+
+/* ---------- 模型 ---------- */
+.slab { fill: var(--m-slab); stroke: var(--m-zone-line); stroke-width: .6; }
+.slab-side-l { fill: var(--m-slab-side-l); }
+.slab-side-r { fill: var(--m-slab-side-r); }
+.road { fill: var(--m-road); }
+
+.zone { fill: var(--m-zone); stroke: var(--m-zone-line); stroke-width: 1; stroke-linejoin: round; }
+.zone-yard { fill: var(--m-yard); stroke-dasharray: 6 4; }
+.zone-wip { fill: none; stroke-dasharray: 3 3; }
+.zone-office,
+.zone-server { fill: var(--m-yard); }
+.zone-outside { fill: var(--m-yard); stroke-dasharray: 6 4; }
+
+.box polygon { stroke: rgba(0, 0, 0, .18); stroke-width: .5; stroke-linejoin: round; }
+.tone-body .f-top { fill: var(--m-body-top); }
+.tone-body .f-left { fill: var(--m-body-l); }
+.tone-body .f-right { fill: var(--m-body-r); }
+.tone-dark .f-top { fill: var(--m-dark-top); }
+.tone-dark .f-left { fill: var(--m-dark-l); }
+.tone-dark .f-right { fill: var(--m-dark-r); }
+.tone-light .f-top { fill: var(--m-light-top); }
+.tone-light .f-left { fill: var(--m-light-l); }
+.tone-light .f-right { fill: var(--m-light-r); }
+.tone-wall .f-top { fill: var(--m-wall-top); }
+.tone-wall .f-left { fill: var(--m-wall-l); }
+.tone-wall .f-right { fill: var(--m-wall-r); }
+.tone-tire .f-top,
+.tone-tire .f-left,
+.tone-tire .f-right { fill: var(--m-tire); }
+.tone-material .f-top { fill: var(--i-material-top); }
+.tone-material .f-left { fill: var(--i-material-l); }
+.tone-material .f-right { fill: var(--i-material-r); }
+.tone-semi .f-top { fill: var(--i-semi-top); }
+.tone-semi .f-left { fill: var(--i-semi-l); }
+.tone-semi .f-right { fill: var(--i-semi-r); }
+.tone-product .f-top { fill: var(--i-product-top); }
+.tone-product .f-left { fill: var(--i-product-l); }
+.tone-product .f-right { fill: var(--i-product-r); }
+.tone-rework .f-top { fill: var(--i-rework-top); }
+.tone-rework .f-left { fill: var(--i-rework-l); }
+.tone-rework .f-right { fill: var(--i-rework-r); }
+.window { fill: var(--m-window); opacity: .85; }
+.server-led { fill: var(--m-led); }
+
+.flow { fill: none; stroke: var(--m-flow); stroke-width: 2; stroke-linejoin: round; }
+.flow-head { fill: var(--m-flow); stroke: none; }
+.flow.flow-material { stroke-dasharray: 5 4; stroke-width: 1.5; }
+
+.person-shadow { fill: rgba(0, 0, 0, .18); }
+.person-body,
+.person-head { stroke: var(--bg); stroke-width: .8; }
+.role-pm .person-body, .role-pm .person-head { fill: var(--r-pm); }
+.role-op .person-body, .role-op .person-head { fill: var(--r-op); }
+.role-lg .person-body, .role-lg .person-head { fill: var(--r-lg); }
+.role-qc .person-body, .role-qc .person-head { fill: var(--r-qc); }
+.terminal { fill: var(--m-dark-l); stroke: var(--bg); stroke-width: .8; }
+.terminal.is-lit { fill: var(--accent); stroke: var(--accent); animation: tour-terminal .45s ease-in-out infinite alternate; }
+
+/* 場面の強調 */
+.zone.is-station { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
+.zone.is-alert { fill: var(--r-ng-bg); stroke: var(--r-ng); stroke-width: 2; animation: tour-alert 1.2s ease-in-out infinite alternate; }
+.is-running { animation: tour-run .16s linear infinite alternate; }
+.is-receiving .server-led { fill: var(--accent); }
+
+/* 信号。太さはカメラの寄りによらず一定にする */
+.signal {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 6;
+  vector-effect: non-scaling-stroke;
+  animation: tour-signal .45s linear infinite;
+}
+.signal-dot { fill: var(--accent); }
+
+/* トレースの光 */
+.trace-glow, .trace-line { fill: none; stroke: var(--accent); stroke-dasharray: 1; stroke-dashoffset: 0; }
+.trace-glow { stroke-opacity: .22; }
+.trace-end { fill: var(--accent); }
+.trace-glow.is-drawing, .trace-line.is-drawing { animation: tour-trace .7s ease-out backwards; }
+.tour-ledger-mo td:first-child { font-weight: 600; }
+
+@keyframes tour-trace { from { stroke-dashoffset: 1; } }
+@keyframes tour-terminal { from { opacity: .55; } to { opacity: 1; } }
+@keyframes tour-alert { from { fill-opacity: .55; } to { fill-opacity: 1; } }
+@keyframes tour-run { from { transform: translateY(0); } to { transform: translateY(-1.2px); } }
+@keyframes tour-signal { to { stroke-dashoffset: -11; } }
+
+/* ラベルは tour.js が縮尺を打ち消すので、ここの文字の大きさがそのまま画面上の大きさになる */
+.label text { font-size: 12px; fill: var(--text); }
+.label rect { fill: var(--m-label-bg); stroke: var(--m-zone-line); stroke-width: .5; }
+.label-zone text { font-weight: 600; }
+.label-equipment text { font-size: 11px; fill: var(--text-muted); }
+.label-equipment rect { stroke: none; }
+.label-flow text { font-size: 11px; fill: var(--text-muted); }
+.label-flow rect { stroke: none; }
+.label-person text { font-size: 11px; font-weight: 600; }
+.label-person rect { stroke: none; }
+.label-person.role-pm text { fill: var(--r-pm); }
+.label-person.role-op text { fill: var(--r-op); }
+.label-person.role-lg text { fill: var(--r-lg); }
+.label-person.role-qc text { fill: var(--r-qc); }
+.label-pin text { font-size: 11px; font-weight: 600; }
+.label-stock text { font-size: 11px; font-weight: 700; }
+.label-stock rect { stroke: none; }
+.label-moving text { font-size: 11px; font-weight: 600; }
+.label-trace text { font-size: 11px; font-weight: 700; fill: var(--accent); }
+.label-trace rect { stroke: var(--accent); }
+.label-alert text { font-size: 11px; font-weight: 700; fill: var(--r-ng); }
+.label-alert rect { fill: var(--r-ng-bg); stroke: var(--r-ng); }
+.label.is-hidden { display: none; }
+/* スマホの全景は小さすぎてラベルが読めないので出さない（カメラを寄せて読む） */
+.is-overview .label { display: none; }
+
+/* ---------- 幅 1000px 未満は縦積み ---------- */
+@media (max-width: 999.98px) {
+  .tour {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+    padding: 8px 16px 16px;
+  }
+  .tour-model { aspect-ratio: 4 / 3; flex: none; max-height: 70vh; width: 100%; }
+  .tour-band { display: block; padding: 8px 12px; }
+  .tour-side { overflow: visible; }
+  .tour-ledger { grid-template-columns: minmax(0, 1fr); }
+  .tour-ledger-scroll { overflow: visible; }
+  .tour-ledger-toggle {
+    display: block;
+    font: inherit;
+    font-size: 13px;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-alt);
+    color: var(--text);
+    cursor: pointer;
+    justify-self: start;
+  }
+  .tour-ledger.is-collapsed .tour-ledger-col { display: none; }
+  .tour-rail { flex-basis: 100%; }
+  /* 下端は異常のラベルが来るので、狭い画面では上端に置く */
+  .tour-legend { top: 6px; bottom: auto; font-size: 10px; gap: 0 8px; }
+}
+
+/* スマホ幅では場面の列が1列に収まらないので折り返す。押せる範囲は 24px のまま */
+@media (max-width: 439.98px) {
+  .tour-rail { flex-wrap: wrap; justify-content: flex-start; background: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-page * { animation: none !important; transition: none !important; }
+}

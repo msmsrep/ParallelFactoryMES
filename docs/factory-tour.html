@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- 工場模型で見る 製造から出荷まで（docs-dev/FactoryTour.md）。サイドバーのない全幅ページ -->
+<title>工場模型で見る 製造から出荷まで | Parallel Factory MES ユーザーガイド</title>
+<meta name="description" content="サンプルのギアポンプ製造を、動く工場模型と MES の記録の変化で見るページ。">
+<!-- ファビコンは build/icon.svg と同じ図柄（intro.html と同じ） -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='translate(-5.5,-9.5) scale(1.06)'%3E%3Crect x='19' y='58' width='21' height='26' rx='6' fill='%23CDEBDF'/%3E%3Crect x='47' y='32' width='21' height='52' rx='6' fill='%238FD2BE'/%3E%3Crect x='75' y='46' width='21' height='38' rx='6' fill='%235CC8A8'/%3E%3Cg fill='none' stroke='%2318193F' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='12' y='50' width='21' height='26' rx='6'/%3E%3Crect x='40' y='24' width='21' height='52' rx='6'/%3E%3Crect x='68' y='38' width='21' height='38' rx='6'/%3E%3Cpath d='M13 88 H88'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/tour/tour.css">
+</head>
+<body class="tour-page">
+<a class="skip" href="#tour-side">説明へスキップ</a>
+
+<header class="topbar">
+  <a class="brand" href="index.html">Parallel Factory <strong>MES</strong></a>
+  <span class="brand-sub">工場模型で見る 製造から出荷まで</span>
+  <a class="intro-link" href="index.html"><span aria-hidden="true">&larr; </span>ガイドへ戻る</a>
+</header>
+
+<noscript>
+  <p class="tour-noscript">このページの表示には JavaScript が必要です。<a href="walkthrough.html">画面写真つきの説明</a>をご覧ください。</p>
+</noscript>
+
+<main class="tour">
+  <section class="tour-model" aria-label="工場模型">
+    <svg id="tour-svg" role="img" aria-label="工場の全景。受入から加工、外注、組立、検査、梱包を経て出荷までの配置"></svg>
+  </section>
+
+  <section class="tour-band" aria-label="この場面で変わった記録">
+    <p class="text-note">この場面で変わった記録がここに出ます。</p>
+  </section>
+
+  <section class="tour-controls" aria-label="場面の操作">
+    <div class="tour-buttons">
+      <button type="button" disabled><span aria-hidden="true">◀ </span>前へ</button>
+      <button type="button" disabled><span aria-hidden="true">▶ </span>再生</button>
+      <button type="button" disabled>もう一度</button>
+      <button type="button" disabled>次へ<span aria-hidden="true"> ▶</span></button>
+    </div>
+    <ol class="tour-rail" id="tour-rail"></ol>
+  </section>
+
+  <aside class="tour-side" id="tour-side" aria-label="場面の説明">
+    <p class="tour-count">開始前</p>
+    <h1>工場模型で見る 製造から出荷まで</h1>
+    <p>現場で物が動くと、誰がどの画面に入力し、MES のどの記録が変わるか。サンプルのギアポンプ製造で順に見ていきます。</p>
+    <h2>現場で起きること</h2>
+    <p class="text-note">―</p>
+    <h2>誰がどの画面に</h2>
+    <p class="text-note">―</p>
+    <h2>MES で変わること</h2>
+    <p class="text-note">―</p>
+    <p aria-live="polite" class="tour-live"></p>
+  </aside>
+
+  <section class="tour-ledger" aria-label="MES の台帳">
+    <div class="tour-ledger-col">
+      <h2>在庫</h2>
+      <div class="tour-ledger-scroll">
+        <table>
+          <thead><tr><th>ロット</th><th>品目</th><th>置場</th><th class="num">数量</th></tr></thead>
+          <tbody id="tour-ledger-lots"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tour-ledger-col">
+      <h2>作業指示の状態</h2>
+      <div class="tour-ledger-scroll">
+        <table>
+          <thead><tr><th>作業指示</th><th>状態</th></tr></thead>
+          <tbody id="tour-ledger-orders"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="assets/tour/scenes.js"></script>
+<script src="assets/tour/tour.js"></script>
+</body>
+</html>

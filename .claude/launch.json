@@ -6,6 +6,12 @@
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "src/MesApp.Api", "--urls", "http://localhost:5210"],
       "port": 5210
+    },
+    {
+      "name": "guide",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-Command", "jekyll serve -s docs -d $env:TEMP\\mes-docs-site --port 4000"],
+      "port": 4000
     }
   ]
 }
