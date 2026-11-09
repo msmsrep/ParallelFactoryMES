@@ -1,0 +1,5 @@
+# すべてのファイルの持ち主を自分にする。PR が開かれると自分にレビュー依頼が自動で付き、
+# https://github.com/pulls/inbox（レビュー依頼で拾う）に出る。Dependabot の PR もこれで載る
+# （担当者の割り当てだけでは Inbox に出ない。dependabot.yml の reviewers は廃止済みなのでこちらで指定する）
+# 自分が作った PR には自分へのレビュー依頼は付かない（作者は対象外）
+* @msmsrep
