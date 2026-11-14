@@ -1,5 +1,6 @@
 # 依存パッケージの更新確認（週1回）。更新があれば dev 向けの PR を作る
-# PR は担当者に自分を割り当て、GitHub の通知（Inbox）と「Assigned」の一覧に出す
+# PR は担当者に自分を割り当て、「Assigned」の一覧に出す
+# pulls/inbox に出すためのレビュー依頼は .github/CODEOWNERS で付ける（担当者だけでは Inbox に出ない）
 version: 2
 updates:
   - package-ecosystem: nuget
