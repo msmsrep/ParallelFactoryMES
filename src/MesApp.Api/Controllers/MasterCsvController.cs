@@ -1,5 +1,6 @@
 using MesApp.Api.Localization;
 using MesApp.Api.Services;
+using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Masters;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,8 +14,11 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/masters/csv")]
 [Authorize]
-public class MasterCsvController(MasterCsvService service) : ControllerBase
+public class MasterCsvController(MasterCsvService service, IBusinessDateService businessDate) : ControllerBase
 {
+    /// <summary>ファイル名に付ける日付。工場の暦日で付ける（サーバーのローカル日付だとUTCのコンテナで現場とずれる）</summary>
+    private string FactoryToday => $"{businessDate.ToFactoryTime(DateTimeOffset.UtcNow):yyyyMMdd}";
+
     /// <summary>CSV入出力に対応するマスタ種別と列定義</summary>
     [HttpGet("kinds")]
     public ActionResult<List<CsvKindInfo>> Kinds() => MasterCsvKinds.All.Select(CsvImport.Localize).ToList();
@@ -35,7 +39,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
         }
 
         var csv = await service.ExportAsync(info, includeInactive, ct);
-        return CsvFileResult(csv, $"{info.Kind}_{DateTime.Now:yyyyMMdd}.csv");
+        return CsvFileResult(csv, $"{info.Kind}_{FactoryToday}.csv");
     }
 
     /// <summary>ヘッダーのみのテンプレートCSV</summary>
@@ -151,7 +155,7 @@ public class MasterCsvController(MasterCsvService service) : ControllerBase
             }
             files.Add(($"{i + 1:00}_{info.Kind}.csv", await service.ExportAsync(info, includeInactive, ct)));
         }
-        return File(CsvBundle.ToZip(files), "application/zip", $"masters_{DateTime.Now:yyyyMMdd}.zip");
+        return File(CsvBundle.ToZip(files), "application/zip", $"masters_{FactoryToday}.zip");
     }
 
     /// <summary>

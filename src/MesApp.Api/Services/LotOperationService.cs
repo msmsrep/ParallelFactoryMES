@@ -27,6 +27,11 @@ public sealed class LotOperationService(
         {
             return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
+        // 同じ場所への移動は数量が変わらないのに在庫トランザクションと監査ログだけが残る（搬送指示と同じ判定）
+        if (fromLocationId == toLocationId)
+        {
+            return Outcome<Lot>.Invalid(ApiText.T("移動元と移動先が同一です。"));
+        }
         if (!await db.Locations.AnyAsync(l => l.Id == toLocationId && l.IsActive, ct))
         {
             return Outcome<Lot>.Invalid(ApiText.T("存在しない（または無効な）移動先ロケーションです。"));
@@ -57,6 +62,12 @@ public sealed class LotOperationService(
         }
         var stock = await db.InventoryStocks.FirstOrDefaultAsync(
             s => s.LotId == lotId && s.LocationId == locationId, ct);
+        // 在庫行が無い場所への調整は在庫を新しく作る。存在しない・無効なロケーションには作らせない
+        // （既にある在庫の訂正は、ロケーションを無効化したあとでもできるようにしておく）
+        if (stock is null && !await db.Locations.AnyAsync(l => l.Id == locationId && l.IsActive, ct))
+        {
+            return Outcome<Lot>.Invalid(ApiText.T("存在しない（または無効な）ロケーションIDです。"));
+        }
         var current = stock?.Quantity ?? 0;
         var delta = newQuantity - current;
         if (delta == 0)

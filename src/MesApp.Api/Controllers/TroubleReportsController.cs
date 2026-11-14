@@ -19,7 +19,9 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/trouble-reports")]
 [Authorize]
-public class TroubleReportsController(MesAppDbContext db, ShopFloorReportService reports, IAuditLogger auditLogger) : ControllerBase
+public class TroubleReportsController(
+    MesAppDbContext db, ShopFloorReportService reports, IAuditLogger auditLogger, IBusinessDateService businessDate)
+    : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<TroubleReportResponse>>> List(
@@ -97,7 +99,8 @@ public class TroubleReportsController(MesAppDbContext db, ShopFloorReportService
         if (!string.IsNullOrWhiteSpace(request.ResponseNote))
         {
             var userName = User.Identity?.Name;
-            var entry = $"[{DateTimeOffset.Now:yyyy-MM-dd HH:mm} {userName}] {request.ResponseNote}";
+            // 保存する文字列なので工場の時刻で書く（サーバーのローカル時刻だと、UTCのコンテナで現場とずれる）
+            var entry = $"[{businessDate.ToFactoryTime(DateTimeOffset.UtcNow):yyyy-MM-dd HH:mm} {userName}] {request.ResponseNote}";
             report.ResponseHistory = string.IsNullOrEmpty(report.ResponseHistory)
                 ? entry
                 : $"{report.ResponseHistory}\n{entry}";
