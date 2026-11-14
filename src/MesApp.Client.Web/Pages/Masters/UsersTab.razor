@@ -144,12 +144,12 @@
                                 <td>@(line.AcquiredOn?.ToString("yyyy-MM-dd") ?? "-")</td>
                                 <td>@(line.ExpiresOn?.ToString("yyyy-MM-dd") ?? "-")</td>
                                 <td>
-                                    @if (line.ExpiresOn is not null && line.ExpiresOn < DateOnly.FromDateTime(DateTime.Today))
+                                    @if (line.ExpiresOn is not null && line.ExpiresOn < _today)
                                     {
                                         <span class="badge badge-danger">@L["期限切れ"]</span>
                                     }
                                     else if (line.ExpiresOn is not null
-                                             && line.ExpiresOn < DateOnly.FromDateTime(DateTime.Today.AddDays(30)))
+                                             && line.ExpiresOn < _today.AddDays(30))
                                     {
                                         <span class="badge badge-warning">@L["期限接近"]</span>
                                     }
@@ -219,11 +219,22 @@
     private string? _message;
     private bool _busy;
 
+    // 資格の期限判定に使う「今日」。APIのスキル照合（SkillQualificationPolicy）と同じ製造日でそろえる（Spec.md 3.9）
+    private DateOnly _today = DateOnly.FromDateTime(DateTime.Today);
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            _skills = await Http.GetFromJsonAsync<List<SkillResponse>>("api/skills") ?? [];
+            _today = (await Http.GetFromJsonAsync<BusinessDateResponse>("api/business-date"))!.Today;
+        }
+        catch (HttpRequestException)
+        {
+            // 取得できないときは端末の日付のまま表示する（表示のバッジだけに使い、可否の判定はAPIが行う）
+        }
+        try
+        {
+            _skills =await Http.GetFromJsonAsync<List<SkillResponse>>("api/skills") ?? [];
             await LoadAsync();
         }
         catch (HttpRequestException)
