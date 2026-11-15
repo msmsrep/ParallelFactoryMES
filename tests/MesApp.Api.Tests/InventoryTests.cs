@@ -136,6 +136,16 @@ public class InventoryTests
             new MoveRequest(lot.Id, ctx.MaterialLocationId, ctx.ProductLocationId, 999m));
         Assert.Equal(HttpStatusCode.BadRequest, overMove.StatusCode);
 
+        // 同じロケーションへの移動は400（数量が変わらないのに履歴だけが残るため）
+        var sameMove = await admin.PostAsJsonAsync("/api/inventory/move",
+            new MoveRequest(lot.Id, ctx.MaterialLocationId, ctx.MaterialLocationId, 1m));
+        Assert.Equal(HttpStatusCode.BadRequest, sameMove.StatusCode);
+
+        // 存在しないロケーションへの数量調整は400（在庫行を新しく作らせない）
+        var unknownLocation = await admin.PostAsJsonAsync("/api/inventory/adjust",
+            new AdjustRequest(lot.Id, int.MaxValue, 5m, "実棚差異"));
+        Assert.Equal(HttpStatusCode.BadRequest, unknownLocation.StatusCode);
+
         // 数量調整（理由必須）
         var adjusted = await admin.PostAsJsonAsync("/api/inventory/adjust",
             new AdjustRequest(lot.Id, ctx.MaterialLocationId, 65m, "実棚差異"));
