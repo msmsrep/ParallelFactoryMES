@@ -58,7 +58,7 @@ Partner Center でアプリ名を予約すると「製品管理 → 製品ID」�
 ./build/Pack-Msix.ps1
 ```
 
-スクリプトは常に自己署名した1つのパッケージを作る。動作確認にも提出（4節）にも同じものを使う。
+スクリプトは既定で x64 と arm64 の2つのパッケージを作り、どちらも同じ証明書で自己署名する。動作確認にも提出（4節）にも同じものを使う。片方だけ作るときは `-Architecture x64` のように指定する。
 
 **`-AllowUnsigned` は使えない。** フルトラストのデスクトップアプリを含むパッケージは
 開発者モードが有効でも未署名ではインストールできない
@@ -147,10 +147,9 @@ Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage
 
 ```powershell
 ./build/Pack-Msix.ps1
-./build/Pack-Msix.ps1 -Architecture arm64
 ```
 
-**自己署名付き**のパッケージをそのまま提出する。アップロードすると Microsoft Store の署名に置き換わる。
+x64 と arm64 の**自己署名付き**のパッケージを、同じ申請にそのまま提出する。アップロードすると Microsoft Store の署名に置き換わる。
 
 出力先は `artifacts/msix/ParallelFactoryMES_<版>_<アーキテクチャ>.msix`。
 

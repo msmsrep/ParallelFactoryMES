@@ -3,7 +3,7 @@
     MesApp.Desktop を発行して MSIX パッケージを作る。
 
 .DESCRIPTION
-    常に自己署名した1つのパッケージを作る。手元の動作確認にもストア提出にも同じものを使う
+    既定で x64 と arm64 の2つを作り、どちらも自己署名する。手元の動作確認にもストア提出にも同じものを使う
     （ストアにアップロードすると Microsoft Store の署名に置き換わる）。
 
     フルトラストのデスクトップアプリは Add-AppxPackage -AllowUnsigned では入らない
@@ -11,13 +11,13 @@
     開発者モードでも署名が要る。
 
 .EXAMPLE
-    ./build/Pack-Msix.ps1
-    ./build/Pack-Msix.ps1 -Architecture arm64
+    ./build/Pack-Msix.ps1                       # x64 と arm64 を作る
+    ./build/Pack-Msix.ps1 -Architecture x64     # 片方だけ作る
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('x64', 'arm64')]
-    [string]$Architecture = 'x64',
+    [string[]]$Architecture = @('x64', 'arm64'),
 
     [string]$Configuration = 'Release',
 
@@ -71,43 +71,11 @@ function Resolve-SdkTool {
 $makeappx = Resolve-SdkTool 'makeappx.exe'
 $signtool = Resolve-SdkTool 'signtool.exe'
 
-# --- 3. 発行 -------------------------------------------------------------------------
-$stage = Join-Path $OutputDirectory "stage-$Architecture"
-if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-New-Item -ItemType Directory -Path $stage -Force | Out-Null
-
-Write-Host "発行中: $Architecture / $Configuration"
-dotnet publish $project -c $Configuration -r "win-$Architecture" -o $stage --nologo -v q
-if ($LASTEXITCODE -ne 0) { throw "dotnet publish に失敗しました。" }
-
-# --- 4. 配布物の整理 -----------------------------------------------------------------
-# 開発用設定とシンボルは配布しない。
-# .br/.gz は MapStaticAssets を使う構成向けの事前圧縮で、UseStaticFiles では配信されないため削除する。
-Remove-Item (Join-Path $stage 'appsettings.Development.json') -Force -ErrorAction SilentlyContinue
-Get-ChildItem $stage -Recurse -Include *.pdb, *.br, *.gz -File | Remove-Item -Force
-
-# --- 5. マニフェストの生成 -----------------------------------------------------------
-$manifest = Get-Content $manifestTemplate -Raw -Encoding UTF8
-$manifest = $manifest.
-    Replace('$IdentityName$', $identity.IdentityName).
-    Replace('$Publisher$', $identity.Publisher).
-    Replace('$PublisherDisplayName$', $identity.PublisherDisplayName).
-    Replace('$DisplayName$', [Security.SecurityElement]::Escape($identity.DisplayName)).
-    Replace('$Version$', $Version).
-    Replace('$Architecture$', $Architecture)
-[IO.File]::WriteAllText((Join-Path $stage 'AppxManifest.xml'), $manifest, (New-Object Text.UTF8Encoding($false)))
-
-# --- 6. パッケージ化 -----------------------------------------------------------------
-$msix = Join-Path $OutputDirectory "ParallelFactoryMES_${Version}_$Architecture.msix"
-Write-Host "パッケージ化中: $msix"
-& $makeappx pack /d $stage /p $msix /o | Out-String | Write-Verbose
-if ($LASTEXITCODE -ne 0) { throw "makeappx pack に失敗しました。" }
-
-# --- 7. 自己署名 ---------------------------------------------------------------------
+# --- 3. 署名用の証明書 ---------------------------------------------------------------
 $subject = $identity.Publisher
 
 # 発行元が一致し、秘密鍵を持ち、コード署名用途で、期限内の証明書を使い回す。
-# 作成のたびに証明書を増やさないため、既存があれば新規作成しない。
+# 作成のたびに証明書を増やさないため、既存があれば新規作成しない（全アーキテクチャで同じ証明書を使う）。
 $cert = Get-ChildItem Cert:\CurrentUser\My |
     Where-Object {
         $_.Subject -eq $subject -and $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date) -and
@@ -125,15 +93,48 @@ if (-not $cert) {
     $created = $true
 }
 
-& $signtool sign /fd SHA256 /sha1 $cert.Thumbprint $msix | Out-String | Write-Verbose
-if ($LASTEXITCODE -ne 0) { throw "signtool sign に失敗しました。" }
+# --- 4. アーキテクチャごとに 発行→整理→マニフェスト→パッケージ化→署名 ---------------
+$packages = foreach ($arch in $Architecture) {
+    $stage = Join-Path $OutputDirectory "stage-$arch"
+    if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+    New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
+    Write-Host "発行中: $arch / $Configuration"
+    dotnet publish $project -c $Configuration -r "win-$arch" -o $stage --nologo -v q | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "dotnet publish に失敗しました（$arch）。" }
+
+    # 開発用設定とシンボルは配布しない。
+    # .br/.gz は MapStaticAssets を使う構成向けの事前圧縮で、UseStaticFiles では配信されないため削除する。
+    Remove-Item (Join-Path $stage 'appsettings.Development.json') -Force -ErrorAction SilentlyContinue
+    Get-ChildItem $stage -Recurse -Include *.pdb, *.br, *.gz -File | Remove-Item -Force
+
+    $manifest = Get-Content $manifestTemplate -Raw -Encoding UTF8
+    $manifest = $manifest.
+        Replace('$IdentityName$', $identity.IdentityName).
+        Replace('$Publisher$', $identity.Publisher).
+        Replace('$PublisherDisplayName$', $identity.PublisherDisplayName).
+        Replace('$DisplayName$', [Security.SecurityElement]::Escape($identity.DisplayName)).
+        Replace('$Version$', $Version).
+        Replace('$Architecture$', $arch)
+    [IO.File]::WriteAllText((Join-Path $stage 'AppxManifest.xml'), $manifest, (New-Object Text.UTF8Encoding($false)))
+
+    $msix = Join-Path $OutputDirectory "ParallelFactoryMES_${Version}_$arch.msix"
+    Write-Host "パッケージ化中: $msix"
+    & $makeappx pack /d $stage /p $msix /o | Out-String | Write-Verbose
+    if ($LASTEXITCODE -ne 0) { throw "makeappx pack に失敗しました（$arch）。" }
+
+    & $signtool sign /fd SHA256 /sha1 $cert.Thumbprint $msix | Out-String | Write-Verbose
+    if ($LASTEXITCODE -ne 0) { throw "signtool sign に失敗しました（$arch）。" }
+
+    $msix
+}
+
+# --- 5. 結果の表示 -------------------------------------------------------------------
 $trusted = Get-ChildItem Cert:\LocalMachine\TrustedPeople -ErrorAction SilentlyContinue |
     Where-Object { $_.Thumbprint -eq $cert.Thumbprint }
 
 Write-Host ""
-Write-Host "署名しました: $msix"
-Write-Host "  証明書: $($cert.Thumbprint)$(if ($created) { ' (新規作成)' } else { ' (既存を再利用)' })"
+Write-Host "署名の証明書: $($cert.Thumbprint)$(if ($created) { ' (新規作成)' } else { ' (既存を再利用)' })"
 
 if (-not $trusted) {
     Write-Host ""
@@ -143,12 +144,14 @@ if (-not $trusted) {
 }
 
 Write-Host ""
-Write-Host "インストール:"
-Write-Host "  Add-AppxPackage -Path '$msix'"
+Write-Host "インストール（使うPCのアーキテクチャに合うもの）:"
+foreach ($msix in $packages) { Write-Host "  Add-AppxPackage -Path '$msix'" }
 Write-Host "アンインストール:"
 Write-Host "  Get-AppxPackage *ParallelFactoryMES* | Remove-AppxPackage"
 
-$size = [Math]::Round((Get-Item $msix).Length / 1MB, 1)
 Write-Host ""
-Write-Host "完了: $msix ($size MB)"
-Write-Host "ストアへはこのパッケージを Partner Center にアップロードしてください（署名は Microsoft Store のものに置き換わります）。"
+foreach ($msix in $packages) {
+    $size = [Math]::Round((Get-Item $msix).Length / 1MB, 1)
+    Write-Host "完了: $msix ($size MB)"
+}
+Write-Host "ストアへはこれらのパッケージを同じ申請で Partner Center にアップロードしてください（署名は Microsoft Store のものに置き換わります）。"
