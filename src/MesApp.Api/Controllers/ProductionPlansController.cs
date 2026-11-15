@@ -57,7 +57,7 @@ public class ProductionPlansController(
             return error;
         }
         var csv = MasterCsvService.FormatProductionPlans(plans!);
-        return File(CsvFile.ToUtf8Bom(csv), "text/csv; charset=utf-8", $"production-plans_{DateTime.Now:yyyyMMdd}.csv");
+        return File(CsvFile.ToUtf8Bom(csv), "text/csv; charset=utf-8", $"production-plans_{businessDate.ToFactoryTime(DateTimeOffset.UtcNow):yyyyMMdd}.csv");
     }
 
     /// <summary>

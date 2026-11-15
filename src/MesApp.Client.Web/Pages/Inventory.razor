@@ -220,7 +220,7 @@ else if (_tab == "expiring")
                             <td>@stock.Quantity</td>
                             <td>
                                 @stock.ExpiresOn?.ToString("yyyy-MM-dd")
-                                @if (stock.ExpiresOn < DateOnly.FromDateTime(DateTime.Today))
+                                @if (stock.ExpiresOn < _today)
                                 {
                                     <span class="badge badge-danger">@L["期限切れ"]</span>
                                 }
@@ -300,9 +300,20 @@ else
     private string? _message;
     private bool _busy;
 
+    // 期限切れの判定に使う「今日」。APIの使用可否判定（LotUsabilityPolicy）と同じ製造日でそろえる（Spec.md 3.9）
+    private DateOnly _today = DateOnly.FromDateTime(DateTime.Today);
+
     protected override async Task OnInitializedAsync()
     {
-        _locations = await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
+        try
+        {
+            _today = (await Http.GetFromJsonAsync<BusinessDateResponse>("api/business-date"))!.Today;
+        }
+        catch (HttpRequestException)
+        {
+            // 取得できないときは端末の日付のまま表示する（表示のバッジだけに使い、可否の判定はAPIが行う）
+        }
+        _locations =await Http.GetFromJsonAsync<List<LocationResponse>>("api/locations") ?? [];
         await LoadStocksAsync();
     }
 
