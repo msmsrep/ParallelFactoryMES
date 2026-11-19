@@ -111,6 +111,26 @@ body {
   padding: 3px 12px;
 }
 .intro-link:hover { background: var(--accent-soft); }
+
+/* 言語の切替（日本語版 ⇔ 英語版。docs-dev/GuideEnPlan.md） */
+.lang-link {
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.lang-link:hover { color: var(--accent); text-decoration: underline; }
+/* 英語版の目次で、英訳がまだ無く日本語版へ飛ぶページの印 */
+.ja-only {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: 4px;
+  vertical-align: 1px;
+}
 /* 狭い画面では導線を優先し、「ユーザーガイド」の副題を隠す */
 @media (max-width: 480px) {
   .brand-sub { display: none; }

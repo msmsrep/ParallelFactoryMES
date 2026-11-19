@@ -1,0 +1,32 @@
+# レイアウト（_layouts/default.html）の文言。言語ごと（docs-dev/GuideEnPlan.md）
+ja:
+  site_title: Parallel Factory MES ユーザーガイド
+  site_description: 製造実績管理システム Parallel Factory MES の操作マニュアル
+  skip: 本文へスキップ
+  menu: メニュー
+  brand_sub: ユーザーガイド
+  intro_link: 紹介ページ
+  nav_label: ガイド目次
+  pager_label: ページ送り
+  foot_version: Parallel Factory MES ユーザーガイド ／ 対象バージョン：Phase 1〜7
+  foot_support: 開発のサポート：
+  # 相手の言語へのリンク（言語名は訳さない）
+  lang_switch: English
+  lang_switch_code: en
+  ja_only: ""
+  ja_only_title: ""
+en:
+  site_title: Parallel Factory MES User Guide
+  site_description: User manual for Parallel Factory MES, a manufacturing execution system
+  skip: Skip to content
+  menu: Menu
+  brand_sub: User Guide
+  intro_link: Overview
+  nav_label: Guide contents
+  pager_label: Page navigation
+  foot_version: Parallel Factory MES User Guide / Covers Phase 1–7
+  foot_support: "Support development: "
+  lang_switch: 日本語
+  lang_switch_code: ja
+  ja_only: JA
+  ja_only_title: Not yet translated. Opens the Japanese page.

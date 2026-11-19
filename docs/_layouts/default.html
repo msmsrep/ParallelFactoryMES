@@ -1,31 +1,55 @@
+{%- comment -%}
+  ガイド共通のレイアウト。日本語版（docs/）と英語版（docs/en/）の両方で使う（docs-dev/GuideEnPlan.md）。
+  - 言語は page.lang（en/ 配下は _config.yml の defaults で en）。文言は _data/ui.yml、目次は _data/nav.yml
+  - 英語版がまだ無いページへのリンクは、出力の href を日本語版（../<ファイル名>）に差し替える
+{%- endcomment -%}
+{%- assign lang = page.lang | default: site.lang -%}
+{%- assign ui = site.data.ui[lang] -%}
+{%- assign root = page.root | default: "" -%}
+{%- assign en_pages = site.pages | where: "dir", "/en/" -%}
+{%- capture untranslated -%}{%- for g in site.data.nav.en -%}{%- for i in g.items -%}{%- assign hit = en_pages | where: "nav_url", i.url | first -%}{%- unless hit -%}{{ i.url }} {% endunless -%}{%- endfor -%}{%- endfor -%}{%- endcapture -%}
+{%- assign untranslated = untranslated | split: " " -%}
+{%- if lang == "en" -%}
+  {%- assign switch_url = "../" | append: page.nav_url -%}
+{%- else -%}
+  {%- assign counterpart = en_pages | where: "nav_url", page.nav_url | first -%}
+  {%- if counterpart -%}{%- assign switch_url = "en/" | append: page.nav_url -%}{%- else -%}{%- assign switch_url = nil -%}{%- endif -%}
+{%- endif -%}
+{%- capture body -%}
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="{{ lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% if page.title and page.url != "/" %}{{ page.title }} | {% endif %}{{ site.title }}</title>
-<meta name="description" content="{{ page.description | default: site.description }}">
-<link rel="stylesheet" href="assets/style.css">
+<title>{% if page.title and page.nav_url != "index.html" %}{{ page.title }} | {% endif %}{{ ui.site_title }}</title>
+<meta name="description" content="{{ page.description | default: ui.site_description }}">
+<link rel="stylesheet" href="{{ root }}assets/style.css">
+{%- if switch_url %}
+<link rel="alternate" hreflang="{{ ui.lang_switch_code }}" href="{{ switch_url }}">
+{%- endif %}
 </head>
 <body>
-<a class="skip" href="#main">本文へスキップ</a>
+<a class="skip" href="#main">{{ ui.skip }}</a>
 
 <header class="topbar">
-  <button class="menu-toggle" aria-label="メニュー" onclick="document.body.classList.toggle('nav-open')">☰</button>
+  <button class="menu-toggle" aria-label="{{ ui.menu }}" onclick="document.body.classList.toggle('nav-open')">☰</button>
   <a class="brand" href="index.html">Parallel Factory <strong>MES</strong></a>
-  <span class="brand-sub">ユーザーガイド</span>
-  <a class="intro-link" href="intro.html">紹介ページ<span aria-hidden="true"> &rarr;</span></a>
+  <span class="brand-sub">{{ ui.brand_sub }}</span>
+  <a class="intro-link" href="intro.html">{{ ui.intro_link }}<span aria-hidden="true"> &rarr;</span></a>
+  {%- if switch_url %}
+  <a class="lang-link" href="{{ switch_url }}" hreflang="{{ ui.lang_switch_code }}" lang="{{ ui.lang_switch_code }}">{{ ui.lang_switch }}</a>
+  {%- endif %}
 </header>
 
 <div class="shell">
-  <nav class="sidebar" aria-label="ガイド目次">
-    {% for group in site.nav %}
+  <nav class="sidebar" aria-label="{{ ui.nav_label }}">
+    {% for group in site.data.nav[lang] %}
     <div class="nav-group">
       <div class="nav-section">{{ group.section }}</div>
       <ul>
         {% for item in group.items %}
         <li>
-          <a href="{{ item.url }}"{% if page.nav_url == item.url %} class="current" aria-current="page"{% endif %}>{{ item.title }}</a>
+          <a href="{{ item.url }}"{% if page.nav_url == item.url %} class="current" aria-current="page"{% endif %}>{{ item.title }}{% if lang == "en" and untranslated contains item.url %} <span class="ja-only" title="{{ ui.ja_only_title }}">{{ ui.ja_only }}</span>{% endif %}</a>
         </li>
         {% endfor %}
       </ul>
@@ -40,16 +64,25 @@
       {{ content }}
     </article>
 
-    <nav class="pager" aria-label="ページ送り">
+    <nav class="pager" aria-label="{{ ui.pager_label }}">
       {% if page.prev_url %}<a class="prev" href="{{ page.prev_url }}">&larr; {{ page.prev_title }}</a>{% endif %}
       {% if page.next_url %}<a class="next" href="{{ page.next_url }}">{{ page.next_title }} &rarr;</a>{% endif %}
     </nav>
 
     <footer class="foot">
-      <p>Parallel Factory MES ユーザーガイド ／ 対象バージョン：Phase 1〜7</p>
-      <p>開発のサポート：<a href="https://github.com/sponsors/msmsrep">GitHub Sponsors</a> ／ <a href="https://ko-fi.com/msmsrep">Ko-fi</a></p>
+      <p>{{ ui.foot_version }}</p>
+      <p>{{ ui.foot_support }}<a href="https://github.com/sponsors/msmsrep">GitHub Sponsors</a> ／ <a href="https://ko-fi.com/msmsrep">Ko-fi</a></p>
     </footer>
   </main>
 </div>
 </body>
 </html>
+{%- endcapture -%}
+{%- if lang == "en" -%}
+  {%- for u in untranslated -%}
+    {%- assign from = 'href="' | append: u -%}
+    {%- assign to = 'href="../' | append: u -%}
+    {%- assign body = body | replace: from, to -%}
+  {%- endfor -%}
+{%- endif -%}
+{{ body }}

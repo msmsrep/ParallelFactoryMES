@@ -1,0 +1,47 @@
+# ユーザーガイド英訳（docs/）バックログ
+
+アプリ本体の英語対応（`docs-dev/I18nPlan.md` の I18N-01〜10）は済んでいる。残っているユーザーガイド（`docs/`。GitHub Pages）を英語でも出す。
+1項目＝1セッションで進める（`Orchestration.md` §4.1）。MES.md の業務プロセスには当たらない（文書の整備）。アプリの仕様は変わらないので Spec.md は更新しない（GEN-12 で About 画面のリンクを変えるときだけ 7.9節に1行足す）。
+
+着手時点の規模（2026-11-19 計測）：Markdown 17ページ（約3,400行）、独立HTML 2ページ（`intro.html` 493行・`factory-tour.html` 84行）、
+工場模型のスクリプト（`assets/tour/scenes.js`・`tour.js`）の日本語を含む行が約310、画面写真 19枚（紹介ページ 11・サンプル 8）。
+
+## 決定事項
+
+| 論点 | 決定 | 理由 |
+|:--|:--|:--|
+| 置き場所 | `docs/en/<同じファイル名>` に英語版を置く。日本語版は今の場所のまま | 既存のURL（Store 掲載のプライバシーポリシー・紹介ページ・About 画面のリンク）を変えずに済む。ページ間の相対リンクが en/ の中でもそのまま通る |
+| 共通の部品 | `_layouts/default.html` は1つのまま、`page.lang` で切り替える。レイアウトの文言（本文へスキップ・目次・フッター等）は `_data/ui.yml` に ja/en で持つ。目次は `_config.yml` の `nav` を `_data/nav.yml` の ja/en に移す | レイアウトを2つにすると片方だけ直してずれる |
+| 資産のパス | `_config.yml` の `defaults` で `en/` 配下に `lang: en`・`root: ../` を与え、レイアウトは `{{ page.root }}assets/...` で参照する | baseurl を使わない今の方針（相対リンク）を保つ |
+| 言語の切替 | ヘッダーに「English / 日本語」のリンクを置き、同じファイル名の相手ページへ飛ぶ | ページの対応がファイル名で決まるので対応表が要らない |
+| 用語 | 画面のボタン名・項目名・区分値は **`UiText.en.resx` / `EnumLabels` の英訳と一字一句同じ**にする。ガイドの中で独自に訳さない | 画面と手順書の表記がずれると操作できない |
+| 画面写真 | 英語表示で撮り直し、`assets/en/intro/`・`assets/en/walkthrough/` に置く（撮り方は既存の手順どおり。言語は localStorage で en にする）。**サンプルデータの値（品目名など）は日本語のまま**（マスタの値は訳さない方針。I18nPlan の決定事項） | 画面の文言が本文と一致する。データの英語化は別の話でスキーマにも触れる |
+| 同期の規則 | 日本語版を変えたら同じコミットで英語版も直す。CLAUDE.md に1行足す（GEN-12） | 片方だけ古くなるのを防ぐ |
+| 点検 | `scripts/GuideEnCheck.ps1` を作る：ja/en のページの対応（片方だけのページ）、前付け（`nav_url`・`prev_url`・`next_url`）の一致、en 側に残った日本語、相対リンク・画像の切れ。取りこぼしがあれば終了コード 1 | `I18nCheck.ps1` と同じく機械で拾う |
+| 翻訳しないもの | 列キー・コマンド・ファイル名・URL・コード例、サンプルデータの値 | アプリの入出力そのものなので |
+
+## バックログ
+
+| ID | 項目 | 対象（行数） | 状態 |
+|:--|:--|:--|:--|
+| GEN-01 | 基盤：`en/` の defaults、レイアウトの言語切替、`_data/ui.yml`・`_data/nav.yml`、`GuideEnCheck.ps1`、`index.md` と `privacy.md` の英訳（Store の英語掲載にも使う）、`jekyll build` で両言語の表示確認 | index・privacy（174） | **対応済**（英語版がまだ無いページへのリンクは、レイアウトが出力の `href` を `../<ファイル名>` に差し替え、目次に「JA」の印を付ける。本文は最終形の相対リンクで書けばよい。日本語版の出力は言語切替のリンク以外変わらないことを旧版のビルドと比べて確認。英語版プライバシーポリシーには「日本語版が優先」の1文を入れた） |
+| GEN-02 | はじめに | getting-started・basics・roles（333） | 未着手 |
+| GEN-03 | マスタ管理 | masters（364） | 未着手 |
+| GEN-04 | 生産管理・製造実行 | production・execution（486） | 未着手 |
+| GEN-05 | 物流・品質保証 | logistics・assurance（343） | 未着手 |
+| GEN-06 | 品質管理・設備保全 | quality・maintenance（409） | 未着手 |
+| GEN-07 | 共通機能・資料 | reports・reference・troubleshooting（381） | 未着手 |
+| GEN-08 | 管理者向け運用 | operations（391） | 未着手 |
+| GEN-09 | サンプルで見る製造から出荷まで＋英語の画面写真 8枚 | walkthrough（528） | 未着手 |
+| GEN-10 | 紹介ページ＋英語の画面写真 11枚（独立HTML。サイドバーなし） | intro.html（493） | 未着手 |
+| GEN-11 | 工場模型：`scenes.js`・`tour.js` の文言を言語ごとのデータに分け、`en/factory-tour.html` を作る | factory-tour・tour/*.js（約310行分） | 未着手 |
+| GEN-12 | 仕上げ：About 画面のガイドへのリンクを表示言語で切替（`L[...]` で URL を持たず、言語で分岐。Spec.md 7.9 に1行）、Readme・`docs-dev/StoreListing.md` に英語版URL、CLAUDE.md に同期の規則、`GuideEnCheck.ps1` を全緑にする | — | 未着手 |
+
+順序：GEN-01 が先（他はこれに乗る）。GEN-02〜11 は互いに独立で、どの順でもよい。GEN-12 は最後。
+
+## 各項目の受入基準
+
+- `jekyll build -s docs -d "$env:TEMP\mes-docs-site"` が警告なしで通る
+- `./scripts/GuideEnCheck.ps1` が対象ページについて0件（GEN-01 以降）
+- 英語版の画面名・ボタン名を `UiText.en.resx` と照合した（grep で確認）
+- 日本語版の表示が変わっていない（レイアウトを触る GEN-01・GEN-11 は両言語を目視）
