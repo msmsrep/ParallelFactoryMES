@@ -11,9 +11,10 @@
       3. 英語版に残った日本語（かな・漢字）。訳さない行には「<!-- 訳さない -->」を書く
       4. 英語版の相対リンク・画像の切れ（英語版がまだ無いページへのリンクは除く。レイアウトが日本語版へ差し替える）
       5. 目次（_data/nav.yml）の ja と en で url の並びが違う
+      6. 工場模型の英訳（assets/tour/scenes.en.js）が場面データ（scenes.js）と合わない・日本語が残る（Node で読む）
 
     参考として出すもの（-Strict のときだけ終了コード 1）:
-      6. 英語版がまだ無いページ（日本語版だけのページ）
+      7. 英語版がまだ無いページ（日本語版だけのページ）
 
 .EXAMPLE
     ./scripts/GuideEnCheck.ps1
@@ -107,7 +108,37 @@ if (($navUrls.ja -join ',') -ne ($navUrls.en -join ',')) {
     $navDiff += "en: $($navUrls.en -join ', ')"
 }
 
-# 6. 英語版がまだ無いページ
+# 6. 工場模型の英訳（assets/tour/scenes.en.js）と場面データ（scenes.js）の対応。
+#    scenes.en.js は読み込み時に食い違いを TOUR_DATA.translationErrors に積むので、Node で読ませて取り出す
+$tour = @()
+$tourDir = Join-Path $docs 'assets' 'tour'
+if (Test-Path (Join-Path $tourDir 'scenes.en.js')) {
+    if (Get-Command node -ErrorAction SilentlyContinue) {
+        $script = @'
+const vm = require('vm'), fs = require('fs'), path = require('path');
+const ctx = { window: {}, console: { error() {} } };
+vm.createContext(ctx);
+for (const f of ['scenes.js', 'scenes.en.js']) vm.runInContext(fs.readFileSync(path.join(process.argv[2], f), 'utf8'), ctx);
+const data = ctx.window.TOUR_DATA, errors = data.translationErrors.slice();
+// 上書きした後に日本語が残っている文言（英訳の漏れ）
+(function walk(o, p) {
+    if (typeof o === 'string') { if (/[぀-ヿ一-鿿]/.test(o)) errors.push(p + ': ' + o); return; }
+    if (o && typeof o === 'object') for (const k of Object.keys(o)) if (k !== 'translationErrors') walk(o[k], p ? p + '.' + k : k);
+})(data, '');
+process.stdout.write(errors.join('\n'));
+'@
+        # node の出力は UTF-8。既定（日本語版 Windows は CP932）のまま受けると文字化けする
+        $saved = [Console]::OutputEncoding
+        [Console]::OutputEncoding = [Text.Encoding]::UTF8
+        try { $out = $script | node - $tourDir 2>&1 } finally { [Console]::OutputEncoding = $saved }
+        if ($LASTEXITCODE -ne 0) { $tour += "scenes.js / scenes.en.js を読めません: $out" }
+        elseif ($out) { $tour += @($out -split "`n" | Where-Object { $_ }) }
+    } else {
+        Write-Warning 'node が無いので、工場模型の英訳の点検を飛ばします。'
+    }
+}
+
+# 7. 英語版がまだ無いページ
 $untranslated = @($jaNames.Keys | Where-Object { -not $enNames.ContainsKey($_) } | Sort-Object)
 
 # ---- 報告 ----
@@ -120,9 +151,10 @@ Write-Section '前付けのずれ' $frontMatter
 Write-Section '英語版に残った日本語' $japanese
 Write-Section '切れたリンク・画像' $broken
 Write-Section '目次（_data/nav.yml）の ja/en のずれ' $navDiff
+Write-Section '工場模型の英訳（assets/tour/scenes.en.js）のずれ' $tour
 Write-Section ('英語版がまだ無いページ' + ($Strict ? '' : '（参考）')) $untranslated
 
-$errors = $orphans.Count + $frontMatter.Count + $japanese.Count + $broken.Count + $navDiff.Count
+$errors = $orphans.Count + $frontMatter.Count + $japanese.Count + $broken.Count + $navDiff.Count + $tour.Count
 if ($Strict) { $errors += $untranslated.Count }
 if ($errors -gt 0) { exit 1 }
 Write-Host '取りこぼしはありません。'

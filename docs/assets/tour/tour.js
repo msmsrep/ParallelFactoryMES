@@ -4,6 +4,75 @@
   'use strict';
 
   var data = window.TOUR_DATA;
+
+  // 画面の文言（ページの lang で選ぶ）。場面の文言は scenes.js（日本語）と scenes.en.js（英語の上書き）に持つ
+  var TEXT = {
+    ja: {
+      server: 'MES サーバー',
+      normal: '正常',
+      join: '・',
+      status: '状態',
+      orderHead: '製造指図・作業指示の状態',
+      orderCol: '指図・作業指示',
+      showAll: 'すべて表示',
+      collapse: '畳む',
+      sep: '：',
+      added: '新規 ',
+      bandEmpty: 'この場面で変わった記録がここに出ます。',
+      bandHead: 'この場面で変わった記録',
+      count: function (no, total) { return '場面 ' + no + '／' + total; },
+      railTitle: function (no, title) { return '場面 ' + no + ' ' + title; },
+      floorHead: '現場で起きること',
+      inputHead: '誰がどの画面に',
+      effectsHead: 'MES で変わること',
+      noteHead: '見どころ',
+      detail: '詳しく見る →',
+      gauge: function (g) { return g.name + '　' + g.values.join('・') + ' ' + g.unit + '（規格 ' + g.min + '〜' + g.max + '）'; },
+      traceGroup: 'たどる向き',
+      announce: function (scene, total) { return '場面 ' + scene.no + '／' + total + ' ' + scene.title + '。' + scene.floor; },
+      overview: '工場の全景。受入から加工、外注、組立、検査、梱包を経て出荷までの配置',
+      labelGroup: '模型のラベルの表示',
+      labelName: 'ラベル',
+      labelPart: '部分',
+      labelAll: '全部',
+      legend: { material: '部材', semi: '半製品', product: '製品', rework: '再作業待ち' },
+      play: '再生',
+      pause: '一時停止'
+    },
+    en: {
+      server: 'MES server',
+      normal: 'Normal',
+      join: ', ',
+      status: 'Status',
+      orderHead: 'Manufacturing order and work order status',
+      orderCol: 'Order / work order',
+      showAll: 'Show all',
+      collapse: 'Collapse',
+      sep: ': ',
+      added: 'new ',
+      bandEmpty: 'The records changed in this scene appear here.',
+      bandHead: 'Records changed in this scene',
+      count: function (no, total) { return 'Scene ' + no + ' / ' + total; },
+      railTitle: function (no, title) { return 'Scene ' + no + ' ' + title; },
+      floorHead: 'On the shop floor',
+      inputHead: 'Who enters what, on which screen',
+      effectsHead: 'What changes in the MES',
+      noteHead: 'Worth noting',
+      detail: 'See the details →',
+      gauge: function (g) { return g.name + '  ' + g.values.join(', ') + ' ' + g.unit + ' (spec ' + g.min + '–' + g.max + ')'; },
+      traceGroup: 'Trace direction',
+      announce: function (scene, total) { return 'Scene ' + scene.no + ' / ' + total + ' ' + scene.title + '. ' + scene.floor; },
+      overview: 'Overview of the factory: the layout from receiving through machining, subcontracting, assembly, inspection and packing to shipping',
+      labelGroup: 'Labels shown on the model',
+      labelName: 'Labels',
+      labelPart: 'Some',
+      labelAll: 'All',
+      legend: { material: 'Material', semi: 'Semi-finished', product: 'Product', rework: 'Awaiting rework' },
+      play: 'Play',
+      pause: 'Pause'
+    }
+  };
+  var T = TEXT[document.documentElement.lang === 'en' ? 'en' : 'ja'];
   var svg = document.getElementById('tour-svg');
   var NS = 'http://www.w3.org/2000/svg';
 
@@ -424,7 +493,7 @@
     var g = el('g', { class: 'label label-pin is-hidden' }, layers.labels);
     var bg = el('rect', { rx: 4, ry: 4 }, g);
     var t = el('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, g);
-    t.textContent = 'MES サーバー';
+    t.textContent = T.server;
     pin = { g: g, bg: bg, text: t, x: 0, y: 0 };
   }
 
@@ -457,7 +526,7 @@
     (scene.effects || []).forEach(function (e) {
       if (e.lot && e.delta !== undefined) {
         state.lots[e.lot] = round((state.lots[e.lot] || 0) + e.delta);
-        state.lotStatus[e.lot] = state.lotStatus[e.lot] || '正常';
+        state.lotStatus[e.lot] = state.lotStatus[e.lot] || T.normal;
       }
       if (e.lot && e.status) state.lotStatus[e.lot] = e.status;
       if (e.mo) state.mos[e.mo] = e.status;
@@ -558,7 +627,7 @@
       entry.labelAt = entry.labelAt || a.labelAt;
     });
     return Object.keys(byZone).map(function (at) {
-      return { at: at, text: byZone[at].tags.join('・'), labelAt: byZone[at].labelAt };
+      return { at: at, text: byZone[at].tags.join(T.join), labelAt: byZone[at].labelAt };
     });
   }
 
@@ -620,13 +689,13 @@
       lotBody.appendChild(tr);
     });
     var statusHead = document.createElement('th');
-    statusHead.textContent = '状態';
+    statusHead.textContent = T.status;
     lotBody.closest('table').tHead.rows[0].appendChild(statusHead);
 
     var orderBody = document.getElementById('tour-ledger-orders');
     var orderCol = orderBody.closest('.tour-ledger-col');
-    orderCol.querySelector('h2').textContent = '製造指図・作業指示の状態';
-    orderBody.closest('table').tHead.rows[0].cells[0].textContent = '指図・作業指示';
+    orderCol.querySelector('h2').textContent = T.orderHead;
+    orderBody.closest('table').tHead.rows[0].cells[0].textContent = T.orderCol;
     data.manufacturingOrders.forEach(function (mo) {
       var tr = document.createElement('tr');
       tr.className = 'tour-ledger-mo';
@@ -648,11 +717,11 @@
     var toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'tour-ledger-toggle';
-    toggle.textContent = 'すべて表示';
+    toggle.textContent = T.showAll;
     toggle.setAttribute('aria-expanded', 'false');
     toggle.addEventListener('click', function () {
       var collapsed = ledgerEl.classList.toggle('is-collapsed');
-      toggle.textContent = collapsed ? 'すべて表示' : '畳む';
+      toggle.textContent = collapsed ? T.showAll : T.collapse;
       toggle.setAttribute('aria-expanded', String(!collapsed));
     });
     ledgerEl.classList.add('is-collapsed');
@@ -666,20 +735,20 @@
     var list = [];
     data.lots.forEach(function (l) {
       var from = before.lots[l.lot], to = after.lots[l.lot];
-      if (from !== to) list.push({ row: ledger.lots[l.lot], text: l.lot + ' ' + l.name + '：' + (from === undefined ? '新規 ' + lotText(l.lot, to) : from + ' → ' + lotText(l.lot, to)) });
+      if (from !== to) list.push({ row: ledger.lots[l.lot], text: l.lot + ' ' + l.name + T.sep + (from === undefined ? T.added + lotText(l.lot, to) : from + ' → ' + lotText(l.lot, to)) });
       (scene.effects || []).forEach(function (e) {
         if (e.lot === l.lot && e.status) {
-          list.push({ row: ledger.lots[l.lot], text: l.lot + ' ' + l.name + '：' + (e.from || before.lotStatus[l.lot]) + ' → ' + e.status });
+          list.push({ row: ledger.lots[l.lot], text: l.lot + ' ' + l.name + T.sep + (e.from || before.lotStatus[l.lot]) + ' → ' + e.status });
         }
       });
     });
     data.manufacturingOrders.forEach(function (mo) {
       var from = before.mos[mo], to = after.mos[mo];
-      if (from !== to) list.push({ row: ledger.mos[mo], text: mo + '：' + (from === undefined ? to : from + ' → ' + to) });
+      if (from !== to) list.push({ row: ledger.mos[mo], text: mo + T.sep + (from === undefined ? to : from + ' → ' + to) });
     });
     data.orders.forEach(function (wo) {
       var from = before.orders[wo], to = after.orders[wo];
-      if (from !== to) list.push({ row: ledger.orders[wo], text: wo + '：' + (from === undefined ? to : from + ' → ' + to) });
+      if (from !== to) list.push({ row: ledger.orders[wo], text: wo + T.sep + (from === undefined ? to : from + ' → ' + to) });
     });
     return list;
   }
@@ -736,12 +805,12 @@
     if (!scene) {
       var empty = document.createElement('p');
       empty.className = 'text-note';
-      empty.textContent = 'この場面で変わった記録がここに出ます。';
+      empty.textContent = T.bandEmpty;
       bandEl.appendChild(empty);
       return;
     }
     var heading = document.createElement('h2');
-    heading.textContent = 'この場面で変わった記録';
+    heading.textContent = T.bandHead;
     bandEl.appendChild(heading);
     var list = document.createElement('ul');
     list.className = revealed ? 'is-flash' : 'is-pending';
@@ -832,11 +901,11 @@
       return;
     }
     sideBody.textContent = '';
-    node('p', 'tour-count', '場面 ' + scene.no + '／' + scenes.length, sideBody);
+    node('p', 'tour-count', T.count(scene.no, scenes.length), sideBody);
     node('h1', '', scene.title, sideBody);
     if (scene.when) node('p', 'tour-when', scene.when, sideBody);
 
-    node('h2', '', '現場で起きること', sideBody);
+    node('h2', '', T.floorHead, sideBody);
     node('p', '', scene.floor, sideBody);
     if (scene.alerts && scene.alerts.length) {
       var alerts = node('ul', 'tour-alerts', undefined, sideBody);
@@ -846,7 +915,7 @@
     if (scene.trace) renderTraceChoice(scene);
 
     var input = node('div', 'tour-section tour-section-input', undefined, sideBody);
-    node('h2', '', '誰がどの画面に', input);
+    node('h2', '', T.inputHead, input);
     scene.input.forEach(function (i) {
       var p = node('p', '', undefined, input);
       node('strong', 'tour-who role-' + people[i.who].role, i.who, p);
@@ -855,16 +924,16 @@
     });
 
     var effects = node('div', 'tour-section tour-section-effects', undefined, sideBody);
-    node('h2', '', 'MES で変わること', effects);
+    node('h2', '', T.effectsHead, effects);
     var list = node('ul', 'tour-effects', undefined, effects);
     changeTexts(scene, changes).forEach(function (text) { node('li', '', text, list); });
 
     if (scene.note) {
-      node('h2', '', '見どころ', sideBody);
+      node('h2', '', T.noteHead, sideBody);
       node('p', '', scene.note, sideBody);
     }
     if (scene.detail) {
-      var link = node('a', 'tour-detail', '詳しく見る →', sideBody);
+      var link = node('a', 'tour-detail', T.detail, sideBody);
       link.href = scene.detail.href;
       if (scene.detail.image) {
         var photo = node('a', 'tour-photo', undefined, sideBody);
@@ -881,7 +950,7 @@
   function renderGauges(gauges) {
     var box = node('div', 'tour-gauges', undefined, sideBody);
     gauges.forEach(function (g) {
-      node('p', 'tour-gauge-name', g.name + '　' + g.values.join('・') + ' ' + g.unit + '（規格 ' + g.min + '〜' + g.max + '）', box);
+      node('p', 'tour-gauge-name', T.gauge(g), box);
       var bar = node('div', 'tour-gauge', undefined, box);
       bar.setAttribute('aria-hidden', 'true');
       node('i', 'tour-gauge-band', undefined, bar);
@@ -901,7 +970,7 @@
   function renderTraceChoice(scene) {
     var group = node('div', 'tour-label-mode tour-trace-mode', undefined, sideBody);
     group.setAttribute('role', 'group');
-    group.setAttribute('aria-label', 'たどる向き');
+    group.setAttribute('aria-label', T.traceGroup);
     var list = node('ul', 'tour-effects', undefined, sideBody);
     var choices = Object.keys(scene.trace).map(function (key) {
       var button = node('button', '', scene.trace[key].name, group);
@@ -929,8 +998,8 @@
 
   function announce(scene) {
     var text = scene
-      ? '場面 ' + scene.no + '／' + scenes.length + ' ' + scene.title + '。' + scene.floor
-      : '工場の全景。受入から加工、外注、組立、検査、梱包を経て出荷までの配置';
+      ? T.announce(scene, scenes.length)
+      : T.overview;
     svg.setAttribute('aria-label', text);
     liveEl.textContent = scene ? text : '';
   }
@@ -1221,7 +1290,7 @@
       var li = document.createElement('li');
       var button = document.createElement('button');
       button.type = 'button';
-      button.title = '場面 ' + scene.no + ' ' + scene.title;
+      button.title = T.railTitle(scene.no, scene.title);
       button.setAttribute('aria-label', button.title);
       button.addEventListener('click', function () {
         playing = false;
@@ -1244,9 +1313,9 @@
     var group = document.createElement('div');
     group.className = 'tour-label-mode';
     group.setAttribute('role', 'group');
-    group.setAttribute('aria-label', '模型のラベルの表示');
-    node('span', 'tour-label-mode-name', 'ラベル', group);
-    var choices = [['part', '部分'], ['all', '全部']].map(function (c) {
+    group.setAttribute('aria-label', T.labelGroup);
+    node('span', 'tour-label-mode-name', T.labelName, group);
+    var choices = [['part', T.labelPart], ['all', T.labelAll]].map(function (c) {
       var button = node('button', '', c[1], group);
       button.type = 'button';
       button.addEventListener('click', function () {
@@ -1269,7 +1338,7 @@
   function legend() {
     var box = node('div', 'tour-legend', undefined, document.querySelector('.tour-model'));
     box.setAttribute('aria-hidden', 'true');
-    [['material', '部材'], ['semi', '半製品'], ['product', '製品'], ['rework', '再作業待ち']].forEach(function (k) {
+    ['material', 'semi', 'product', 'rework'].map(function (k) { return [k, T.legend[k]]; }).forEach(function (k) {
       var item = node('span', '', undefined, box);
       node('i', 'swatch-' + k[0], undefined, item);
       item.appendChild(document.createTextNode(k[1]));
@@ -1282,7 +1351,7 @@
     buttons.next.disabled = current >= scenes.length - 1;
     buttons.play.textContent = '';
     node('span', '', playing ? '❚❚ ' : '▶ ', buttons.play).setAttribute('aria-hidden', 'true');
-    buttons.play.appendChild(document.createTextNode(playing ? '一時停止' : '再生'));
+    buttons.play.appendChild(document.createTextNode(playing ? T.pause : T.play));
     document.querySelectorAll('#tour-rail button').forEach(function (button, index) {
       button.classList.toggle('is-past', index < current);
       if (index === current) button.setAttribute('aria-current', 'step');
