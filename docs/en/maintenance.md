@@ -128,6 +128,33 @@ The format is the same as for [master data CSVs](masters.html), and the sample i
 
 ---
 
+### Consumables monitoring tab
+
+Totals the parts deducted from stock by maintenance records, per product, alongside current stock.
+Use it to decide whether to replenish replacement parts before they run out.
+
+<ol class="steps">
+<li>Enter a <strong>Start date</strong> and an <strong>End date</strong> (when the tab opens, the last month is filled in).</li>
+<li>Press <strong>Aggregate</strong>.</li>
+</ol>
+
+The list shows the following columns, sorted by quantity consumed (largest first).
+
+| Column | Contents |
+|:--|:--|
+| Product / Name | Product code and name of the deducted part |
+| Qty consumed | Total quantity deducted by maintenance records in the period |
+| Maintenance count | Number of maintenance records that used the part |
+| On hand | Current stock of the product (total across all locations) |
+
+<div class="note">
+<p><strong>Only lines entered under "Parts consumed (deducted from stock)" in maintenance records are counted.</strong>
+Text written in the free-form "Parts consumed / replaced" field is not included.
+The period is judged by the maintenance record's start time, and days are divided at the production-date boundary (6:00 by default).</p>
+</div>
+
+---
+
 ## Tool management  {#tool-management}
 
 **Left menu: Equipment & Maintenance → Tool Management**
