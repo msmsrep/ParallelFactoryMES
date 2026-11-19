@@ -25,7 +25,7 @@
 | ID | 項目 | 対象（行数） | 状態 |
 |:--|:--|:--|:--|
 | GEN-01 | 基盤：`en/` の defaults、レイアウトの言語切替、`_data/ui.yml`・`_data/nav.yml`、`GuideEnCheck.ps1`、`index.md` と `privacy.md` の英訳（Store の英語掲載にも使う）、`jekyll build` で両言語の表示確認 | index・privacy（174） | **対応済**（英語版がまだ無いページへのリンクは、レイアウトが出力の `href` を `../<ファイル名>` に差し替え、目次に「JA」の印を付ける。本文は最終形の相対リンクで書けばよい。日本語版の出力は言語切替のリンク以外変わらないことを旧版のビルドと比べて確認。英語版プライバシーポリシーには「日本語版が優先」の1文を入れた） |
-| GEN-02 | はじめに | getting-started・basics・roles（333） | 未着手 |
+| GEN-02 | はじめに | getting-started・basics・roles（333） | **対応済**（画面名・ボタン名・ロール名は `UiText.en.resx`・`CoreText.en.resx` の訳を引いて合わせた。長いメッセージは引用せず意味で書いた。権限表の英語は列が広がるが、表の中で横に送られページは横に送られない） |
 | GEN-03 | マスタ管理 | masters（364） | 未着手 |
 | GEN-04 | 生産管理・製造実行 | production・execution（486） | 未着手 |
 | GEN-05 | 物流・品質保証 | logistics・assurance（343） | 未着手 |
