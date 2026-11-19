@@ -42,7 +42,7 @@ Right after installation, things go most smoothly in this order.
   <span>Master data</span><em>→</em>
   <span>Receiving (materials)</span><em>→</em>
   <span>Manufacturing order</span><em>→</em>
-  <span>Process expansion</span><em>→</em>
+  <span>Release to processes</span><em>→</em>
   <span>Dispatching</span><em>→</em>
   <span>Setup</span><em>→</em>
   <span>Actuals</span><em>→</em>
@@ -57,7 +57,7 @@ Right after installation, things go most smoothly in this order.
 | Master data | Master Data | System administrator / Production management | [Master data](masters.html) |
 | Receiving | Receiving | Logistics / warehouse | [Logistics and inventory](logistics.html) |
 | Production plan and plan vs. actual | Production Plan vs. Actual | Production management | [Production management](production.html#plan) |
-| Manufacturing orders, approval and process expansion | Manufacturing Orders | Production management | [Production management](production.html) |
+| Manufacturing orders, approval and release to processes | Manufacturing Orders | Production management | [Production management](production.html) |
 | Dispatching, setup, actuals and completion approval | Dispatching / Work Orders | Production management / Operator | [Production execution](execution.html) |
 | Inspection and nonconformances | Inspections / Nonconformances | Quality control | [Quality control](quality.html) |
 | Shipment judgment and tracing | Shipment Judgments / Traceability | Quality assurance | [Quality assurance](assurance.html) |
@@ -69,7 +69,7 @@ using the sample data (manufacturing and shipping 10 gear pumps).
 
 ## What this version can do
 
-- Production management (receiving production plans and comparing plan with actual, manufacturing orders, process expansion, progress)
+- Production management (receiving production plans and comparing plan with actual, manufacturing orders, release to processes, progress)
 - Production execution (dispatching, setups, checklists, actuals, trouble reports)
 - Logistics and inventory (receiving, inventory operations, issuing, shipping, stocktaking)
 - Quality control (inspection orders, results, judgments, nonconformances)

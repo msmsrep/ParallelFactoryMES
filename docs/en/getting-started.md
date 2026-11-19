@@ -129,7 +129,7 @@ and link them to users from "Skills & Qualifications" in each user's row.
 ## What to do next
 
 You need to register master data before you can start work. In particular, unless you register them in the order **Processes → Products → Routings (BOP)**,
-you cannot expand manufacturing orders into processes. Continue to [Master data](masters.html).
+you cannot release manufacturing orders to processes. Continue to [Master data](masters.html).
 
 If you want to try things out first, load the sample data. It gives you a complete set of records from manufacturing order to shipment, plus maintenance, tools, inventory, logistics and nonconformances.
 Import the [master data sample](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)

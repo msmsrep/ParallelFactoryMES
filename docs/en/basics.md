@@ -18,7 +18,7 @@ After you sign in, the screen consists of the menu on the left and the work area
 | Group | Menu | Contents |
 |---|---|---|
 | — | Dashboard | Daily, weekly and monthly trends of the KPIs (defect rate, operating rate) with breakdowns by process, product, shift, line and equipment, and the process progress of manufacturing orders |
-| Production & Execution | Manufacturing Orders | Registering, approving and expanding orders into processes |
+| Production & Execution | Manufacturing Orders | Registering, approving and releasing orders to processes |
 | | Dispatching | Assigning operators, equipment and start order to work orders |
 | | Work Orders | The list of work orders and the entry point to setup and recording results |
 | | Process Progress & Issues | Progress totals by process, trouble reports and their handling history |

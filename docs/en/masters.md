@@ -15,7 +15,7 @@ Switch between the kinds of master data with the tabs at the top of the screen.
 
 <div class="warn">
 <p><strong>The order of registration matters.</strong> You cannot create a routing (BOP) until the processes are registered,
-and you cannot expand a manufacturing order into processes without a routing. Proceed in the following order.</p>
+and you cannot release a manufacturing order to processes without a routing. Proceed in the following order.</p>
 </div>
 
 <div class="flow">
@@ -61,7 +61,7 @@ Register finished products, semi-finished products and components all as "produc
 | Unit | pcs, kg and so on |
 | Product type | Product / Semi-finished / intermediate / Component |
 | Specification | Any specification information |
-| Standard defect rate (%) | When a manufacturing order is expanded, the planned materials are increased by this rate (0–99.99) |
+| Standard defect rate (%) | When a manufacturing order is released, the planned materials are increased by this rate (0–99.99) |
 
 Registered products are shown in the list. Use **Edit** to change them and **Deactivate** to remove them from future choices
 (past actuals are kept).
@@ -90,19 +90,19 @@ Even if you only want to add one line, keep the existing lines and save with the
 
 The MBOM is used for **backflushing** (automatic consumption of components) when recording results.
 If you plan to use backflushing, be sure to register it.
-When a manufacturing order is expanded, the planned materials are created from the MBOM. The planned quantity is **Qty required × order quantity ÷ (1 − standard defect rate)**.
+When a manufacturing order is released, the planned materials are created from the MBOM. The planned quantity is **Qty required × order quantity ÷ (1 − standard defect rate)**.
 Components are also used for units that turn out defective, so extra is allowed for by the parent product's standard defect rate (for example, with Qty required 2, order quantity 10 and standard defect rate 20%, the planned quantity is 25).
 Backflushing consumes each component **only in the work order of its consuming step**, so for components used in assembly, choose the assembly process as the consuming step.
 
 <div class="warn">
-<p>If a consuming step is set to a routing sequence that is not in the routing, the manufacturing order cannot be expanded. When you rebuild a routing, also review the consuming steps in the MBOM (the list shows "(not in routing)").</p>
+<p>If a consuming step is set to a routing sequence that is not in the routing, the manufacturing order cannot be released. When you rebuild a routing, also review the consuming steps in the MBOM (the list shows "(not in routing)").</p>
 </div>
 
 ---
 
 ## ④ Routing (BOP)  {#bop}
 
-This is also edited from **MBOM / Routing** in the product list. **A routing is required to expand a manufacturing order into processes.**
+This is also edited from **MBOM / Routing** in the product list. **A routing is required to release a manufacturing order to processes.**
 
 | Field | Description |
 |---|---|
@@ -112,7 +112,7 @@ This is also edited from **MBOM / Routing** in the product list. **A routing is 
 | Required skill / qualification | The operator's qualifications are checked against this when dispatching |
 | Equipment / Tools used | The default equipment and tools |
 | Checklists | The checklist carried out in this process |
-| Process Control Items | Choose one or more manufacturing conditions to record in this process (temperature, speed and so on) from the process control item master. The set values and tolerances are copied to the expanded work orders and checked against the actuals |
+| Process Control Items | Choose one or more manufacturing conditions to record in this process (temperature, speed and so on) from the process control item master. The set values and tolerances are copied to the released work orders and checked against the actuals |
 | Control item notes | Notes such as checks that have no set value |
 
 Add rows with **Add process** and confirm with **Save routing (replace all)**. As with the MBOM, saving replaces everything.
@@ -361,5 +361,5 @@ after importing. Exported CSVs do not contain passwords.</p>
 
 - Changes to master data are **recorded in the audit log**.
 - Saving an MBOM or routing replaces everything. For a design change, put together the complete changed structure before saving.
-- Changing a routing **does not change work orders that have already been expanded**. The new routing applies to orders expanded after that.
+- Changing a routing **does not change work orders that have already been released**. The new routing applies to orders released after that.
 - Instead of deleting products you no longer use, **deactivate** them. This keeps the links to past actuals and lots.

@@ -27,7 +27,7 @@
 | GEN-01 | 基盤：`en/` の defaults、レイアウトの言語切替、`_data/ui.yml`・`_data/nav.yml`、`GuideEnCheck.ps1`、`index.md` と `privacy.md` の英訳（Store の英語掲載にも使う）、`jekyll build` で両言語の表示確認 | index・privacy（174） | **対応済**（英語版がまだ無いページへのリンクは、レイアウトが出力の `href` を `../<ファイル名>` に差し替え、目次に「JA」の印を付ける。本文は最終形の相対リンクで書けばよい。日本語版の出力は言語切替のリンク以外変わらないことを旧版のビルドと比べて確認。英語版プライバシーポリシーには「日本語版が優先」の1文を入れた） |
 | GEN-02 | はじめに | getting-started・basics・roles（333） | **対応済**（画面名・ボタン名・ロール名は `UiText.en.resx`・`CoreText.en.resx` の訳を引いて合わせた。長いメッセージは引用せず意味で書いた。権限表の英語は列が広がるが、表の中で横に送られページは横に送られない） |
 | GEN-03 | マスタ管理 | masters（364） | **対応済**（他ページから張られる見出しID（`#csv`・`#mbom`・`#bop`・`#tools`・`#inspection-items`・`#actual-csv`）は日本語版と同じ。日本語の自動IDだった「サンプルCSV」は `#sample-csv` を明示した。CSV が受け付ける日本語の区分値（製品・有効 など）は `<!-- 訳さない -->` を付けて残した。英語の読者向けに「サンプルデータの値は日本語」の1文を足した。日本語版の「9種類のマスタ」は実際のタブ数と合わなかったため、両言語とも数を書かないようにした） |
-| GEN-04 | 生産管理・製造実行 | production・execution（486） | 未着手 |
+| GEN-04 | 生産管理・製造実行 | production・execution（486） | **対応済**（「工程展開」は画面の訳に合わせて release（Release to Processes）とし、GEN-01〜03 で expand と書いていた箇所も直した。エラーの引用は `ApiText.en.resx` の英文。日本語版のバックフラッシュのエラー文が古かったため現行の文に直した。画面の「着手」ボタンは状態名と同じキーで「Started」と出るため、ガイドもその表記に合わせた） |
 | GEN-05 | 物流・品質保証 | logistics・assurance（343） | 未着手 |
 | GEN-06 | 品質管理・設備保全 | quality・maintenance（409） | 未着手 |
 | GEN-07 | 共通機能・資料 | reports・reference・troubleshooting（381） | 未着手 |

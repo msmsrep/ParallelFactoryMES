@@ -14,7 +14,7 @@ next_title: Reference
 | Role | Intended for | Main permissions |
 |---|---|---|
 | System administrator | IT / implementation staff | All master data management and user management. Can also perform every operation of the other roles |
-| Production management | Production planning and control | Registering production plans; issuing, approving, expanding and dispatching manufacturing orders; master data management; inventory operations |
+| Production management | Production planning and control | Registering production plans; issuing, approving, releasing and dispatching manufacturing orders; master data management; inventory operations |
 | Operator | Line operators | Checking work orders; recording setups, checklists and actuals |
 | Logistics / warehouse | Warehouse and shipping | Receiving, inventory operations, picking and issuing, shipping, stocktaking |
 | Quality control | Quality control (QC) | Ordering, recording, judging and approving inspections; instructing and approving the handling of nonconformances |
@@ -36,7 +36,7 @@ one system administrator and a few users with the roles for their work.</p>
 | Registering and editing master data (products, processes, equipment and so on) | ○ | ○ | | | | | |
 | User management and granting skills & qualifications | ○ | | | | | | |
 | Registering, changing, deleting and importing (CSV) production plans | ○ | ○ | | | | | |
-| Registering, approving, changing, expanding and canceling manufacturing orders | ○ | ○ | | | | | |
+| Registering, approving, changing, releasing and canceling manufacturing orders | ○ | ○ | | | | | |
 | Dispatching (assigning operators, equipment and start order) | ○ | ○ | | | | | |
 | Recording setups and carrying out checklists | ○ | ○ | ○ | | | | |
 | Starting work and registering actuals | ○ | ○ | ○ | | | | |
