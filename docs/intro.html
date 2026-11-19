@@ -8,203 +8,12 @@
 <!-- ファビコンは build/icon.svg と同じ図柄（図柄の定義はそちらが正。変えたらここも合わせる） -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='translate(-5.5,-9.5) scale(1.06)'%3E%3Crect x='19' y='58' width='21' height='26' rx='6' fill='%23CDEBDF'/%3E%3Crect x='47' y='32' width='21' height='52' rx='6' fill='%238FD2BE'/%3E%3Crect x='75' y='46' width='21' height='38' rx='6' fill='%235CC8A8'/%3E%3Cg fill='none' stroke='%2318193F' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='12' y='50' width='21' height='26' rx='6'/%3E%3Crect x='40' y='24' width='21' height='52' rx='6'/%3E%3Crect x='68' y='38' width='21' height='38' rx='6'/%3E%3Cpath d='M13 88 H88'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
 <meta name="description" content="製造指図から出荷まで、ロット単位で記録・追跡するオープンソースの製造実行システム。">
+<link rel="alternate" hreflang="ja" href="intro.html">
+<link rel="alternate" hreflang="en" href="en/intro.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>
-/* 公開用の最小リセット */
-html{color-scheme:light dark}
-body{margin:0}
-img{max-width:100%}
-[hidden]{display:none!important}
-
-:root{
-  /* 配色はアイコン（build/icon.svg）に合わせる: 濃紺 #18193F のライン＋緑3段 #CDEBDF / #8FD2BE / #5CC8A8 */
-  --ground:#F4F8F6; --surface:#FFFFFF; --ink:#18193F; --muted:#565A78; --line:#D8E2DD;
-  --band:#18193F; --band-ink:#EEF1F7; --band-muted:#A3A8C6;
-  --accent:#17785F; --accent-soft:#E3F3EC;
-  --g1:#CDEBDF; --g2:#8FD2BE; --g3:#5CC8A8;
-  --logo-ink:#18193F;
-  --btn-bg:#18193F; --btn-ink:#FFFFFF;
-  --chip-grey-bg:#E6E8EE; --chip-grey:#4C5070;
-  --chip-blue-bg:#DCE0F5; --chip-blue:#2E3787;
-  --chip-orange-bg:#F8DDB4; --chip-orange:#8A4E00;
-  --chip-green-bg:#CDEBDF; --chip-green:#145F4B;
-  --shadow:0 1px 2px rgba(24,25,63,.06),0 12px 32px -12px rgba(24,25,63,.24);
-  --display:"BIZ UDPGothic","Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-  --body:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,"Consolas",monospace;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --ground:#0F1024; --surface:#171933; --ink:#E8EBF5; --muted:#A0A5C2; --line:#2A2D4F;
-    --band:#0A0B1B; --band-ink:#E8EBF5; --band-muted:#8C91B0;
-    --accent:#5CC8A8; --accent-soft:#16302D;
-    --g1:#1F4A40; --g2:#2F7A66; --g3:#5CC8A8;
-    --logo-ink:#E8EBF5;
-    --btn-bg:#5CC8A8; --btn-ink:#0F1024;
-    --chip-grey-bg:#262947; --chip-grey:#BCC0D8;
-    --chip-blue-bg:#232A55; --chip-blue:#AEB6F0;
-    --chip-orange-bg:#44331B; --chip-orange:#F2C27D;
-    --chip-green-bg:#16302D; --chip-green:#8FD2BE;
-    --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px -14px rgba(0,0,0,.7);
-  }
-}
-:root[data-theme="dark"]{
-  --ground:#0F1024; --surface:#171933; --ink:#E8EBF5; --muted:#A0A5C2; --line:#2A2D4F;
-  --band:#0A0B1B; --band-ink:#E8EBF5; --band-muted:#8C91B0;
-  --accent:#5CC8A8; --accent-soft:#16302D;
-  --g1:#1F4A40; --g2:#2F7A66; --g3:#5CC8A8;
-  --logo-ink:#E8EBF5;
-  --btn-bg:#5CC8A8; --btn-ink:#0F1024;
-  --chip-grey-bg:#262947; --chip-grey:#BCC0D8;
-  --chip-blue-bg:#232A55; --chip-blue:#AEB6F0;
-  --chip-orange-bg:#44331B; --chip-orange:#F2C27D;
-  --chip-green-bg:#16302D; --chip-green:#8FD2BE;
-  --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px -14px rgba(0,0,0,.7);
-}
-*{box-sizing:border-box}
-body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.85;-webkit-font-smoothing:antialiased}
-a{color:var(--accent)}
-a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
-.wrap{max-width:1120px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
-h1,h2,h3{font-family:var(--display);font-weight:700;text-wrap:balance;letter-spacing:.01em;margin:0}
-p{margin:0}
-.mono{font-family:var(--mono)}
-
-/* 上部バー */
-.top{border-bottom:1px solid var(--line);background:var(--surface)}
-.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:14px}
-.brand{white-space:nowrap;font-family:var(--display);font-weight:700;font-size:17px;display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none}
-.brand-mark{width:30px;height:30px;flex:none}
-#logo .l1{fill:var(--g1)}#logo .l2{fill:var(--g2)}#logo .l3{fill:var(--g3)}
-#logo .ln{fill:none;stroke:var(--logo-ink);stroke-width:8;stroke-linecap:round;stroke-linejoin:round}
-.top nav{display:flex;gap:20px;font-size:14px;flex-wrap:wrap;align-items:center}
-.top nav a{color:var(--muted);text-decoration:none}
-.top nav a:hover{color:var(--ink)}
-.gh{display:inline-flex;align-items:center;gap:5px;font-size:12.5px}
-.gh svg{width:14px;height:14px;fill:currentColor}
-
-/* ヒーロー */
-.hero{padding-block:clamp(40px,7vw,80px) 0}
-.hero-logo{width:clamp(64px,8vw,88px);height:auto;display:block;margin-bottom:22px}
-.eyebrow{font-size:13px;letter-spacing:.12em;color:var(--muted);font-weight:500;margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.eyebrow .tag{font-family:var(--mono);letter-spacing:.02em;border:1px solid var(--line);padding:1px 8px;border-radius:3px;background:var(--surface)}
-.hero h1{font-size:clamp(30px,5.2vw,54px);line-height:1.3;max-width:17em;word-break:keep-all;overflow-wrap:anywhere}
-.hero h1 em{font-style:normal;background:linear-gradient(transparent 62%,var(--g1) 62%);padding-inline:.06em}
-.lead{margin-top:22px;font-size:clamp(16px,1.6vw,18px);color:var(--muted);max-width:40em}
-.cta{margin-top:30px;display:flex;gap:12px 20px;flex-wrap:wrap;align-items:center}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:6px;font-weight:500;font-size:15px;text-decoration:none;border:1px solid transparent}
-.btn-primary{background:var(--btn-bg);color:var(--btn-ink);box-shadow:4px 4px 0 var(--g2)}
-.btn-ghost{border-color:var(--line);color:var(--ink);background:var(--surface)}
-.btn:hover{filter:brightness(1.08)}
-.hero-shot{margin-top:clamp(36px,5vw,56px);position:relative}
-
-/* 画面フレーム */
-.screen{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:var(--shadow)}
-/* ヒーローの画面だけ、アイコンと同じ「右下にずらした緑の面」を敷く */
-.hero-shot .screen{box-shadow:10px 10px 0 var(--g1),var(--shadow)}
-.screen img{display:block;width:100%;height:auto}
-.screen figcaption{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:var(--ground)}
-.screen figcaption b{font-weight:500;color:var(--ink)}
-.screen figcaption .mono{font-size:11.5px}
-/* 画面写真は常に明るいUIなので、暗いテーマでは少しだけ落とす */
-:root[data-theme="dark"] .screen img{filter:brightness(.92)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .screen img{filter:brightness(.92)}}
-
-/* 流れ */
-.flow-band{background:var(--band);color:var(--band-ink);margin-top:clamp(-120px,-9vw,-60px);padding-block:calc(clamp(60px,9vw,120px) + 48px) 56px}
-.flow-head{display:flex;justify-content:space-between;align-items:end;gap:24px;flex-wrap:wrap;margin-bottom:28px}
-.flow-head h2{font-size:clamp(22px,2.6vw,28px)}
-.flow-head p{color:var(--band-muted);font-size:14.5px;max-width:34em}
-.flow-scroll{overflow-x:auto;padding-bottom:6px}
-.flow{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(11,minmax(92px,1fr));min-width:1040px;counter-reset:s}
-.flow li{position:relative;padding:14px 10px 0 0;counter-increment:s}
-.flow li::before{content:counter(s,decimal-leading-zero);font-family:var(--mono);font-size:11px;color:var(--band-muted);display:block;margin-bottom:6px}
-.flow li::after{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--dept)}
-.flow li strong{display:block;font-size:14.5px;font-weight:700;line-height:1.4}
-.flow li span{display:block;font-size:12px;color:var(--band-muted);margin-top:4px;line-height:1.5}
-.d-plan{--dept:#8C95E8}.d-floor{--dept:#E9B45B}.d-qc{--dept:#5CC8A8}.d-log{--dept:#C7A3E0}
-.legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:22px;font-size:12.5px;color:var(--band-muted)}
-.legend i{display:inline-block;width:14px;height:3px;background:var(--dept);vertical-align:middle;margin-right:6px}
-
-/* 機能 */
-.features{padding-block:clamp(56px,8vw,96px);display:grid;gap:clamp(64px,9vw,112px)}
-.feature{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:clamp(24px,4vw,56px);align-items:start}
-.feature.flip{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
-.feature.flip .copy{order:2}
-.copy{position:sticky;top:24px}
-.codes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-.code{font-family:var(--mono);font-size:11.5px;padding:2px 7px;border-radius:3px;background:var(--accent-soft);color:var(--accent);font-weight:500}
-.copy h3{font-size:clamp(22px,2.6vw,29px);line-height:1.45;word-break:keep-all;overflow-wrap:anywhere}
-.copy p{margin-top:16px;color:var(--muted);max-width:32em}
-.copy ul{margin:18px 0 0;padding:0;list-style:none;display:grid;gap:9px;font-size:14.5px}
-.copy li{padding-left:18px;position:relative;line-height:1.7}
-.copy li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:8px;border-radius:2px;background:var(--g2)}
-.stack{display:grid;gap:18px}
-.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.42fr);gap:18px;align-items:start}
-
-/* ステータス */
-.chips{display:flex;flex-wrap:wrap;gap:6px 4px;align-items:center;margin-top:18px;font-size:12.5px;color:var(--muted)}
-.chip{display:inline-block;padding:1px 10px;border-radius:999px;font-size:12px;font-weight:500}
-.c-grey{background:var(--chip-grey-bg);color:var(--chip-grey)}
-.c-blue{background:var(--chip-blue-bg);color:var(--chip-blue)}
-.c-orange{background:var(--chip-orange-bg);color:var(--chip-orange)}
-.c-green{background:var(--chip-green-bg);color:var(--chip-green)}
-
-/* 数字 */
-.clock{margin-top:20px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:14px 16px;font-size:13.5px}
-.clock-bar{position:relative;height:26px;margin:10px 0 6px;border-radius:3px;background:var(--accent-soft);border:1px solid var(--line);overflow:hidden}
-.clock-bar .night{position:absolute;top:0;bottom:0;left:62.5%;right:0;background:repeating-linear-gradient(135deg,var(--chip-orange-bg) 0 5px,transparent 5px 10px)}
-.clock-ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-.clock small{display:block;color:var(--muted);margin-top:6px;line-height:1.6}
-
-/* 始め方 */
-.start{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-block:clamp(56px,8vw,88px)}
-.start-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,5vw,64px);margin-top:clamp(48px,7vw,72px)}
-.start h2{font-size:clamp(22px,2.6vw,28px)}
-.start-lead{margin-top:10px;color:var(--muted);font-size:15px}
-.gets{margin-top:24px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.get{border:1px solid var(--line);border-radius:8px;background:var(--ground);padding:20px 22px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
-.get h3{font-size:19px}
-.get p{font-size:14px;color:var(--muted);flex:1}
-.get pre{margin:0;align-self:stretch;font-size:12px}
-.get small{font-size:12.5px;color:var(--muted)}
-.get .mono{white-space:nowrap}
-.steps{list-style:none;margin:24px 0 0;padding:0;display:grid;gap:20px;counter-reset:st}
-.steps li{counter-increment:st;display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px}
-.steps li::before{content:counter(st);font-family:var(--mono);font-weight:500;font-size:13px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--accent);margin-top:2px}
-.steps b{display:block;font-weight:700}
-.steps p{color:var(--muted);font-size:14.5px}
-pre{margin:10px 0 0;background:var(--band);color:var(--band-ink);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:13px;line-height:1.6;overflow-x:auto}
-.forms{margin-top:24px;display:grid;gap:12px}
-.form{border:1px solid var(--line);border-radius:6px;padding:16px 18px;background:var(--ground)}
-.form b{font-family:var(--display);font-size:16px}
-.form p{font-size:14px;color:var(--muted);margin-top:4px}
-dl.req{margin:24px 0 0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 20px;font-size:14.5px}
-dl.req dt{color:var(--muted)}
-dl.req dd{margin:0}
-
-footer{border-top:1px solid var(--line);padding-block:32px 48px;font-size:13px;color:var(--muted)}
-footer .wrap{display:grid;gap:10px}
-footer p{max-width:62em}
-
-@media (max-width:860px){
-  .feature,.feature.flip{grid-template-columns:minmax(0,1fr)}
-  .feature.flip .copy{order:0}
-  .copy{position:static}
-  .start-grid,.gets{grid-template-columns:minmax(0,1fr)}
-  .pair{grid-template-columns:minmax(0,1fr)}
-  .pair .screen:last-child{max-width:320px}
-}
-@media (max-width:520px){
-  .top nav a.opt{display:none}
-}
-@media (prefers-reduced-motion:no-preference){
-  .hero-shot .screen{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
-  @keyframes rise{from{transform:translateY(14px)}to{transform:none}}
-}
-</style>
+<link rel="stylesheet" href="assets/intro.css">
 </head>
 <body>
 <header class="top">
@@ -230,6 +39,7 @@ footer p{max-width:62em}
       <a class="opt" href="#features">できること</a>
       <a class="opt" href="#start">入手する</a>
       <a class="opt" href="index.html">ユーザーガイド</a>
+      <a href="en/intro.html" lang="en" hreflang="en">English</a>
       <a class="gh" href="https://github.com/msmsrep/ParallelFactoryMES" aria-label="GitHub リポジトリ"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
     </nav>
   </div>
@@ -248,8 +58,8 @@ footer p{max-width:62em}
     </div>
     <div class="hero-shot">
       <figure class="screen">
-        <figcaption><b>ダッシュボード</b><span class="mono">当日＝製造日 · 6時境界</span></figcaption>
-        <img src="assets/intro/dashboard.webp" width="1440" height="660" alt="ダッシュボード画面。当日の良品数68・不良数2・不良率2.86%と、製造指図4件の状態（展開済・承認済・未承認）と工程進捗の一覧">
+        <figcaption><b>ダッシュボード</b><span class="mono">月次 · 2026年9月</span></figcaption>
+        <img src="assets/intro/dashboard.webp" width="1440" height="660" alt="ダッシュボード画面。2026年9月の月次で、良品数68・不良数2・不良率2.86%と、製造指図の工程進捗の一覧">
       </figure>
     </div>
   </div>
@@ -272,7 +82,7 @@ footer p{max-width:62em}
         <li class="d-floor"><strong>実績入力</strong><span>良品・不良・投入</span></li>
         <li class="d-floor"><strong>完了承認</strong><span>工程の締め</span></li>
         <li class="d-qc"><strong>検査</strong><span>測定値を自動判定</span></li>
-        <li class="d-qc"><strong>出荷判定</strong><span>可・特採・否</span></li>
+        <li class="d-qc"><strong>出荷判定</strong><span>可・保留・特採</span></li>
         <li class="d-log"><strong>出荷</strong><span>判定済みだけ出せる</span></li>
       </ol>
     </div>
@@ -303,7 +113,7 @@ footer p{max-width:62em}
       </figure>
       <figure class="screen">
         <figcaption><b>作業指示一覧</b><span class="mono">指図番号-工程順序</span></figcaption>
-        <img src="assets/intro/workorders.webp" width="1220" height="420" loading="lazy" alt="作業指示一覧。工程ごとの作業指示5件と、段取り・実績入力・指示書のボタン">
+        <img src="assets/intro/workorders.webp" width="1220" height="424" loading="lazy" alt="作業指示一覧。工程ごとの作業指示5件と、段取り・実績入力・指示書のボタン">
       </figure>
     </div>
   </article>
@@ -359,7 +169,7 @@ footer p{max-width:62em}
       </ul>
     </div>
     <figure class="screen">
-      <figcaption><b>在庫照会・操作</b><span class="mono">10 ロット</span></figcaption>
+      <figcaption><b>在庫照会・操作</b><span class="mono">15 ロット</span></figcaption>
       <img src="assets/intro/inventory.webp" width="1220" height="760" loading="lazy" alt="在庫照会画面。ロット番号・品目・ロケーション・数量・ステータス・有効期限の一覧と、操作・現品票・追跡のボタン">
     </figure>
   </article>

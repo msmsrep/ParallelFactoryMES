@@ -83,7 +83,7 @@ foreach ($page in $enPages) {
     $targets = [regex]::Matches($text, '(?:href|src)="([^"#?]+)|\]\(([^)#?\s]+)') |
         ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } }
     foreach ($t in $targets | Sort-Object -Unique) {
-        if ($t -match '^(https?:|mailto:|/|\{)') { continue }
+        if ($t -match '^(https?:|mailto:|data:|/|\{)') { continue }
         $target = [IO.Path]::GetFullPath((Join-Path $en $t))
         if ($t -notmatch '^\.\./' -and $t.EndsWith('.html') -and -not $t.Contains('/')) {
             # 英語版の中のページ：英語版が無ければ日本語版があればよい（レイアウトが差し替える）

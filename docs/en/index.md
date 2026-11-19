@@ -17,7 +17,7 @@ so you can use it directly from shop-floor PCs and tablets.
 - **Every record keeps "who and when".** Corrections to actuals and inspections, master data changes, inventory operations and cancellations are recorded in the audit log, which you can view on the [Audit Log screen](operations.html#audit-log) (system administrators only).
 
 <a class="intro-banner" href="intro.html">
-  <img src="../assets/intro/dashboard.webp" width="1440" height="660" alt="" loading="lazy">
+  <img src="../assets/en/intro/dashboard.webp" width="1440" height="660" alt="" loading="lazy">
   <span><strong>Start with the overview page &rarr;</strong><small>A tour of the flow from manufacturing order to shipment and the main screens, with screenshots.</small></span>
 </a>
 
