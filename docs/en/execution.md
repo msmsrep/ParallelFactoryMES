@@ -107,7 +107,7 @@ After recording, the history keeps "who carried it out, when, and checked items 
 
 ### Starting work
 
-While a work order is "Not dispatched" or "Dispatched", a **Started** button for starting the work is shown.
+While a work order is "Not dispatched" or "Dispatched", a **Start** button is shown.
 Pressing it changes the status to "Started".
 
 ### Reporting output
