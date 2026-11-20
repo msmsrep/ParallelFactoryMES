@@ -48,6 +48,11 @@ dotnet test tests/MesApp.Api.Tests --filter FullyQualifiedName~MasterCsvTests -v
 jekyll build -s docs -d "$env:TEMP\mes-docs-site"
 ```
 
+ユーザーガイドは日英2言語（英語版は `docs/en/<同じファイル名>`。工場模型の英語の文言は `assets/tour/scenes.en.js`）。**日本語版を変えたら同じコミットで英語版も直す**。用語は `*.en.resx` の訳と一字一句合わせる（`docs-dev/GuideEnPlan.md`）。点検（あれば終了コード 1）:
+```powershell
+./scripts/GuideEnCheck.ps1 -Strict
+```
+
 アプリ起動は `.claude/launch.json` の `mesapp`（preview_start）を使う。シェルから `dotnet run` を常駐させない。
 
 ## 構成（依存は Core ← Infrastructure ← Api、Client.Web → Core）
