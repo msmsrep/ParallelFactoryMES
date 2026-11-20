@@ -339,7 +339,7 @@ The following are recorded for one work order. All of them are entered on the **
 | Output | At packing, good 9, defective 1 (DR-05), awaiting rework 1 | In the final process, the put-away location (WH-P01) is required |
 
 <figure class="shot">
-<img src="../assets/en/walkthrough/record.webp" width="1440" height="1287" alt="The result entry screen of SMP-FG-001-10. It shows the registered result, 7 material consumption records (including the O-ring with a substitution reason) and the work procedure" loading="lazy">
+<img src="../assets/en/walkthrough/record.webp" width="1440" height="1287" alt="The result entry screen of SMP-FG-001-10. It shows the registered result, 7 material consumption records (including the O-ring with a substitution reason) the work procedure, the instructed process conditions, the process condition data and the status history" loading="lazy">
 <figcaption>Recording results (SMP-FG-001-10, assembly). The list of material consumption keeps the alternate oil-resistant O-ring and its substitution reason</figcaption>
 </figure>
 

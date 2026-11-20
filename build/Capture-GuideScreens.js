@@ -81,7 +81,7 @@ function zip(dir, files, dest) {
 async function prepare() {
     const status = await api('GET', '/api/setup/status');
     if (status.data.setupRequired) {
-        await api('POST', '/api/setup/initialize', { userName: USER, password: PASSWORD, displayName: 'Administrator' });
+        await api('POST', '/api/setup/initialize', { userName: USER, password: PASSWORD, displayName: LANG === 'ja' ? 'システム管理者' : 'Administrator' });
         console.log('初期管理者を作りました: ' + USER);
     }
     const login = await api('POST', '/api/auth/login', { userName: USER, password: PASSWORD });
@@ -204,6 +204,8 @@ async function shoot(ws, name) {
         ...[...document.querySelectorAll('main, .content, article')].map(e => e.scrollHeight))`);
     await send(ws, 'Emulation.setDeviceMetricsOverride',
         { width: WIDTH, height: Math.max(HEIGHT, height), deviceScaleFactor: DPR, mobile: false });
+    // 画面遷移で見出しにフォーカスが移り、枠が写るので外す
+    await evalJs(ws, `(document.activeElement && document.activeElement.blur(), true)`);
     await sleep(800);
     await send(ws, 'Page.bringToFront');
     const result = await send(ws, 'Page.captureScreenshot', { format: 'png' });
