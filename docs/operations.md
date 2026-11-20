@@ -364,7 +364,7 @@ docker compose start
 | 項目 | 状況 |
 |---|---|
 | PostgreSQL / SQL Server | 対応（[PostgreSQL / SQL Server を使う](#database)）。既存のSQLiteデータを移す機能は無し |
-| Docker化・Zip配布 | 未対応 |
+| Docker化・Zip配布 | 対応（[配布と起動](#配布と起動)） |
 | HTTPS | アプリ側では強制しない（リバースプロキシで終端。[HTTPSで運用する](#https)） |
 | 設備・秤量機からの自動データ収集 | 未対応（手入力） |
 | EDI / ASN連携 | 未対応 |
@@ -381,11 +381,11 @@ APIの統合テストが実行されます。
 
 ## このガイドの公開について
 
-このガイドは `docs/` フォルダのMarkdownで管理されています。GitHub Pagesで公開するには、
+このガイドは `docs/` フォルダのMarkdownで管理されています。英語版は `docs/en/` に日本語版と同じファイル名で置いています。GitHub Pagesで公開するには、
 リポジトリの **Settings → Pages** で次のように設定します。
 
 - Source: `Deploy from a branch`
 - Branch: `master`（または `main`）／ フォルダ: `/docs`
 
-内容を更新するときは `docs/*.md` を編集してコミットすれば、自動的に再公開されます。
-ページを追加した場合は、左メニューに載せるため `docs/_config.yml` の `nav` にも項目を追加してください。
+内容を更新するときは `docs/*.md`（英語版は `docs/en/*.md`）を編集してコミットすれば、自動的に再公開されます。
+ページを追加した場合は、左メニューに載せるため `docs/_data/nav.yml` の `ja` と `en` の両方に項目を追加してください。

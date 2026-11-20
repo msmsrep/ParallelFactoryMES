@@ -338,7 +338,7 @@ MBOMと工順の登録方法は、[マスタ管理の品目・MBOM・工順](mas
 | 出来高 | 梱包で良品9・不良1（DR-05）・再作業待ち1 | 最終工程では入庫先（WH-P01）が必須 |
 
 <figure class="shot">
-<img src="assets/walkthrough/record.webp" width="1440" height="866" alt="SMP-FG-001-10 の実績入力画面。登録済みの実績、7件の部材投入（代替理由つきのOリングを含む）、作業手順書が表示されている" loading="lazy">
+<img src="assets/walkthrough/record.webp" width="1440" height="1331" alt="SMP-FG-001-10 の実績入力画面。登録済みの実績、7件の部材投入（代替理由つきのOリングを含む）、作業手順書、製造条件の指示とデータ、状態の履歴が表示されている" loading="lazy">
 <figcaption>実績入力（SMP-FG-001-10 組立）。部材投入の一覧に、代替品の Oリング（耐油）と代替理由が残っている</figcaption>
 </figure>
 
@@ -396,8 +396,8 @@ MBOMと工順の登録方法は、[マスタ管理の品目・MBOM・工順](mas
 </figure>
 
 <figure class="shot">
-<img src="assets/walkthrough/inspections.webp" width="1440" height="816" alt="検査管理画面。受入・工程内・完成品の3件の検査指示が、承認済・合格で並んでいる" loading="lazy">
-<figcaption>検査管理。3件とも合格で、承認まで済んでいる。各行の「詳細・実績入力」から測定値と判定を確認できる</figcaption>
+<img src="assets/walkthrough/inspections.webp" width="1440" height="858" alt="検査管理画面。4件の検査指示がすべて承認済で並び、受入・工程内・完成品の検査は合格、追加入荷 R3001-260902 の受入検査は不合格になっている" loading="lazy">
+<figcaption>検査管理。4件とも承認まで済んでいる。図7の3件は合格、追加入荷 R3001-260902 の受入検査は不合格（そのロットは「不良」になる）。各行の「詳細・実績入力」から測定値と判定を確認できる</figcaption>
 </figure>
 
 - 工程内検査は **作業指示**（SMP-SF-001-10）を、受入・完成品検査は **ロット** を対象にします。

@@ -166,6 +166,9 @@ msmsrep
 「個人情報」の設問は、保存するだけでも「はい」に当たる扱い。「いいえ」にしてプライバシーポリシーURLを空けると、
 監査ログにユーザー名・IPアドレスを残す実装と食い違う。
 
+英語の掲載を足すときは、英語版のページを使う：プライバシーポリシー `https://msmsrep.github.io/ParallelFactoryMES/en/privacy.html`、
+Webサイト `https://msmsrep.github.io/ParallelFactoryMES/en/intro.html`（ユーザーガイドは `…/en/`）。英語版プライバシーポリシーには「日本語版が優先」の1文がある。
+
 ## 年齢区分（IARC アンケート）
 
 カテゴリは「ユーティリティ・生産性・その他」系を選び、暴力・性的表現・薬物・ギャンブル・ユーザー間のやり取り・

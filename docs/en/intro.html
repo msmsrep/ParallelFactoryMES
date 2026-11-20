@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parallel Factory MES</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='translate(-5.5,-9.5) scale(1.06)'%3E%3Crect x='19' y='58' width='21' height='26' rx='6' fill='%23CDEBDF'/%3E%3Crect x='47' y='32' width='21' height='52' rx='6' fill='%238FD2BE'/%3E%3Crect x='75' y='46' width='21' height='38' rx='6' fill='%235CC8A8'/%3E%3Cg fill='none' stroke='%2318193F' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='12' y='50' width='21' height='26' rx='6'/%3E%3Crect x='40' y='24' width='21' height='52' rx='6'/%3E%3Crect x='68' y='38' width='21' height='38' rx='6'/%3E%3Cpath d='M13 88 H88'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
+<meta name="description" content="An open-source manufacturing execution system that records and traces production lot by lot, from manufacturing orders to shipping.">
+<link rel="alternate" hreflang="ja" href="../intro.html">
+<link rel="alternate" hreflang="en" href="intro.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/intro.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="logo" viewBox="0 0 100 100">
+        <g transform="translate(-5.5,-9.5) scale(1.06)">
+          <rect class="l1" x="19" y="58" width="21" height="26" rx="6"/>
+          <rect class="l2" x="47" y="32" width="21" height="52" rx="6"/>
+          <rect class="l3" x="75" y="46" width="21" height="38" rx="6"/>
+          <g class="ln">
+            <rect x="12" y="50" width="21" height="26" rx="6"/>
+            <rect x="40" y="24" width="21" height="52" rx="6"/>
+            <rect x="68" y="38" width="21" height="38" rx="6"/>
+            <path d="M13 88 H88"/>
+          </g>
+        </g>
+      </symbol>
+    </svg>
+    <a class="brand" href="#"><svg class="brand-mark logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg>Parallel Factory MES</a>
+    <nav>
+      <a class="opt" href="#features">Features</a>
+      <a class="opt" href="#start">Get it</a>
+      <a class="opt" href="index.html">User Guide</a>
+      <a href="../intro.html" lang="ja" hreflang="ja">日本語</a><!-- 訳さない -->
+      <a class="gh" href="https://github.com/msmsrep/ParallelFactoryMES" aria-label="GitHub repository"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <svg class="hero-logo logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg>
+    <div class="eyebrow"><span>Manufacturing execution system (MES)</span><span class="tag">AGPL-3.0</span><span class="tag">.NET 10 / Blazor</span></div>
+    <h1>From manufacturing order to shipment, every record linked by <em>lot</em>.</h1>
+    <p class="lead">Parallel Factory MES is an open-source MES for recording and tracing factory production in the browser. It treats orders, work, inventory, inspection and shipping as one continuous flow, so you can always trace in both directions which material lots went into which product lots.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="index.html">Read the user guide</a>
+      <a class="btn btn-ghost" href="#start">Get it</a>
+    </div>
+    <div class="hero-shot">
+      <figure class="screen">
+        <figcaption><b>Dashboard</b><span class="mono">Monthly · September 2026</span></figcaption>
+        <img src="../assets/en/intro/dashboard.webp" width="1440" height="660" alt="Dashboard screen showing the monthly summary for September 2026: 68 good, 2 defects, a 2.86% defect rate, and the process progress of the manufacturing orders">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="flow-band" aria-labelledby="flow-title">
+  <div class="wrap">
+    <div class="flow-head">
+      <h2 id="flow-title">A factory's whole day, in one set of screens</h2>
+      <p>Records that each department used to keep in separate spreadsheets are linked by the same lot number. A process cannot start before the previous one is finished, and nothing ships until inspection has passed: the system keeps the order of the work.</p>
+    </div>
+    <div class="flow-scroll" tabindex="0" aria-label="Business flow (scrolls horizontally)">
+      <ol class="flow">
+        <li class="d-plan"><strong>Master data</strong><span>Products, routings, equipment</span></li>
+        <li class="d-log"><strong>Receiving</strong><span>Record material lots</span></li>
+        <li class="d-plan"><strong>Order</strong><span>Register and approve</span></li>
+        <li class="d-plan"><strong>Release</strong><span>Work orders and output lots</span></li>
+        <li class="d-plan"><strong>Dispatching</strong><span>Assign operators and equipment</span></li>
+        <li class="d-floor"><strong>Setup</strong><span>Checklists</span></li>
+        <li class="d-floor"><strong>Record results</strong><span>Good, defects, consumption</span></li>
+        <li class="d-floor"><strong>Completion approval</strong><span>Close the process</span></li>
+        <li class="d-qc"><strong>Inspection</strong><span>Measurements judged automatically</span></li>
+        <li class="d-qc"><strong>Shipment judgment</strong><span>Approved, on hold, special acceptance</span></li>
+        <li class="d-log"><strong>Shipping</strong><span>Only judged lots can ship</span></li>
+      </ol>
+    </div>
+    <div class="legend">
+      <span class="d-plan"><i></i>Production management</span>
+      <span class="d-floor"><i></i>Shop floor</span>
+      <span class="d-qc"><i></i>Quality</span>
+      <span class="d-log"><i></i>Logistics / warehouse</span>
+    </div>
+  </div>
+</section>
+
+<section class="features wrap" id="features" aria-label="Features">
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">A-20-10-01</span><span class="code">B-10-20</span></div>
+      <h3>Register an order, and work orders line up for each process</h3>
+      <p>When you approve a manufacturing order and release it, work orders are created following the routing registered for the product, and the output lot is numbered automatically. Each status has its own color, and no step can be skipped.</p>
+      <div class="chips" aria-label="Manufacturing order statuses">
+        <span class="chip c-grey">Draft</span>→<span class="chip c-blue">Approved</span>→<span class="chip c-orange">Released</span>→<span class="chip c-green">Completed</span>
+      </div>
+    </div>
+    <div class="stack">
+      <figure class="screen">
+        <figcaption><b>Manufacturing Order Management</b><span class="mono">SMP-FG-001 and others</span></figcaption>
+        <img src="../assets/en/intro/orders.webp" width="1220" height="660" loading="lazy" alt="Manufacturing Order Management screen with the order registration form and a list of four manufacturing orders (category, status, output lot)">
+      </figure>
+      <figure class="screen">
+        <figcaption><b>Work Orders</b><span class="mono">order no.-sequence</span></figcaption>
+        <img src="../assets/en/intro/workorders.webp" width="1220" height="554" loading="lazy" alt="Work order list with five work orders, one per process, and Setup, Record Results and Instruction buttons">
+      </figure>
+    </div>
+  </article>
+
+  <article class="feature flip">
+    <div class="copy">
+      <div class="codes"><span class="code">Barcode</span><span class="code">QR</span></div>
+      <h3>Paper work instructions and lot tags, printed straight for the floor</h3>
+      <p>A work instruction lists the parts used in that process with their required quantities, a recording area and a barcode. You can also issue a lot tag for each lot, and save either as PDF.</p>
+      <ul>
+        <li>Scan with a USB barcode reader or a tablet's camera</li>
+        <li>Every lot number and work order number field accepts scans</li>
+      </ul>
+    </div>
+    <div class="pair">
+      <figure class="screen">
+        <figcaption><b>Work instruction</b><span class="mono">Print / PDF</span></figcaption>
+        <img src="../assets/en/intro/print-wo.webp" width="800" height="707" loading="lazy" alt="Print preview of a work instruction: work order number, product and process, a table of the materials used in this step (planned materials), the work record area, and a barcode of the work order number">
+      </figure>
+      <figure class="screen">
+        <figcaption><b>Lot tag</b></figcaption>
+        <img src="../assets/en/intro/print-lot.webp" width="320" height="435" loading="lazy" alt="Lot tag showing the product code, product name, quantity, production / receipt date and a barcode of the lot number">
+      </figure>
+    </div>
+  </article>
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">H-30-10-01</span><span class="code">-02</span></div>
+      <h3>Which lots went into this product?</h3>
+      <p>Just scan a product lot number to follow the semi-finished and material lots it used all the way down (trace back). In the other direction, you can find every product that used a given material lot (trace forward).</p>
+      <ul>
+        <li>Each lot shows which work order consumed it</li>
+        <li>"Trace this lot" takes you straight to the next level</li>
+        <li>Production, inspection and stock movement history on the same screen</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>Lot Traceability</b><span class="mono">FG1000-S001</span></figcaption>
+      <img src="../assets/en/intro/trace.webp" width="1220" height="760" loading="lazy" alt="Traceability screen showing the trace back of product lot FG1000-S001: the semi-finished lot SF2000-S001 and seven material lots, including the casting lot under it, in a tree">
+    </figure>
+  </article>
+
+  <article class="feature flip">
+    <div class="copy">
+      <div class="codes"><span class="code">D-10-30-01</span><span class="code">D-10-30</span></div>
+      <h3>Inventory is held by lot × location</h3>
+      <p>Stock moves with every receipt, production and shipment, and the movement history is kept. Location moves, quantity adjustments, splits and merges, holds and scrapping are all recorded with a reason.</p>
+      <ul>
+        <li>Expiry alerts for lots close to their expiry date</li>
+        <li>Lots on hold or nonconforming are stopped at issuing and consumption</li>
+        <li>Screens for stocktaking, transfer orders, and picking &amp; issuing too</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>Inventory</b><span class="mono">15 lots</span></figcaption>
+      <img src="../assets/en/intro/inventory.webp" width="1220" height="760" loading="lazy" alt="Inventory inquiry screen listing lot number, product, location, quantity, status and expiry, with Actions, Lot tag and Trace buttons">
+    </figure>
+  </article>
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">B-60-10-05</span><span class="code">C-40-10-03</span></div>
+      <h3>Figures close by production date</h3>
+      <p>First-pass rate, yield and defect rate are totaled by product, by process and by shift. Even when a night shift runs past midnight, results up to the boundary time (6:00 a.m. by default) fall on the same production date.</p>
+      <div class="clock" aria-label="Example of the production date boundary">
+        <b>Production date September 21</b>
+        <div class="clock-bar" aria-hidden="true"><div class="night"></div></div>
+        <div class="clock-ticks" aria-hidden="true"><span>21st 6:00</span><span>12:00</span><span>18:00</span><span>0:00</span><span>22nd 6:00</span></div>
+        <small>The hatched area is the night shift from 21:00. Even after the date changes, results up to 6:00 the next morning count toward the production date of the 21st. The boundary time can be changed in the settings.</small>
+      </div>
+    </div>
+    <div class="stack">
+      <figure class="screen">
+        <figcaption><b>Productivity Monitoring</b><span class="mono">First-pass rate 97.14 %</span></figcaption>
+        <img src="../assets/en/intro/productivity.webp" width="1220" height="750" loading="lazy" alt="Productivity Monitoring screen with the total good quantity, defect quantity, first-pass rate and yield, and tables by product and by process">
+      </figure>
+      <figure class="screen">
+        <figcaption><b>Quality Analysis</b><span class="mono">Defects by process</span></figcaption>
+        <img src="../assets/en/intro/quality.webp" width="1220" height="580" loading="lazy" alt="Quality Analysis screen with defects totaled by item and by process, including scrapped, awaiting rework and defect rate">
+      </figure>
+    </div>
+  </article>
+
+  <article class="feature flip">
+    <div class="copy">
+      <div class="codes"><span class="code">Audit log</span></div>
+      <h3>Who changed what, and when</h3>
+      <p>Correcting results or inspection results, changing master data, inventory operations, cancellations: every operation that changes a record is kept in the audit log, and corrections also store the values before and after.</p>
+      <ul>
+        <li>The log itself cannot be edited or deleted</li>
+        <li>Even purging entries past the retention period is itself recorded</li>
+        <li>Permissions are per role: viewing stays open, and only write operations are restricted</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>Audit Log</b><span class="mono">System administrator</span></figcaption>
+      <img src="../assets/en/intro/audit.webp" width="1220" height="860" loading="lazy" alt="Audit Log screen listing date/time, user, category, action, target and details">
+    </figure>
+  </article>
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">CSV</span><span class="code">ZIP</span></div>
+      <h3>Get started by loading CSV in bulk</h3>
+      <p>Master data such as products, routings, equipment and inspection items can be imported and exported as CSV. Bundle the files in a ZIP to import them all at once; if even one row has an error, the whole import is rolled back. You can check first with "Validate only".</p>
+      <ul>
+        <li>UTF-8 and Shift_JIS are detected automatically</li>
+        <li>Actual records such as receipts, production results and inspections can also be imported from CSV (for testing, migration and training)</li>
+        <li>Comes with a complete set of sample data ready to import. The screens on this page were made with it</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>Master Data</b><span class="mono">15 tabs</span></figcaption>
+      <img src="../assets/en/intro/masters.webp" width="1220" height="580" loading="lazy" alt="Master Data screen with tabs such as Products, MBOM & Routings, Process, Work center and Equipment, the product registration form, and the ZIP bulk import/export panel">
+    </figure>
+  </article>
+
+</section>
+
+<section class="start" id="start" aria-labelledby="start-title">
+  <div class="wrap">
+    <h2 id="start-title">Get it</h2>
+    <p class="start-lead">All editions are free, with no license activation. The ZIP, Docker and Store editions do not need .NET installed.</p>
+    <div class="gets">
+      <div class="get">
+        <span class="chip c-grey">Try on one PC</span>
+        <h3>Microsoft Store</h3>
+        <p>A Windows desktop edition that bundles the API, database and screens into one app. It needs no server and no network connection, so it suits trying out and evaluating the features.</p>
+        <a class="btn btn-primary" href="https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=en-US&amp;gl=US">Get it from Microsoft Store</a>
+        <small>Windows 10 (2004 or later) / 11</small>
+      </div>
+      <div class="get">
+        <span class="chip c-green">Company server</span>
+        <h3>ZIP</h3>
+        <p>Extract it and run <span class="mono">start.cmd</span> (<span class="mono">sh start.sh</span> on Linux). It is self-contained, with the runtime included.</p>
+        <a class="btn btn-ghost" href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest">Download from Releases</a>
+        <small>Windows / Linux (x64) · port 5000</small>
+      </div>
+      <div class="get">
+        <span class="chip c-green">Company server</span>
+        <h3>Docker</h3>
+        <p>Data stays in a volume. To run it together with PostgreSQL, use <a href="https://github.com/msmsrep/ParallelFactoryMES/blob/main/compose.postgres.yaml"><span class="mono">compose.postgres.yaml</span></a>.</p>
+        <pre>docker run -d -p 8080:8080 \
+  -v mesapp-data:/data \
+  ghcr.io/msmsrep/parallelfactorymes</pre>
+        <small>amd64 / arm64 · port 8080</small>
+      </div>
+    </div>
+
+    <div class="start-grid">
+      <div>
+        <h2>Try it out</h2>
+        <ol class="steps">
+          <li><div><b>Start it</b><p>Start one of the editions above and open <span class="mono">http://localhost:5000</span> in a browser (<span class="mono">8080</span> for Docker). The Store edition opens the app window directly. The database (SQLite) is created automatically.</p></div></li>
+          <li><div><b>Create an administrator</b><p>The first time, the initial setup guides you through creating an administrator. The Store edition creates one automatically and shows the user name and initial password at the top of the screen.</p></div></li>
+          <li><div><b>Load the samples</b><p>Import the <a href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip">master data</a> and <a href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip">actual records</a> sample ZIPs in that order, and you are ready to try everything from manufacturing orders to shipping. The sample values, such as product names, are in Japanese.</p></div></li>
+        </ol>
+      </div>
+      <div>
+        <h2>How to use it</h2>
+        <div class="forms">
+          <div class="form"><b>On a server on your company LAN</b><p>Put it on one machine with ZIP or Docker; PCs and tablets on the floor just open it in a browser. No installation or license activation on the devices. Use this setup for production.</p></div>
+          <div class="form"><b>Just trying it? One PC is enough</b> <span class="chip c-grey">For testing and evaluation</span><p>Other devices cannot connect to the Microsoft Store desktop edition. Use it to try out the features or to check procedures.</p></div>
+        </div>
+        <dl class="req">
+          <dt>Server</dt><dd>Windows / Linux (x64), or Docker (amd64 / arm64)</dd>
+          <dt>Database</dt><dd>SQLite (default, nothing extra to install) / PostgreSQL / SQL Server</dd>
+          <dt>HTTPS</dt><dd>Terminated at a reverse proxy such as IIS / nginx (certificates from an internal CA or mkcert are fine)</dd>
+          <dt>Devices</dt><dd>A browser such as Chrome / Edge</dd>
+          <dt>Architecture</dt><dd>ASP.NET Core Web API + Blazor WebAssembly (.NET 10 SDK to run from source)</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Parallel Factory MES — Copyright © 2026 msmsrep. The source code and documentation are published under the GNU Affero General Public License v3.0. If you provide a modified version over a network, you must make its source code available to its users.</p>
+    <p>The scope of the features is based on the Engineering Advancement Association of Japan (ENAA) list of standard business processes for MES/MOM implementation (October 2025, in Japanese). Codes such as <span class="mono">A-20-10-01</span> shown on the screens are business process numbers from that list. The copyright of the list belongs to ENAA.</p>
+    <p>The screenshots were taken with the sample data. The sample values, such as product names, are in Japanese.</p>
+  </div>
+</footer>
+</body>
+</html>

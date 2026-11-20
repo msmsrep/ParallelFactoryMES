@@ -34,4 +34,6 @@ samples/*.zip
 
 # ストア掲載画像の素材（アプリの実画面。build/Capture-AppScreens.js でいつでも撮り直せる）
 build/store/raw/
+# ガイドの画面写真の撮影結果（build/Capture-WalkthroughScreens.js。webp にしたものだけを docs/assets/ に置く）
+build/guide-shots/
 scripts/keys.txt
