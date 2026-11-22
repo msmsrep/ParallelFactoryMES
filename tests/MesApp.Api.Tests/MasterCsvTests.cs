@@ -4,10 +4,14 @@ using System.Net.Http.Json;
 using System.Text;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Dashboard;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Planning;
 using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
+using MesApp.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MesApp.Api.Tests;
 
@@ -1378,6 +1382,133 @@ public class MasterCsvTests
         var kind = (await admin.GetFromJsonAsync<List<CsvKindInfo>>("/api/masters/csv/kinds"))!
             .Single(k => k.Kind == "production-plans");
         Assert.Equal(MesRoleGroups.ProductionManage, kind.WriteRoles);
+    }
+
+    // ---- フォルダ連携（Spec.md 3.8 フォルダ連携） ----
+
+    /// <summary>連携フォルダを一時ディレクトリに向けた ApiFactory。常駐処理の間隔は長くし、走査はテストから呼ぶ</summary>
+    private static (ApiFactory Factory, string Root) CreateFolderLinkFactory(string userName = TestAuth.AdminUser)
+    {
+        var root = Directory.CreateTempSubdirectory("mesapp-folder-link-").FullName;
+        var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["FolderLink:Root"] = root,
+            ["FolderLink:UserName"] = userName,
+            ["FolderLink:PollSeconds"] = "3600",
+            ["FolderLink:SettleSeconds"] = "0",
+        });
+        return (factory, root);
+    }
+
+    private static async Task<FolderLinkStatusResponse> ScanAsync(HttpClient client)
+    {
+        var response = await client.PostAsync("/api/folder-link/scan", null);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<FolderLinkStatusResponse>())!;
+    }
+
+    private static string[] FilesUnder(string root, string folder, string pattern) =>
+        Directory.Exists(Path.Combine(root, folder))
+            ? Directory.GetFiles(Path.Combine(root, folder), pattern, SearchOption.AllDirectories)
+            : [];
+
+    private const string DefectReasonCsv = "Code,Name,Category,IsActive\nDF-01,寸法外れ,Process,true\n";
+
+    [Fact]
+    public async Task フォルダ連携でinboxのCSVを取り込み_結果に応じてprocessedとerrorへ移す()
+    {
+        var (factory, root) = CreateFolderLinkFactory();
+        using var _ = factory;
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        var inbox = Path.Combine(root, "inbox");
+        Directory.CreateDirectory(Path.Combine(inbox, "defect-reasons"));
+
+        // 直下はファイル名で、種別フォルダの中は名前に関係なくフォルダ名で種別を決める
+        await File.WriteAllTextAsync(Path.Combine(inbox, "defect-reasons.csv"), DefectReasonCsv);
+        await File.WriteAllTextAsync(Path.Combine(inbox, "defect-reasons", "ERP出力.csv"),
+            "Code,Name,Category,IsActive\nDF-02,キズ,Process,true\n");
+        // 1行でもエラーなら何も反映しない（画面からの取込と同じ）
+        await File.WriteAllTextAsync(Path.Combine(inbox, "02_defect-reasons.csv"),
+            "Code,Name,Category,IsActive\nDF-03,打痕,Process,true\nDF-04,欠け,存在しない区分,true\n");
+        await File.WriteAllTextAsync(Path.Combine(inbox, "unknown-kind.csv"), "A,B\n1,2\n");
+        // CSV・ZIP 以外は触らない（書き出し途中の一時ファイルなど）
+        await File.WriteAllTextAsync(Path.Combine(inbox, "writing.tmp"), "x");
+
+        var status = await ScanAsync(client);
+        Assert.True(status.Enabled);
+        Assert.Null(status.ConfigError);
+        Assert.Equal(4, status.Recent.Count);
+        Assert.Equal(2, status.Recent.Count(r => r.Succeeded));
+        Assert.Contains(status.Recent, r => r.FileName == "defect-reasons/ERP出力.csv" && r.Succeeded && r.Created == 1);
+        Assert.Contains(status.Recent, r => r.FileName == "02_defect-reasons.csv" && !r.Succeeded && r.Messages.Count > 0);
+
+        var reasons = (await client.GetFromJsonAsync<List<DefectReasonResponse>>("/api/defect-reasons"))!;
+        Assert.Equal(["DF-01", "DF-02"], reasons.Select(r => r.Code).Order());
+
+        // 取り込んだものも取り込めなかったものも inbox から無くなり、横に結果ファイルが付く。CSV 以外は残る
+        Assert.Equal(["writing.tmp"], Directory.GetFiles(inbox, "*", SearchOption.AllDirectories).Select(Path.GetFileName));
+        Assert.Equal(2, FilesUnder(root, "processed", "*.csv").Length);
+        Assert.Equal(2, FilesUnder(root, "error", "*.csv").Length);
+        Assert.Equal(4, FilesUnder(root, "processed", "*.result.txt").Length + FilesUnder(root, "error", "*.result.txt").Length);
+        // 種別フォルダの中のファイルは、移した先でも種別フォルダに入れる（直してそのまま戻せる）
+        Assert.Single(FilesUnder(root, "processed", "ERP出力.csv"),
+            f => Path.GetFileName(Path.GetDirectoryName(f)) == "defect-reasons");
+
+        // 取込は設定した利用者として監査ログに残る
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+        var logs = await db.AuditLogs.AsNoTracking()
+            .Where(l => l.Category == "Master" && l.Action == "CsvImport").ToListAsync();
+        Assert.Equal(2, logs.Count);
+        Assert.All(logs, l => Assert.Equal(TestAuth.AdminUser, l.UserName));
+    }
+
+    [Fact]
+    public async Task フォルダ連携は取込の利用者の権限で判定する()
+    {
+        var (factory, root) = CreateFolderLinkFactory("folder-op");
+        using var _ = factory;
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        using var op = await TestAuth.CreateUserClientAsync(factory, admin, "folder-op", "Passw0rd123", MesRoles.Operator);
+        var inbox = Path.Combine(root, "inbox");
+        Directory.CreateDirectory(inbox);
+        await File.WriteAllTextAsync(Path.Combine(inbox, "defect-reasons.csv"), DefectReasonCsv);
+
+        var status = await ScanAsync(admin);
+        var result = Assert.Single(status.Recent);
+        Assert.False(result.Succeeded);
+        Assert.Empty((await admin.GetFromJsonAsync<List<DefectReasonResponse>>("/api/defect-reasons"))!);
+        Assert.Single(FilesUnder(root, "error", "defect-reasons.csv"));
+    }
+
+    [Fact]
+    public async Task フォルダ連携は利用者がいなければ取り込まず_ファイルをinboxに残す()
+    {
+        var (factory, root) = CreateFolderLinkFactory("no-such-user");
+        using var _ = factory;
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var inbox = Path.Combine(root, "inbox");
+        Directory.CreateDirectory(inbox);
+        await File.WriteAllTextAsync(Path.Combine(inbox, "defect-reasons.csv"), DefectReasonCsv);
+
+        var status = await ScanAsync(admin);
+        Assert.NotNull(status.ConfigError);
+        Assert.Empty(status.Recent);
+        Assert.True(File.Exists(Path.Combine(inbox, "defect-reasons.csv")));
+    }
+
+    [Fact]
+    public async Task フォルダ連携が未設定なら走査できず_状態の参照はシステム管理者だけ()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var status = await admin.GetFromJsonAsync<FolderLinkStatusResponse>("/api/folder-link/status");
+        Assert.False(status!.Enabled);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsync("/api/folder-link/scan", null)).StatusCode);
+
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "manager", "Passw0rd123", MesRoles.ProductionManager);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync("/api/folder-link/status")).StatusCode);
     }
 
     private static async Task<CsvImportResult> ImportAsync(

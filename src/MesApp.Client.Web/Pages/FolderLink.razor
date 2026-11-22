@@ -1,0 +1,154 @@
+@page "/folder-link"
+@attribute [Authorize(Roles = MesRoles.SystemAdmin)]
+@using MesApp.Core.Contracts.Integration
+@inject HttpClient Http
+
+@* フォルダ連携（CSVの自動取込。Spec.md 3.8 フォルダ連携。ERP等からの指図の取込 A-20-10-01 ほか）。
+   設定は appsettings / 環境変数で行い、この画面は状態の確認と手動の走査だけ（サーバーのパスを出すのでシステム管理者専用） *@
+
+<PageTitle>@L["フォルダ連携 - Parallel Factory MES"]</PageTitle>
+
+<h1>@L["フォルダ連携"]</h1>
+<p class="text-muted">
+    @L["連携フォルダの inbox に置かれたCSV・ZIPを自動で取り込みます。販売管理・生産管理などのソフトが出力したCSVを、そのまま取り込めます。"]
+    @L["取込はマスタ管理・実績CSV取込の画面と同じチェックを通り、1行でもエラーがあればそのファイルは何も反映しません。"]
+</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+@if (_status is null)
+{
+    <p class="text-muted">@L["読み込み中..."]</p>
+}
+else if (!_status.Enabled)
+{
+    <div class="card">
+        <h2 style="margin-top:0;">@L["設定されていません"]</h2>
+        <p class="text-muted">
+            @L["サーバーの設定（appsettings.json、Docker では環境変数）で連携フォルダと取込を行う利用者を指定し、再起動すると始まります。"]
+        </p>
+        @* 設定のキーは訳さない *@
+        @* 行の高さが既定（normal）だと、等幅フォントによっては「__」の下線が次の行に隠れて「FolderLink Root」に見える *@
+        <pre style="line-height:1.6;">FolderLink__Root=/data/folder-link
+FolderLink__UserName=folder-link</pre>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="form-grid">
+            <div class="form-field">
+                <label>@L["連携フォルダ"]</label>
+                @* サーバーのパスは長く区切りが無いので、どこででも折り返す（画面を横にはみ出させない） *@
+                <div style="word-break:break-all;">@_status.Root</div>
+            </div>
+            <div class="form-field">
+                <label>@L["取込を行う利用者"]</label>
+                <div>@_status.UserName</div>
+            </div>
+            <div class="form-field">
+                <label>@L["走査の間隔"]</label>
+                <div>@L["{0} 秒", _status.PollSeconds]</div>
+            </div>
+            <div class="form-field">
+                <label>@L["最後の走査"]</label>
+                <div>@(_status.LastScanAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</div>
+            </div>
+        </div>
+        @if (_status.ConfigError is { } configError)
+        {
+            <Notice Error="@L["設定に誤りがあるため取り込んでいません：{0}", configError].Value" />
+        }
+        <p class="text-muted">
+            @L["種別はファイル名（例 inbox/manufacturing-orders.csv）か、inbox の下の種別の名前のフォルダ（例 inbox/manufacturing-orders/）で決まります。"]
+            @L["取り込んだファイルは processed へ、取り込めなかったファイルは error へ、結果ファイル（.result.txt）と一緒に移します。"]
+        </p>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="ScanAsync">@L["今すぐ取り込む"]</button>
+            <button class="btn btn-secondary" disabled="@_busy" @onclick="LoadAsync">@L["表示を更新"]</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">@L["最近処理したファイル"]</h2>
+        @if (_status.Recent.Count == 0)
+        {
+            <p class="text-muted">@L["まだ処理したファイルはありません（再起動すると一覧は消えます。結果は processed・error フォルダに残ります）。"]</p>
+        }
+        else
+        {
+            @* 列が多いので、狭い画面では表だけを横にスクロールさせる（ページ全体をはみ出させない） *@
+            <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
+                    <tr><th>@L["日時"]</th><th>@L["ファイル"]</th><th>@L["結果"]</th><th>@L["種別"]</th><th>@L["データ行"]</th><th>@L["登録件数"]</th><th>@L["更新件数"]</th><th>@L["移した先"]</th><th>@L["メッセージ"]</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var file in _status.Recent)
+                    {
+                        <tr>
+                            <td>@file.ProcessedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            <td>@file.FileName</td>
+                            <td>@(file.Succeeded ? L["取込済み"].Value : L["エラー"].Value)</td>
+                            <td>@file.Kind</td>
+                            <td>@file.Rows</td>
+                            <td>@file.Created</td>
+                            <td>@file.Updated</td>
+                            <td class="text-muted">@file.MovedTo</td>
+                            <td style="white-space:pre-wrap;word-break:break-all;min-width:16em;">@string.Join("\n", file.Messages)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private FolderLinkStatusResponse? _status;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _message = null;
+        try
+        {
+            _status = await Http.GetFromJsonAsync<FolderLinkStatusResponse>("api/folder-link/status");
+        }
+        catch (HttpRequestException)
+        {
+            _error = L["フォルダ連携の状態を取得できませんでした。"];
+        }
+    }
+
+    private async Task ScanAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            // 一覧は件数の上限で古いものから消えるので、件数の差ではなく前回の最新より新しいものを数える
+            var newest = _status?.Recent.FirstOrDefault()?.ProcessedAt ?? DateTimeOffset.MinValue;
+            var response = await Http.PostAsync("api/folder-link/scan", null);
+            if (await response.ReadErrorAsync(L["取込に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _status = await response.Content.ReadFromJsonAsync<FolderLinkStatusResponse>();
+            var processed = _status?.Recent.Count(r => r.ProcessedAt > newest) ?? 0;
+            _message = L["inbox を確認しました（処理したファイル {0} 件）。", processed];
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -90,6 +90,10 @@ Edit `appsettings.json` or override the values with environment variables.
 | Automatic generation of the initial password | `MesAdmin__GeneratePassword` | `false` (`true` only in the desktop edition) |
 | IPs of trusted reverse proxies | `ReverseProxy__KnownProxies__0` (`__1`, `__2` … for more) | Not set (forwarded headers are not read) |
 | Networks of trusted reverse proxies | `ReverseProxy__KnownNetworks__0` (CIDR, for example `192.168.10.0/24`) | Not set |
+| Folder integration: integration folder | `FolderLink__Root` | Not set (no integration) |
+| Folder integration: importing user | `FolderLink__UserName` | Not set |
+| Folder integration: scan interval (seconds) | `FolderLink__PollSeconds` | `30` |
+| Folder integration: language of results | `FolderLink__Language` | `ja` (`en` is also allowed) |
 
 ### Business date boundary hour
 
@@ -109,6 +113,56 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 If `MesAdmin__Password` is not specified, no initial administrator is created (so that no account is left
 whose password nobody knows). Only the desktop edition, which can show the password on screen,
 uses automatic generation with `MesAdmin__GeneratePassword=true`.
+
+## Folder integration  {#folder-link}
+
+CSV files placed in a chosen folder are imported automatically. CSV files exported by sales or production management software
+can be imported without writing a program (for example, have the manufacturing order CSV exported every morning placed in a shared folder).
+
+### Setting it up
+
+1. Create the user who performs the imports (for example `folder-link`). Give it **only the roles needed for the types you want to import**
+   (Production management for manufacturing orders, Logistics / warehouse for receiving; see [Roles and permissions](roles.html) for what each role can do).
+   Whether an import is allowed, who is recorded on actuals, and the audit log are all decided and recorded as this user.
+2. Set the integration folder and the user, then restart.
+
+```powershell
+$env:FolderLink__Root="D:\mes-link"; $env:FolderLink__UserName="folder-link"; ./start.cmd
+```
+
+With Docker, mount the integration folder from a folder on the host (example for `compose.yaml`).
+
+```yaml
+    volumes:
+      - mesapp-data:/data
+      - ./mes-link:/link
+    environment:
+      FolderLink__Root: /link
+      FolderLink__UserName: folder-link
+```
+
+Changing the settings requires a restart. On startup, `inbox`, `processed` and `error` are created under the integration folder.
+
+### Where to put files
+
+| Location | How the type is determined | Example |
+|---|---|---|
+| Directly in `inbox` | File name (the part after the first "_") | `inbox/manufacturing-orders.csv`, `inbox/20261122_manufacturing-orders.csv` |
+| `inbox/<type>/` | Folder name (any file name) | `inbox/manufacturing-orders/orders.csv` |
+| A ZIP directly in `inbox` | File names inside (same as ZIP bulk import) | `inbox/masters.zip` |
+
+- The type names and CSV columns are the same as the templates on the Master Data and Actuals CSV Import screens. For software that cannot change the name of the file it exports, have it export into the type's folder.
+- Files other than CSV and ZIP are ignored. Files being written are imported after writing finishes.
+- Files are imported one at a time in the order they were placed (oldest modification time first). When a later file refers to an earlier one (receiving after manufacturing orders, for example), place them in order or put them in one ZIP.
+
+### Checking the results
+
+- **Imported files are moved to `processed` and files that could not be imported to `error`**, under `date/time/`, with a result file (`.result.txt`) beside them. The line numbers and reasons for errors are written there.
+- Imports go through the same checks as importing from the screens, and **if even one row has an error, nothing in that file is applied**. Put the corrected file back in the same place in `inbox` to import it again.
+- System administrators can check settings errors and recently processed files under "Administration" → "Folder integration" in the menu. "Import now" imports without waiting for the next interval.
+- If the user does not exist, is inactive or is locked out, nothing is imported and the files stay in `inbox` (the reason is shown on the screen).
+
+There is no integration that writes data out of the MES yet (automatic export of actuals).
 
 ## Security
 

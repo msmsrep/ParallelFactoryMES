@@ -330,6 +330,7 @@ Open **Administration → Actuals CSV Import** in the menu and import from the p
 - The permission needed to import each kind is the same as when registering it on the screen (logistics for receiving, shipping orders and shipments; production management for manufacturing orders; quality control for inspections; quality assurance for shipment judgments; and so on. Anyone can import maintenance spot requests and results and tool usage; only maintenance staff can import maintenance plans and planned maintenance orders; production management for tool allocation; quality control for inspection device calibration).
 - "If even one row has an error, all rows are rolled back" and "Validate only" work the same as for master data CSVs.
 - With **Bulk import via ZIP** at the top of the screen, you can import several CSVs at once (in file name order; if even one file has an error, all files in the ZIP are rolled back).
+- To import CSV files exported regularly by sales or production management software, use **[Folder integration](operations.html#folder-link)**: files placed in a chosen folder are imported automatically (a system administrator sets it up).
 
 A **sample** with a complete set from receiving to shipment is available at
 **[samples-actual-csv.zip](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip)**

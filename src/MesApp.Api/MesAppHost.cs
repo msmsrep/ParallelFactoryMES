@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using MesApp.Api.Services;
+using MesApp.Api.Services.FolderLink;
 using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
@@ -108,6 +109,10 @@ public static class MesAppHost
         builder.Services.AddScoped<TransferOrderService>();
         builder.Services.AddScoped<SampleStorageService>();
         builder.Services.AddScoped<ActualCsvService>();
+        // フォルダ連携（Spec.md 3.8）。FolderLink:Root が空なら常駐処理は何もしない
+        builder.Services.Configure<FolderLinkOptions>(builder.Configuration.GetSection(FolderLinkOptions.SectionName));
+        builder.Services.AddSingleton<FolderLinkService>();
+        builder.Services.AddHostedService<FolderLinkWorker>();
 
         builder.Services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

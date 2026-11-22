@@ -90,6 +90,10 @@ ASP.NET Core 10 Runtime が必要です。同じLAN内の他のPCからは `http
 | 初期パスワードの自動生成 | `MesAdmin__GeneratePassword` | `false`（デスクトップ版のみ `true`） |
 | 信頼するリバースプロキシのIP | `ReverseProxy__KnownProxies__0`（複数は `__1`, `__2` …） | 未設定（転送ヘッダを読まない） |
 | 信頼するリバースプロキシのネットワーク | `ReverseProxy__KnownNetworks__0`（CIDR。例 `192.168.10.0/24`） | 未設定 |
+| フォルダ連携の連携フォルダ | `FolderLink__Root` | 未設定（連携しない） |
+| フォルダ連携の取込を行う利用者 | `FolderLink__UserName` | 未設定 |
+| フォルダ連携の走査の間隔（秒） | `FolderLink__PollSeconds` | `30` |
+| フォルダ連携の結果の言語 | `FolderLink__Language` | `ja`（`en` も可） |
 
 ### 業務日付の境界時刻
 
@@ -109,6 +113,56 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 `MesAdmin__Password` を指定しない場合、初期管理者は作成されません（値を誰も知らない
 アカウントを残さないため）。パスワードを画面に表示できるデスクトップ版のみ、
 `MesAdmin__GeneratePassword=true` による自動生成を使います。
+
+## フォルダ連携  {#folder-link}
+
+決めたフォルダに置かれたCSVを自動で取り込みます。販売管理・生産管理などのソフトが出力したCSVを、
+プログラムを書かずに取り込めます（たとえば、毎朝出力される製造指図のCSVを共有フォルダに置かせる）。
+
+### 設定する
+
+1. 取込を行う利用者を作ります（例 `folder-link`）。**取り込みたい種別に必要なロールだけ**を与えます
+   （製造指図なら生産管理担当者、受入なら物流・倉庫担当者。ロールごとの権限は[ロールと権限](roles.html)）。
+   取込の可否・実績の記録者・監査ログは、この利用者で判定・記録されます。
+2. 連携フォルダと利用者を設定して、再起動します。
+
+```powershell
+$env:FolderLink__Root="D:\mes-link"; $env:FolderLink__UserName="folder-link"; ./start.cmd
+```
+
+Docker では、連携フォルダをホストのフォルダにマウントします（`compose.yaml` の例）。
+
+```yaml
+    volumes:
+      - mesapp-data:/data
+      - ./mes-link:/link
+    environment:
+      FolderLink__Root: /link
+      FolderLink__UserName: folder-link
+```
+
+設定を変えたときは再起動が要ります。起動すると、連携フォルダの下に `inbox`・`processed`・`error` が作られます。
+
+### ファイルの置き方
+
+| 置く場所 | 種別の決まり方 | 例 |
+|---|---|---|
+| `inbox` の直下 | ファイル名（最初の「_」より後ろ） | `inbox/manufacturing-orders.csv`、`inbox/20261122_manufacturing-orders.csv` |
+| `inbox/<種別>/` | フォルダ名（ファイル名は問わない） | `inbox/manufacturing-orders/製造指図.csv` |
+| `inbox` の直下のZIP | 中のファイル名（ZIPの一括取込と同じ） | `inbox/masters.zip` |
+
+- 種別の名前とCSVの列は、マスタ管理・実績CSV取込の画面のテンプレートと同じです。出力するファイル名を変えられないソフトは、種別のフォルダに出力させます。
+- CSV・ZIP 以外のファイルは無視します。書き込み中のファイルは、書き終わってから取り込みます。
+- 置かれた順（更新日時の古い順）に1ファイルずつ取り込みます。後のファイルが前のファイルを参照するとき（製造指図のあとに受入など）は、順に置くか1つのZIPにまとめます。
+
+### 結果を確かめる
+
+- **取り込めたファイルは `processed`、取り込めなかったファイルは `error`** の `日付/時刻/` の下へ移り、横に結果ファイル（`.result.txt`）が付きます。エラーの行番号と理由はここに書かれます。
+- 取込は画面から取り込むときと同じチェックを通り、**1行でもエラーがあればそのファイルは何も反映しません**。直したファイルを `inbox` の同じ場所へ戻せば、取り込み直せます。
+- システム管理者は、メニューの「管理」→「フォルダ連携」で、設定の誤りと最近処理したファイルを確かめられます。「今すぐ取り込む」で、次の間隔を待たずに取り込めます。
+- 利用者がいない・無効・ロック中のときは、何も取り込まずファイルを `inbox` に残します（画面に理由が出ます）。
+
+MESから外へ書き出す連携（実績の自動出力）は、まだありません。
 
 ## セキュリティ
 

@@ -4326,4 +4326,85 @@
   <data name="ずれが {0}% 以上で、作業指示が {1} 件以上あるものを見直し候補とする。標準の変更はマスタ管理の工順で行う。" xml:space="preserve">
     <value>Steps with a deviation of {0}% or more and at least {1} work orders are review candidates. Change the standards in the routing under master management.</value>
   </data>
+  <data name="フォルダ連携" xml:space="preserve">
+    <value>Folder integration</value>
+  </data>
+  <data name="フォルダ連携 - Parallel Factory MES" xml:space="preserve">
+    <value>Folder integration - Parallel Factory MES</value>
+  </data>
+  <data name="連携フォルダの inbox に置かれたCSV・ZIPを自動で取り込みます。販売管理・生産管理などのソフトが出力したCSVを、そのまま取り込めます。" xml:space="preserve">
+    <value>CSV and ZIP files placed in the inbox of the integration folder are imported automatically. CSV files exported by sales or production management software can be imported as they are.</value>
+  </data>
+  <data name="取込はマスタ管理・実績CSV取込の画面と同じチェックを通り、1行でもエラーがあればそのファイルは何も反映しません。" xml:space="preserve">
+    <value>Imports go through the same checks as the Master Data and Actuals CSV Import screens. If even one row has an error, nothing in that file is applied.</value>
+  </data>
+  <data name="設定されていません" xml:space="preserve">
+    <value>Not configured</value>
+  </data>
+  <data name="サーバーの設定（appsettings.json、Docker では環境変数）で連携フォルダと取込を行う利用者を指定し、再起動すると始まります。" xml:space="preserve">
+    <value>Specify the integration folder and the importing user in the server settings (appsettings.json, or environment variables in Docker), then restart to begin.</value>
+  </data>
+  <data name="連携フォルダ" xml:space="preserve">
+    <value>Integration folder</value>
+  </data>
+  <data name="取込を行う利用者" xml:space="preserve">
+    <value>Importing user</value>
+  </data>
+  <data name="走査の間隔" xml:space="preserve">
+    <value>Scan interval</value>
+  </data>
+  <data name="{0} 秒" xml:space="preserve">
+    <value>{0} s</value>
+  </data>
+  <data name="最後の走査" xml:space="preserve">
+    <value>Last scan</value>
+  </data>
+  <data name="設定に誤りがあるため取り込んでいません：{0}" xml:space="preserve">
+    <value>Not importing because the settings are invalid: {0}</value>
+  </data>
+  <data name="種別はファイル名（例 inbox/manufacturing-orders.csv）か、inbox の下の種別の名前のフォルダ（例 inbox/manufacturing-orders/）で決まります。" xml:space="preserve">
+    <value>The type is determined by the file name (e.g. inbox/manufacturing-orders.csv) or by a folder under the inbox named after the type (e.g. inbox/manufacturing-orders/).</value>
+  </data>
+  <data name="取り込んだファイルは processed へ、取り込めなかったファイルは error へ、結果ファイル（.result.txt）と一緒に移します。" xml:space="preserve">
+    <value>Imported files are moved to processed and files that could not be imported are moved to error, together with a result file (.result.txt).</value>
+  </data>
+  <data name="今すぐ取り込む" xml:space="preserve">
+    <value>Import now</value>
+  </data>
+  <data name="表示を更新" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="最近処理したファイル" xml:space="preserve">
+    <value>Recently processed files</value>
+  </data>
+  <data name="まだ処理したファイルはありません（再起動すると一覧は消えます。結果は processed・error フォルダに残ります）。" xml:space="preserve">
+    <value>No files have been processed yet (this list is cleared on restart; results remain in the processed and error folders).</value>
+  </data>
+  <data name="データ行" xml:space="preserve">
+    <value>Data rows</value>
+  </data>
+  <data name="登録件数" xml:space="preserve">
+    <value>Created</value>
+  </data>
+  <data name="更新件数" xml:space="preserve">
+    <value>Updated</value>
+  </data>
+  <data name="移した先" xml:space="preserve">
+    <value>Moved to</value>
+  </data>
+  <data name="メッセージ" xml:space="preserve">
+    <value>Messages</value>
+  </data>
+  <data name="取込済み" xml:space="preserve">
+    <value>Imported</value>
+  </data>
+  <data name="エラー" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="フォルダ連携の状態を取得できませんでした。" xml:space="preserve">
+    <value>Could not get the folder integration status.</value>
+  </data>
+  <data name="inbox を確認しました（処理したファイル {0} 件）。" xml:space="preserve">
+    <value>Checked the inbox ({0} files processed).</value>
+  </data>
 </root>

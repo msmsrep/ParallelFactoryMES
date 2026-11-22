@@ -284,6 +284,16 @@ public static class MasterCsvKinds
         All.FirstOrDefault(k => string.Equals(k.Kind, kind, StringComparison.OrdinalIgnoreCase));
 
     public static string[] ColumnNames(CsvKindInfo kind) => [.. kind.Columns.Select(c => c.Name)];
+
+    /// <summary>
+    /// 取込に要るロールグループ。ユーザー系とスキル・資格はユーザー管理権限、それ以外はマスタ更新権限。
+    /// 単票APIがマスタ更新権限以外で絞る種別（生産計画）は、種別の WriteRoles をそのまま使う。
+    /// 画面からの取込とフォルダ連携の両方がここで判定する（片方だけ直すと権限がずれる）
+    /// </summary>
+    public static string WriteRolesOf(CsvKindInfo kind) =>
+        kind.WriteRoles ?? (kind.UserAdminOnly || kind.UserAdminWrite
+            ? MesRoleGroups.UserAdmin
+            : MesRoleGroups.MasterWrite);
 }
 
 /// <summary>CSVの列挙値として受け付ける文字列（英語の列挙名＋画面と同じ日本語ラベル）</summary>
