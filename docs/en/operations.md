@@ -193,6 +193,79 @@ curl -H "X-Api-Key: pfm_..." http://localhost:5000/api/integration/v1/whoami
 - **A revoked key cannot be restored.** A key also stops working immediately when its user is deactivated or its expiry passes. When the user's roles change, the next call is checked with the new roles.
 - Treat keys like passwords. Do not paste them into email or chat; keep them only in the settings of the connecting system.
 
+## Integration API  {#integration-api}
+
+An API for exchanging data with the MES from sales or production management software (ERP) or in-house scripts. Calls use an [API key](#api-keys).
+
+### Specification (OpenAPI)
+
+The integration API specification is published at `/openapi/integration-v1.json` (for example `http://localhost:5000/openapi/integration-v1.json`).
+Load it into Postman, Visual Studio or similar tools to see the endpoints, parameters and response shapes. No key is needed to get the specification.
+
+### Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/integration/v1/whoami` | Check that the key works and who you are treated as, with which roles |
+| `GET /api/integration/v1/csv-kinds` | The CSV types and columns that can be imported (the same as the Master Data and Actuals CSV Import screens) |
+| `POST /api/integration/v1/masters/{type}` | Import a master data CSV (overwritten by code) |
+| `POST /api/integration/v1/actuals/{type}` | Import an actuals CSV (always registered as new) |
+| `POST /api/integration/v1/masters/bundle`, `actuals/bundle` | Import a ZIP of CSV files |
+| `GET /api/integration/v1/masters/{type}` | Export master data as CSV |
+| `GET /api/integration/v1/production-results` | Read production results from where you left off |
+| `GET /api/integration/v1/production-result-corrections` | Read corrections to production results from where you left off |
+
+### Importing CSV
+
+Send the CSV as the request body (UTF-8 or Shift_JIS). Add `?dryRun=true` to only validate without applying anything.
+The PowerShell examples on this page are for PowerShell 7 (`pwsh`).
+
+```powershell
+$headers = @{ "X-Api-Key" = "pfm_..."; "Idempotency-Key" = "orders-20261123" }
+Invoke-RestMethod -Method Post -Headers $headers -ContentType "text/csv; charset=utf-8" -InFile .\manufacturing-orders.csv -Uri http://localhost:5000/api/integration/v1/actuals/manufacturing-orders
+```
+
+```bash
+curl -H "X-Api-Key: pfm_..." -H "Idempotency-Key: orders-20261123" -H "Content-Type: text/csv" --data-binary @manufacturing-orders.csv http://localhost:5000/api/integration/v1/actuals/manufacturing-orders
+```
+
+- **200** when imported, and **422** if even one row has an error, in which case nothing is applied. In both cases the response body contains the counts and errors with line numbers (in PowerShell 7, add `-SkipHttpErrorCheck` to also receive the body of a 422).
+- Import permission is checked with the roles of the user linked to the key, the same as on the screens (403 without permission).
+
+### Sending again without registering twice (Idempotency-Key)
+
+Actuals CSV files are **always registered as new**, so sending the same CSV again after a dropped connection can register it twice.
+To prevent this, put a value chosen for each content you send (for example the order export time and a sequence number, or a UUID) in the `Idempotency-Key` header.
+
+- If you send the same key with the same content again, **the previous response is returned without importing again** (the response has the header `Idempotent-Replayed: true`).
+- A request with the same key but different content gets 409. Use a new key for new content.
+- Keys are remembered for 24 hours, separately for each API key.
+
+### Reading production results (from where you left off)
+
+Pass the previous `nextAfterId` as `afterId` to get only the results recorded after it. Keep reading while `hasMore` is true.
+Save the last `nextAfterId` so that the next run starts where this one ended.
+
+```powershell
+$headers = @{ "X-Api-Key" = "pfm_..." }
+$after = if (Test-Path .\last-id.txt) { Get-Content .\last-id.txt } else { 0 }
+do {
+  $page = Invoke-RestMethod -Headers $headers -Uri "http://localhost:5000/api/integration/v1/production-results?afterId=$after"
+  $page.items | Export-Csv .\production-results.csv -Append -Encoding utf8
+  $after = $page.nextAfterId
+} while ($page.hasMore)
+Set-Content .\last-id.txt $after
+```
+
+- Quantities are the current values after any correction. To learn that a result you already read was corrected later, read `production-result-corrections` from where you left off in the same way.
+- Results not yet approved are also returned (`approvedAt` is empty). Results of canceled orders are also returned because the physical lots remain (see `workOrderStatus`).
+
+### Promises that keep integrations working after upgrades
+
+- Within v1 (`/api/integration/v1`), **fields and endpoints are only added**, never removed, renamed or given a new meaning. Such changes go into a v2.
+- The same applies to CSV columns. Columns are not removed and no required columns are added (if you leave out a new column, things work as before). When a column is renamed, its former name can still be read.
+- Build your integrations to skip fields they do not know, in case new fields are added to responses.
+
 ## Security
 
 <div class="warn">

@@ -4,6 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- 連携API の OpenAPI 文書に XML コメントを説明として載せる（Spec.md 3.8 連携API）。
+         説明の網羅は求めない（CS1591：コメントの無い公開型、CS1573：引数の一部にだけ説明がある） -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

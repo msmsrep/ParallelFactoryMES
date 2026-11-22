@@ -12,6 +12,7 @@ namespace MesApp.Api.Controllers.Integration;
 [ApiController]
 [Route("api/integration/v1/whoami")]
 [Authorize(AuthenticationSchemes = ApiKeyAuthentication.IntegrationSchemes)]
+[ApiExplorerSettings(GroupName = IntegrationOpenApi.DocumentName)]
 public class WhoAmIController : ControllerBase
 {
     [HttpGet]

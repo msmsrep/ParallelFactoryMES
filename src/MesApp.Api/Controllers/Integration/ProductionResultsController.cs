@@ -18,6 +18,7 @@ namespace MesApp.Api.Controllers.Integration;
 [ApiController]
 [Route("api/integration/v1")]
 [Authorize(AuthenticationSchemes = ApiKeyAuthentication.IntegrationSchemes)]
+[ApiExplorerSettings(GroupName = IntegrationOpenApi.DocumentName)]
 public class ProductionResultsController(MesAppDbContext db) : ControllerBase
 {
     public const int DefaultLimit = 500;

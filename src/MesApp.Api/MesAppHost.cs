@@ -48,7 +48,12 @@ public static class MesAppHost
                     manager.ApplicationParts.Add(new AssemblyPart(apiAssembly));
                 }
             });
-        builder.Services.AddOpenApi();
+        // OpenAPI 文書：画面用の API を含む既定の文書（v1）は開発環境だけ。連携API の文書は全環境（Spec.md 3.8 連携API）
+        if (builder.Environment.IsDevelopment())
+        {
+            builder.Services.AddOpenApi();
+        }
+        builder.Services.AddIntegrationOpenApi();
         builder.Services.AddHttpContextAccessor();
         // MesAppExceptionFilterで拾わない想定外の例外も、本文なしの500ではなくProblemDetailsで返す
         builder.Services.AddProblemDetails();
@@ -167,10 +172,8 @@ public static class MesAppHost
             options.RequestCultureProviders = [new AcceptLanguageHeaderRequestCultureProvider()];
         });
 
-        if (app.Environment.IsDevelopment())
-        {
-            app.MapOpenApi();
-        }
+        // /openapi/{文書名}.json。登録した文書だけが出る（本番は integration-v1 だけ。ほかの名前は404）
+        app.MapOpenApi();
 
         // Blazor WASMクライアントの配信（index.html・_framework・css）
         app.UseBlazorFrameworkFiles();

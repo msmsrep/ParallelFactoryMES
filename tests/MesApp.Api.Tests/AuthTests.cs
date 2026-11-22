@@ -560,4 +560,41 @@ public class AuthTests
         Assert.Equal(HttpStatusCode.Forbidden,
             (await manager.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest("x", userId, null))).StatusCode);
     }
+
+    // ---- 連携API の OpenAPI 文書（Spec.md 3.8 連携API。INT-04） ----
+
+    [Fact]
+    public async Task 連携APIのOpenAPI文書は開発環境でなくても認証なしで取れ_連携APIだけが載る()
+    {
+        // ApiFactory は Testing 環境（開発環境ではない）
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/openapi/integration-v1.json");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+
+        var paths = root.GetProperty("paths").EnumerateObject().Select(p => p.Name).ToList();
+        Assert.Contains("/api/integration/v1/whoami", paths);
+        Assert.Contains("/api/integration/v1/csv-kinds", paths);
+        Assert.Contains("/api/integration/v1/actuals/{kind}", paths);
+        Assert.Contains("/api/integration/v1/production-results", paths);
+        Assert.Contains("/api/integration/v1/production-result-corrections", paths);
+        // 画面用の API は外部との約束にしないので載せない
+        Assert.All(paths, p => Assert.StartsWith("/api/integration/v1/", p));
+
+        // APIキーの送り方が文書に載る
+        var scheme = root.GetProperty("components").GetProperty("securitySchemes").GetProperty("ApiKey");
+        Assert.Equal("apiKey", scheme.GetProperty("type").GetString());
+        Assert.Equal("header", scheme.GetProperty("in").GetString());
+        Assert.Equal("X-Api-Key", scheme.GetProperty("name").GetString());
+
+        // 説明は XML コメントから載る
+        var feed = root.GetProperty("paths").GetProperty("/api/integration/v1/production-results").GetProperty("get");
+        Assert.Contains("afterId", feed.GetProperty("summary").GetString());
+
+        // 画面用の API を含む既定の文書は開発環境だけ
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/openapi/v1.json")).StatusCode);
+    }
 }

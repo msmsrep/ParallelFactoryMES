@@ -24,7 +24,9 @@
 | INT-01 APIキーの土台 | 完了（2026-11-22。Spec.md 改訂150） |
 | INT-02 CSVの取込・出力を連携APIで | 完了（2026-11-22。Spec.md 改訂151） |
 | INT-03 実績の取得 | 完了（2026-11-23。Spec.md 改訂152） |
-| INT-04 OpenAPI 文書と利用者ガイド | 未着手 |
+| INT-04 OpenAPI 文書と利用者ガイド | 完了（2026-11-23。Spec.md 改訂153） |
+
+**バックログは全件完了**（2026-11-23）。続きの候補は「対象外」の節（Webhook、設備イベントの受信、業務別の JSON API、機械向けのエラーコード）。
 
 ## 決定事項（2026-11-22 確定）
 
@@ -115,6 +117,11 @@
 
 **変更ファイルの想定（約8）**：`Api/MesAppHost.cs`、`Api/MesApp.Api.csproj`、（必要なら）`Api/Integration/IntegrationOpenApi.cs`、`Tests/AuthTests.cs`（文書が取れる・連携API だけが載る）、`Spec.md`、`docs/operations.md`・`docs/en/operations.md`、`CodeMap.md`
 **受入基準**：本番構成で文書が 200／画面用 API が文書に載らない／ガイドの例を新しい DB でそのまま実行して通る
+
+**実施メモ（2026-11-23）**：変更は15ファイル（想定約11。多かったのは、文書のグループに入れるため連携APIの Controller 3つに `ApiExplorerSettings` を足した分と、下の CS1587 で `WorkCenterHierarchyPolicy.cs` を直した1件）。
+- `GenerateDocumentationFile` を有効にすると、既存のコメントで CS1573（引数の一部にだけ説明がある）が48件、CS1587（置き場所の誤ったコメント）が1件出た。CS1573 は CS1591 と同じ「説明の網羅」なので抑止し、CS1587 は孤立したコメント（`WorkCenterHierarchyPolicy.cs`）を消した
+- 既定の文書 v1（画面用の API を含む）は開発環境だけ登録し、`MapOpenApi` は全環境にした（登録していない文書名は404）
+- ガイドの例は新しい DB で、サンプルのマスタ・実績の ZIP 取込（同じ `Idempotency-Key` で2回）、実績の続きの読み出し、curl の取込を実行して確かめた。PowerShell 7 では `Export-Csv -NoTypeInformation` が廃止済みで警告が出るので例から外し、例は PowerShell 7 向けと書いた
 
 ## 順序と依存
 
