@@ -1,0 +1,89 @@
+---
+nav_url: factory-tour.html
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factory model: from production to shipping | Parallel Factory MES User Guide</title>
+<meta name="description" content="Follow the sample gear-pump production on a moving factory model and see how the MES records change.">
+<link rel="alternate" hreflang="ja" href="../factory-tour.html">
+<link rel="alternate" hreflang="en" href="factory-tour.html">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='translate(-5.5,-9.5) scale(1.06)'%3E%3Crect x='19' y='58' width='21' height='26' rx='6' fill='%23CDEBDF'/%3E%3Crect x='47' y='32' width='21' height='52' rx='6' fill='%238FD2BE'/%3E%3Crect x='75' y='46' width='21' height='38' rx='6' fill='%235CC8A8'/%3E%3Cg fill='none' stroke='%2318193F' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='12' y='50' width='21' height='26' rx='6'/%3E%3Crect x='40' y='24' width='21' height='52' rx='6'/%3E%3Crect x='68' y='38' width='21' height='38' rx='6'/%3E%3Cpath d='M13 88 H88'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/tour/tour.css">
+</head>
+<body class="tour-page">
+<a class="skip" href="#tour-side">Skip to the explanation</a>
+
+<header class="topbar">
+  <a class="brand" href="index.html">Parallel Factory <strong>MES</strong></a>
+  <span class="brand-sub">Factory model: from production to shipping</span>
+  <a class="intro-link" href="index.html"><span aria-hidden="true">&larr; </span>Back to the guide</a>
+  <a class="lang-link" href="../factory-tour.html" hreflang="ja" lang="ja">日本語</a><!-- 訳さない -->
+</header>
+
+<noscript>
+  <p class="tour-noscript">This page needs JavaScript. See the <a href="walkthrough.html">explanation with screenshots</a> instead.</p>
+</noscript>
+
+<main class="tour">
+  <section class="tour-model" aria-label="Factory model">
+    <svg id="tour-svg" role="img" aria-label="Overview of the factory: the layout from receiving through machining, subcontracting, assembly, inspection and packing to shipping"></svg>
+  </section>
+
+  <section class="tour-band" aria-label="Records changed in this scene">
+    <p class="text-note">The records changed in this scene appear here.</p>
+  </section>
+
+  <section class="tour-controls" aria-label="Scene controls">
+    <div class="tour-buttons">
+      <button type="button" disabled><span aria-hidden="true">◀ </span>Previous</button>
+      <button type="button" disabled><span aria-hidden="true">▶ </span>Play</button>
+      <button type="button" disabled>Replay</button>
+      <button type="button" disabled>Next<span aria-hidden="true"> ▶</span></button>
+    </div>
+    <ol class="tour-rail" id="tour-rail"></ol>
+  </section>
+
+  <aside class="tour-side" id="tour-side" aria-label="Scene explanation">
+    <p class="tour-count">Not started</p>
+    <h1>Factory model: from production to shipping</h1>
+    <p>When goods move on the shop floor, who enters what on which screen, and which MES records change? Follow the sample gear-pump production step by step. The product names and other values of the sample data are shown in English here, but appear in Japanese on the app screens.</p>
+    <h2>On the shop floor</h2>
+    <p class="text-note">―</p>
+    <h2>Who enters what, on which screen</h2>
+    <p class="text-note">―</p>
+    <h2>What changes in the MES</h2>
+    <p class="text-note">―</p>
+    <p aria-live="polite" class="tour-live"></p>
+  </aside>
+
+  <section class="tour-ledger" aria-label="MES ledger">
+    <div class="tour-ledger-col">
+      <h2>Stock</h2>
+      <div class="tour-ledger-scroll">
+        <table>
+          <thead><tr><th>Lot</th><th>Product</th><th>Location</th><th class="num">Qty</th></tr></thead>
+          <tbody id="tour-ledger-lots"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tour-ledger-col">
+      <h2>Work order status</h2>
+      <div class="tour-ledger-scroll">
+        <table>
+          <thead><tr><th>Work order</th><th>Status</th></tr></thead>
+          <tbody id="tour-ledger-orders"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="../assets/tour/scenes.js"></script>
+<script src="../assets/tour/scenes.en.js"></script>
+<script src="../assets/tour/tour.js"></script>
+</body>
+</html>

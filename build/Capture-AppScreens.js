@@ -1,11 +1,14 @@
 // ストア掲載用スクリーンショットの素材として、アプリの実画面をPNGに撮る。
 //
 //   node build/Capture-AppScreens.js [--base http://localhost:5212]
-//                                    [--user admin] [--password xxxx]
+//                                    [--user admin] [--password xxxx] [--lang ja|en]
 //
-// 撮影先は build/store/raw/。組み立て（見出し・背景）は build/New-StoreScreenshots.py が行う。
+// 撮影先は build/store/raw/（--lang en のときは build/store/raw/en/）。
+// 組み立て（見出し・背景）は build/New-StoreScreenshots.py が行う。
 // Edge をヘッドレスで起動し、CDP（DevTools プロトコル）を直接叩く。追加のパッケージは要らない。
-// デモ用のデータは samples/master-csv・samples/actual-csv を一括取込した空DBを前提にする。
+// デモ用のデータは samples/master-csv・samples/actual-csv を一括取込した空DBを前提にする
+// （build/Capture-GuideScreens.js --page intro を先に流すと、管理者の作成と取込まで済む）。
+// ダッシュボードはサンプルの実績がある製造日（--date）を基準日にして撮る。
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -20,11 +23,13 @@ const USER = arg('user', 'admin');
 const PASSWORD = arg('password', 'Shots#2026pw');
 const EDGE = arg('edge', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe');
 const PORT = Number(arg('port', '9223'));
-const OUT = path.join(__dirname, 'store', 'raw');
+const LANG = arg('lang', 'ja');
+const DATE = arg('date', '2026-09-03');
+const OUT = path.join(__dirname, 'store', 'raw', ...(LANG === 'ja' ? [] : [LANG]));
 
 // 撮る画面（href はナビゲーションのリンク。null はログイン直後のダッシュボード）
 const SHOTS = [
-    { name: 'dashboard', href: null },
+    { name: 'dashboard', href: null, after: setDashboardDate },
     { name: 'orders', href: 'manufacturing-orders' },
     { name: 'work-orders', href: 'work-orders' },
     { name: 'inventory', href: 'inventory' },
@@ -65,11 +70,21 @@ async function waitFor(ws, expression, label, timeout = 60000) {
     }
 }
 
+// ダッシュボードの基準日を変える（日付欄は @onchange なので、値を入れて change を投げる）
+async function setDashboardDate(ws) {
+    await evalJs(ws, `(() => {
+        const el = document.querySelector('input[type="date"]');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(DATE)});
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return true; })()`);
+    await sleep(2500);
+}
+
 (async () => {
     fs.mkdirSync(OUT, { recursive: true });
     const profile = fs.mkdtempSync(path.join(require('os').tmpdir(), 'mes-shots-'));
     const edge = spawn(EDGE, ['--headless=new', `--remote-debugging-port=${PORT}`,
-        `--user-data-dir=${profile}`, '--no-first-run', '--hide-scrollbars',
+        `--user-data-dir=${profile}`, '--no-first-run', '--disable-extensions', '--disable-sync', '--hide-scrollbars',
         `--window-size=${WIDTH},${HEIGHT}`, 'about:blank'], { stdio: 'ignore' });
 
     try {
@@ -80,15 +95,23 @@ async function waitFor(ws, expression, label, timeout = 60000) {
         }
         if (!targets) throw new Error('Edge のデバッグポートに接続できませんでした。');
 
-        const ws = new WebSocket(targets.find(t => t.type === 'page').webSocketDebuggerUrl);
+        // Edge が自分のダイアログをページとして開くことがあるので、起動時の about:blank を選ぶ
+        const target = targets.find(t => t.type === 'page' && t.url === 'about:blank')
+            || targets.find(t => t.type === 'page');
+        const ws = new WebSocket(target.webSocketDebuggerUrl);
         await new Promise(r => ws.addEventListener('open', r));
         await send(ws, 'Page.enable');
+        await send(ws, 'Emulation.setFocusEmulationEnabled', { enabled: true });
         await send(ws, 'Runtime.enable');
         await send(ws, 'Emulation.setDeviceMetricsOverride',
             { width: WIDTH, height: HEIGHT, deviceScaleFactor: 2, mobile: false });
 
+        // 表示言語はブラウザの localStorage に持つ（Shared/AppCulture.cs・wwwroot/js/app.js）
         await send(ws, 'Page.navigate', { url: BASE + '/' });
-        await waitFor(ws, `!!document.querySelector('input')`, 'ログイン画面');
+        await waitFor(ws, `document.readyState === 'complete'`, '読み込み');
+        await evalJs(ws, `(localStorage.setItem('mesapp.culture', ${JSON.stringify(LANG)}), true)`);
+        await send(ws, 'Page.reload');
+        await waitFor(ws, `document.querySelectorAll('input').length >= 2`, 'ログイン画面');
         await sleep(1500);
 
         // ログイン欄は @bind:event="oninput" なので、値を入れた後に input と change を投げる
@@ -104,8 +127,8 @@ async function waitFor(ws, expression, label, timeout = 60000) {
             return true;
         })()`);
         await sleep(300);
-        await evalJs(ws,
-            `([...document.querySelectorAll('button')].find(b => b.textContent.includes('ログイン')).click(), true)`);
+        // ボタンは表示言語で文言が変わるので、ログイン画面に1つだけある .btn を押す
+        await evalJs(ws, `(document.querySelector('button.btn').click(), true)`);
         await waitFor(ws, `!!document.querySelector('a[href="manufacturing-orders"]')`,
             'ログイン後のダッシュボード');
         await sleep(2000);
@@ -116,6 +139,10 @@ async function waitFor(ws, expression, label, timeout = 60000) {
                 await evalJs(ws, `(document.querySelector('a[href="${shot.href}"]').click(), true)`);
                 await sleep(3000);
             }
+            if (shot.after) await shot.after(ws);
+            // 遷移後は見出し（h1）にフォーカスが当たって枠が写るので外す
+            await evalJs(ws, `(document.activeElement && document.activeElement.blur(), true)`);
+            await send(ws, 'Page.bringToFront');
             const result = await send(ws, 'Page.captureScreenshot', { format: 'png' });
             fs.writeFileSync(path.join(OUT, shot.name + '.png'), Buffer.from(result.data, 'base64'));
             console.log('  ' + shot.name + '.png');
@@ -123,7 +150,9 @@ async function waitFor(ws, expression, label, timeout = 60000) {
         ws.close();
         console.log('撮影しました: ' + OUT);
     } finally {
-        edge.kill();
+        // 親だけ kill すると子プロセスがデバッグポートを掴んだまま残る
+        try { require('child_process').execFileSync('taskkill', ['/PID', String(edge.pid), '/T', '/F'], { stdio: 'ignore' }); }
+        catch { edge.kill(); }
         // プロセスが終わりきる前に消すと EPERM になる。消せなくても撮影結果には影響しない
         await sleep(1500);
         try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* 一時プロファイルの残骸 */ }

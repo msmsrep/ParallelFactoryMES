@@ -1,0 +1,101 @@
+# 左サイドバーのナビゲーション（言語ごと。url は ja/en で同じファイル名にする。docs-dev/GuideEnPlan.md）
+# en 側で英語版がまだ無いページは、レイアウトが日本語版（../<url>）へのリンクに差し替え、「JA」の印を付ける。
+ja:
+  - section: はじめに
+    items:
+      - title: このガイドについて
+        url: index.html
+      - title: 紹介ページ（画面写真で見る）
+        url: intro.html
+      - title: 導入と初期設定
+        url: getting-started.html
+      - title: 画面構成と共通操作
+        url: basics.html
+      - title: 工場模型で見る 製造から出荷まで
+        url: factory-tour.html
+      - title: サンプルで見る 製造から出荷まで
+        url: walkthrough.html
+  - section: 準備
+    items:
+      - title: マスタ管理
+        url: masters.html
+  - section: 日々の業務
+    items:
+      - title: 生産管理
+        url: production.html
+      - title: 製造実行
+        url: execution.html
+      - title: 物流・在庫管理
+        url: logistics.html
+      - title: 品質管理
+        url: quality.html
+      - title: 品質保証
+        url: assurance.html
+      - title: 設備保全・治工具
+        url: maintenance.html
+  - section: 共通機能
+    items:
+      - title: 帳票・ラベル・スキャン
+        url: reports.html
+      - title: ロールと権限
+        url: roles.html
+  - section: 資料
+    items:
+      - title: リファレンス
+        url: reference.html
+      - title: 困ったときは
+        url: troubleshooting.html
+      - title: 管理者向け運用
+        url: operations.html
+      - title: プライバシーポリシー
+        url: privacy.html
+
+en:
+  - section: Getting started
+    items:
+      - title: About this guide
+        url: index.html
+      - title: Product overview (screenshots)
+        url: intro.html
+      - title: Installation and initial setup
+        url: getting-started.html
+      - title: Screen layout and common operations
+        url: basics.html
+      - title: "Factory model: from production to shipping"
+        url: factory-tour.html
+      - title: "Sample walkthrough: from production to shipping"
+        url: walkthrough.html
+  - section: Preparation
+    items:
+      - title: Master data
+        url: masters.html
+  - section: Daily operations
+    items:
+      - title: Production management
+        url: production.html
+      - title: Production execution
+        url: execution.html
+      - title: Logistics and inventory
+        url: logistics.html
+      - title: Quality control
+        url: quality.html
+      - title: Quality assurance
+        url: assurance.html
+      - title: Equipment maintenance and tools
+        url: maintenance.html
+  - section: Common features
+    items:
+      - title: Reports, labels and scanning
+        url: reports.html
+      - title: Roles and permissions
+        url: roles.html
+  - section: Reference
+    items:
+      - title: Reference
+        url: reference.html
+      - title: Troubleshooting
+        url: troubleshooting.html
+      - title: Administration
+        url: operations.html
+      - title: Privacy policy
+        url: privacy.html

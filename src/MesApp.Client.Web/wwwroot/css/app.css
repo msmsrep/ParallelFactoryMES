@@ -260,6 +260,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 }
 .print-sheet h1 { text-align: center; font-size: 18px; letter-spacing: 4px; }
 .label-sheet { width: 320px; }
+/* ラベルは幅が決まっているので、長い項目名（英語表示など）や品目名は折り返してはみ出さないようにする */
+.label-sheet .table th, .label-sheet .table td { white-space: normal; }
 .label-sheet .barcode { text-align: center; margin: 10px 0 2px; }
 .label-sheet .barcode-text { text-align: center; font-family: monospace; letter-spacing: 1px; }
 

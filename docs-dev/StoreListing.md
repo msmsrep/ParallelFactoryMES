@@ -95,7 +95,7 @@ Parallel Factory MES は、製造指図・作業実績・在庫・品質・設�
 | screenshot-4 | ロット単位で在庫と履歴を追う。入出庫・移動・調整の履歴と期限のアラート。部材まで双方向に追跡。 |
 | screenshot-5 | 受入から完成品まで検査を一本化。検査指示の発行と、測定値からの自動判定。不適合もその場で記録します。 |
 
-見出しを変えたときは `build/New-StoreScreenshots.py` の `SHOTS` とこの表の両方を直す。
+見出しを変えたときは `build/New-StoreScreenshots.py` の `SHOTS` とこの表の両方を直す。英語版の画像は `build/store/en/`（作り方は `StoreListing.en.md`）。
 
 ## ストアロゴ・トレーラー
 
@@ -165,6 +165,9 @@ msmsrep
 
 「個人情報」の設問は、保存するだけでも「はい」に当たる扱い。「いいえ」にしてプライバシーポリシーURLを空けると、
 監査ログにユーザー名・IPアドレスを残す実装と食い違う。
+
+英語の掲載を足すときは、英語版のページを使う：プライバシーポリシー `https://msmsrep.github.io/ParallelFactoryMES/en/privacy.html`、
+Webサイト `https://msmsrep.github.io/ParallelFactoryMES/en/intro.html`（ユーザーガイドは `…/en/`）。英語版プライバシーポリシーには「日本語版が優先」の1文がある。
 
 ## 年齢区分（IARC アンケート）
 

@@ -17,7 +17,7 @@
     <h2 style="margin-top: 0;">@L["リンク"]</h2>
     <ul>
         <li>
-            <a href="https://msmsrep.github.io/ParallelFactoryMES/" target="_blank" rel="noopener">
+            <a href="@GuideUrl" target="_blank" rel="noopener">
                 @L["ユーザーガイド（操作マニュアル）"]
             </a>
             <span class="text-muted">- GitHub Pages</span>
@@ -83,6 +83,13 @@
 
 @code {
     private static readonly string Version = ResolveVersion();
+
+    // ユーザーガイドは表示言語に合わせて日本語版・英語版を開く（Spec.md 7.9）。URL は訳の対象にせず言語で分ける
+    private const string GuideBaseUrl = "https://msmsrep.github.io/ParallelFactoryMES/";
+    private static string GuideUrl =>
+        MesCultures.Resolve(System.Globalization.CultureInfo.CurrentUICulture.Name) == MesCultures.English
+            ? GuideBaseUrl + "en/"
+            : GuideBaseUrl;
 
     private static string ResolveVersion()
     {

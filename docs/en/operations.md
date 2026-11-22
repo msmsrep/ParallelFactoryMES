@@ -1,0 +1,391 @@
+---
+layout: default
+title: Administration
+nav_url: operations.html
+lead: Information for system administrators, such as deploying the server, settings and backups.
+prev_url: troubleshooting.html
+prev_title: Troubleshooting
+next_url: privacy.html
+next_title: Privacy policy
+---
+
+## Architecture
+
+The web client (Blazor WebAssembly) is served from the same origin by the API server (ASP.NET Core).
+Nothing needs to be installed on users' devices.
+
+| Component | Role |
+|---|---|
+| MesApp.Api | Business logic and database. Also serves the web client |
+| MesApp.Client.Web | The client that runs in the browser |
+| Database | One of SQLite (the default; a single file), PostgreSQL or SQL Server. Migrations are applied automatically at startup ([Using PostgreSQL / SQL Server](#database)) |
+
+## Distribution and startup
+
+There are three ways to put it on a server. If you only want to try it on one PC, the [Microsoft Store desktop edition](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=en-US&gl=US) is the easiest
+(other devices cannot connect to it, so use one of the methods below for shop-floor operation).
+
+| Method | Best for | Get it from |
+|---|---|---|
+| ZIP (self-contained) | Putting it directly on a Windows / Linux server. No .NET installation needed | `ParallelFactoryMES-<version>-win-x64.zip` / `-linux-x64.zip` from [GitHub Releases](https://github.com/msmsrep/ParallelFactoryMES/releases/latest) |
+| Docker | Running it in a container (amd64 / arm64) | `ghcr.io/msmsrep/parallelfactorymes` |
+| Publish from source | Distributing your own modified version | `dotnet publish src/MesApp.Api -c Release -o publish` |
+
+### Starting from the ZIP
+
+In the extracted folder, double-click `start.cmd` on Windows, or run `sh start.sh` on Linux.
+The default port is 5000. To change it, set the environment variable `MESAPP_URLS` (for example `http://0.0.0.0:8080`) before starting.
+
+To upgrade, stop the server, replace the extracted folder with the new version and start it.
+The data is in the data folder (see below), so it is not lost when the folder is replaced. The database is updated automatically at startup.
+
+### Starting with Docker  {#docker}
+
+```bash
+docker compose up -d
+```
+
+The repository's `compose.yaml` starts it with SQLite, and `compose.postgres.yaml` starts it with PostgreSQL
+(write `POSTGRES_PASSWORD=...` in `.env` first, then run `docker compose -f compose.postgres.yaml up -d`).
+Open `http://<server IP>:8080` in a browser.
+
+- The database and signing key are kept in a volume (`/data` inside the container). They are not lost when the container is recreated
+- The default time zone is `TZ=Asia/Tokyo`. The business date boundary is judged in this time zone
+- The container does not handle HTTPS. Terminate it at a reverse proxy in front, and specify the network the proxy is on
+  with `ReverseProxy__KnownNetworks__0` (for example `172.16.0.0/12`) ([Running with HTTPS](#https))
+- To upgrade, run `docker compose pull` → `docker compose up -d`
+
+### Publishing from source and starting
+
+```bash
+dotnet publish/MesApp.Api.dll --urls http://0.0.0.0:5000
+```
+
+The ASP.NET Core 10 Runtime is required. Other PCs on the same LAN can access it at `http://<server IP>:5000`.
+
+<div class="warn">
+<p>Windows Firewall must <strong>allow incoming connections</strong> on that port.
+Without this, other PCs cannot connect.</p>
+</div>
+
+The database file (`mesapp.db`) and the JWT signing key (`jwt-signing.key`) are created automatically in
+**the data folder (by default `%LOCALAPPDATA%\ParallelFactoryMES`, `~/.local/share/ParallelFactoryMES` on Linux and `/data` on Docker; it can be changed with the environment variable `MESAPP_DATA_DIR`)**.
+If a setting contains an absolute path, that path is used.
+
+## Settings  {#settings}
+
+Edit `appsettings.json` or override the values with environment variables.
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| DB connection string (the file location for SQLite) | `Database__ConnectionString` | `Data Source=mesapp.db` |
+| DB provider | `Database__Provider` | `Sqlite` (`PostgreSql` / `SqlServer` are also possible) |
+| Data folder (DB and signing key) | `MESAPP_DATA_DIR` | `%LOCALAPPDATA%\ParallelFactoryMES` (`~/.local/share/ParallelFactoryMES` on Linux, `/data` on Docker) |
+| Business date boundary hour | `BusinessDay__BoundaryHour` | `6` (6:00 a.m.) |
+| Audit log retention period (years) | `Audit__RetentionYears` | `5` |
+| Access token lifetime (minutes) | `Jwt__AccessTokenLifetimeMinutes` | `60` |
+| Refresh token lifetime (hours) | `Jwt__RefreshTokenLifetimeHours` | `12` |
+| JWT signing key file | `Jwt__SigningKeyFile` | `jwt-signing.key` (created automatically if it does not exist) |
+| Automatic creation of the initial administrator | `MesAdmin__UserName` / `MesAdmin__Password` / `MesAdmin__DisplayName` | Not set |
+| Automatic generation of the initial password | `MesAdmin__GeneratePassword` | `false` (`true` only in the desktop edition) |
+| IPs of trusted reverse proxies | `ReverseProxy__KnownProxies__0` (`__1`, `__2` … for more) | Not set (forwarded headers are not read) |
+| Networks of trusted reverse proxies | `ReverseProxy__KnownNetworks__0` (CIDR, for example `192.168.10.0/24`) | Not set |
+
+### Business date boundary hour
+
+Changing `BusinessDay__BoundaryHour` changes the date boundary for totals and numbering.
+For example, setting it to `8` makes 8:00 a.m. the point where the date changes.
+Set it to match the start time of your shifts.
+
+### Unattended setup
+
+An example of creating the initial administrator without using the screens. **It applies only while there are no users**,
+and the password must be changed at the first sign-in (until it is changed, no API other than password change can be used).
+
+```powershell
+$env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet publish/MesApp.Api.dll
+```
+
+If `MesAdmin__Password` is not specified, no initial administrator is created (so that no account is left
+whose password nobody knows). Only the desktop edition, which can show the password on screen,
+uses automatic generation with `MesAdmin__GeneratePassword=true`.
+
+## Security
+
+<div class="warn">
+<p><strong>The app itself does not enforce HTTPS.</strong> For LAN operation, terminate HTTPS at a reverse proxy
+(IIS / nginx) (<a href="#https">Running with HTTPS</a>).</p>
+<p>Also, <strong>barcode scanning with the camera requires HTTPS anywhere other than <code>localhost</code></strong>.
+The camera cannot be used over plain HTTP (USB readers and typing work over HTTP too).</p>
+</div>
+
+- Authentication uses ASP.NET Core Identity + JWT.
+- Corrections to actuals and inspections, master data changes, inventory adjustments and so on are recorded in the audit log (see below).
+- Passwords must be at least 8 characters long and contain a lowercase letter and a digit.
+
+### Running with HTTPS  {#https}
+
+A reverse proxy (IIS / nginx) receives HTTPS from browsers and relays it to the app over HTTP.
+Only the proxy holds the certificate.
+
+```
+Device browser ──HTTPS──▶ IIS / nginx (certificate) ──HTTP──▶ MesApp (127.0.0.1:5000)
+```
+
+**1. Prepare a certificate.** On a company LAN you cannot get a public certificate, so issue one with an internal CA or
+[mkcert](https://github.com/FiloSottile/mkcert). With mkcert, run the following on the server.
+
+```bash
+mkcert -install
+mkcert mes.example.local 192.168.10.5
+```
+
+List every name (host name and IP) that devices will use. Configure the resulting `mes.example.local+1.pem` (certificate) and
+`mes.example.local+1-key.pem` (private key) in the proxy.
+
+**2. Distribute the CA certificate to devices.** Rename `rootCA.pem` in the folder shown by `mkcert -CAROOT`
+to `rootCA.crt`, distribute it to each device and add it to "Trusted Root Certification Authorities"
+(run `certutil -addstore -f Root rootCA.crt` on the device, or distribute it by Group Policy if there are many devices).
+**Do not distribute** `rootCA-key.pem` in the same folder (anyone holding it can issue any certificate).
+
+**3. Start the app so that it can be reached only from the proxy.** So that nobody can connect to it directly over HTTP,
+listen only on the loopback address (the app does not redirect HTTP to HTTPS).
+
+```bash
+dotnet publish/MesApp.Api.dll --urls http://127.0.0.1:5000
+```
+
+**4. Configure the proxy.** Pass the client IP and scheme with `X-Forwarded-For` / `X-Forwarded-Proto`.
+
+An nginx example:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name mes.example.local;
+    ssl_certificate     mes.example.local+1.pem;
+    ssl_certificate_key mes.example.local+1-key.pem;
+    client_max_body_size 50m;   # for bulk CSV and ZIP imports
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+For IIS, install URL Rewrite and Application Request Routing (ARR), and enable the ARR proxy.
+ARR adds `X-Forwarded-For`. Add `X-Forwarded-Proto` with a rewrite rule, after adding the server variable `HTTP_X_FORWARDED_PROTO`
+to "Allowed Server Variables" (a `web.config` example).
+
+```xml
+<rewrite>
+  <rules>
+    <rule name="MesApp" stopProcessing="true">
+      <match url="(.*)" />
+      <serverVariables>
+        <set name="HTTP_X_FORWARDED_PROTO" value="https" />
+      </serverVariables>
+      <action type="Rewrite" url="http://127.0.0.1:5000/{R:1}" />
+    </rule>
+  </rules>
+</rewrite>
+```
+
+**5. Configure the app to trust the proxy.** The app reads forwarded headers only from the sources specified here.
+If the proxy is on the same PC, use the following (if it is on another PC, use its IP).
+
+```powershell
+$env:ReverseProxy__KnownProxies__0="127.0.0.1"
+```
+
+<div class="warn">
+<p><strong>Without this setting, forwarded headers are not read.</strong> Even over HTTPS,
+the refresh token cookie does not get <code>Secure</code>, and every client IP in the audit log becomes the proxy's IP.
+They are not read when this is not set so that a device connecting directly over HTTP cannot forge the headers to fake its source.</p>
+</div>
+
+**Check:** Sign in over HTTPS from a device. If the client IP of the "sign-in" entry in the audit log is the device's IP, you are done.
+If it is still `127.0.0.1`, the setting in step 5 is not taking effect.
+
+## Audit log  {#audit-log}
+
+A record of "who changed what, and when". You can view it from **"Audit Log" in the menu**
+(system administrators only; other roles do not even see the menu item).
+
+### Operations recorded
+
+| Category | Main operations |
+|---|---|
+| Setup | Creating the initial administrator |
+| Auth | Sign-in, failed sign-in, account lockout, sign-out, password change |
+| User | Creating and changing users, password resets, granting skills and qualifications |
+| Master | Registering, changing and deactivating master data, CSV imports |
+| Production | Registering, approving, canceling and releasing manufacturing orders, dispatching |
+| Execution | Starting work, registering results, **correcting results**, work time, process condition data, completion approval |
+| Inventory | Receiving, moves, **quantity adjustments**, status changes, split / merge / reassign, scrapping, picking, shipping, stocktaking, **cancellations** |
+| Quality | Registering, **correcting**, judging and approving inspection results; raising, instructing and approving nonconformances; shipment judgments |
+| Maintenance | Maintenance plans, maintenance orders, maintenance records, managing maintenance procedures |
+| Equipment | Recording equipment operation, tool usage |
+
+For **operations whose before and after you want to follow**, such as quantity adjustments, status changes, corrections and cancellations, the "Details" column contains **the value before, the value after and the reason**.
+Other operations contain a summary.
+
+### Filtering
+
+You can filter by period, category / operation and target (type and ID).
+For example, entering `Lot` in "Target type" and the internal ID of a lot in "Target ID"
+lists only the operations performed on that lot.
+
+<div class="note">
+<p><strong>The period filters by the recorded date (the server's date).</strong>
+The date and time in the list are shown in the browser's time, so where the server and browser are in different time zones,
+entries around midnight may appear on a different day.</p>
+</div>
+
+### Deletion and tampering
+
+- Individual records **cannot be changed or deleted, either from the screens or from the API**. Records are only ever added.
+- **The retention period is 5 years** (it can be changed with `Audit__RetentionYears`). **Nothing is deleted automatically** (whether records may be deleted is a business decision).
+- Only when storage becomes a problem can you **delete records older than the retention period in bulk** (see below).
+
+### Purging old records
+
+This operation clears out records that are past the retention period. It is **at the very bottom of the Audit Log screen**.
+Take a backup first (see below).
+
+<div class="steps">
+<ol>
+<li>Enter a date in "Delete up to this date (inclusive)" and the reason for deleting in "Reason (required)" (records <strong>on or before the date</strong> are targeted).</li>
+<li>Press <strong>Check count to delete</strong>. Nothing is deleted yet at this point. The number of targeted records is shown.</li>
+<li>Check the count and press <strong>"Delete N records"</strong> to delete them.</li>
+</ol>
+</div>
+
+Changing the date or the reason resets the count check, and you must check again
+(so that what you checked and what is actually deleted do not differ).
+
+To run it from the API, use the following. While `dryRun=true`, it only returns the count and does not touch the database.
+
+```
+POST /api/audit-logs/purge?dryRun=true
+{ "to": "2020-12-31", "reason": "To reduce storage" }
+```
+
+<div class="warn">
+<p><strong>Records within the retention period cannot be deleted.</strong> A date newer than the retention period is rejected
+(if the records of recent operations could be deleted to hide them, the audit log would not stand as evidence).</p>
+<p><strong>A reason is required</strong>, and <strong>the purge itself (period, count, reason and user) is recorded in the audit log</strong>.
+This record is written after the deletion, so it is not removed by the same operation.</p>
+</div>
+
+## Using PostgreSQL / SQL Server {#database}
+
+The default SQLite needs no extra installation and can be used as is for up to a few dozen devices.
+When many devices write at the same time, the data volume is large, or you want to manage it together on an existing DB server,
+switch to PostgreSQL or SQL Server.
+
+1. Create an **empty database** and a login for connecting on the DB server.
+   Give the login permission to create and change tables in that database (the schema is created and updated at startup).
+2. Set `Database__Provider` and `Database__ConnectionString` and start it.
+
+```powershell
+# PostgreSQL
+$env:Database__Provider="PostgreSql"; $env:Database__ConnectionString="Host=db;Database=mesapp;Username=mesapp;Password=..."
+# SQL Server
+$env:Database__Provider="SqlServer"; $env:Database__ConnectionString="Server=db;Database=mesapp;User Id=mesapp;Password=...;TrustServerCertificate=True"
+```
+
+3. The tables are created at startup. When you open it in a browser, the initial setup guidance is shown, just as with SQLite.
+   In later upgrades, the differences are also applied automatically at startup.
+
+<div class="warn">
+<p><strong>Existing SQLite data is not carried over.</strong> After switching, you start from an empty database.
+Decide which database to use before you start operating. If you switch the setting back to SQLite, the original <code>mesapp.db</code> is used as is (the two sets of data are separate).</p>
+</div>
+
+### Differences from SQLite
+
+| Item | Difference |
+|---|---|
+| Upper and lower case in codes | With SQL Server's default collation they are not distinguished (`ABC` and `abc` are treated as the same, duplicate code, and searches do not distinguish them either). SQLite and PostgreSQL distinguish them |
+| Date and time | PostgreSQL stores them in UTC. They refer to the same moment, so screen display, totals and CSV results do not change |
+| Decimals | Up to 6 decimal places are stored (trailing zeros are dropped so that values look the same as in SQLite) |
+| Desktop edition | Intended for use with SQLite (because it is designed to run entirely on one PC) |
+
+### When it does not start
+
+| Symptom | What to do |
+|---|---|
+| It stops with an "unknown DB provider" error (the message is in Japanese: <code>不明なDBプロバイダー</code>) <!-- 訳さない --> | Write `Database__Provider` as exactly one of `Sqlite` / `PostgreSql` / `SqlServer`, including upper and lower case |
+| It stops with a connection timeout or authentication error | Check the host name, port, user name and password in the connection string, the firewall on the DB server, and, for SQL Server, whether TCP/IP connections are enabled |
+| SQL Server gives a certificate error | For a server with an internal self-signed certificate, add `TrustServerCertificate=True` to the connection string, or configure a trusted certificate on the server |
+| It stops with a permission error (cannot create tables) | Give the connecting login permission to create and change tables in the target database |
+
+## Backups
+
+### SQLite
+
+<div class="warn">
+<p><strong>Do not simply copy the DB file while it is running.</strong>
+SQLite runs in WAL mode, so the copied file may be corrupted.</p>
+</div>
+
+There are two safe methods.
+
+1. Stop the server, then copy `mesapp.db`
+2. While it is running, create a backup file with SQLite's `VACUUM INTO`
+
+With Docker, stop the container and save the whole volume (the signing key is kept along with it).
+Check the volume name with `docker volume ls` (with compose it is `<folder name>_mesapp-data`).
+
+```bash
+docker compose stop
+docker run --rm -v <volume name>:/data -v "$PWD":/backup alpine tar czf /backup/mesapp-data.tgz -C /data .
+docker compose start
+```
+
+Deleting all of `mesapp.db*` (including `-wal` / `-shm`) and restarting returns it to the initial state.
+You can use this to reset a test environment.
+
+### PostgreSQL / SQL Server
+
+Back up with each database's standard tools (backups can be taken while it is running).
+
+- PostgreSQL: `pg_dump -Fc -d mesapp -f mesapp.dump` (restore with `pg_restore`)
+- SQL Server: `BACKUP DATABASE mesapp TO DISK = N'...\mesapp.bak'` (or a backup from SQL Server Management Studio)
+
+To return to the initial state, drop the database, create an empty one again and restart.
+
+## Limitations
+
+| Item | Status |
+|---|---|
+| PostgreSQL / SQL Server | Supported ([Using PostgreSQL / SQL Server](#database)). There is no function for moving existing SQLite data |
+| Docker and ZIP distribution | Supported ([Distribution and startup](#distribution-and-startup)) |
+| HTTPS | Not enforced by the app (terminate at a reverse proxy; [Running with HTTPS](#https)) |
+| Automatic data collection from equipment and scales | Not supported (entered by hand) |
+| EDI / ASN integration | Not supported |
+| Tracking by serial number (individual unit) | Not supported (by lot only) |
+| Multi-step approval workflow | Not supported (single-step approval) |
+
+## Testing
+
+```bash
+dotnet test ParallelFactoryMES.slnx
+```
+
+This runs the integration tests of the API.
+
+## Publishing this guide
+
+This guide is managed as Markdown in the `docs/` folder. The English version is in `docs/en/`, with the same file names as the Japanese version. To publish it on GitHub Pages,
+set the following under the repository's **Settings → Pages**.
+
+- Source: `Deploy from a branch`
+- Branch: `master` (or `main`) / folder: `/docs`
+
+To update the content, edit `docs/*.md` (and `docs/en/*.md`) and commit, and it is republished automatically.
+When you add a page, also add an item to both `ja` and `en` in `docs/_data/nav.yml` so that it appears in the left menu.
