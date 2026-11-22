@@ -22,7 +22,7 @@
 | カード | 状態 |
 |:--|:--|
 | INT-01 APIキーの土台 | 完了（2026-11-22。Spec.md 改訂150） |
-| INT-02 CSVの取込・出力を連携APIで | 未着手 |
+| INT-02 CSVの取込・出力を連携APIで | 完了（2026-11-22。Spec.md 改訂151） |
 | INT-03 実績の取得 | 未着手 |
 | INT-04 OpenAPI 文書と利用者ガイド | 未着手 |
 
@@ -79,6 +79,12 @@
 **変更ファイルの想定（約19＋マイグレーション）**：`Core/Entities/IntegrationRequest.cs`、`MesAppDbContext.cs`、`SystemConfigurations.cs`、マイグレーション3プロバイダー（`AddIntegrationRequests`）、`Api/Services/CsvIntake.cs`（新規）、`MasterCsvController.cs`・`ActualCsvController.cs`・`FolderLinkService.cs`（共通の受付へ寄せる）、`Api/Controllers/Integration/IntegrationCsvController.cs`、`Api/Services/IdempotencyService.cs`、`Core/Contracts/Masters/MasterCsvContracts.cs`（`CsvColumnInfo` に別名）、`Api/Services/CsvTable.cs`（別名の解決）、`tests/MesApp.Api.Tests/CsvContract.v1.json`（新規）、`ApiText.en.resx`、`Tests/MasterCsvTests.cs`、`Spec.md`（3.8・改訂履歴）、`CodeMap.md`、`CLAUDE.md`
 **受入基準**：キーでマスタ・実績・ZIP を取り込める／ロールの無い種別は 403／同じ `Idempotency-Key` で2回送っても実績は1回分／本文を変えて同じキーなら 409／既存の画面用CSVと FolderLink のテストが変わらず通る／基準ファイルから列を1つ消す・必須にする・名前を変えると約束のテストが落ち、列を足すだけなら通る／別名の列名で書いた CSV が取り込める
 
+**実施メモ（2026-11-22）**：変更は23ファイル＋マイグレーション9（想定19から4件多い。設計のずれではなく、想定の書き漏れと補助の移動）。
+- 想定に無かったもの：`MesAppHost.cs`（`CsvIntake`・`IdempotencyService` の DI 登録）、`CsvImport.cs`（別名の解決は `CsvImport.Prepare` の1か所に入れた。全入口がここを通る）、`Core/Contracts/Integration/IntegrationCsvDtos.cs`（`csv-kinds` の応答）、`TestAuth.cs`・`AuthTests.cs`（APIキーを発行するテストの補助を `TestAuth` へ移して共有）
+- SQLite で全件、SQL Server・PostgreSQL で連携API・フォルダ連携・ZIP取込・認証・プロバイダーのテスト（41件）を確認した
+- 連携API の口は `api/integration/v1/csv-kinds`（`kinds` にしなかったのは、INT-03 以降で CSV 以外の口が並ぶため）
+- 利用者向けのガイド（呼び出し例・`Idempotency-Key` の使い方・列の約束）は INT-04 でまとめて書く。ガイドの実績CSVの説明（「試験・移行・教育用に」）も INT-04 で連携API に触れる形に直す
+
 ### INT-03 実績の取得（生産実績と訂正）
 
 **目的**：ERP が完成実績を取りに来られるようにする（MES から送り出す仕組みを作らずに済む）。
@@ -97,7 +103,8 @@
 
 - `AddOpenApi("integration-v1")` で連携API だけを集めた文書を作り、`/openapi/integration-v1.json` を全環境で出す（既存の開発用文書は開発環境のまま）
 - セキュリティの定義に `X-Api-Key` を載せる。説明は XML コメントから（`GenerateDocumentationFile`。警告を増やさないよう公開型すべてにコメントがあるか確かめる）
-- 運用ガイドに「連携API」の節（日英）：キーの発行、PowerShell と curl の呼び出し例、`Idempotency-Key` の使い方、実績の続きの読み方、互換の約束
+- 運用ガイドに「連携API」の節（日英）：キーの発行、PowerShell と curl の呼び出し例、`Idempotency-Key` の使い方、実績の続きの読み方、互換の約束（CSVの列の約束を含む）
+- マスタ管理のガイド（`docs/masters.md`・英語版）の実績CSVの説明「試験・移行・教育用に」を、フォルダ連携・連携API からも取り込めることに触れる形に直す（INT-02 からの持ち越し）
 - Spec.md 7.x に互換の約束（v1 は足すだけ、CSV の列キーも同じ）
 
 **変更ファイルの想定（約8）**：`Api/MesAppHost.cs`、`Api/MesApp.Api.csproj`、（必要なら）`Api/Integration/IntegrationOpenApi.cs`、`Tests/AuthTests.cs`（文書が取れる・連携API だけが載る）、`Spec.md`、`docs/operations.md`・`docs/en/operations.md`、`CodeMap.md`

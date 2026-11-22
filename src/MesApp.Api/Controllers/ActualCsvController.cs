@@ -15,7 +15,7 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/actuals/csv")]
 [Authorize]
-public class ActualCsvController(ActualCsvService service) : ControllerBase
+public class ActualCsvController(ActualCsvService service, CsvIntake intake) : ControllerBase
 {
     /// <summary>CSV取込に対応する実績種別と列定義</summary>
     [HttpGet("kinds")]
@@ -85,24 +85,15 @@ public class ActualCsvController(ActualCsvService service) : ControllerBase
             return this.BadRequestProblem(zipError);
         }
 
-        var unknown = entries.Where(e => ActualCsvKinds.Find(e.Kind) is null).ToList();
-        if (unknown.Count > 0)
+        // 種別の解決と振り分け（マスタの混入の拒否）は画面・フォルダ連携・連携APIで共通
+        if (CsvIntake.ResolveBundle(entries, CsvIntakeArea.Actual, out var error) is not { } bundle)
         {
-            var masters = unknown.Where(e => MasterCsvKinds.Find(e.Kind) is not null).ToList();
-            return this.BadRequestProblem(
-                masters.Count > 0
-                    ? ApiText.T("マスタのCSVが含まれています：{0}。マスタはマスタ管理で別のZIPとして取り込んでください。",
-                        string.Join(ApiText.T("、"), masters.Select(e => e.FileName)))
-                    : ApiText.T("取込に対応していない実績のCSVが含まれています：{0}（ファイル名は「番号_種別.csv」。例 01_receiving.csv）。",
-                        string.Join(ApiText.T("、"), unknown.Select(e => e.FileName))));
+            return this.BadRequestProblem(error);
         }
-        var files = entries
-            .Select(e => new CsvBundleFile<ActualCsvKind>(e.FileName, ActualCsvKinds.Find(e.Kind)!, e.Text))
-            .ToList();
-        if (files.Any(f => !MesRoleGroups.IsInGroup(User, f.Kind.WriteRoles)))
+        if (CsvIntake.FirstDenied(User, bundle) is not null)
         {
             return Forbid();
         }
-        return await service.ImportBundleAsync(files, dryRun, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
+        return await intake.ImportBundleAsync(bundle, dryRun, User.FindFirstValue(ClaimTypes.NameIdentifier), ct);
     }
 }

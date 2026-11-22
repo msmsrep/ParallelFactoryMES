@@ -264,34 +264,21 @@ public sealed class FolderLinkService(
         httpContextAccessor.HttpContext = new DefaultHttpContext { User = principal, RequestServices = scope.ServiceProvider };
         try
         {
-            var services = scope.ServiceProvider;
+            var intake = scope.ServiceProvider.GetRequiredService<CsvIntake>();
             var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
             if (IsZip(file.Name))
             {
-                return await ImportZipAsync(services, bytes, principal, userId, ct);
+                return await ImportZipAsync(intake, bytes, principal, userId, ct);
             }
 
             // 種別フォルダに置かれたものはフォルダ名、直下に置かれたものはファイル名で種別を決める
             var folder = Path.GetDirectoryName(relative);
             var kindName = string.IsNullOrEmpty(folder) ? CsvBundle.KindOf(file.Name) : folder;
-            var csv = CsvFile.Decode(bytes);
-            if (MasterCsvKinds.Find(kindName) is { } master)
+            if (CsvIntake.Find(kindName) is { } kind)
             {
-                if (!MesRoleGroups.IsInGroup(principal, MasterCsvKinds.WriteRolesOf(master)))
-                {
-                    return Outcome.Fail(master.Kind, NoPermission(master.Label));
-                }
-                return Outcome.Of(await services.GetRequiredService<MasterCsvService>()
-                    .ImportAsync(master, csv, dryRun: false, ct));
-            }
-            if (ActualCsvKinds.Find(kindName) is { } actual)
-            {
-                if (!MesRoleGroups.IsInGroup(principal, actual.WriteRoles))
-                {
-                    return Outcome.Fail(actual.Info.Kind, NoPermission(actual.Info.Label));
-                }
-                return Outcome.Of(await services.GetRequiredService<ActualCsvService>()
-                    .ImportAsync(actual, csv, dryRun: false, userId, ct));
+                return CsvIntake.CanWrite(principal, kind)
+                    ? Outcome.Of(await intake.ImportAsync(kind, CsvFile.Decode(bytes), dryRun: false, userId, ct))
+                    : Outcome.Fail(kind.Info.Kind, NoPermission(kind.Info.Label));
             }
             return Outcome.Fail(kindName, ApiText.T(
                 "CSVの種別 '{0}' が分かりません。ファイル名を「種別.csv」（例 manufacturing-orders.csv）にするか、inbox の下の種別の名前のフォルダに置いてください。",
@@ -311,40 +298,22 @@ public sealed class FolderLinkService(
     /// 全ファイルを1つのトランザクションで取り込む（混ざっていたら受け付けない）
     /// </summary>
     private async Task<Outcome> ImportZipAsync(
-        IServiceProvider services, byte[] bytes, ClaimsPrincipal principal, string? userId, CancellationToken ct)
+        CsvIntake intake, byte[] bytes, ClaimsPrincipal principal, string? userId, CancellationToken ct)
     {
         if (CsvBundle.ReadZip(bytes, out var zipError) is not { } entries)
         {
             return Outcome.Fail("zip", zipError ?? "");
         }
-        var masters = entries.Select(e => MasterCsvKinds.Find(e.Kind)).ToList();
-        if (masters.All(k => k is not null) &&
-            !entries.Any(e => MasterCsvKinds.Standalone.Contains(e.Kind, StringComparer.OrdinalIgnoreCase)))
+        // 取込先は中身から決める（すべてマスタならマスタ、すべて実績なら実績。混在・生産計画入りは拒否）
+        if (CsvIntake.ResolveBundle(entries, area: null, out var error) is not { } bundle)
         {
-            var denied = masters.FirstOrDefault(k => !MesRoleGroups.IsInGroup(principal, MasterCsvKinds.WriteRolesOf(k!)));
-            if (denied is not null)
-            {
-                return Outcome.Fail("zip", NoPermission(denied.Label));
-            }
-            return Outcome.Of(await services.GetRequiredService<MasterCsvService>().ImportBundleAsync(
-                [.. entries.Select((e, i) => new CsvBundleFile<CsvKindInfo>(e.FileName, masters[i]!, e.Text))], dryRun: false, ct));
+            return Outcome.Fail("zip", error ?? "");
         }
-        var actuals = entries.Select(e => ActualCsvKinds.Find(e.Kind)).ToList();
-        if (actuals.All(k => k is not null))
+        if (CsvIntake.FirstDenied(principal, bundle) is { } denied)
         {
-            var denied = actuals.FirstOrDefault(k => !MesRoleGroups.IsInGroup(principal, k!.WriteRoles));
-            if (denied is not null)
-            {
-                return Outcome.Fail("zip", NoPermission(denied.Info.Label));
-            }
-            return Outcome.Of(await services.GetRequiredService<ActualCsvService>().ImportBundleAsync(
-                [.. entries.Select((e, i) => new CsvBundleFile<ActualCsvKind>(e.FileName, actuals[i]!, e.Text))], dryRun: false, userId, ct));
+            return Outcome.Fail("zip", NoPermission(denied.Info.Label));
         }
-        var unknown = entries.Where((e, i) => masters[i] is null && actuals[i] is null).Select(e => e.FileName).ToList();
-        return Outcome.Fail("zip", unknown.Count > 0
-            ? ApiText.T("ZIPに種別の分からないCSVが含まれています：{0}（ファイル名は「番号_種別.csv」。例 01_receiving.csv）。",
-                string.Join(ApiText.T("、"), unknown))
-            : ApiText.T("ZIPには、マスタだけか実績だけのCSVを入れてください。生産計画はZIPに入れず、1ファイルずつ置いてください。"));
+        return Outcome.Of(await intake.ImportBundleAsync(bundle, dryRun: false, userId, ct));
     }
 
     /// <summary>

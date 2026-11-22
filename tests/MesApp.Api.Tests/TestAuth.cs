@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using MesApp.Core.Contracts.Auth;
+using MesApp.Core.Contracts.Common;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Contracts.Setup;
 using MesApp.Core.Contracts.Users;
 
@@ -52,6 +54,29 @@ public static class TestAuth
             "/api/auth/change-password", new ChangePasswordRequest(password, password));
         changed.EnsureSuccessStatusCode();
         await LoginAsync(client, userName, password);
+        return client;
+    }
+
+    /// <summary>
+    /// 連携API 用に、指定ロールの利用者を作って APIキーを発行する（Spec.md 7.4 連携APIの認証）。
+    /// 利用者のIDと発行の結果（平文のキーを含む）を返す
+    /// </summary>
+    public static async Task<(string UserId, CreatedApiKeyResponse Created)> IssueApiKeyAsync(
+        ApiFactory factory, HttpClient adminClient, string userName, params string[] roles)
+    {
+        using var _ = await CreateUserClientAsync(factory, adminClient, userName, "Passw0rd123", roles);
+        var options = await adminClient.GetFromJsonAsync<OptionsResult<UserOptionResponse>>($"/api/users/options?keyword={userName}");
+        var userId = options!.Items.Single(u => u.UserName == userName).Id;
+        var response = await adminClient.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest("販売管理からの取込", userId, null));
+        response.EnsureSuccessStatusCode();
+        return (userId, (await response.Content.ReadFromJsonAsync<CreatedApiKeyResponse>())!);
+    }
+
+    /// <summary>APIキーを X-Api-Key ヘッダに付けたクライアント</summary>
+    public static HttpClient CreateApiKeyClient(ApiFactory factory, string key)
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", key);
         return client;
     }
 }

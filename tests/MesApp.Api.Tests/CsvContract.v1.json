@@ -1,0 +1,1973 @@
+{
+  "version": 1,
+  "kinds": [
+    {
+      "area": "master",
+      "kind": "products",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Unit",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Specification",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Type",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "StandardDefectRate",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "DefaultLocationCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "processes",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Category",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "equipments",
+      "columns": [
+        {
+          "name": "AssetNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "WorkCenterCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Site",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Status",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "MaintenanceType",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "MaintenanceThreshold",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "MaintenanceParts",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "equipment-parts",
+      "columns": [
+        {
+          "name": "EquipmentAssetNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ProductCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Category",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "QuantityPer",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "tools",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ToolType",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "LifeThresholdCount",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "LifeThresholdHours",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Status",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "work-centers",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Level",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ParentCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "locations",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "WorkCenterCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "AreaType",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ShelfNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "inspection-items",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "TargetProductCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "TargetProcessCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Type",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "LowerLimit",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "UpperLimit",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "StandardValue",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Method",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "SamplingCount",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "RequiredSkillCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Version",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "control-items",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Unit",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "TargetValue",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "LowerLimit",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "UpperLimit",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "checklists",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Category",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Text",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsRequired",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "defect-reasons",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Category",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "skills",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Type",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "RequiresExpiry",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "bom",
+      "columns": [
+        {
+          "name": "ParentProductCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ChildProductCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "QuantityPer",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "MakeOrBuy",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "AlternativeGroup",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsAlternative",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "RoutingSequence",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "routing",
+      "columns": [
+        {
+          "name": "ProductCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ProcessCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "StandardWorkMinutes",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "StandardSetupMinutes",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "RequiredSkillCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "EquipmentAssetNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "EquipmentAssetNos",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ToolCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "WorkCenterCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ChecklistCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ControlItems",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ControlItemCodes",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "WorkProcedureNo",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "work-procedures",
+      "columns": [
+        {
+          "name": "ProcedureNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Title",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Steps",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Reference",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "maintenance-procedures",
+      "columns": [
+        {
+          "name": "ProcedureNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Title",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "TargetEquipmentAssetNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "TargetToolCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "RequiredSkillCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Steps",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "shifts",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "StartTime",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "EndTime",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "inspection-devices",
+      "columns": [
+        {
+          "name": "Code",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Name",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "SerialNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Location",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "CalibratedOn",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "CalibrationDueOn",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "CalibrationCycleDays",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "users",
+      "columns": [
+        {
+          "name": "UserName",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "DisplayName",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Roles",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "WorkCenterCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Department",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ShiftCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "InitialPassword",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "user-skills",
+      "columns": [
+        {
+          "name": "UserName",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "SkillCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "AcquiredOn",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ExpiresOn",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
+      "kind": "production-plans",
+      "columns": [
+        {
+          "name": "BusinessDate",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ProductCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ProcessCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "WorkCenterCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "PlannedQuantity",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "receiving",
+      "columns": [
+        {
+          "name": "ProductCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Quantity",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LocationCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LotNumber",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ExpiresOn",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "manufacturing-orders",
+      "columns": [
+        {
+          "name": "OrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ProductCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Quantity",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "DueDate",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "OrderType",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "SourceOrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Approve",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Expand",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "OutputLotNumber",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "setup-records",
+      "columns": [
+        {
+          "name": "OrderNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Type",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "StartedAt",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "EndedAt",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "AbnormalityNote",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "checklist-records",
+      "columns": [
+        {
+          "name": "OrderNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ChecklistCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ItemSequence",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "IsChecked",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "consumptions",
+      "columns": [
+        {
+          "name": "OrderNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LotNumber",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LocationCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Quantity",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "SubstituteReason",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "production-records",
+      "columns": [
+        {
+          "name": "OrderNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "GoodQuantity",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "DefectQuantity",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ScrapQuantity",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ReworkQuantity",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "StartedAt",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "EndedAt",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "OutputLocationCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Backflush",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Defects",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "data-records",
+      "columns": [
+        {
+          "name": "OrderNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ControlItemCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "NumericValue",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Item",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Value",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "inspections",
+      "columns": [
+        {
+          "name": "InspectionKey",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Type",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LotNumber",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "OrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ItemCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "SampleNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "MeasuredValue",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "TextValue",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Judgment",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "DeviceCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Judge",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Grade",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "work-time-records",
+      "columns": [
+        {
+          "name": "Type",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "IndirectCategory",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "OrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "StartedAt",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "EndedAt",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "trouble-reports",
+      "columns": [
+        {
+          "name": "OccurredAt",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Category",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "OrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "EquipmentAssetNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Content",
+          "required": true,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "equipment-logs",
+      "columns": [
+        {
+          "name": "EquipmentAssetNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Status",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "StartedAt",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "EndedAt",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "StopCause",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "OrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "shipping-orders",
+      "columns": [
+        {
+          "name": "ShippingNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Destination",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "PlannedDate",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ProductCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Quantity",
+          "required": true,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "shipment-judgments",
+      "columns": [
+        {
+          "name": "ShippingNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "LotNumber",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Result",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Approve",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "shipments",
+      "columns": [
+        {
+          "name": "ShippingNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LotNumber",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LocationCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Quantity",
+          "required": true,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "maintenance-plans",
+      "columns": [
+        {
+          "name": "EquipmentAssetNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Category",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "PlanYear",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ScheduledDate",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "CycleDays",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "maintenance-orders",
+      "columns": [
+        {
+          "name": "MaintenanceNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "EquipmentAssetNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ToolCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "RequestType",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ProcedureNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ScheduledDate",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "FromPlan",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "maintenance-records",
+      "columns": [
+        {
+          "name": "MaintenanceNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "StartedAt",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "EndedAt",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Result",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "PartsUsed",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ResetToolLife",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "PartLotNumber",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "PartLocationCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "PartQuantity",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "PartNote",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "tool-usages",
+      "columns": [
+        {
+          "name": "ToolCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "OrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "UsageCount",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "UsageHours",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "RecordedAt",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "tool-issues",
+      "columns": [
+        {
+          "name": "ToolCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "OrderNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Issue",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Return",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "calibrations",
+      "columns": [
+        {
+          "name": "DeviceCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "CalibratedOn",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "NextDueOn",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Result",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "inventory-operations",
+      "columns": [
+        {
+          "name": "Operation",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LotNumber",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LocationCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ToLocationCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Quantity",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "NewLotNumber",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "TargetLotNumber",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ProductCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Status",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "OrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Reason",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "transfer-orders",
+      "columns": [
+        {
+          "name": "LotNumber",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "FromLocationCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "ToLocationCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Quantity",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Execute",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "picking-orders",
+      "columns": [
+        {
+          "name": "PickingNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Type",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "OrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ShippingNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ProductCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Quantity",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Execute",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "stocktakes",
+      "columns": [
+        {
+          "name": "StocktakeNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LocationCode",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "stocktake-counts",
+      "columns": [
+        {
+          "name": "StocktakeNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LotNumber",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LocationCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "CountedQuantity",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "Finalize",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "nonconformances",
+      "columns": [
+        {
+          "name": "ReportNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "LotNumber",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Source",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Content",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "OrderNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Sequence",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "CauseCategory",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "CauseDetail",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Action",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ActionInstruction",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "ActionRecord",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Approve",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "actual",
+      "kind": "sample-storages",
+      "columns": [
+        {
+          "name": "SampleNo",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "LotNumber",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Quantity",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "StorageLocationCode",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "RetainUntil",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Note",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "Close",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    }
+  ]
+}

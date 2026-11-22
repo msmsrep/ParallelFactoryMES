@@ -2664,4 +2664,16 @@
   <data name="このAPIキーは既に失効しています。" xml:space="preserve">
     <value>This API key has already been revoked.</value>
   </data>
+  <data name="Idempotency-Key は{0}文字以内にしてください。" xml:space="preserve">
+    <value>Idempotency-Key must be {0} characters or fewer.</value>
+  </data>
+  <data name="同じ Idempotency-Key の要求を処理しています。終わってから送り直してください。" xml:space="preserve">
+    <value>A request with the same Idempotency-Key is being processed. Send it again after it finishes.</value>
+  </data>
+  <data name="この Idempotency-Key は、内容の違う要求で既に使われています。新しい要求には新しいキーを付けてください。" xml:space="preserve">
+    <value>This Idempotency-Key has already been used for a request with different content. Use a new key for a new request.</value>
+  </data>
+  <data name="同じ列が新しい名前と以前の名前の両方で書かれています：{0}。どちらか一方にしてください。" xml:space="preserve">
+    <value>The same column is written under both its new name and its former name: {0}. Use only one of them.</value>
+  </data>
 </root>

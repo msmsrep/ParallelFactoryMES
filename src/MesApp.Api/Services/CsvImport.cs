@@ -45,6 +45,15 @@ public static class CsvImport
             return null;
         }
 
+        // 以前の列名で書かれたCSVも読む（画面・フォルダ連携・連携APIの全入口がここを通る）
+        var conflicts = table.ApplyAliases(kind.Columns);
+        if (conflicts.Count > 0)
+        {
+            errors.Add(new CsvImportError(table.Header.Line,
+                ApiText.T("同じ列が新しい名前と以前の名前の両方で書かれています：{0}。どちらか一方にしてください。", string.Join(", ", conflicts))));
+            return null;
+        }
+
         var missing = kind.Columns.Where(c => c.Required && !table.HasColumn(c.Name)).Select(c => c.Name).ToList();
         if (missing.Count > 0)
         {

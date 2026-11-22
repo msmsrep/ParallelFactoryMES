@@ -972,6 +972,49 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("InspectionResultCorrections");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.IntegrationRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Caller")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ExpiresAtUnixSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResponseBody")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUnixSeconds");
+
+                    b.HasIndex("Caller", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("IntegrationRequests");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.InventoryStock", b =>
                 {
                     b.Property<int>("Id")

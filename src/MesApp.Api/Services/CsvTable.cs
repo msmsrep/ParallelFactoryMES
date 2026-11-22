@@ -33,6 +33,30 @@ public sealed class CsvTable
 
     public bool HasColumn(string name) => _columns.ContainsKey(name);
 
+    /// <summary>
+    /// 以前の列名（<see cref="CsvColumnInfo.Aliases"/>）で書かれた列を、今の列名で読めるようにする（Spec.md 3.8 CSVの列の約束）。
+    /// 新旧の名前が両方あるとどちらの値を使うか決まらないので、その列を返す（呼び出し側がエラーにする）
+    /// </summary>
+    public List<string> ApplyAliases(IEnumerable<CsvColumnInfo> columns)
+    {
+        var conflicts = new List<string>();
+        foreach (var column in columns)
+        {
+            foreach (var alias in column.Aliases)
+            {
+                if (!_columns.TryGetValue(alias, out var index))
+                {
+                    continue;
+                }
+                if (!_columns.TryAdd(column.Name, index))
+                {
+                    conflicts.Add($"{column.Name} / {alias}");
+                }
+            }
+        }
+        return conflicts;
+    }
+
     /// <summary>列の値（前後の空白を除去し、空文字はnull）。列が無い場合もnull。</summary>
     public string? Value(CsvRecord row, string name)
     {

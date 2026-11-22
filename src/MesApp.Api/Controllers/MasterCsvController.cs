@@ -14,7 +14,7 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/masters/csv")]
 [Authorize]
-public class MasterCsvController(MasterCsvService service, IBusinessDateService businessDate) : ControllerBase
+public class MasterCsvController(MasterCsvService service, CsvIntake intake, IBusinessDateService businessDate) : ControllerBase
 {
     /// <summary>ファイル名に付ける日付。工場の暦日で付ける（サーバーのローカル日付だとUTCのコンテナで現場とずれる）</summary>
     private string FactoryToday => $"{businessDate.ToFactoryTime(DateTimeOffset.UtcNow):yyyyMMdd}";
@@ -106,34 +106,16 @@ public class MasterCsvController(MasterCsvService service, IBusinessDateService 
             return this.BadRequestProblem(zipError);
         }
 
-        // 生産計画などマスタでない種別は、種別として取り込めてもマスタのZIPには入れさせない（それぞれの画面から取り込む）
-        var standalone = entries
-            .Where(e => MasterCsvKinds.Standalone.Contains(e.Kind, StringComparer.OrdinalIgnoreCase)).ToList();
-        if (standalone.Count > 0)
+        // 種別の解決と振り分け（生産計画・実績の混入の拒否）は画面・フォルダ連携・連携APIで共通
+        if (CsvIntake.ResolveBundle(entries, CsvIntakeArea.Master, out var error) is not { } bundle)
         {
-            return this.BadRequestProblem(ApiText.T(
-                "マスタでないCSVが含まれています：{0}。生産計画は生産計画・予実画面の計画登録タブから取り込んでください。",
-                string.Join(ApiText.T("、"), standalone.Select(e => e.FileName))));
+            return this.BadRequestProblem(error);
         }
-        var unknown = entries.Where(e => MasterCsvKinds.Find(e.Kind) is null).ToList();
-        if (unknown.Count > 0)
-        {
-            var actual = unknown.Where(e => ActualCsvKinds.Find(e.Kind) is not null).ToList();
-            return this.BadRequestProblem(
-                actual.Count > 0
-                    ? ApiText.T("実績のCSVが含まれています：{0}。実績は実績CSV取込で別のZIPとして取り込んでください。",
-                        string.Join(ApiText.T("、"), actual.Select(e => e.FileName)))
-                    : ApiText.T("取込に対応していないマスタのCSVが含まれています：{0}（ファイル名は「番号_種別.csv」。例 01_work-centers.csv）。",
-                        string.Join(ApiText.T("、"), unknown.Select(e => e.FileName))));
-        }
-        var files = entries
-            .Select(e => new CsvBundleFile<CsvKindInfo>(e.FileName, MasterCsvKinds.Find(e.Kind)!, e.Text))
-            .ToList();
-        if (files.Any(f => !CanWrite(f.Kind)))
+        if (CsvIntake.FirstDenied(User, bundle) is not null)
         {
             return Forbid();
         }
-        return await service.ImportBundleAsync(files, dryRun, ct);
+        return await intake.ImportBundleAsync(bundle, dryRun, null, ct);
     }
 
     /// <summary>

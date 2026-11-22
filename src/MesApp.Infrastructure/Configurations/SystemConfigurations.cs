@@ -47,6 +47,19 @@ internal sealed class ApiKeyConfiguration : IEntityTypeConfiguration<ApiKey>
     }
 }
 
+internal sealed class IntegrationRequestConfiguration : IEntityTypeConfiguration<IntegrationRequest>
+{
+    public void Configure(EntityTypeBuilder<IntegrationRequest> e)
+    {
+        // 同じ呼び出し元・同じキーは1行だけ（同時に送られた2回目はここで止まる）
+        e.HasIndex(x => new { x.Caller, x.IdempotencyKey }).IsUnique();
+        e.HasIndex(x => x.ExpiresAtUnixSeconds);
+        e.Property(x => x.Caller).HasMaxLength(100);
+        e.Property(x => x.IdempotencyKey).HasMaxLength(100);
+        e.Property(x => x.RequestHash).HasMaxLength(64);
+    }
+}
+
 internal sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
     public void Configure(EntityTypeBuilder<AuditLog> e)

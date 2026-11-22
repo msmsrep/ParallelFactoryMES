@@ -110,6 +110,8 @@ public static class MesAppHost
         builder.Services.AddScoped<TransferOrderService>();
         builder.Services.AddScoped<SampleStorageService>();
         builder.Services.AddScoped<ActualCsvService>();
+        builder.Services.AddScoped<CsvIntake>();
+        builder.Services.AddScoped<IdempotencyService>();
         // フォルダ連携（Spec.md 3.8）。FolderLink:Root が空なら常駐処理は何もしない
         builder.Services.Configure<FolderLinkOptions>(builder.Configuration.GetSection(FolderLinkOptions.SectionName));
         builder.Services.AddSingleton<FolderLinkService>();

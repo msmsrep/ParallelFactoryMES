@@ -435,24 +435,11 @@ public class AuthTests
 
     private const string WhoAmI = "/api/integration/v1/whoami";
 
-    /// <summary>利用者を作ってキーを発行し、その利用者のIDと発行結果を返す</summary>
-    private static async Task<(string UserId, CreatedApiKeyResponse Created)> IssueKeyAsync(
-        ApiFactory factory, HttpClient admin, string userName, params string[] roles)
-    {
-        using var _ = await TestAuth.CreateUserClientAsync(factory, admin, userName, "Passw0rd123", roles);
-        var options = await admin.GetFromJsonAsync<OptionsResult<UserOptionResponse>>($"/api/users/options?keyword={userName}");
-        var userId = options!.Items.Single(u => u.UserName == userName).Id;
-        var response = await admin.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest("販売管理からの取込", userId, null));
-        response.EnsureSuccessStatusCode();
-        return (userId, (await response.Content.ReadFromJsonAsync<CreatedApiKeyResponse>())!);
-    }
+    private static Task<(string UserId, CreatedApiKeyResponse Created)> IssueKeyAsync(
+        ApiFactory factory, HttpClient admin, string userName, params string[] roles) =>
+        TestAuth.IssueApiKeyAsync(factory, admin, userName, roles);
 
-    private static HttpClient KeyClient(ApiFactory factory, string key)
-    {
-        var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Api-Key", key);
-        return client;
-    }
+    private static HttpClient KeyClient(ApiFactory factory, string key) => TestAuth.CreateApiKeyClient(factory, key);
 
     [Fact]
     public async Task APIキーで連携APIを呼ぶと紐づく利用者とロールとして扱われる()
