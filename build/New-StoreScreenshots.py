@@ -3,6 +3,11 @@
 
 アプリの実画面（build/store/raw/*.png）を右に置き、左に見出しと説明を入れる。
 実画面の撮影は build/Capture-AppScreens.js が行う。ここは合成だけを担当する。
+
+    python build/New-StoreScreenshots.py [--lang ja|en]
+
+--lang en は英語表示で撮った実画面（build/store/raw/en/）から、英語の見出しで build/store/en/ に出す。
+見出しを変えたときは docs-dev/StoreListing.md（英語は StoreListing.en.md）のキャプションも直す。
 """
 import os
 import sys
@@ -15,12 +20,19 @@ SUB = (85, 96, 107)         # 説明文
 MINT = (219, 238, 231)      # 背景の円（アイコンのパステルに合わせたミント）
 BG = (255, 255, 255)
 
-FONT_BOLD = r'C:\Windows\Fonts\YuGothB.ttc'
-FONT_REG = r'C:\Windows\Fonts\YuGothR.ttc'
+LANG = sys.argv[sys.argv.index('--lang') + 1] if '--lang' in sys.argv else 'ja'
+if LANG not in ('ja', 'en'):
+    sys.exit('--lang は ja か en です。')
+
+# 英語は欧文書体のほうが字面が締まる（游ゴシックの欧文は字間が広い）
+FONT_BOLD = r'C:\Windows\Fonts\YuGothB.ttc' if LANG == 'ja' else r'C:\Windows\Fonts\segoeuib.ttf'
+FONT_REG = r'C:\Windows\Fonts\YuGothR.ttc' if LANG == 'ja' else r'C:\Windows\Fonts\segoeui.ttf'
+TEXT_MAX_W = 700            # 見出し・説明の幅の上限（右の画面写真に掛からない）
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-RAW = os.path.join(ROOT, 'store', 'raw')
-OUT = os.path.join(ROOT, 'store')
+SUBDIR = [] if LANG == 'ja' else [LANG]
+RAW = os.path.join(ROOT, 'store', 'raw', *SUBDIR)
+OUT = os.path.join(ROOT, 'store', *SUBDIR)
 ICON = os.path.join(ROOT, '..', 'src', 'MesApp.Desktop', 'Assets', 'Square44x44Logo.targetsize-256.png')
 
 SHOTS = [
@@ -35,6 +47,31 @@ SHOTS = [
     ('inspections', '受入から完成品まで\n検査を一本化',
      '検査指示の発行と、測定値からの自動\n判定。不適合もその場で記録します。'),
 ]
+
+SHOTS_EN = [
+    ('dashboard', 'Today’s factory\nat a glance',
+     'Good quantity, defect rate and inspection\nresults for the day on a single screen.'),
+    ('orders', 'From order entry\nto process release',
+     'Register manufacturing orders, then approve,\nrelease and dispatch. Status history is kept.'),
+    ('work-orders', 'Record results\nfrom the work order',
+     'Start, setup, checklists, material input\nand result reporting on the same screen.'),
+    ('inventory', 'Track stock and\nhistory by lot',
+     'Receipts, issues, transfers, adjustments and\nexpiry alerts. Trace down to materials.'),
+    ('inspections', 'One inspection flow,\nreceiving to finished',
+     'Issue inspection orders and judge results\nfrom measurements. Log nonconformances.'),
+]
+
+if LANG == 'en':
+    SHOTS = SHOTS_EN
+
+
+def fit_font(path, size, text, max_w):
+    """一番長い行が max_w に収まるまで字を小さくする（英語は日本語より行が長くなりやすい）"""
+    while True:
+        font = ImageFont.truetype(path, size)
+        if max(font.getlength(line) for line in text.split('\n')) <= max_w or size <= 20:
+            return font
+        size -= 2
 
 
 def rounded_shadow(img, radius=22, blur=26, offset=(0, 14), alpha=58):
@@ -86,8 +123,8 @@ def compose(name, headline, body):
     base = Image.alpha_composite(base.convert('RGBA'), layer)
 
     d = ImageDraw.Draw(base)
-    head_font = ImageFont.truetype(FONT_BOLD, 66)
-    body_font = ImageFont.truetype(FONT_REG, 27)
+    head_font = fit_font(FONT_BOLD, 66, headline, TEXT_MAX_W)
+    body_font = fit_font(FONT_REG, 27, body, TEXT_MAX_W)
     end = draw_lines(d, (145, 372), headline, head_font, INK, 92)
     draw_lines(d, (147, end + 44), body, body_font, SUB, 48)
 
@@ -109,8 +146,8 @@ def compose(name, headline, body):
 if __name__ == '__main__':
     missing = [n for n, _, _ in SHOTS if not os.path.exists(os.path.join(RAW, n + '.png'))]
     if missing:
-        sys.exit('実画面のPNGがありません: %s（build/Capture-AppScreens.js で撮影してください）'
-                 % '、'.join(missing))
+        sys.exit('実画面のPNGがありません: %s（build/Capture-AppScreens.js --lang %s で撮影してください）'
+                 % ('、'.join(missing), LANG))
     os.makedirs(OUT, exist_ok=True)
     print('生成先: ' + OUT)
     for index, (name, headline, body) in enumerate(SHOTS):

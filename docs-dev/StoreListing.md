@@ -95,7 +95,7 @@ Parallel Factory MES は、製造指図・作業実績・在庫・品質・設�
 | screenshot-4 | ロット単位で在庫と履歴を追う。入出庫・移動・調整の履歴と期限のアラート。部材まで双方向に追跡。 |
 | screenshot-5 | 受入から完成品まで検査を一本化。検査指示の発行と、測定値からの自動判定。不適合もその場で記録します。 |
 
-見出しを変えたときは `build/New-StoreScreenshots.py` の `SHOTS` とこの表の両方を直す。
+見出しを変えたときは `build/New-StoreScreenshots.py` の `SHOTS` とこの表の両方を直す。英語版の画像は `build/store/en/`（作り方は `StoreListing.en.md`）。
 
 ## ストアロゴ・トレーラー
 

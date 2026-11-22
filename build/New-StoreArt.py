@@ -9,6 +9,11 @@
   ボックスアート       1080x1080  製品名入り
   アプリタイルアイコン 300x300    図柄だけ
   スーパーヒーロー     1920x1080  文字を入れない。下1/3はストアが文字を重ねるので主役を置かない
+
+  python build/New-StoreArt.py [--lang ja|en]
+
+--lang en は英語表示の実画面（build/store/raw/en/）を使い、タイル以外を build/store/en/ に出す
+（タイルは図柄だけなので日本語版と共通）。
 """
 import os
 import shutil
@@ -29,8 +34,9 @@ MINT_DEEP = (205, 235, 223)  # アイコンの一番淡いバー（#CDEBDF）
 FONT_LATIN = r'C:\Windows\Fonts\seguisb.ttf'
 FONT_REG = shots.FONT_REG
 NAME = 'Parallel Factory MES'
-KIND = '製造実行システム'
-TAGLINE = 'PC1台で、工場の記録を始める。'
+LANG = shots.LANG
+KIND = '製造実行システム' if LANG == 'ja' else 'Manufacturing Execution System'
+TAGLINE = 'PC1台で、工場の記録を始める。' if LANG == 'ja' else 'Start your factory records on a single PC.'
 
 ROOT = shots.ROOT
 RAW = shots.RAW
@@ -68,9 +74,12 @@ def center_text(d, cx, y, text, font, fill):
     d.text((cx - (right - left) / 2 - left, y), text, font=font, fill=fill)
 
 
-def shot_card(name, width):
+def shot_card(name, width, max_height=None):
+    """実画面を幅 width に縮めた角丸カード。max_height を超える分は下を切る"""
     img = shots.trim_bottom(Image.open(os.path.join(RAW, name + '.png')).convert('RGB'))
     img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
+    if max_height and img.height > max_height:
+        img = img.crop((0, 0, width, max_height))
     return shots.rounded_shadow(img, radius=max(10, width // 44))
 
 
@@ -109,10 +118,10 @@ def super_hero(workdir):
     w, h = 1920, 1080
     base = canvas(w, h, [((-360, -420, 900, 840), MINT), ((1500, 560, 2260, 1320), MINT_DEEP)])
     base.alpha_composite(render_icon(380, workdir), (200, 150))
-    # 主役は上2/3（y < 720）に収める
-    back, pad_b = shot_card('work-orders', 820)
+    # 主役は上2/3（y < 720）に収める（英語表示のダッシュボードは縦に長いので、はみ出す分を切る）
+    back, pad_b = shot_card('work-orders', 820, max_height=600)
     base.alpha_composite(back, (1000 - pad_b, 70 - pad_b))
-    front, pad_f = shot_card('dashboard', 880)
+    front, pad_f = shot_card('dashboard', 880, max_height=460)
     base.alpha_composite(front, (760 - pad_f, 250 - pad_f))
     return base
 
@@ -123,12 +132,14 @@ ARTS = [
     ('app-tile-icon-300x300.png', tile),
     ('super-hero-art-1920x1080.png', super_hero),
 ]
+if LANG != 'ja':
+    ARTS = [a for a in ARTS if a[1] is not tile]
 
 if __name__ == '__main__':
     missing = [n for n in ('dashboard', 'work-orders') if not os.path.exists(os.path.join(RAW, n + '.png'))]
     if missing:
-        sys.exit('実画面のPNGがありません: %s（build/Capture-AppScreens.js で撮影してください）'
-                 % '、'.join(missing))
+        sys.exit('実画面のPNGがありません: %s（build/Capture-AppScreens.js --lang %s で撮影してください）'
+                 % ('、'.join(missing), LANG))
     os.makedirs(OUT, exist_ok=True)
     print('生成先: ' + OUT)
     with tempfile.TemporaryDirectory() as workdir:
