@@ -23,7 +23,7 @@
 |:--|:--|
 | INT-01 APIキーの土台 | 完了（2026-11-22。Spec.md 改訂150） |
 | INT-02 CSVの取込・出力を連携APIで | 完了（2026-11-22。Spec.md 改訂151） |
-| INT-03 実績の取得 | 未着手 |
+| INT-03 実績の取得 | 完了（2026-11-23。Spec.md 改訂152） |
 | INT-04 OpenAPI 文書と利用者ガイド | 未着手 |
 
 ## 決定事項（2026-11-22 確定）
@@ -96,6 +96,12 @@
 
 **変更ファイルの想定（約8）**：`Core/Contracts/Integration/ProductionResultDtos.cs`、`Api/Controllers/Integration/ProductionResultsController.cs`、`ApiText.en.resx`、`Tests/ProductionTests.cs`、`Spec.md`、`CodeMap.md`、（必要なら）`Infra/Configurations` に索引
 **受入基準**：`afterId` で続きだけが返る／訂正が訂正の口に出る／取消された作業指示の実績の扱いを決めて Spec.md に書く／参照の権限は認証済みなら誰でも（既存の参照系と同じ）
+
+**実施メモ（2026-11-23）**：変更は7ファイル（想定約8。索引は主キーの昇順で足りたので `Configurations` は触らなかった）。
+- 取り消した指図・作業指示の実績も返し、`workOrderStatus` を添える（指図の取消は未完了の作業指示を取消にするが、記録済みの実績と産出ロットは現物として残る。消すと ERP の在庫と食い違う）
+- 区分・状態は列挙の名前を文字列で返す（既存の画面用 API は列挙を数値で返すが、連携の約束では並べ替えで意味が変わる数値を避ける）
+- 実績の口は訂正後の今の値を返す。訂正の前後は訂正の口で返す
+- 入庫先（`OutputLocationId`）は関連のナビゲーションが無いので、射影の中で `Locations` を ID で引いた
 
 ### INT-04 OpenAPI 文書と利用者ガイド
 

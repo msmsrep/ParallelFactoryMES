@@ -2676,4 +2676,10 @@
   <data name="同じ列が新しい名前と以前の名前の両方で書かれています：{0}。どちらか一方にしてください。" xml:space="preserve">
     <value>The same column is written under both its new name and its former name: {0}. Use only one of them.</value>
   </data>
+  <data name="afterId は0以上で指定してください。" xml:space="preserve">
+    <value>Specify afterId as 0 or greater.</value>
+  </data>
+  <data name="limit は1以上{0}以下で指定してください。" xml:space="preserve">
+    <value>Specify limit between 1 and {0}.</value>
+  </data>
 </root>
