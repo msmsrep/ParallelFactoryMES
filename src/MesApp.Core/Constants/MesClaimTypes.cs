@@ -19,4 +19,10 @@ public static class MesClaimTypes
     /// DB側の値が変わると、発行済みのアクセストークンは有効期限を待たずに使えなくなる
     /// </summary>
     public const string SecurityStamp = "security_stamp";
+
+    /// <summary>APIキーで認証したときのキーのID（連携API。Spec.md 7.4）。ログインのトークンには付かない</summary>
+    public const string ApiKeyId = "api_key_id";
+
+    /// <summary>APIキーで認証したときのキーの名前（用途）</summary>
+    public const string ApiKeyName = "api_key_name";
 }

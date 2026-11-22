@@ -5,6 +5,7 @@ using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
@@ -114,9 +115,11 @@ public static class MesAppHost
         builder.Services.AddSingleton<FolderLinkService>();
         builder.Services.AddHostedService<FolderLinkWorker>();
 
+        // 既定は JWT（画面用 API）。APIキーは連携API の Controller が明示したときだけ使う（ApiKeyAuthentication.IntegrationSchemes）
         builder.Services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer();
+            .AddJwtBearer()
+            .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthentication.Scheme, null);
 
         // 検証鍵はDIのSigningKeyProvider（シングルトン）から取る。
         // ここで別インスタンスを作ると、鍵ファイルが無い初回に発行側と検証側で別の鍵が生まれる

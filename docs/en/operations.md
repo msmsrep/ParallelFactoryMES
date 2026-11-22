@@ -164,6 +164,35 @@ Changing the settings requires a restart. On startup, `inbox`, `processed` and `
 
 There is no integration that writes data out of the MES yet (automatic export of actuals).
 
+## API keys  {#api-keys}
+
+Keys that systems such as sales or production management software, or in-house scripts, use to call the MES **integration API** (`/api/integration/v1/...`) without signing in.
+
+### Issuing a key
+
+1. Create the user the key will act as (for example `erp-link`). **What the key can do is determined by this user's roles.** Create a dedicated user for each purpose and give it only the roles it needs ([Roles and permissions](roles.html)).
+2. A system administrator opens "Administration" → "API keys" in the menu, specifies the purpose, the user and an optional expiry, and clicks **Issue key**.
+3. Copy the key shown (a string starting with `pfm_`) into the settings of the connecting system. **The key is shown only at this time.** If it is lost, revoke it and issue a new one.
+
+### Trying it
+
+Send the key in the `X-Api-Key` request header. The following endpoint shows who you are treated as (the user and roles).
+
+```powershell
+Invoke-RestMethod http://localhost:5000/api/integration/v1/whoami -Headers @{ "X-Api-Key" = "pfm_..." }
+```
+
+```bash
+curl -H "X-Api-Key: pfm_..." http://localhost:5000/api/integration/v1/whoami
+```
+
+### Notes
+
+- Keys work only with the integration API. The APIs used by the screens (such as `/api/products`) cannot be called with a key (401).
+- Operations performed with a key are recorded in the audit log as the linked user.
+- **A revoked key cannot be restored.** A key also stops working immediately when its user is deactivated or its expiry passes. When the user's roles change, the next call is checked with the new roles.
+- Treat keys like passwords. Do not paste them into email or chat; keep them only in the settings of the connecting system.
+
 ## Security
 
 <div class="warn">

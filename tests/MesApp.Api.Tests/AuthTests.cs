@@ -11,9 +11,13 @@ using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Auth;
 using MesApp.Core.Contracts.Common;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Contracts.Setup;
 using MesApp.Core.Contracts.Users;
+using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MesApp.Api.Tests;
 
@@ -425,5 +429,148 @@ public class AuthTests
         var page = await admin.GetFromJsonAsync<PagedResult<AuditLogResponse>>(
             "/api/audit-logs?category=Auth&action=Login&pageSize=200");
         return page!.Items.Select(a => a.IpAddress).ToList();
+    }
+
+    // ---- 連携API の APIキー（Spec.md 7.4 連携APIの認証。INT-01） ----
+
+    private const string WhoAmI = "/api/integration/v1/whoami";
+
+    /// <summary>利用者を作ってキーを発行し、その利用者のIDと発行結果を返す</summary>
+    private static async Task<(string UserId, CreatedApiKeyResponse Created)> IssueKeyAsync(
+        ApiFactory factory, HttpClient admin, string userName, params string[] roles)
+    {
+        using var _ = await TestAuth.CreateUserClientAsync(factory, admin, userName, "Passw0rd123", roles);
+        var options = await admin.GetFromJsonAsync<OptionsResult<UserOptionResponse>>($"/api/users/options?keyword={userName}");
+        var userId = options!.Items.Single(u => u.UserName == userName).Id;
+        var response = await admin.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest("販売管理からの取込", userId, null));
+        response.EnsureSuccessStatusCode();
+        return (userId, (await response.Content.ReadFromJsonAsync<CreatedApiKeyResponse>())!);
+    }
+
+    private static HttpClient KeyClient(ApiFactory factory, string key)
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", key);
+        return client;
+    }
+
+    [Fact]
+    public async Task APIキーで連携APIを呼ぶと紐づく利用者とロールとして扱われる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (_, created) = await IssueKeyAsync(factory, admin, "erp-link", MesRoles.ProductionManager);
+        Assert.StartsWith("pfm_", created.PlainKey);
+        Assert.StartsWith(created.Key.Prefix, created.PlainKey);
+
+        using var client = KeyClient(factory, created.PlainKey);
+        var me = await client.GetFromJsonAsync<IntegrationWhoAmIResponse>(WhoAmI);
+        Assert.Equal("erp-link", me!.UserName);
+        Assert.Equal("ApiKey", me.AuthenticatedBy);
+        Assert.Equal("販売管理からの取込", me.ApiKeyName);
+        Assert.Equal([MesRoles.ProductionManager], me.Roles);
+
+        // ログインのトークンでも連携APIを確かめられる
+        var byLogin = await admin.GetFromJsonAsync<IntegrationWhoAmIResponse>(WhoAmI);
+        Assert.Equal("Bearer", byLogin!.AuthenticatedBy);
+
+        // 使われた日時が残る
+        var keys = await admin.GetFromJsonAsync<List<ApiKeyResponse>>("/api/api-keys");
+        Assert.NotNull(keys!.Single().LastUsedAt);
+    }
+
+    [Fact]
+    public async Task APIキーでは画面用のAPIを呼べず_誤ったキーも通らない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (_, created) = await IssueKeyAsync(factory, admin, "erp-link", MesRoles.SystemAdmin);
+
+        using var client = KeyClient(factory, created.PlainKey);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/api-keys")).StatusCode);
+
+        using var wrong = KeyClient(factory, created.PlainKey + "x");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await wrong.GetAsync(WhoAmI)).StatusCode);
+        using var none = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await none.GetAsync(WhoAmI)).StatusCode);
+    }
+
+    [Fact]
+    public async Task APIキーは失効_期限切れ_利用者の無効化で即座に使えなくなり_ロールの変更も即座に効く()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (userId, created) = await IssueKeyAsync(factory, admin, "erp-link", MesRoles.ProductionManager);
+        using var client = KeyClient(factory, created.PlainKey);
+
+        // ロールの変更は次の要求から効く
+        (await admin.PutAsJsonAsync($"/api/users/{userId}",
+            new UpdateUserRequest("erp-link", [MesRoles.Logistics], true))).EnsureSuccessStatusCode();
+        Assert.Equal([MesRoles.Logistics], (await client.GetFromJsonAsync<IntegrationWhoAmIResponse>(WhoAmI))!.Roles);
+
+        // 利用者を無効化すると使えない。有効に戻せばまた使える
+        (await admin.PutAsJsonAsync($"/api/users/{userId}",
+            new UpdateUserRequest("erp-link", [MesRoles.Logistics], false))).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(WhoAmI)).StatusCode);
+        (await admin.PutAsJsonAsync($"/api/users/{userId}",
+            new UpdateUserRequest("erp-link", [MesRoles.Logistics], true))).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(WhoAmI)).StatusCode);
+
+        // 期限切れ（発行時は未来しか指定できないので、DBで過去にする）
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            var key = await db.ApiKeys.SingleAsync();
+            key.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(WhoAmI)).StatusCode);
+
+        // 失効は戻せない
+        var (_, second) = await IssueKeyAsync(factory, admin, "erp-link2", MesRoles.ProductionManager);
+        using var secondClient = KeyClient(factory, second.PlainKey);
+        Assert.Equal(HttpStatusCode.OK, (await secondClient.GetAsync(WhoAmI)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await admin.PostAsync($"/api/api-keys/{second.Key.Id}/revoke", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await secondClient.GetAsync(WhoAmI)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await admin.PostAsync($"/api/api-keys/{second.Key.Id}/revoke", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task APIキーの平文は発行の応答にしか出ず_管理はシステム管理者だけ()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (userId, created) = await IssueKeyAsync(factory, admin, "erp-link", MesRoles.ProductionManager);
+        (await admin.PostAsync($"/api/api-keys/{created.Key.Id}/revoke", null)).EnsureSuccessStatusCode();
+
+        var list = await admin.GetStringAsync("/api/api-keys");
+        Assert.DoesNotContain(created.PlainKey, list);
+        var audits = await admin.GetStringAsync("/api/audit-logs?category=ApiKey&pageSize=200");
+        Assert.DoesNotContain(created.PlainKey, audits);
+        Assert.DoesNotContain(created.PlainKey[12..], audits);
+        Assert.Contains("Create", audits);
+        Assert.Contains("Revoke", audits);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            Assert.DoesNotContain(await db.ApiKeys.Select(k => k.KeyHash).ToListAsync(), h => h == created.PlainKey);
+        }
+
+        // 無効な利用者には発行できない・存在しない利用者は404
+        (await admin.PutAsJsonAsync($"/api/users/{userId}",
+            new UpdateUserRequest("erp-link", [MesRoles.ProductionManager], false))).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await admin.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest("x", userId, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await admin.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest("x", "no-such-user", null))).StatusCode);
+
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "manager", "Passw0rd123", MesRoles.ProductionManager);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync("/api/api-keys")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await manager.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest("x", userId, null))).StatusCode);
     }
 }

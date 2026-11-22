@@ -2643,4 +2643,25 @@
   <data name="警告 {0}行目：{1}" xml:space="preserve">
     <value>Warning, line {0}: {1}</value>
   </data>
+  <data name="用途（名前）を入力してください。" xml:space="preserve">
+    <value>Enter the purpose (name).</value>
+  </data>
+  <data name="用途（名前）は{0}文字以内で入力してください。" xml:space="preserve">
+    <value>Enter the purpose (name) in {0} characters or fewer.</value>
+  </data>
+  <data name="有効期限は今より後の日時を指定してください。" xml:space="preserve">
+    <value>Specify an expiry later than now.</value>
+  </data>
+  <data name="利用者が見つかりません。" xml:space="preserve">
+    <value>The user was not found.</value>
+  </data>
+  <data name="無効な利用者にはAPIキーを発行できません。" xml:space="preserve">
+    <value>API keys cannot be issued to inactive users.</value>
+  </data>
+  <data name="APIキーが見つかりません。" xml:space="preserve">
+    <value>The API key was not found.</value>
+  </data>
+  <data name="このAPIキーは既に失効しています。" xml:space="preserve">
+    <value>This API key has already been revoked.</value>
+  </data>
 </root>

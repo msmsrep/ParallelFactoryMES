@@ -29,7 +29,7 @@ one system administrator and a few users with the roles for their work.</p>
 ## Permissions by operation
 
 ○ = allowed. Blank = the buttons and forms are not shown (anyone can view the lists).
-**The audit log and folder integration are the exceptions: only system administrators can view them at all** (they are not shown in the menu either).
+**The audit log, folder integration and API keys are the exceptions: only system administrators can view them at all** (they are not shown in the menu either).
 
 | Operation | System administrator | Production management | Operator | Logistics / warehouse | Quality control | Quality assurance | Equipment maintenance |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -63,6 +63,7 @@ one system administrator and a few users with the roles for their work.</p>
 | Recording tool usage | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | Viewing the audit log | ○ | | | | | | |
 | Checking folder integration and Import now | ○ | | | | | | |
+| Issuing and revoking API keys | ○ | | | | | | |
 
 ## Assigning roles
 

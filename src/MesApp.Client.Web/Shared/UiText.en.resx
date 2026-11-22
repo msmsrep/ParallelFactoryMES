@@ -4407,4 +4407,100 @@
   <data name="inbox を確認しました（処理したファイル {0} 件）。" xml:space="preserve">
     <value>Checked the inbox ({0} files processed).</value>
   </data>
+  <data name="APIキー" xml:space="preserve">
+    <value>API keys</value>
+  </data>
+  <data name="APIキー - Parallel Factory MES" xml:space="preserve">
+    <value>API keys - Parallel Factory MES</value>
+  </data>
+  <data name="販売管理・生産管理などのシステムやスクリプトが、連携API を呼ぶためのキーです。" xml:space="preserve">
+    <value>Keys that systems such as sales or production management software, or scripts, use to call the integration API.</value>
+  </data>
+  <data name="キーで呼んだ操作は、紐づけた利用者が行ったものとして権限を判定し、監査ログにもその利用者で記録します。" xml:space="preserve">
+    <value>Operations called with a key are authorized as the linked user and recorded in the audit log as that user.</value>
+  </data>
+  <data name="用途ごとに専用の利用者を作り、必要なロールだけを与えてください。" xml:space="preserve">
+    <value>Create a dedicated user for each purpose and give it only the roles it needs.</value>
+  </data>
+  <data name="発行したキー" xml:space="preserve">
+    <value>Issued key</value>
+  </data>
+  <data name="このキーは今しか表示できません。連携するシステムの設定に、今すぐ写してください。" xml:space="preserve">
+    <value>This key is shown only now. Copy it into the settings of the connecting system right away.</value>
+  </data>
+  <data name="要求のヘッダ {0} にこのキーを付けて呼びます。" xml:space="preserve">
+    <value>Send this key in the {0} request header.</value>
+  </data>
+  <data name="写したので閉じる" xml:space="preserve">
+    <value>I have copied it, close</value>
+  </data>
+  <data name="キーを発行する" xml:space="preserve">
+    <value>Issue a key</value>
+  </data>
+  <data name="用途" xml:space="preserve">
+    <value>Purpose</value>
+  </data>
+  <data name="例：販売管理からの指図取込" xml:space="preserve">
+    <value>e.g. Order import from sales management</value>
+  </data>
+  <data name="利用者" xml:space="preserve">
+    <value>User</value>
+  </data>
+  <data name="有効期限（任意。この日まで有効）" xml:space="preserve">
+    <value>Expiry (optional; valid through this date)</value>
+  </data>
+  <data name="このキーで行える操作は、利用者のロールで決まります：{0}" xml:space="preserve">
+    <value>What this key can do is determined by the user's roles: {0}</value>
+  </data>
+  <data name="（ロールなし）" xml:space="preserve">
+    <value>(no roles)</value>
+  </data>
+  <data name="発行済みのキー" xml:space="preserve">
+    <value>Issued keys</value>
+  </data>
+  <data name="発行したキーはありません。" xml:space="preserve">
+    <value>No keys have been issued.</value>
+  </data>
+  <data name="キーの先頭" xml:space="preserve">
+    <value>Key prefix</value>
+  </data>
+  <data name="発行日時" xml:space="preserve">
+    <value>Issued at</value>
+  </data>
+  <data name="最後に使われた日時" xml:space="preserve">
+    <value>Last used at</value>
+  </data>
+  <data name="失効する（戻せません）" xml:space="preserve">
+    <value>Revoke (cannot be undone)</value>
+  </data>
+  <data name="やめる" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="失効" xml:space="preserve">
+    <value>Revoke</value>
+  </data>
+  <data name="利用者の一覧を取得できませんでした。" xml:space="preserve">
+    <value>Could not get the list of users.</value>
+  </data>
+  <data name="APIキーの一覧を取得できませんでした。" xml:space="preserve">
+    <value>Could not get the list of API keys.</value>
+  </data>
+  <data name="利用者を選択してください。" xml:space="preserve">
+    <value>Select a user.</value>
+  </data>
+  <data name="APIキーの発行に失敗しました。" xml:space="preserve">
+    <value>Failed to issue the API key.</value>
+  </data>
+  <data name="APIキーの失効に失敗しました。" xml:space="preserve">
+    <value>Failed to revoke the API key.</value>
+  </data>
+  <data name="「{0}」のキーを失効しました。" xml:space="preserve">
+    <value>Revoked the key "{0}".</value>
+  </data>
+  <data name="失効済み" xml:space="preserve">
+    <value>Revoked</value>
+  </data>
+  <data name="キーを発行" xml:space="preserve">
+    <value>Issue key</value>
+  </data>
 </root>
