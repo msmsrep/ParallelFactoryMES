@@ -4,10 +4,14 @@ using System.Net.Http.Json;
 using System.Text;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Dashboard;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Planning;
 using MesApp.Core.Contracts.Users;
 using MesApp.Core.Entities;
+using MesApp.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MesApp.Api.Tests;
 
@@ -1378,6 +1382,424 @@ public class MasterCsvTests
         var kind = (await admin.GetFromJsonAsync<List<CsvKindInfo>>("/api/masters/csv/kinds"))!
             .Single(k => k.Kind == "production-plans");
         Assert.Equal(MesRoleGroups.ProductionManage, kind.WriteRoles);
+    }
+
+    // ---- CSVの列の約束（Spec.md 3.8。docs-dev/IntegrationApiTasks.md INT-02） ----
+
+    /// <summary>基準ファイルを書き直すときに立てる環境変数（列を足したとき。互換を壊す変更はこれでは通らない）</summary>
+    private const string UpdateContractVariable = "MESAPP_UPDATE_CSV_CONTRACT";
+
+    private sealed record ContractColumn(string Name, bool Required, List<string> Aliases);
+
+    private sealed record ContractKind(string Area, string Kind, List<ContractColumn> Columns);
+
+    private sealed record CsvContract(int Version, List<ContractKind> Kinds);
+
+    private static readonly System.Text.Json.JsonSerializerOptions ContractJson = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+    };
+
+    /// <summary>基準ファイルの場所（ソースの横。テストから書き直せるよう出力先ではなくソースを指す）</summary>
+    private static string ContractPath([System.Runtime.CompilerServices.CallerFilePath] string source = "") =>
+        Path.Combine(Path.GetDirectoryName(source)!, "CsvContract.v1.json");
+
+    /// <summary>今の列定義（マスタCSV・実績CSVの全種別）</summary>
+    private static CsvContract CurrentContract() => new(1,
+    [
+        .. MesApp.Api.Services.MasterCsvKinds.All.Select(k => ToContract("master", k)),
+        .. MesApp.Api.Services.ActualCsvKinds.All.Select(k => ToContract("actual", k.Info)),
+    ]);
+
+    private static ContractKind ToContract(string area, CsvKindInfo kind) =>
+        new(area, kind.Kind, [.. kind.Columns.Select(c => new ContractColumn(c.Name, c.Required, [.. c.Aliases]))]);
+
+    /// <summary>
+    /// 基準から今へ、外部の連携を壊す変更を挙げる。種別・列を消す／名前を変える（以前の名前を別名に残さずに）／
+    /// 任意を必須にする／新しい列を必須で足す、を壊す変更とする。列の追加（任意）と、必須→任意は壊さない
+    /// </summary>
+    private static List<string> BreakingChanges(CsvContract baseline, CsvContract current)
+    {
+        var problems = new List<string>();
+        foreach (var before in baseline.Kinds)
+        {
+            var after = current.Kinds.SingleOrDefault(k => k.Area == before.Area && k.Kind == before.Kind);
+            if (after is null)
+            {
+                problems.Add($"{before.Area}/{before.Kind}：種別が無くなった");
+                continue;
+            }
+            foreach (var column in before.Columns)
+            {
+                var now = after.Columns.SingleOrDefault(c => c.Name == column.Name)
+                    ?? after.Columns.SingleOrDefault(c => c.Aliases.Contains(column.Name));
+                if (now is null)
+                {
+                    problems.Add($"{before.Kind}.{column.Name}：列が無くなった（名前を変えたなら以前の名前を Aliases に残す）");
+                }
+                else if (now.Required && !column.Required)
+                {
+                    problems.Add($"{before.Kind}.{column.Name}：任意だった列が必須になった");
+                }
+            }
+            foreach (var added in after.Columns.Where(c =>
+                         !before.Columns.Any(b => b.Name == c.Name || c.Aliases.Contains(b.Name))))
+            {
+                if (added.Required)
+                {
+                    problems.Add($"{before.Kind}.{added.Name}：必須の列を足した（省けば今までどおりに動く任意の列で足す）");
+                }
+            }
+        }
+        return problems;
+    }
+
+    [Fact]
+    public void CSVの列の約束_基準ファイルから外部の連携を壊す変更をしていない()
+    {
+        var baseline = System.Text.Json.JsonSerializer.Deserialize<CsvContract>(File.ReadAllText(ContractPath()), ContractJson)!;
+        var problems = BreakingChanges(baseline, CurrentContract());
+        Assert.True(problems.Count == 0,
+            "CSVの列は連携API・フォルダ連携の約束です（Spec.md 3.8）。次の変更は外部の連携を壊します：\n" + string.Join("\n", problems));
+    }
+
+    [Fact]
+    public void CSVの列の約束_基準ファイルが今の列定義と同じ()
+    {
+        var current = System.Text.Json.JsonSerializer.Serialize(CurrentContract(), ContractJson).ReplaceLineEndings("\n") + "\n";
+        if (Environment.GetEnvironmentVariable(UpdateContractVariable) == "1")
+        {
+            File.WriteAllText(ContractPath(), current);
+        }
+        var saved = File.Exists(ContractPath()) ? File.ReadAllText(ContractPath()).ReplaceLineEndings("\n") : "";
+        Assert.True(saved == current,
+            $"CSVの列定義が基準ファイル（{Path.GetFileName(ContractPath())}）と違います。列を足しただけなら、" +
+            $"$env:{UpdateContractVariable}='1' を立ててこのテストを流すと基準ファイルが更新されます。更新した基準ファイルは同じコミットに入れてください。");
+    }
+
+    [Fact]
+    public void CSVの列の約束_削除_改名_必須化を見つけ_任意の列の追加と別名つきの改名は通す()
+    {
+        var baseline = CurrentContract();
+        var products = baseline.Kinds.Single(k => k.Kind == "products");
+        CsvContract With(Func<ContractKind, ContractKind> change) =>
+            baseline with { Kinds = [.. baseline.Kinds.Select(k => k.Kind == "products" ? change(k) : k)] };
+
+        var optional = products.Columns.First(c => !c.Required);
+        // 消す・別名なしで改名する・任意を必須にする・必須の列を足すのは壊す変更
+        Assert.NotEmpty(BreakingChanges(baseline, With(k => k with { Columns = [.. k.Columns.Where(c => c != optional)] })));
+        Assert.NotEmpty(BreakingChanges(baseline, With(k => k with
+        {
+            Columns = [.. k.Columns.Select(c => c == optional ? c with { Name = "Renamed" } : c)],
+        })));
+        Assert.NotEmpty(BreakingChanges(baseline, With(k => k with
+        {
+            Columns = [.. k.Columns.Select(c => c == optional ? c with { Required = true } : c)],
+        })));
+        Assert.NotEmpty(BreakingChanges(baseline, With(k => k with { Columns = [.. k.Columns, new("NewRequired", true, [])] })));
+        Assert.NotEmpty(BreakingChanges(baseline, baseline with { Kinds = [.. baseline.Kinds.Where(k => k.Kind != "products")] }));
+
+        // 任意の列を足す・必須を任意にする・以前の名前を別名に残して改名するのは壊さない
+        Assert.Empty(BreakingChanges(baseline, With(k => k with { Columns = [.. k.Columns, new("NewOptional", false, [])] })));
+        Assert.Empty(BreakingChanges(baseline, With(k => k with
+        {
+            Columns = [.. k.Columns.Select(c => c.Required ? c with { Required = false } : c)],
+        })));
+        Assert.Empty(BreakingChanges(baseline, With(k => k with
+        {
+            Columns = [.. k.Columns.Select(c => c == optional ? c with { Name = "Renamed", Aliases = [optional.Name] } : c)],
+        })));
+    }
+
+    [Fact]
+    public void CSVの以前の列名で書いた列も同じ列として読み_新旧両方あればエラーにする()
+    {
+        var kind = new CsvKindInfo("test", "テスト", false,
+        [
+            new CsvColumnInfo("Code", "コード", true, null) { Aliases = ["OldCode"] },
+            new CsvColumnInfo("Name", "名称", false, null),
+        ]);
+
+        var errors = new List<CsvImportError>();
+        var table = MesApp.Api.Services.CsvImport.Prepare(kind, "OldCode,Name\nA-1,名前\n", errors);
+        Assert.Empty(errors);
+        Assert.Equal("A-1", table!.Value(table.Rows[0], "Code"));
+
+        var both = MesApp.Api.Services.CsvImport.Prepare(kind, "Code,OldCode,Name\nA-1,A-2,名前\n", errors);
+        Assert.Null(both);
+        Assert.Contains(errors, e => e.Message.Contains("OldCode"));
+    }
+
+    // ---- 連携API の CSV（Spec.md 3.8 連携API。INT-02） ----
+
+    private const string EquipmentCsv = "AssetNo,Name\nEQ-01,マシニングセンタ\n";
+    private const string EquipmentLogCsv = "EquipmentAssetNo,Status,StartedAt,EndedAt\nEQ-01,Running,2026-09-01 08:00,2026-09-01 12:00\n";
+
+    private static Task<HttpResponseMessage> PostIntegrationCsvAsync(
+        HttpClient client, string path, string csv, string? idempotencyKey = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/integration/v1/{path}")
+        {
+            Content = new StringContent(csv, Encoding.UTF8, "text/csv"),
+        };
+        if (idempotencyKey is not null)
+        {
+            request.Headers.Add("Idempotency-Key", idempotencyKey);
+        }
+        return client.SendAsync(request);
+    }
+
+    private static async Task<int> EquipmentLogCountAsync(ApiFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<MesAppDbContext>().EquipmentLogs.CountAsync();
+    }
+
+    [Fact]
+    public async Task 連携APIでAPIキーを使ってマスタ_実績_ZIPを取り込み_失敗は422で返す()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (_, created) = await TestAuth.IssueApiKeyAsync(factory, admin, "erp-link", MesRoles.ProductionManager);
+        using var client = TestAuth.CreateApiKeyClient(factory, created.PlainKey);
+
+        // 種別と列定義（画面のマスタCSV・実績CSVと同じ）
+        var kinds = await client.GetFromJsonAsync<IntegrationCsvKindsResponse>("/api/integration/v1/csv-kinds");
+        Assert.Contains(kinds!.Masters, k => k.Kind == "equipments" && k.WriteRoles == MesRoleGroups.MasterWrite);
+        Assert.Contains(kinds.Actuals, k => k.Kind == "equipment-logs");
+
+        // マスタ・実績の取込。検証のみは反映しない
+        var master = await PostIntegrationCsvAsync(client, "masters/equipments", EquipmentCsv);
+        Assert.Equal(HttpStatusCode.OK, master.StatusCode);
+        Assert.Equal(1, (await master.Content.ReadFromJsonAsync<CsvImportResult>())!.Created);
+        Assert.Equal(HttpStatusCode.OK, (await PostIntegrationCsvAsync(client, "actuals/equipment-logs?dryRun=true", EquipmentLogCsv)).StatusCode);
+        Assert.Equal(0, await EquipmentLogCountAsync(factory));
+        Assert.Equal(HttpStatusCode.OK, (await PostIntegrationCsvAsync(client, "actuals/equipment-logs", EquipmentLogCsv)).StatusCode);
+        Assert.Equal(1, await EquipmentLogCountAsync(factory));
+
+        // 取込のエラーは 422 で、本文は行ごとのエラー付きの取込結果
+        var failed = await PostIntegrationCsvAsync(client, "actuals/equipment-logs", "EquipmentAssetNo,Status,StartedAt\nNO-SUCH,Running,2026-09-01 08:00\n");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, failed.StatusCode);
+        var failedResult = (await failed.Content.ReadFromJsonAsync<CsvImportResult>())!;
+        Assert.False(failedResult.Succeeded);
+        Assert.Contains(failedResult.Errors, e => e.Line == 2);
+
+        // ZIP（マスタ）。中に実績が混ざっていれば 400
+        var zip = MesApp.Api.Services.CsvBundle.ToZip([("01_defect-reasons.csv", DefectReasonCsv)]);
+        var bundle = await client.PostAsync("/api/integration/v1/masters/bundle", new ByteArrayContent(zip));
+        Assert.Equal(HttpStatusCode.OK, bundle.StatusCode);
+        Assert.True((await bundle.Content.ReadFromJsonAsync<CsvBundleImportResult>())!.Succeeded);
+        var mixed = MesApp.Api.Services.CsvBundle.ToZip([("01_defect-reasons.csv", DefectReasonCsv), ("02_equipment-logs.csv", EquipmentLogCsv)]);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/integration/v1/masters/bundle", new ByteArrayContent(mixed))).StatusCode);
+
+        // マスタの出力（画面の出力と同じ内容）
+        var export = await client.GetAsync("/api/integration/v1/masters/equipments");
+        Assert.Equal(HttpStatusCode.OK, export.StatusCode);
+        Assert.Contains("EQ-01", await export.Content.ReadAsStringAsync());
+
+        // 種別が無ければ 404
+        Assert.Equal(HttpStatusCode.NotFound, (await PostIntegrationCsvAsync(client, "masters/no-such-kind", EquipmentCsv)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostIntegrationCsvAsync(client, "actuals/equipments", EquipmentCsv)).StatusCode);
+    }
+
+    [Fact]
+    public async Task 連携APIのCSV取込はキーの利用者のロールで判定する()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (_, created) = await TestAuth.IssueApiKeyAsync(factory, admin, "line-pc", MesRoles.Operator);
+        using var client = TestAuth.CreateApiKeyClient(factory, created.PlainKey);
+
+        // 作業者はマスタを取り込めない（画面と同じ）。設備稼働記録は誰でも取り込める（単票APIと同じ）
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostIntegrationCsvAsync(client, "masters/equipments", EquipmentCsv)).StatusCode);
+        (await PostCsvAsync(admin, "equipments", EquipmentCsv)).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.OK, (await PostIntegrationCsvAsync(client, "actuals/equipment-logs", EquipmentLogCsv)).StatusCode);
+        var zip = MesApp.Api.Services.CsvBundle.ToZip([("01_defect-reasons.csv", DefectReasonCsv)]);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync("/api/integration/v1/masters/bundle", new ByteArrayContent(zip))).StatusCode);
+
+        // キーが無ければ 401
+        using var anonymous = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostIntegrationCsvAsync(anonymous, "actuals/equipment-logs", EquipmentLogCsv)).StatusCode);
+    }
+
+    [Fact]
+    public async Task 連携APIは同じIdempotency_Keyの送り直しで二重に取り込まず_中身が違えば409()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (_, created) = await TestAuth.IssueApiKeyAsync(factory, admin, "erp-link", MesRoles.ProductionManager);
+        using var client = TestAuth.CreateApiKeyClient(factory, created.PlainKey);
+        (await PostIntegrationCsvAsync(client, "masters/equipments", EquipmentCsv)).EnsureSuccessStatusCode();
+
+        var first = await PostIntegrationCsvAsync(client, "actuals/equipment-logs", EquipmentLogCsv, "order-20260901-001");
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var again = await PostIntegrationCsvAsync(client, "actuals/equipment-logs", EquipmentLogCsv, "order-20260901-001");
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.True(again.Headers.Contains("Idempotent-Replayed"));
+        Assert.Equal(1, (await again.Content.ReadFromJsonAsync<CsvImportResult>())!.Created);
+        Assert.Equal(1, await EquipmentLogCountAsync(factory));
+
+        // 同じキーで中身が違えば 409（取り込まない）
+        var other = EquipmentLogCsv.Replace("12:00", "13:00");
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await PostIntegrationCsvAsync(client, "actuals/equipment-logs", other, "order-20260901-001")).StatusCode);
+        Assert.Equal(1, await EquipmentLogCountAsync(factory));
+
+        // 失敗の応答も覚えていて、送り直しても同じ 422（取り込まない）
+        const string bad = "EquipmentAssetNo,Status,StartedAt\nNO-SUCH,Running,2026-09-01 08:00\n";
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PostIntegrationCsvAsync(client, "actuals/equipment-logs", bad, "bad-1")).StatusCode);
+        var badAgain = await PostIntegrationCsvAsync(client, "actuals/equipment-logs", bad, "bad-1");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, badAgain.StatusCode);
+        Assert.True(badAgain.Headers.Contains("Idempotent-Replayed"));
+
+        // キーは呼び出し元ごと。別のキーの利用者が同じ値を使っても、別の要求として取り込む
+        var (_, second) = await TestAuth.IssueApiKeyAsync(factory, admin, "erp-link2", MesRoles.ProductionManager);
+        using var secondClient = TestAuth.CreateApiKeyClient(factory, second.PlainKey);
+        Assert.Equal(HttpStatusCode.OK,
+            (await PostIntegrationCsvAsync(secondClient, "actuals/equipment-logs", EquipmentLogCsv, "order-20260901-001")).StatusCode);
+        Assert.Equal(2, await EquipmentLogCountAsync(factory));
+
+        // キーを付けなければ、送るたびに取り込む（実績CSVは常に新規登録）
+        (await PostIntegrationCsvAsync(client, "actuals/equipment-logs", EquipmentLogCsv)).EnsureSuccessStatusCode();
+        Assert.Equal(3, await EquipmentLogCountAsync(factory));
+
+        // 24時間を過ぎた記録は消え、同じキーでも新しい要求として扱う
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            await db.IntegrationRequests.ExecuteUpdateAsync(s => s.SetProperty(r => r.ExpiresAtUnixSeconds, 0L));
+        }
+        Assert.Equal(HttpStatusCode.OK,
+            (await PostIntegrationCsvAsync(client, "actuals/equipment-logs", EquipmentLogCsv, "order-20260901-001")).StatusCode);
+        Assert.Equal(4, await EquipmentLogCountAsync(factory));
+    }
+
+    // ---- フォルダ連携（Spec.md 3.8 フォルダ連携） ----
+
+    /// <summary>連携フォルダを一時ディレクトリに向けた ApiFactory。常駐処理の間隔は長くし、走査はテストから呼ぶ</summary>
+    private static (ApiFactory Factory, string Root) CreateFolderLinkFactory(string userName = TestAuth.AdminUser)
+    {
+        var root = Directory.CreateTempSubdirectory("mesapp-folder-link-").FullName;
+        var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["FolderLink:Root"] = root,
+            ["FolderLink:UserName"] = userName,
+            ["FolderLink:PollSeconds"] = "3600",
+            ["FolderLink:SettleSeconds"] = "0",
+        });
+        return (factory, root);
+    }
+
+    private static async Task<FolderLinkStatusResponse> ScanAsync(HttpClient client)
+    {
+        var response = await client.PostAsync("/api/folder-link/scan", null);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<FolderLinkStatusResponse>())!;
+    }
+
+    private static string[] FilesUnder(string root, string folder, string pattern) =>
+        Directory.Exists(Path.Combine(root, folder))
+            ? Directory.GetFiles(Path.Combine(root, folder), pattern, SearchOption.AllDirectories)
+            : [];
+
+    private const string DefectReasonCsv = "Code,Name,Category,IsActive\nDF-01,寸法外れ,Process,true\n";
+
+    [Fact]
+    public async Task フォルダ連携でinboxのCSVを取り込み_結果に応じてprocessedとerrorへ移す()
+    {
+        var (factory, root) = CreateFolderLinkFactory();
+        using var _ = factory;
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        var inbox = Path.Combine(root, "inbox");
+        Directory.CreateDirectory(Path.Combine(inbox, "defect-reasons"));
+
+        // 直下はファイル名で、種別フォルダの中は名前に関係なくフォルダ名で種別を決める
+        await File.WriteAllTextAsync(Path.Combine(inbox, "defect-reasons.csv"), DefectReasonCsv);
+        await File.WriteAllTextAsync(Path.Combine(inbox, "defect-reasons", "ERP出力.csv"),
+            "Code,Name,Category,IsActive\nDF-02,キズ,Process,true\n");
+        // 1行でもエラーなら何も反映しない（画面からの取込と同じ）
+        await File.WriteAllTextAsync(Path.Combine(inbox, "02_defect-reasons.csv"),
+            "Code,Name,Category,IsActive\nDF-03,打痕,Process,true\nDF-04,欠け,存在しない区分,true\n");
+        await File.WriteAllTextAsync(Path.Combine(inbox, "unknown-kind.csv"), "A,B\n1,2\n");
+        // CSV・ZIP 以外は触らない（書き出し途中の一時ファイルなど）
+        await File.WriteAllTextAsync(Path.Combine(inbox, "writing.tmp"), "x");
+
+        var status = await ScanAsync(client);
+        Assert.True(status.Enabled);
+        Assert.Null(status.ConfigError);
+        Assert.Equal(4, status.Recent.Count);
+        Assert.Equal(2, status.Recent.Count(r => r.Succeeded));
+        Assert.Contains(status.Recent, r => r.FileName == "defect-reasons/ERP出力.csv" && r.Succeeded && r.Created == 1);
+        Assert.Contains(status.Recent, r => r.FileName == "02_defect-reasons.csv" && !r.Succeeded && r.Messages.Count > 0);
+
+        var reasons = (await client.GetFromJsonAsync<List<DefectReasonResponse>>("/api/defect-reasons"))!;
+        Assert.Equal(["DF-01", "DF-02"], reasons.Select(r => r.Code).Order());
+
+        // 取り込んだものも取り込めなかったものも inbox から無くなり、横に結果ファイルが付く。CSV 以外は残る
+        Assert.Equal(["writing.tmp"], Directory.GetFiles(inbox, "*", SearchOption.AllDirectories).Select(Path.GetFileName));
+        Assert.Equal(2, FilesUnder(root, "processed", "*.csv").Length);
+        Assert.Equal(2, FilesUnder(root, "error", "*.csv").Length);
+        Assert.Equal(4, FilesUnder(root, "processed", "*.result.txt").Length + FilesUnder(root, "error", "*.result.txt").Length);
+        // 種別フォルダの中のファイルは、移した先でも種別フォルダに入れる（直してそのまま戻せる）
+        Assert.Single(FilesUnder(root, "processed", "ERP出力.csv"),
+            f => Path.GetFileName(Path.GetDirectoryName(f)) == "defect-reasons");
+
+        // 取込は設定した利用者として監査ログに残る
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+        var logs = await db.AuditLogs.AsNoTracking()
+            .Where(l => l.Category == "Master" && l.Action == "CsvImport").ToListAsync();
+        Assert.Equal(2, logs.Count);
+        Assert.All(logs, l => Assert.Equal(TestAuth.AdminUser, l.UserName));
+    }
+
+    [Fact]
+    public async Task フォルダ連携は取込の利用者の権限で判定する()
+    {
+        var (factory, root) = CreateFolderLinkFactory("folder-op");
+        using var _ = factory;
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        using var op = await TestAuth.CreateUserClientAsync(factory, admin, "folder-op", "Passw0rd123", MesRoles.Operator);
+        var inbox = Path.Combine(root, "inbox");
+        Directory.CreateDirectory(inbox);
+        await File.WriteAllTextAsync(Path.Combine(inbox, "defect-reasons.csv"), DefectReasonCsv);
+
+        var status = await ScanAsync(admin);
+        var result = Assert.Single(status.Recent);
+        Assert.False(result.Succeeded);
+        Assert.Empty((await admin.GetFromJsonAsync<List<DefectReasonResponse>>("/api/defect-reasons"))!);
+        Assert.Single(FilesUnder(root, "error", "defect-reasons.csv"));
+    }
+
+    [Fact]
+    public async Task フォルダ連携は利用者がいなければ取り込まず_ファイルをinboxに残す()
+    {
+        var (factory, root) = CreateFolderLinkFactory("no-such-user");
+        using var _ = factory;
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var inbox = Path.Combine(root, "inbox");
+        Directory.CreateDirectory(inbox);
+        await File.WriteAllTextAsync(Path.Combine(inbox, "defect-reasons.csv"), DefectReasonCsv);
+
+        var status = await ScanAsync(admin);
+        Assert.NotNull(status.ConfigError);
+        Assert.Empty(status.Recent);
+        Assert.True(File.Exists(Path.Combine(inbox, "defect-reasons.csv")));
+    }
+
+    [Fact]
+    public async Task フォルダ連携が未設定なら走査できず_状態の参照はシステム管理者だけ()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var status = await admin.GetFromJsonAsync<FolderLinkStatusResponse>("/api/folder-link/status");
+        Assert.False(status!.Enabled);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsync("/api/folder-link/scan", null)).StatusCode);
+
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "manager", "Passw0rd123", MesRoles.ProductionManager);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync("/api/folder-link/status")).StatusCode);
     }
 
     private static async Task<CsvImportResult> ImportAsync(

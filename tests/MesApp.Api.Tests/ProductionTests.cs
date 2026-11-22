@@ -5,6 +5,7 @@ using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Dashboard;
 using MesApp.Core.Contracts.Execution;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Planning;
 using MesApp.Core.Contracts.Maintenance;
@@ -1362,5 +1363,92 @@ public class ProductionTests
         var response = await client.PostAsJsonAsync("/api/production-plans", request);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<ProductionPlanResponse>())!;
+    }
+
+    // ---- 連携API の生産実績の取得（Spec.md 3.8 連携API。INT-03） ----
+
+    [Fact]
+    public async Task 連携APIで生産実績と訂正を前回の続きから読める()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var started = new DateTimeOffset(2026, 9, 1, 8, 0, 0, TimeSpan.FromHours(9));
+
+        // 工程1と最終工程の実績（最終工程だけ産出ロット・入庫先を持つ）
+        (await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[0].Id}/production-records",
+            new ProductionRecordRequest(10m, 0m, started, started.AddHours(1), null, false))).EnsureSuccessStatusCode();
+        var finalPosted = await admin.PostAsJsonAsync($"/api/work-orders/{order.WorkOrders[1].Id}/production-records",
+            new ProductionRecordRequest(9m, 1m, started.AddHours(2), started.AddHours(3), ctx.ProductLocationId, false));
+        var finalRecord = (await finalPosted.Content.ReadFromJsonAsync<ProductionRecordResponse>())!;
+
+        // 参照の口なので、作業者のキーでも読める
+        var (_, created) = await TestAuth.IssueApiKeyAsync(factory, admin, "erp-link", MesRoles.Operator);
+        using var client = TestAuth.CreateApiKeyClient(factory, created.PlainKey);
+
+        // 1件ずつ読むと、続きがあることと次の位置が分かる
+        var first = (await client.GetFromJsonAsync<IntegrationFeed<ProductionResultResponse>>(
+            "/api/integration/v1/production-results?limit=1"))!;
+        Assert.Single(first.Items);
+        Assert.True(first.HasMore);
+        Assert.Equal(first.Items[0].Id, first.NextAfterId);
+        var item = first.Items[0];
+        Assert.Equal(order.Order.OrderNo, item.OrderNo);
+        Assert.Equal("Normal", item.OrderType);
+        Assert.Equal(1, item.Sequence);
+        Assert.Equal("FG-01", item.ProductCode);
+        Assert.Equal("PR-01", item.ProcessCode);
+        Assert.Equal(10m, item.GoodQuantity);
+        Assert.Null(item.OutputLotNumber);
+        Assert.Equal(TestAuth.AdminUser, item.PerformedBy);
+
+        var rest = (await client.GetFromJsonAsync<IntegrationFeed<ProductionResultResponse>>(
+            $"/api/integration/v1/production-results?afterId={first.NextAfterId}"))!;
+        var last = Assert.Single(rest.Items);
+        Assert.False(rest.HasMore);
+        Assert.Equal(2, last.Sequence);
+        Assert.Equal(9m, last.GoodQuantity);
+        Assert.Equal(1m, last.DefectQuantity);
+        Assert.NotNull(last.OutputLotNumber);
+        Assert.Equal("LOC-P", last.OutputLocationCode);
+
+        // 続きが無ければ空で、位置は動かない
+        var none = (await client.GetFromJsonAsync<IntegrationFeed<ProductionResultResponse>>(
+            $"/api/integration/v1/production-results?afterId={rest.NextAfterId}"))!;
+        Assert.Empty(none.Items);
+        Assert.Equal(rest.NextAfterId, none.NextAfterId);
+
+        // 訂正は訂正の口に出る。実績の口は訂正後の今の値を返す
+        (await admin.PutAsJsonAsync($"/api/production-records/{finalRecord.Id}",
+            new ProductionRecordCorrectionRequest(8m, 2m, "検査で1個不良判明"))).EnsureSuccessStatusCode();
+        var corrections = (await client.GetFromJsonAsync<IntegrationFeed<ProductionResultCorrectionResponse>>(
+            "/api/integration/v1/production-result-corrections"))!;
+        var correction = Assert.Single(corrections.Items);
+        Assert.Equal(last.Id, correction.ProductionResultId);
+        Assert.Equal(9m, correction.BeforeGoodQuantity);
+        Assert.Equal(8m, correction.AfterGoodQuantity);
+        Assert.Equal("検査で1個不良判明", correction.Reason);
+        Assert.Equal(TestAuth.AdminUser, correction.CorrectedBy);
+        var reread = (await client.GetFromJsonAsync<IntegrationFeed<ProductionResultResponse>>(
+            $"/api/integration/v1/production-results?afterId={first.NextAfterId}"))!;
+        Assert.Equal(8m, reread.Items.Single().GoodQuantity);
+
+        // 指図を取り消しても、記録済みの実績は残り、作業指示の状態で分かる（未完了の作業指示は取消になる）
+        (await admin.PostAsync($"/api/manufacturing-orders/{order.Order.Id}/cancel", null)).EnsureSuccessStatusCode();
+        var afterCancel = (await client.GetFromJsonAsync<IntegrationFeed<ProductionResultResponse>>(
+            "/api/integration/v1/production-results"))!;
+        Assert.Equal(2, afterCancel.Items.Count);
+        var detail = (await admin.GetFromJsonAsync<ManufacturingOrderDetailResponse>($"/api/manufacturing-orders/{order.Order.Id}"))!;
+        Assert.All(afterCancel.Items, i => Assert.Equal(
+            detail.WorkOrders.Single(w => w.RoutingSequence == i.Sequence).Status.ToString(), i.WorkOrderStatus));
+
+        // 範囲外の指定は 400、キーが無ければ 401
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/integration/v1/production-results?limit=0")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/integration/v1/production-results?limit=5001")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/integration/v1/production-results?afterId=-1")).StatusCode);
+        using var anonymous = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/integration/v1/production-results")).StatusCode);
     }
 }

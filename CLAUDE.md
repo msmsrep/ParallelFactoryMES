@@ -117,7 +117,9 @@ DB は既定 SQLite（`mesapp.db`）、`Database:Provider` で PostgreSQL / SQL 
 
 ## 新機能を追加する順序
 
-Entity（`Core/Entities`）→ `MesAppDbContext` の `DbSet` と `Configurations/` の設定 → マイグレーション → DTO（`Core/Contracts`）→ Controller → 必要なら `MesRoleGroups` → Razor 画面 → `MastersPage`/`NavMenu` 登録 → CSV 対応（`MasterCsvKinds`）→ テスト → `Spec.md` 更新
+Entity（`Core/Entities`）→ `MesAppDbContext` の `DbSet` と `Configurations/` の設定 → マイグレーション → DTO（`Core/Contracts`）→ Controller → 必要なら `MesRoleGroups` → Razor 画面 → `MastersPage`/`NavMenu` 登録 → CSV 対応（`MasterCsvKinds`）→ 列の約束の基準ファイル更新 → テスト → `Spec.md` 更新
+
+**CSVの列は連携API・フォルダ連携の約束**（Spec.md 3.8 CSVの列の約束）。列は消さない・必須の列を増やさない（新しい列は省けば今までどおりに動く任意の列で足す）・改名は以前の名前を `CsvColumnInfo.Aliases` に残す。列を足したら `$env:MESAPP_UPDATE_CSV_CONTRACT='1'` で `MasterCsvTests` の「CSVの列の約束」を流して `tests/MesApp.Api.Tests/CsvContract.v1.json` を更新し、同じコミットに入れる（互換を壊す変更はこの方法でも通らない）
 
 ## 完了の定義（DoD・全項目必須）
 

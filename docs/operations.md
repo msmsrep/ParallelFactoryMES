@@ -90,6 +90,10 @@ ASP.NET Core 10 Runtime が必要です。同じLAN内の他のPCからは `http
 | 初期パスワードの自動生成 | `MesAdmin__GeneratePassword` | `false`（デスクトップ版のみ `true`） |
 | 信頼するリバースプロキシのIP | `ReverseProxy__KnownProxies__0`（複数は `__1`, `__2` …） | 未設定（転送ヘッダを読まない） |
 | 信頼するリバースプロキシのネットワーク | `ReverseProxy__KnownNetworks__0`（CIDR。例 `192.168.10.0/24`） | 未設定 |
+| フォルダ連携の連携フォルダ | `FolderLink__Root` | 未設定（連携しない） |
+| フォルダ連携の取込を行う利用者 | `FolderLink__UserName` | 未設定 |
+| フォルダ連携の走査の間隔（秒） | `FolderLink__PollSeconds` | `30` |
+| フォルダ連携の結果の言語 | `FolderLink__Language` | `ja`（`en` も可） |
 
 ### 業務日付の境界時刻
 
@@ -109,6 +113,158 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 `MesAdmin__Password` を指定しない場合、初期管理者は作成されません（値を誰も知らない
 アカウントを残さないため）。パスワードを画面に表示できるデスクトップ版のみ、
 `MesAdmin__GeneratePassword=true` による自動生成を使います。
+
+## フォルダ連携  {#folder-link}
+
+決めたフォルダに置かれたCSVを自動で取り込みます。販売管理・生産管理などのソフトが出力したCSVを、
+プログラムを書かずに取り込めます（たとえば、毎朝出力される製造指図のCSVを共有フォルダに置かせる）。
+
+### 設定する
+
+1. 取込を行う利用者を作ります（例 `folder-link`）。**取り込みたい種別に必要なロールだけ**を与えます
+   （製造指図なら生産管理担当者、受入なら物流・倉庫担当者。ロールごとの権限は[ロールと権限](roles.html)）。
+   取込の可否・実績の記録者・監査ログは、この利用者で判定・記録されます。
+2. 連携フォルダと利用者を設定して、再起動します。
+
+```powershell
+$env:FolderLink__Root="D:\mes-link"; $env:FolderLink__UserName="folder-link"; ./start.cmd
+```
+
+Docker では、連携フォルダをホストのフォルダにマウントします（`compose.yaml` の例）。
+
+```yaml
+    volumes:
+      - mesapp-data:/data
+      - ./mes-link:/link
+    environment:
+      FolderLink__Root: /link
+      FolderLink__UserName: folder-link
+```
+
+設定を変えたときは再起動が要ります。起動すると、連携フォルダの下に `inbox`・`processed`・`error` が作られます。
+
+### ファイルの置き方
+
+| 置く場所 | 種別の決まり方 | 例 |
+|---|---|---|
+| `inbox` の直下 | ファイル名（最初の「_」より後ろ） | `inbox/manufacturing-orders.csv`、`inbox/20261122_manufacturing-orders.csv` |
+| `inbox/<種別>/` | フォルダ名（ファイル名は問わない） | `inbox/manufacturing-orders/製造指図.csv` |
+| `inbox` の直下のZIP | 中のファイル名（ZIPの一括取込と同じ） | `inbox/masters.zip` |
+
+- 種別の名前とCSVの列は、マスタ管理・実績CSV取込の画面のテンプレートと同じです。出力するファイル名を変えられないソフトは、種別のフォルダに出力させます。
+- CSV・ZIP 以外のファイルは無視します。書き込み中のファイルは、書き終わってから取り込みます。
+- 置かれた順（更新日時の古い順）に1ファイルずつ取り込みます。後のファイルが前のファイルを参照するとき（製造指図のあとに受入など）は、順に置くか1つのZIPにまとめます。
+
+### 結果を確かめる
+
+- **取り込めたファイルは `processed`、取り込めなかったファイルは `error`** の `日付/時刻/` の下へ移り、横に結果ファイル（`.result.txt`）が付きます。エラーの行番号と理由はここに書かれます。
+- 取込は画面から取り込むときと同じチェックを通り、**1行でもエラーがあればそのファイルは何も反映しません**。直したファイルを `inbox` の同じ場所へ戻せば、取り込み直せます。
+- システム管理者は、メニューの「管理」→「フォルダ連携」で、設定の誤りと最近処理したファイルを確かめられます。「今すぐ取り込む」で、次の間隔を待たずに取り込めます。
+- 利用者がいない・無効・ロック中のときは、何も取り込まずファイルを `inbox` に残します（画面に理由が出ます）。
+
+MESから外へ書き出す連携（実績の自動出力）は、まだありません。
+
+## APIキー  {#api-keys}
+
+販売管理・生産管理などのシステムや社内のスクリプトが、ログインせずに MES の**連携API**（`/api/integration/v1/...`）を呼ぶためのキーです。
+
+### 発行する
+
+1. キーで操作させる利用者を作ります（例 `erp-link`）。**キーで行える操作は、この利用者のロールで決まります**。用途ごとに専用の利用者を作り、必要なロールだけを与えてください（[ロールと権限](roles.html)）。
+2. システム管理者が、メニューの「管理」→「APIキー」で、用途・利用者・有効期限（任意）を指定して **キーを発行** を押します。
+3. 表示されたキー（`pfm_` で始まる文字列）を、連携するシステムの設定に写します。**キーはこのときしか表示されません**。なくしたときは、失効させて発行し直します。
+
+### 呼んでみる
+
+要求のヘッダ `X-Api-Key` にキーを付けます。次の口で、誰として扱われるか（利用者とロール）を確かめられます。
+
+```powershell
+Invoke-RestMethod http://localhost:5000/api/integration/v1/whoami -Headers @{ "X-Api-Key" = "pfm_..." }
+```
+
+```bash
+curl -H "X-Api-Key: pfm_..." http://localhost:5000/api/integration/v1/whoami
+```
+
+### 注意
+
+- キーで呼べるのは連携API だけです。画面で使っている API（`/api/products` など）はキーでは呼べません（401）。
+- キーで行った操作は、紐づけた利用者が行ったものとして監査ログに残ります。
+- **失効させたキーは元に戻せません**。利用者を無効にしたとき、キーの有効期限が過ぎたときも、すぐに使えなくなります。ロールを変えると、次の呼び出しから新しいロールで判定されます。
+- キーはパスワードと同じように扱ってください。メールやチャットに貼らず、連携するシステムの設定の中だけに置きます。
+
+## 連携API  {#integration-api}
+
+販売管理・生産管理（ERP）や社内のスクリプトから、MES とデータをやり取りするための API です。呼び出しには [APIキー](#api-keys) を使います。
+
+### 仕様書（OpenAPI）
+
+連携API の仕様書を `/openapi/integration-v1.json` で公開しています（例 `http://localhost:5000/openapi/integration-v1.json`）。
+Postman や Visual Studio などに読み込むと、口の一覧・引数・応答の形が分かります。仕様書の取得にはキーは要りません。
+
+### 使える口
+
+| 口 | 内容 |
+|---|---|
+| `GET /api/integration/v1/whoami` | キーが通るか、誰として・どのロールで扱われるかを確かめる |
+| `GET /api/integration/v1/csv-kinds` | 取り込める CSV の種別と列（マスタ管理・実績CSV取込の画面と同じ） |
+| `POST /api/integration/v1/masters/{種別}` | マスタCSVの取込（コードで上書き） |
+| `POST /api/integration/v1/actuals/{種別}` | 実績CSVの取込（常に新規登録） |
+| `POST /api/integration/v1/masters/bundle`・`actuals/bundle` | CSV をまとめた ZIP の取込 |
+| `GET /api/integration/v1/masters/{種別}` | マスタのCSV出力 |
+| `GET /api/integration/v1/production-results` | 生産実績を前回の続きから読む |
+| `GET /api/integration/v1/production-result-corrections` | 生産実績の訂正を前回の続きから読む |
+
+### CSV を取り込む
+
+本文に CSV をそのまま送ります（文字コードは UTF-8 か Shift_JIS）。`?dryRun=true` を付けると、検証だけして反映しません。
+このページの PowerShell の例は PowerShell 7（`pwsh`）向けです。
+
+```powershell
+$headers = @{ "X-Api-Key" = "pfm_..."; "Idempotency-Key" = "orders-20261123" }
+Invoke-RestMethod -Method Post -Headers $headers -ContentType "text/csv; charset=utf-8" -InFile .\manufacturing-orders.csv -Uri http://localhost:5000/api/integration/v1/actuals/manufacturing-orders
+```
+
+```bash
+curl -H "X-Api-Key: pfm_..." -H "Idempotency-Key: orders-20261123" -H "Content-Type: text/csv" --data-binary @manufacturing-orders.csv http://localhost:5000/api/integration/v1/actuals/manufacturing-orders
+```
+
+- 取り込めたら **200**、1行でもエラーがあれば **422** で、何も反映しません。どちらも応答の本文に、件数と行番号付きのエラーが入ります（PowerShell 7 では `-SkipHttpErrorCheck` を付けると 422 の本文も受け取れます）。
+- 取込の権限は、キーに紐づく利用者のロールで画面と同じように判定します（権限が無ければ 403）。
+
+### 送り直しても二重に登録しない（Idempotency-Key）
+
+実績CSVは**常に新規登録**なので、通信が切れたあとに同じ CSV を送り直すと、二重に登録されることがあります。
+これを防ぐには、送る内容ごとに決めた値（例：指図の出力日時と連番、UUID）を `Idempotency-Key` ヘッダに付けます。
+
+- 同じキー・同じ内容で送り直すと、**取り込み直さずに前回の応答を返します**（応答のヘッダに `Idempotent-Replayed: true` が付きます）。
+- 同じキーで内容が違う要求は 409 になります。新しい内容には新しいキーを付けてください。
+- キーは24時間覚えています。キーは APIキーごとに別に扱います。
+
+### 生産実績を読む（前回の続きから）
+
+`afterId` に前回の `nextAfterId` を渡すと、その後に記録された実績だけが返ります。`hasMore` が true の間は続けて読みます。
+最後の `nextAfterId` を保存しておけば、次の実行は続きから始まります。
+
+```powershell
+$headers = @{ "X-Api-Key" = "pfm_..." }
+$after = if (Test-Path .\last-id.txt) { Get-Content .\last-id.txt } else { 0 }
+do {
+  $page = Invoke-RestMethod -Headers $headers -Uri "http://localhost:5000/api/integration/v1/production-results?afterId=$after"
+  $page.items | Export-Csv .\production-results.csv -Append -Encoding utf8
+  $after = $page.nextAfterId
+} while ($page.hasMore)
+Set-Content .\last-id.txt $after
+```
+
+- 実績の数量は、訂正された後の今の値です。既に読んだ実績が後から訂正されたことは、`production-result-corrections` を同じように続きから読むと分かります。
+- 承認前の実績も返します（`approvedAt` が空）。取り消した指図の実績も、現物のロットが残るので返します（`workOrderStatus` で分かります）。
+
+### 版を上げても連携が動き続けるための約束
+
+- v1（`/api/integration/v1`）の中では、**項目や口を足すだけ**で、消したり名前や意味を変えたりしません。変えるときは v2 を作ります。
+- CSV の列も同じです。列は消さず、必須の列も増やしません（新しい列は、省けば今までどおりに動きます）。列の名前を変えるときは、以前の名前でも読めるようにします。
+- 応答に知らない項目が増えても、読み飛ばすように連携を作ってください。
 
 ## セキュリティ
 

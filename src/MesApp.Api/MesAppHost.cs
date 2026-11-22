@@ -1,9 +1,11 @@
 ﻿using System.Globalization;
 using MesApp.Api.Services;
+using MesApp.Api.Services.FolderLink;
 using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
@@ -46,7 +48,12 @@ public static class MesAppHost
                     manager.ApplicationParts.Add(new AssemblyPart(apiAssembly));
                 }
             });
-        builder.Services.AddOpenApi();
+        // OpenAPI 文書：画面用の API を含む既定の文書（v1）は開発環境だけ。連携API の文書は全環境（Spec.md 3.8 連携API）
+        if (builder.Environment.IsDevelopment())
+        {
+            builder.Services.AddOpenApi();
+        }
+        builder.Services.AddIntegrationOpenApi();
         builder.Services.AddHttpContextAccessor();
         // MesAppExceptionFilterで拾わない想定外の例外も、本文なしの500ではなくProblemDetailsで返す
         builder.Services.AddProblemDetails();
@@ -108,10 +115,18 @@ public static class MesAppHost
         builder.Services.AddScoped<TransferOrderService>();
         builder.Services.AddScoped<SampleStorageService>();
         builder.Services.AddScoped<ActualCsvService>();
+        builder.Services.AddScoped<CsvIntake>();
+        builder.Services.AddScoped<IdempotencyService>();
+        // フォルダ連携（Spec.md 3.8）。FolderLink:Root が空なら常駐処理は何もしない
+        builder.Services.Configure<FolderLinkOptions>(builder.Configuration.GetSection(FolderLinkOptions.SectionName));
+        builder.Services.AddSingleton<FolderLinkService>();
+        builder.Services.AddHostedService<FolderLinkWorker>();
 
+        // 既定は JWT（画面用 API）。APIキーは連携API の Controller が明示したときだけ使う（ApiKeyAuthentication.IntegrationSchemes）
         builder.Services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer();
+            .AddJwtBearer()
+            .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthentication.Scheme, null);
 
         // 検証鍵はDIのSigningKeyProvider（シングルトン）から取る。
         // ここで別インスタンスを作ると、鍵ファイルが無い初回に発行側と検証側で別の鍵が生まれる
@@ -157,10 +172,8 @@ public static class MesAppHost
             options.RequestCultureProviders = [new AcceptLanguageHeaderRequestCultureProvider()];
         });
 
-        if (app.Environment.IsDevelopment())
-        {
-            app.MapOpenApi();
-        }
+        // /openapi/{文書名}.json。登録した文書だけが出る（本番は integration-v1 だけ。ほかの名前は404）
+        app.MapOpenApi();
 
         // Blazor WASMクライアントの配信（index.html・_framework・css）
         app.UseBlazorFrameworkFiles();

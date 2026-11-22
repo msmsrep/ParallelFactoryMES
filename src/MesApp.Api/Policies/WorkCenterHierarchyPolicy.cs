@@ -168,6 +168,4 @@ public static class WorkCenterHierarchyPolicy
         }
         return false;
     }
-
-    /// <summary>エラーメッセージ用の段の日本語名</summary>
 }

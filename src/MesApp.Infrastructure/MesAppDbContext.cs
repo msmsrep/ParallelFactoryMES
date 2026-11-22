@@ -11,6 +11,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     : IdentityDbContext<AppUser>(options)
 {
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+    public DbSet<IntegrationRequest> IntegrationRequests => Set<IntegrationRequest>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // マスタ系（Spec.md 5.1）

@@ -1,0 +1,220 @@
+@page "/api-keys"
+@attribute [Authorize(Roles = MesRoles.SystemAdmin)]
+@using MesApp.Core.Contracts.Integration
+@inject HttpClient Http
+
+@* 連携API の APIキー（Spec.md 7.4 連携APIの認証。docs-dev/IntegrationApiTasks.md INT-01）。
+   キーは利用者に代わって操作する鍵なので、システム管理者専用（一覧の参照も） *@
+
+<PageTitle>@L["APIキー - Parallel Factory MES"]</PageTitle>
+
+<h1>@L["APIキー"]</h1>
+<p class="text-muted">
+    @L["販売管理・生産管理などのシステムやスクリプトが、連携API を呼ぶためのキーです。"]
+    @L["キーで呼んだ操作は、紐づけた利用者が行ったものとして権限を判定し、監査ログにもその利用者で記録します。"]
+    @L["用途ごとに専用の利用者を作り、必要なロールだけを与えてください。"]
+</p>
+
+<Notice Error="@_error" Message="@_message" />
+
+@if (_created is not null)
+{
+    <div class="card">
+        <h2 style="margin-top:0;">@L["発行したキー"]</h2>
+        <p><strong>@L["このキーは今しか表示できません。連携するシステムの設定に、今すぐ写してください。"]</strong></p>
+        @* キーは長く区切りが無いので、どこででも折り返す *@
+        <pre style="white-space:pre-wrap;word-break:break-all;line-height:1.6;">@_created.PlainKey</pre>
+        <p class="text-muted">@L["要求のヘッダ {0} にこのキーを付けて呼びます。", "X-Api-Key"]</p>
+        <div class="actions">
+            <button class="btn btn-secondary" @onclick="() => _created = null">@L["写したので閉じる"]</button>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <h2 style="margin-top:0;">@L["キーを発行する"]</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>@L["用途"]</label>
+            <input @bind="_name" maxlength="100" placeholder="@L["例：販売管理からの指図取込"]" />
+        </div>
+        <div class="form-field">
+            <label>@L["利用者"]</label>
+            <select @bind="_userId">
+                <option value="">@L["選択してください"]</option>
+                @foreach (var user in _users)
+                {
+                    <option value="@user.Id">@user.DisplayName（@user.UserName）</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>@L["有効期限（任意。この日まで有効）"]</label>
+            <input type="date" @bind="_expiresOn" />
+        </div>
+    </div>
+    @if (_users.FirstOrDefault(u => u.Id == _userId) is { } selected)
+    {
+        <p class="text-muted">
+            @L["このキーで行える操作は、利用者のロールで決まります：{0}", selected.Roles.Count == 0
+                ? L["（ロールなし）"].Value
+                : string.Join(L["、"].Value, selected.Roles.Select(EnumLabels.Role))]
+        </p>
+    }
+    <div class="actions">
+        <button class="btn" disabled="@_busy" @onclick="CreateAsync">@L["キーを発行"]</button>
+    </div>
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">@L["発行済みのキー"]</h2>
+    @if (_keys is null)
+    {
+        <p class="text-muted">@L["読み込み中..."]</p>
+    }
+    else if (_keys.Count == 0)
+    {
+        <p class="text-muted">@L["発行したキーはありません。"]</p>
+    }
+    else
+    {
+        @* 列が多いので、狭い画面では表だけを横にスクロールさせる *@
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
+                    <tr><th>@L["用途"]</th><th>@L["利用者"]</th><th>@L["キーの先頭"]</th><th>@L["発行日時"]</th><th>@L["有効期限"]</th><th>@L["最後に使われた日時"]</th><th>@L["状態"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var key in _keys)
+                    {
+                        <tr>
+                            <td>@key.Name</td>
+                            <td>@key.UserDisplayName（@key.UserName）</td>
+                            <td><code>@key.Prefix…</code></td>
+                            <td>@Format(key.CreatedAt)</td>
+                            <td>@Format(key.ExpiresAt)</td>
+                            <td>@Format(key.LastUsedAt)</td>
+                            <td>@StateOf(key)</td>
+                            <td>
+                                @if (key.RevokedAt is null)
+                                {
+                                    @* 失効は戻せないので、押してから確かめる二段階にする *@
+                                    @if (_confirmRevokeId == key.Id)
+                                    {
+                                        <button class="btn btn-danger" disabled="@_busy" @onclick="() => RevokeAsync(key)">@L["失効する（戻せません）"]</button>
+                                        <button class="btn btn-secondary" @onclick="() => _confirmRevokeId = null">@L["やめる"]</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-secondary" @onclick="() => _confirmRevokeId = key.Id">@L["失効"]</button>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ApiKeyResponse>? _keys;
+    private List<UserSummaryResponse> _users = [];
+    private CreatedApiKeyResponse? _created;
+    private string _name = string.Empty;
+    private string _userId = string.Empty;
+    private DateOnly? _expiresOn;
+    private int? _confirmRevokeId;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _users = await Http.GetFromJsonAsync<List<UserSummaryResponse>>("api/users") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _error = L["利用者の一覧を取得できませんでした。"];
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _keys = await Http.GetFromJsonAsync<List<ApiKeyResponse>>("api/api-keys") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _error = L["APIキーの一覧を取得できませんでした。"];
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _error = null;
+        _message = null;
+        if (string.IsNullOrEmpty(_userId))
+        {
+            _error = L["利用者を選択してください。"];
+            return;
+        }
+        _busy = true;
+        try
+        {
+            // 「この日まで有効」なので、翌日の0時（この画面を開いている端末の時刻）で切れるようにする
+            DateTimeOffset? expiresAt = _expiresOn is { } day
+                ? new DateTimeOffset(day.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeZoneInfo.Local.GetUtcOffset(day.AddDays(1).ToDateTime(TimeOnly.MinValue)))
+                : null;
+            var response = await Http.PostAsJsonAsync("api/api-keys", new CreateApiKeyRequest(_name, _userId, expiresAt));
+            if (await response.ReadErrorAsync(L["APIキーの発行に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _created = await response.Content.ReadFromJsonAsync<CreatedApiKeyResponse>();
+            _name = string.Empty;
+            _expiresOn = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RevokeAsync(ApiKeyResponse key)
+    {
+        _error = null;
+        _message = null;
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/api-keys/{key.Id}/revoke", null);
+            if (await response.ReadErrorAsync(L["APIキーの失効に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _confirmRevokeId = null;
+            _message = L["「{0}」のキーを失効しました。", key.Name];
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string Format(DateTimeOffset? at) => at?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "-";
+
+    private string StateOf(ApiKeyResponse key) =>
+        key.RevokedAt is not null ? L["失効済み"].Value
+        : key.ExpiresAt is { } expires && expires <= DateTimeOffset.UtcNow ? L["期限切れ"].Value
+        : L["有効"].Value;
+}

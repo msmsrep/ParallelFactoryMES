@@ -90,6 +90,10 @@ Edit `appsettings.json` or override the values with environment variables.
 | Automatic generation of the initial password | `MesAdmin__GeneratePassword` | `false` (`true` only in the desktop edition) |
 | IPs of trusted reverse proxies | `ReverseProxy__KnownProxies__0` (`__1`, `__2` … for more) | Not set (forwarded headers are not read) |
 | Networks of trusted reverse proxies | `ReverseProxy__KnownNetworks__0` (CIDR, for example `192.168.10.0/24`) | Not set |
+| Folder integration: integration folder | `FolderLink__Root` | Not set (no integration) |
+| Folder integration: importing user | `FolderLink__UserName` | Not set |
+| Folder integration: scan interval (seconds) | `FolderLink__PollSeconds` | `30` |
+| Folder integration: language of results | `FolderLink__Language` | `ja` (`en` is also allowed) |
 
 ### Business date boundary hour
 
@@ -109,6 +113,158 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 If `MesAdmin__Password` is not specified, no initial administrator is created (so that no account is left
 whose password nobody knows). Only the desktop edition, which can show the password on screen,
 uses automatic generation with `MesAdmin__GeneratePassword=true`.
+
+## Folder integration  {#folder-link}
+
+CSV files placed in a chosen folder are imported automatically. CSV files exported by sales or production management software
+can be imported without writing a program (for example, have the manufacturing order CSV exported every morning placed in a shared folder).
+
+### Setting it up
+
+1. Create the user who performs the imports (for example `folder-link`). Give it **only the roles needed for the types you want to import**
+   (Production management for manufacturing orders, Logistics / warehouse for receiving; see [Roles and permissions](roles.html) for what each role can do).
+   Whether an import is allowed, who is recorded on actuals, and the audit log are all decided and recorded as this user.
+2. Set the integration folder and the user, then restart.
+
+```powershell
+$env:FolderLink__Root="D:\mes-link"; $env:FolderLink__UserName="folder-link"; ./start.cmd
+```
+
+With Docker, mount the integration folder from a folder on the host (example for `compose.yaml`).
+
+```yaml
+    volumes:
+      - mesapp-data:/data
+      - ./mes-link:/link
+    environment:
+      FolderLink__Root: /link
+      FolderLink__UserName: folder-link
+```
+
+Changing the settings requires a restart. On startup, `inbox`, `processed` and `error` are created under the integration folder.
+
+### Where to put files
+
+| Location | How the type is determined | Example |
+|---|---|---|
+| Directly in `inbox` | File name (the part after the first "_") | `inbox/manufacturing-orders.csv`, `inbox/20261122_manufacturing-orders.csv` |
+| `inbox/<type>/` | Folder name (any file name) | `inbox/manufacturing-orders/orders.csv` |
+| A ZIP directly in `inbox` | File names inside (same as ZIP bulk import) | `inbox/masters.zip` |
+
+- The type names and CSV columns are the same as the templates on the Master Data and Actuals CSV Import screens. For software that cannot change the name of the file it exports, have it export into the type's folder.
+- Files other than CSV and ZIP are ignored. Files being written are imported after writing finishes.
+- Files are imported one at a time in the order they were placed (oldest modification time first). When a later file refers to an earlier one (receiving after manufacturing orders, for example), place them in order or put them in one ZIP.
+
+### Checking the results
+
+- **Imported files are moved to `processed` and files that could not be imported to `error`**, under `date/time/`, with a result file (`.result.txt`) beside them. The line numbers and reasons for errors are written there.
+- Imports go through the same checks as importing from the screens, and **if even one row has an error, nothing in that file is applied**. Put the corrected file back in the same place in `inbox` to import it again.
+- System administrators can check settings errors and recently processed files under "Administration" → "Folder integration" in the menu. "Import now" imports without waiting for the next interval.
+- If the user does not exist, is inactive or is locked out, nothing is imported and the files stay in `inbox` (the reason is shown on the screen).
+
+There is no integration that writes data out of the MES yet (automatic export of actuals).
+
+## API keys  {#api-keys}
+
+Keys that systems such as sales or production management software, or in-house scripts, use to call the MES **integration API** (`/api/integration/v1/...`) without signing in.
+
+### Issuing a key
+
+1. Create the user the key will act as (for example `erp-link`). **What the key can do is determined by this user's roles.** Create a dedicated user for each purpose and give it only the roles it needs ([Roles and permissions](roles.html)).
+2. A system administrator opens "Administration" → "API keys" in the menu, specifies the purpose, the user and an optional expiry, and clicks **Issue key**.
+3. Copy the key shown (a string starting with `pfm_`) into the settings of the connecting system. **The key is shown only at this time.** If it is lost, revoke it and issue a new one.
+
+### Trying it
+
+Send the key in the `X-Api-Key` request header. The following endpoint shows who you are treated as (the user and roles).
+
+```powershell
+Invoke-RestMethod http://localhost:5000/api/integration/v1/whoami -Headers @{ "X-Api-Key" = "pfm_..." }
+```
+
+```bash
+curl -H "X-Api-Key: pfm_..." http://localhost:5000/api/integration/v1/whoami
+```
+
+### Notes
+
+- Keys work only with the integration API. The APIs used by the screens (such as `/api/products`) cannot be called with a key (401).
+- Operations performed with a key are recorded in the audit log as the linked user.
+- **A revoked key cannot be restored.** A key also stops working immediately when its user is deactivated or its expiry passes. When the user's roles change, the next call is checked with the new roles.
+- Treat keys like passwords. Do not paste them into email or chat; keep them only in the settings of the connecting system.
+
+## Integration API  {#integration-api}
+
+An API for exchanging data with the MES from sales or production management software (ERP) or in-house scripts. Calls use an [API key](#api-keys).
+
+### Specification (OpenAPI)
+
+The integration API specification is published at `/openapi/integration-v1.json` (for example `http://localhost:5000/openapi/integration-v1.json`).
+Load it into Postman, Visual Studio or similar tools to see the endpoints, parameters and response shapes. No key is needed to get the specification.
+
+### Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/integration/v1/whoami` | Check that the key works and who you are treated as, with which roles |
+| `GET /api/integration/v1/csv-kinds` | The CSV types and columns that can be imported (the same as the Master Data and Actuals CSV Import screens) |
+| `POST /api/integration/v1/masters/{type}` | Import a master data CSV (overwritten by code) |
+| `POST /api/integration/v1/actuals/{type}` | Import an actuals CSV (always registered as new) |
+| `POST /api/integration/v1/masters/bundle`, `actuals/bundle` | Import a ZIP of CSV files |
+| `GET /api/integration/v1/masters/{type}` | Export master data as CSV |
+| `GET /api/integration/v1/production-results` | Read production results from where you left off |
+| `GET /api/integration/v1/production-result-corrections` | Read corrections to production results from where you left off |
+
+### Importing CSV
+
+Send the CSV as the request body (UTF-8 or Shift_JIS). Add `?dryRun=true` to only validate without applying anything.
+The PowerShell examples on this page are for PowerShell 7 (`pwsh`).
+
+```powershell
+$headers = @{ "X-Api-Key" = "pfm_..."; "Idempotency-Key" = "orders-20261123" }
+Invoke-RestMethod -Method Post -Headers $headers -ContentType "text/csv; charset=utf-8" -InFile .\manufacturing-orders.csv -Uri http://localhost:5000/api/integration/v1/actuals/manufacturing-orders
+```
+
+```bash
+curl -H "X-Api-Key: pfm_..." -H "Idempotency-Key: orders-20261123" -H "Content-Type: text/csv" --data-binary @manufacturing-orders.csv http://localhost:5000/api/integration/v1/actuals/manufacturing-orders
+```
+
+- **200** when imported, and **422** if even one row has an error, in which case nothing is applied. In both cases the response body contains the counts and errors with line numbers (in PowerShell 7, add `-SkipHttpErrorCheck` to also receive the body of a 422).
+- Import permission is checked with the roles of the user linked to the key, the same as on the screens (403 without permission).
+
+### Sending again without registering twice (Idempotency-Key)
+
+Actuals CSV files are **always registered as new**, so sending the same CSV again after a dropped connection can register it twice.
+To prevent this, put a value chosen for each content you send (for example the order export time and a sequence number, or a UUID) in the `Idempotency-Key` header.
+
+- If you send the same key with the same content again, **the previous response is returned without importing again** (the response has the header `Idempotent-Replayed: true`).
+- A request with the same key but different content gets 409. Use a new key for new content.
+- Keys are remembered for 24 hours, separately for each API key.
+
+### Reading production results (from where you left off)
+
+Pass the previous `nextAfterId` as `afterId` to get only the results recorded after it. Keep reading while `hasMore` is true.
+Save the last `nextAfterId` so that the next run starts where this one ended.
+
+```powershell
+$headers = @{ "X-Api-Key" = "pfm_..." }
+$after = if (Test-Path .\last-id.txt) { Get-Content .\last-id.txt } else { 0 }
+do {
+  $page = Invoke-RestMethod -Headers $headers -Uri "http://localhost:5000/api/integration/v1/production-results?afterId=$after"
+  $page.items | Export-Csv .\production-results.csv -Append -Encoding utf8
+  $after = $page.nextAfterId
+} while ($page.hasMore)
+Set-Content .\last-id.txt $after
+```
+
+- Quantities are the current values after any correction. To learn that a result you already read was corrected later, read `production-result-corrections` from where you left off in the same way.
+- Results not yet approved are also returned (`approvedAt` is empty). Results of canceled orders are also returned because the physical lots remain (see `workOrderStatus`).
+
+### Promises that keep integrations working after upgrades
+
+- Within v1 (`/api/integration/v1`), **fields and endpoints are only added**, never removed, renamed or given a new meaning. Such changes go into a v2.
+- The same applies to CSV columns. Columns are not removed and no required columns are added (if you leave out a new column, things work as before). When a column is renamed, its former name can still be read.
+- Build your integrations to skip fields they do not know, in case new fields are added to responses.
 
 ## Security
 

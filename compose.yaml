@@ -10,7 +10,12 @@ services:
       - "8080:8080"
     volumes:
       - mesapp-data:/data
+      # フォルダ連携（CSVの自動取込）を使うときは、ホストのフォルダをマウントする
+      # - ./mes-link:/link
     environment:
+      # フォルダ連携：連携フォルダと取込を行う利用者（利用者は先に画面から作っておく）
+      # FolderLink__Root: /link
+      # FolderLink__UserName: folder-link
       # 初期管理者を自動作成する（ユーザーが0件のときだけ。初回ログインでパスワード変更を強制）
       # MesAdmin__UserName: admin
       # MesAdmin__Password: ChangeMe123

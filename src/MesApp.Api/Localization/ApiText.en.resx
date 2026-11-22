@@ -2583,4 +2583,103 @@
   <data name="計画年度" xml:space="preserve">
     <value>Plan year</value>
   </data>
+  <data name="フォルダ連携は設定されていません（FolderLink:Root）。" xml:space="preserve">
+    <value>Folder integration is not configured (FolderLink:Root).</value>
+  </data>
+  <data name="連携フォルダを作れません：{0}" xml:space="preserve">
+    <value>Cannot create the integration folder: {0}</value>
+  </data>
+  <data name="取込を行う利用者（FolderLink:UserName）が設定されていません。" xml:space="preserve">
+    <value>The importing user (FolderLink:UserName) is not configured.</value>
+  </data>
+  <data name="取込を行う利用者 '{0}' がいないか、無効です。" xml:space="preserve">
+    <value>The importing user '{0}' does not exist or is inactive.</value>
+  </data>
+  <data name="取込を行う利用者 '{0}' はロックされています。" xml:space="preserve">
+    <value>The importing user '{0}' is locked out.</value>
+  </data>
+  <data name="ファイルが大きすぎます（CSVは{0}MB、ZIPは{1}MBまで）。" xml:space="preserve">
+    <value>The file is too large (up to {0} MB for CSV and {1} MB for ZIP).</value>
+  </data>
+  <data name="取込中に想定外のエラーが発生しました：{0}" xml:space="preserve">
+    <value>An unexpected error occurred during import: {0}</value>
+  </data>
+  <data name="CSVの種別 '{0}' が分かりません。ファイル名を「種別.csv」（例 manufacturing-orders.csv）にするか、inbox の下の種別の名前のフォルダに置いてください。" xml:space="preserve">
+    <value>Unknown CSV type '{0}'. Name the file "type.csv" (e.g. manufacturing-orders.csv) or place it in a folder under the inbox named after the type.</value>
+  </data>
+  <data name="利用者 '{0}' には「{1}」を取り込む権限がありません。" xml:space="preserve">
+    <value>User '{0}' does not have permission to import "{1}".</value>
+  </data>
+  <data name="ZIPに種別の分からないCSVが含まれています：{0}（ファイル名は「番号_種別.csv」。例 01_receiving.csv）。" xml:space="preserve">
+    <value>The ZIP contains CSV files of unknown type: {0} (file names must be "number_type.csv", e.g. 01_receiving.csv).</value>
+  </data>
+  <data name="ZIPには、マスタだけか実績だけのCSVを入れてください。生産計画はZIPに入れず、1ファイルずつ置いてください。" xml:space="preserve">
+    <value>A ZIP must contain only master data CSV files or only actuals CSV files. Do not put production plans in a ZIP; place them one file at a time.</value>
+  </data>
+  <data name="ファイル：{0}" xml:space="preserve">
+    <value>File: {0}</value>
+  </data>
+  <data name="処理日時：{0}" xml:space="preserve">
+    <value>Processed at: {0}</value>
+  </data>
+  <data name="結果：取り込みました" xml:space="preserve">
+    <value>Result: imported</value>
+  </data>
+  <data name="結果：取り込めませんでした（何も反映していません）" xml:space="preserve">
+    <value>Result: not imported (nothing was applied)</value>
+  </data>
+  <data name="種別：{0}" xml:space="preserve">
+    <value>Type: {0}</value>
+  </data>
+  <data name="データ行：{0}　登録：{1}　更新：{2}" xml:space="preserve">
+    <value>Data rows: {0}  Created: {1}  Updated: {2}</value>
+  </data>
+  <data name="処理しなかったファイル：{0}" xml:space="preserve">
+    <value>Files not processed: {0}</value>
+  </data>
+  <data name="{0}行目：{1}" xml:space="preserve">
+    <value>Line {0}: {1}</value>
+  </data>
+  <data name="警告 {0}行目：{1}" xml:space="preserve">
+    <value>Warning, line {0}: {1}</value>
+  </data>
+  <data name="用途（名前）を入力してください。" xml:space="preserve">
+    <value>Enter the purpose (name).</value>
+  </data>
+  <data name="用途（名前）は{0}文字以内で入力してください。" xml:space="preserve">
+    <value>Enter the purpose (name) in {0} characters or fewer.</value>
+  </data>
+  <data name="有効期限は今より後の日時を指定してください。" xml:space="preserve">
+    <value>Specify an expiry later than now.</value>
+  </data>
+  <data name="利用者が見つかりません。" xml:space="preserve">
+    <value>The user was not found.</value>
+  </data>
+  <data name="無効な利用者にはAPIキーを発行できません。" xml:space="preserve">
+    <value>API keys cannot be issued to inactive users.</value>
+  </data>
+  <data name="APIキーが見つかりません。" xml:space="preserve">
+    <value>The API key was not found.</value>
+  </data>
+  <data name="このAPIキーは既に失効しています。" xml:space="preserve">
+    <value>This API key has already been revoked.</value>
+  </data>
+  <data name="Idempotency-Key は{0}文字以内にしてください。" xml:space="preserve">
+    <value>Idempotency-Key must be {0} characters or fewer.</value>
+  </data>
+  <data name="同じ Idempotency-Key の要求を処理しています。終わってから送り直してください。" xml:space="preserve">
+    <value>A request with the same Idempotency-Key is being processed. Send it again after it finishes.</value>
+  </data>
+  <data name="この Idempotency-Key は、内容の違う要求で既に使われています。新しい要求には新しいキーを付けてください。" xml:space="preserve">
+    <value>This Idempotency-Key has already been used for a request with different content. Use a new key for a new request.</value>
+  </data>
+  <data name="同じ列が新しい名前と以前の名前の両方で書かれています：{0}。どちらか一方にしてください。" xml:space="preserve">
+    <value>The same column is written under both its new name and its former name: {0}. Use only one of them.</value>
+  </data>
+  <data name="afterId は0以上で指定してください。" xml:space="preserve">
+    <value>Specify afterId as 0 or greater.</value>
+  </data>
+  <data name="limit は1以上{0}以下で指定してください。" xml:space="preserve">
+    <value>Specify limit between 1 and {0}.</value>
+  </data>
 </root>

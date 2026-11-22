@@ -50,4 +50,12 @@ public record CsvKindInfo(
 }
 
 /// <summary>CSVの列定義</summary>
-public record CsvColumnInfo(string Name, string Label, bool Required, string? Note);
+public record CsvColumnInfo(string Name, string Label, bool Required, string? Note)
+{
+    /// <summary>
+    /// 以前の列名（Spec.md 3.8 CSVの列の約束）。列の名前を変えるときは古い名前をここに残し、
+    /// 古い名前で書かれたCSVも同じ列として読む（連携API・フォルダ連携で外部が古い列名のまま送ってくるため。
+    /// v2 を作るより安い）。ヘッダーに新旧の名前が両方あればエラー
+    /// </summary>
+    public IReadOnlyList<string> Aliases { get; init; } = [];
+}
