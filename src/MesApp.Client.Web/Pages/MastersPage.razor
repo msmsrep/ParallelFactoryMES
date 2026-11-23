@@ -13,6 +13,7 @@
     <button class="@TabClass("processes")" @onclick='() => _tab = "processes"'>@L["工程"]</button>
     <button class="@TabClass("work-centers")" @onclick='() => _tab = "work-centers"'>@L["作業区"]</button>
     <button class="@TabClass("equipments")" @onclick='() => _tab = "equipments"'>@L["設備（BOE）"]</button>
+    <button class="@TabClass("equipment-alarm-codes")" @onclick='() => _tab = "equipment-alarm-codes"'>@L["停止原因の対応表"]</button>
     <button class="@TabClass("tools")" @onclick='() => _tab = "tools"'>@L["治工具"]</button>
     <button class="@TabClass("locations")" @onclick='() => _tab = "locations"'>@L["ロケーション"]</button>
     <button class="@TabClass("inspection")" @onclick='() => _tab = "inspection"'>@L["検査項目・基準"]</button>
@@ -41,6 +42,9 @@
         break;
     case "equipments":
         <EquipmentsTab />
+        break;
+    case "equipment-alarm-codes":
+        <EquipmentAlarmCodesTab />
         break;
     case "tools":
         <ToolsTab />

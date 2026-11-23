@@ -539,6 +539,39 @@ namespace MesApp.Migrations.SqlServer.Migrations
                     b.ToTable("Equipments");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentAlarmCode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AlarmCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("EquipmentId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("StopCause")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentId", "AlarmCode")
+                        .IsUnique()
+                        .HasFilter("[EquipmentId] IS NOT NULL");
+
+                    b.ToTable("EquipmentAlarmCodes");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -3845,6 +3878,16 @@ namespace MesApp.Migrations.SqlServer.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("WorkCenter");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentAlarmCode", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Equipment");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>

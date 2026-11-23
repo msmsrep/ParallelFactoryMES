@@ -508,6 +508,36 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("Equipments");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentAlarmCode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AlarmCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("EquipmentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("StopCause")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentId", "AlarmCode")
+                        .IsUnique();
+
+                    b.ToTable("EquipmentAlarmCodes");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -3637,6 +3667,16 @@ namespace MesApp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("WorkCenter");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentAlarmCode", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Equipment");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>

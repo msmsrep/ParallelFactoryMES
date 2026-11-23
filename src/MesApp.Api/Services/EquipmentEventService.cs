@@ -1,5 +1,6 @@
 using System.Globalization;
 using MesApp.Api.Localization;
+using MesApp.Api.Policies;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Entities;
@@ -33,7 +34,8 @@ public sealed class EquipmentEventOptions
 /// </para>
 /// <para>
 /// 手入力・CSV の登録（<see cref="ShopFloorReportService.AddEquipmentLogAsync"/>）は通さない。
-/// あちらは収集する設備を拒否し、停止原因を必須にするが、PLC は原因の文章を持たないため（原因は後から入れる）。
+/// あちらは収集する設備を拒否し、停止原因を必須にするが、PLC は原因の文章を持たないため
+/// （アラーム番号から対応表で引き、引けなければ後から入れる）。
 /// </para>
 /// </summary>
 public sealed class EquipmentEventService(
@@ -238,6 +240,7 @@ public sealed class EquipmentEventService(
                     var (workOrderId, note) = await ResolveWorkOrderAsync(equipmentId, e, ct);
                     message = note;
                     openLog.Status = status.Value;
+                    openLog.StopCause = await StopCauseAsync(equipmentId, status.Value, row.AlarmCode, ct);
                     openLog.WorkOrderId = workOrderId;
                     openLog.Note = row.Note;
                     row.EquipmentLogId = openLog.Id;
@@ -260,8 +263,8 @@ public sealed class EquipmentEventService(
                         WorkOrderId = workOrderId,
                         Status = next,
                         StartedAt = occurredAt,
-                        // 停止原因は PLC から来ないので空で開く（アラーム番号からの引き当てと後からの追記は EQE-03）
-                        StopCause = null,
+                        // 停止原因は PLC から来ないので、アラーム番号から対応表で引く。引けなければ空で開き、画面から後で入れる
+                        StopCause = await StopCauseAsync(equipmentId, next, row.AlarmCode, ct),
                         Note = row.Note,
                         RecordedByUserId = userId,
                         Source = EquipmentLogSource.Event,
@@ -357,6 +360,13 @@ public sealed class EquipmentEventService(
             .Select(w => w.Id).Take(2).ToListAsync(ct);
         return (started.Count == 1 ? started[0] : null, null);
     }
+
+    /// <summary>停止・故障の区間だけ、アラーム番号から停止原因を引く（Spec.md 5.1 EquipmentAlarmCode）</summary>
+    private async Task<string?> StopCauseAsync(
+        int equipmentId, EquipmentLogStatus status, string? alarmCode, CancellationToken ct) =>
+        status is EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure
+            ? await EquipmentAlarmCodePolicy.ResolveStopCauseAsync(db, equipmentId, alarmCode, ct)
+            : null;
 
     /// <summary>消す区間を指していた控えの参照を外す（控えは残す）</summary>
     private async Task DetachEventsAsync(int logId, List<EquipmentEvent> stored, CancellationToken ct)

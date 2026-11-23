@@ -25,7 +25,7 @@ MES の設備稼働履歴（`EquipmentLog`）の区間に組み立てる（B-40-
 |:--|:--|
 | EQE-01 土台（生イベント・収集フラグ・手入力との住み分け） | 完了（2026-11-23。Spec.md 改訂154） |
 | EQE-02 受信APIと区間の組み立て | 完了（2026-11-23。Spec.md 改訂155） |
-| EQE-03 停止原因の対応表と原因の追記 | 未着手 |
+| EQE-03 停止原因の対応表と原因の追記 | 完了（2026-11-23。Spec.md 改訂156） |
 | EQE-04 稼働監視に今の状態を出す | 未着手 |
 | EQE-05 ゲートウェイのサンプル（Mosquitto＋Node-RED）と利用者ガイド | 未着手 |
 
@@ -110,6 +110,14 @@ MES の設備稼働履歴（`EquipmentLog`）の区間に組み立てる（B-40-
 **変更ファイルの想定（約16＋マイグレーション）**：`/add-master` の定型一式（エンティティ・`DbSet`・設定・マイグレーション3プロバイダー・DTO・Controller・`Masters/EquipmentAlarmCodesTab.razor`・`MastersPage.razor`・`MasterCsvKinds`・CSVの取込と出力・`CsvContract.v1.json`）、`Api/Services/EquipmentEventService.cs`、`EquipmentLogsController.cs`、`Web/Pages/Maintenance/EquipmentLogsTab.razor`、`UiText.en.resx`・`ApiText.en.resx`、`Tests/MasterTests.cs`・`MaintenanceTests.cs`・`MasterCsvTests.cs`、`Spec.md`（5.1・3.5・3.8・6.1・改訂履歴）、`CodeMap.md`
 **受入基準**：設備ごとの定義が共通の定義に勝つ／引けないアラームの停止は原因未入力で区間ができる／追記で原因が入り、監査ログに変更前後が残る／稼働の区間には追記できない
 
+**実施メモ（2026-11-23）**：変更は27ファイル＋マイグレーション9（想定約16。多かったのは、CSV が種別定義・出力・取込の3ファイルに分かれていること、判定を `Api/Policies/EquipmentAlarmCodePolicy.cs` に置いたこと、受信の `EquipmentEventService.cs`、追記を置いた `ShopFloorReportService.cs` と DTO、サンプル（`samples/master-csv/21_equipment-alarm-codes.csv`・README）。設計のずれではなく、想定の書き漏れ）。
+- **一括ZIPのファイル番号を変えないよう、新しい種別は `ImportOrder` の末尾（21番）に置いた**。最初は設備の保全部品の次（9番）に入れたが、`18_users.csv` 以降の番号が1つずつずれ、番号を頼りに連携を組んでいる利用者を壊す。末尾なら「参照先より後ろ」の条件も必ず満たす。この方針を Spec.md 3.8 と `ImportOrder` の注釈に書いた
+- サンプルのマスタに対応表が無いと、一括ZIPの往復のテストが空のCSV（データ行なし）で落ちる。EQE-05 で足す予定だったサンプルを先に入れた（共通の行と、`EQ-01` だけの上書き）
+- 設備が空（共通）の行どうしの重複は、SQLite・PostgreSQL の一意索引では止まらない（NULL は互いに別の値）。単票APIはポリシーで、CSV は既存の行を全部読んでキーで突き合わせる
+- 原因の追記の監査ログは `new { before, after, reason }` で、変更前が空なら `before` は JSON から省かれる（監査ログの直列化が null を書かない）
+- 利用者ガイド（マスタ管理・保全）への対応表と追記の説明は EQE-05 でまとめて書く
+- SQLite で全件、SQL Server・PostgreSQL で `MaintenanceTests`・停止原因・一括ZIP・サンプル取込のテストを確認した
+
 ### EQE-04 稼働監視に今の状態を出す
 
 **目的**：設備ごとの「今どうなっているか」を一覧で見られるようにする（E-20-10-03）。
@@ -127,7 +135,8 @@ MES の設備稼働履歴（`EquipmentLog`）の区間に組み立てる（B-40-
 
 - `compose.yaml` に**任意のプロファイル `equipment`** で `mosquitto` と `node-red` を足す（`docker compose --profile equipment up -d`。プロファイルを付けなければ今までどおり MES だけが起動する）。設定は `samples/equipment-gateway/` に置く（`mosquitto.conf`、Node-RED の `flows.json`）
 - Node-RED のフロー：①模擬設備（数秒ごとに状態を変えて `mes/equipment/<資産番号>/state` に出す）②MQTT を購読して `equipment-events` へ送る（`eventId` を振る・送れなかったらためて再送する）③応答の `rejected` をデバッグ欄に出す。APIキーは環境変数から読む
-- サンプルのマスタ（`samples/master-csv`）の設備のうち1台に `CollectsEvents` を立て、停止原因の対応表の例を足す
+- サンプルのマスタ（`samples/master-csv`）の設備のうち1台に `CollectsEvents` を立てる（停止原因の対応表の例 `21_equipment-alarm-codes.csv` は EQE-03 で入れ済み）
+- マスタ管理のガイド（`docs/masters.md`・英語版）に停止原因の対応表タブ、保全のガイド（`docs/maintenance.md`・英語版）に稼働記録の記録元・原因未入力の絞り込みと追記を書く（EQE-01〜03 の画面の変更）
 - 運用ガイドに「設備イベントの受信」の節（日英）：仕組みの図、収集フラグ、時刻の揃え方（NTP）、遅着・重複の扱い、原因の追記、PLC の接続はゲートウェイ側で行うこと（Node-RED のノードの例は名前を挙げるだけにする）
 
 **変更ファイルの想定（約10）**：`compose.yaml`、`samples/equipment-gateway/mosquitto.conf`・`flows.json`・`README`（短く）、`samples/master-csv/` の設備と対応表、`docs/operations.md`・`docs/en/operations.md`、`Spec.md`（3.8・改訂履歴）、`CodeMap.md`、`Readme.md`（起動の一行）

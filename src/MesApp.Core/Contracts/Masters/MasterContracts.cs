@@ -127,6 +127,19 @@ public record EquipmentPartResponse(
     int Id, int EquipmentId, int ProductId, string ProductCode, string ProductName, string Unit,
     MaintenancePartCategory Category, decimal QuantityPer, string? Note);
 
+// ---- 停止原因の対応表（EquipmentAlarmCode。B-40-20-02）----
+
+/// <summary>EquipmentId を空にすると全設備共通の定義になる</summary>
+public record EquipmentAlarmCodeRequest(
+    int? EquipmentId,
+    [Required, MaxLength(50)] string AlarmCode,
+    [Required, MaxLength(500)] string StopCause);
+
+/// <summary>EquipmentAssetNo・EquipmentName は画面表示用の付随情報（共通の定義では null）</summary>
+public record EquipmentAlarmCodeResponse(
+    int Id, int? EquipmentId, string? EquipmentAssetNo, string? EquipmentName,
+    string AlarmCode, string StopCause, bool IsActive);
+
 // ---- 勤務シフト（直。F-10-10-01）----
 
 public record ShiftRequest(

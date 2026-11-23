@@ -1006,6 +1006,53 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 設備イベントの停止原因はアラーム番号で引き引けなければ後から追記する()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, gateway) = await SetupEventEquipmentAsync(factory, admin);
+        using var _ = gateway;
+        (await admin.PostAsJsonAsync("/api/equipment-alarm-codes", new EquipmentAlarmCodeRequest(null, "A-101", "材料切れ")))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/equipment-alarm-codes", new EquipmentAlarmCodeRequest(equipment.Id, "A-102", "金型の温度異常")))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/equipment-alarm-codes", new EquipmentAlarmCodeRequest(null, "A-102", "共通の原因")))
+            .EnsureSuccessStatusCode();
+        var t0 = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-3).ToUnixTimeSeconds());
+
+        await SendEventsAsync(gateway,
+            new("EQ-01", "s-1", t0, "Stopped", AlarmCode: "A-101"),
+            new("EQ-01", "s-2", t0.AddMinutes(10), "Failure", AlarmCode: "A-102"),
+            new("EQ-01", "s-3", t0.AddMinutes(20), "Stopped", AlarmCode: "Z-999"),
+            new("EQ-01", "s-4", t0.AddMinutes(30), "Running", AlarmCode: "A-101"));
+        var logs = await LogsAsync(admin, equipment.Id);
+        // 共通の定義、設備ごとの定義（共通に勝つ）、引けない番号は空、稼働には原因を入れない
+        Assert.Equal(["材料切れ", "金型の温度異常", null, null], logs.Select(l => l.StopCause));
+
+        // 原因未入力の絞り込みには、原因の無い停止・故障だけが出る
+        var missing = await admin.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>("/api/equipment-logs?missingCause=true");
+        var target = Assert.Single(missing!.Items);
+        Assert.Equal(logs[2].Id, target.Id);
+
+        // 後から原因を入れられる（イベントで収集する設備でも）。稼働の区間には入れられない
+        var updated = await admin.PutAsJsonAsync($"/api/equipment-logs/{target.Id}/stop-cause",
+            new EquipmentLogStopCauseRequest("チョコ停（ワーク詰まり）"));
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal("チョコ停（ワーク詰まり）", (await updated.Content.ReadFromJsonAsync<EquipmentLogResponse>())!.StopCause);
+        Assert.Empty((await admin.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>("/api/equipment-logs?missingCause=true"))!.Items);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/equipment-logs/{logs[3].Id}/stop-cause",
+            new EquipmentLogStopCauseRequest("原因"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PutAsJsonAsync("/api/equipment-logs/99999/stop-cause",
+            new EquipmentLogStopCauseRequest("原因"))).StatusCode);
+
+        // 追記は変更前後を監査ログに残す
+        var audits = await admin.GetFromJsonAsync<PagedResult<MesApp.Core.Contracts.Audit.AuditLogResponse>>(
+            "/api/audit-logs?action=UpdateStopCause");
+        Assert.Contains(audits!.Items, a => a.Action == "UpdateStopCause" && a.TargetId == target.Id.ToString()
+            && a.Detail!.Contains("\"after\":\"チョコ停（ワーク詰まり）\""));  // 変更前は空（null は省かれる）
+    }
+
+    [Fact]
     public async Task 同じ設備への設備イベントが同時に届いても開いた区間は1つになる()
     {
         using var factory = new ApiFactory();

@@ -39,6 +39,12 @@ public record EquipmentLogResponse(
     int? WorkOrderId = null, string? WorkOrderNo = null,
     EquipmentLogSource Source = EquipmentLogSource.Manual);
 
+/// <summary>
+/// 停止原因の追記（B-40-20-02）。停止・故障の区間の原因だけを書き換える。
+/// 設備イベントで原因が引けなかった区間に、後から原因を入れるのが主な使い道
+/// </summary>
+public record EquipmentLogStopCauseRequest([Required, MaxLength(500)] string StopCause);
+
 /// <summary>設備別の稼働サマリ（E-20-10-03 稼働・停止実績、E-20-30-03 パフォーマンス確認）</summary>
 public record EquipmentUtilizationRow(
     int EquipmentId, string AssetNo, string EquipmentName,

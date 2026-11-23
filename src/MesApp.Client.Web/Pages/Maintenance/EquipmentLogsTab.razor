@@ -142,6 +142,12 @@
 
 <div class="card">
     <h2 style="margin-top:0;">@L["稼働履歴"]</h2>
+    <div class="form-field">
+        <label>
+            <input type="checkbox" style="width:auto;" checked="@_missingCauseOnly" @onchange="ToggleMissingCauseAsync" />
+            @L["停止原因が未入力の停止・故障だけを表示する"]
+        </label>
+    </div>
     @if (_logs is not null && _logs.Total > 0)
     {
         <table class="table">
@@ -155,7 +161,19 @@
                         <td>@(log.WorkOrderNo ?? "-")</td>
                         <td>@log.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(log.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
-                        <td>@(log.StopCause ?? "-")</td>
+                        <td>
+                            @if (NeedsCause(log))
+                            {
+                                @* 設備イベントで原因を引けなかった区間に、後から原因を入れる（B-40-20-02） *@
+                                <input style="width:auto;" placeholder="@L["原因未入力"]" @bind="_causeInputs[log.Id]" />
+                                <button class="btn btn-secondary btn-sm" disabled="@_busy"
+                                        @onclick="() => SaveStopCauseAsync(log.Id)">@L["原因を保存"]</button>
+                            }
+                            else
+                            {
+                                @(log.StopCause ?? "-")
+                            }
+                        </td>
                         <td>@EnumLabels.Of(log.Source)</td>
                     </tr>
                 }
@@ -183,6 +201,8 @@
 
     private List<EquipmentResponse> _equipments = [];
     private PagedResult<EquipmentLogResponse>? _logs;
+    private bool _missingCauseOnly;
+    private readonly Dictionary<int, string?> _causeInputs = [];
     private List<EquipmentUtilizationRow>? _utilization;
     private List<EquipmentOeeRow>? _oee;
 
@@ -201,8 +221,57 @@
     /// <summary>算出できない指標は0%ではなく「-」で見せる（記録漏れを悪い評価に化けさせない）</summary>
     private static string Rate(decimal? value) => value is null ? "-" : $"{value:0.##} %";
 
-    private async Task LoadEquipmentLogsAsync(int page) =>
-        _logs = await Http.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>($"api/equipment-logs?page={page}");
+    private async Task LoadEquipmentLogsAsync(int page)
+    {
+        _logs = await Http.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>(
+            $"api/equipment-logs?page={page}&missingCause={(_missingCauseOnly ? "true" : "false")}");
+        _causeInputs.Clear();
+        foreach (var log in _logs?.Items ?? [])
+        {
+            if (NeedsCause(log))
+            {
+                _causeInputs[log.Id] = null;
+            }
+        }
+    }
+
+    private static bool NeedsCause(EquipmentLogResponse log) =>
+        log.Status is EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure && string.IsNullOrEmpty(log.StopCause);
+
+    private async Task ToggleMissingCauseAsync(ChangeEventArgs e)
+    {
+        _missingCauseOnly = e.Value is true;
+        await LoadEquipmentLogsAsync(1);
+    }
+
+    private async Task SaveStopCauseAsync(int logId)
+    {
+        var cause = _causeInputs.GetValueOrDefault(logId);
+        if (string.IsNullOrWhiteSpace(cause))
+        {
+            _error = L["停止原因を入力してください。"];
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/equipment-logs/{logId}/stop-cause",
+                new EquipmentLogStopCauseRequest(cause));
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = L["停止原因を保存しました。"];
+            await LoadEquipmentLogsAsync(_logs?.Page ?? 1);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 
     private async Task LoadLogsAsync()
     {

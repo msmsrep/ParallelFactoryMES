@@ -388,6 +388,47 @@ public class MasterTests
     }
 
     [Fact]
+    public async Task 停止原因の対応表は共通と設備ごとに登録でき重複と権限を判定する()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await (await admin.PostAsJsonAsync("/api/equipments",
+                new EquipmentRequest("EQ-01", "プレス機", null, EquipmentStatus.Available, MaintenanceType.None, null, null)))
+            .Content.ReadFromJsonAsync<EquipmentResponse>();
+
+        var common = await admin.PostAsJsonAsync("/api/equipment-alarm-codes",
+            new EquipmentAlarmCodeRequest(null, "A-101", "材料切れ"));
+        Assert.Equal(HttpStatusCode.Created, common.StatusCode);
+        var specific = await admin.PostAsJsonAsync("/api/equipment-alarm-codes",
+            new EquipmentAlarmCodeRequest(equipment!.Id, "A-101", "金型の温度異常"));
+        Assert.Equal(HttpStatusCode.Created, specific.StatusCode);
+
+        // 共通の行どうしの重複は一意索引では止まらないので、API で拒否する
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync("/api/equipment-alarm-codes",
+            new EquipmentAlarmCodeRequest(null, "A-101", "別の原因"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync("/api/equipment-alarm-codes",
+            new EquipmentAlarmCodeRequest(equipment.Id, "A-101", "別の原因"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/equipment-alarm-codes",
+            new EquipmentAlarmCodeRequest(9999, "A-102", "原因"))).StatusCode);
+
+        var list = await admin.GetFromJsonAsync<List<EquipmentAlarmCodeResponse>>("/api/equipment-alarm-codes");
+        Assert.Equal([null, "EQ-01"], list!.Select(a => a.EquipmentAssetNo));
+
+        // 更新・無効化。無効にした行は一覧の既定から外れる
+        var created = (await common.Content.ReadFromJsonAsync<EquipmentAlarmCodeResponse>())!;
+        (await admin.PutAsJsonAsync($"/api/equipment-alarm-codes/{created.Id}",
+            new EquipmentAlarmCodeRequest(null, "A-101", "材料切れ（補充待ち）"))).EnsureSuccessStatusCode();
+        (await admin.DeleteAsync($"/api/equipment-alarm-codes/{created.Id}")).EnsureSuccessStatusCode();
+        Assert.Single((await admin.GetFromJsonAsync<List<EquipmentAlarmCodeResponse>>("/api/equipment-alarm-codes"))!);
+
+        // 登録はマスタ更新権限が要る。参照は開いている
+        using var operator_ = await TestAuth.CreateUserClientAsync(factory, admin, "alarm-op", "Passw0rd!x", MesRoles.Operator);
+        Assert.Equal(HttpStatusCode.Forbidden, (await operator_.PostAsJsonAsync("/api/equipment-alarm-codes",
+            new EquipmentAlarmCodeRequest(null, "A-200", "原因"))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await operator_.GetAsync("/api/equipment-alarm-codes")).StatusCode);
+    }
+
+    [Fact]
     public async Task 作業区の登録はマスタ更新権限が要る()
     {
         using var factory = new ApiFactory();

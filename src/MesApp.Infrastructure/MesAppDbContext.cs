@@ -24,6 +24,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<RoutingControlItem> RoutingControlItems => Set<RoutingControlItem>();
     public DbSet<Equipment> Equipments => Set<Equipment>();
     public DbSet<EquipmentPart> EquipmentParts => Set<EquipmentPart>();
+    public DbSet<EquipmentAlarmCode> EquipmentAlarmCodes => Set<EquipmentAlarmCode>();
     public DbSet<Tool> Tools => Set<Tool>();
     public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
     public DbSet<Location> Locations => Set<Location>();

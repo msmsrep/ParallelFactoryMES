@@ -538,6 +538,38 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.ToTable("Equipments");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentAlarmCode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AlarmCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("EquipmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("StopCause")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentId", "AlarmCode")
+                        .IsUnique();
+
+                    b.ToTable("EquipmentAlarmCodes");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -3842,6 +3874,16 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("WorkCenter");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentAlarmCode", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Equipment");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>

@@ -142,6 +142,34 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
     }
 
     /// <summary>
+    /// 停止原因の追記（B-40-20-02）。停止・故障の区間の原因だけを書き換え、変更前後を監査ログに残す。
+    /// 設備イベントで収集する設備にも使える（区間の手入力は拒否するが、原因は人が入れるしかないため）
+    /// </summary>
+    public async Task<Outcome<EquipmentLog>> UpdateStopCauseAsync(int logId, string stopCause, CancellationToken ct)
+    {
+        var log = await db.EquipmentLogs.FindAsync([logId], ct);
+        if (log is null)
+        {
+            return Outcome<EquipmentLog>.NotFound(ApiText.T("稼働記録（ID {0}）が見つかりません。", logId));
+        }
+        if (log.Status is not (EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure))
+        {
+            return Outcome<EquipmentLog>.Invalid(ApiText.T("停止原因を入れられるのは停止・故障の記録だけです。"));
+        }
+        var cause = stopCause.Trim();
+        if (cause.Length == 0)
+        {
+            return Outcome<EquipmentLog>.Invalid(ApiText.T("停止原因を入力してください。"));
+        }
+        var before = log.StopCause;
+        log.StopCause = cause;
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Equipment", "UpdateStopCause", nameof(EquipmentLog), log.Id.ToString(),
+            detail: new { before, after = cause, reason = (string?)null }, ct: ct);
+        return Outcome<EquipmentLog>.Ok(log);
+    }
+
+    /// <summary>
     /// 治工具の利用実績（E-60-20-01。寿命の累計に使う）。記録はロールで絞らない（現場作業者も記録できる）。
     /// recordedAt は省略すると登録時刻（CSV取込で過去の利用実績を入れるときだけ指定する）
     /// </summary>

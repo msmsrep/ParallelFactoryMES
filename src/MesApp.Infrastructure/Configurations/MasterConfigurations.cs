@@ -156,6 +156,20 @@ internal sealed class EquipmentPartConfiguration : IEntityTypeConfiguration<Equi
     }
 }
 
+internal sealed class EquipmentAlarmCodeConfiguration : IEntityTypeConfiguration<EquipmentAlarmCode>
+{
+    public void Configure(EntityTypeBuilder<EquipmentAlarmCode> e)
+    {
+        // 設備が空（共通）の行どうしの重複は SQLite・PostgreSQL の一意索引では止まらない（NULL は互いに別の値）。
+        // API と CSV 取込で判定する
+        e.HasIndex(x => new { x.EquipmentId, x.AlarmCode }).IsUnique();
+        e.Property(x => x.AlarmCode).HasMaxLength(50);
+        e.Property(x => x.StopCause).HasMaxLength(500);
+        e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class ShiftConfiguration : IEntityTypeConfiguration<Shift>
 {
     public void Configure(EntityTypeBuilder<Shift> e)

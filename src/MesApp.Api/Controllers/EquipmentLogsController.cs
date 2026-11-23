@@ -13,7 +13,7 @@ namespace MesApp.Api.Controllers;
 
 /// <summary>
 /// 設備稼働報告・稼働監視（B-40-20 稼働時間・停止時間・停止原因の記録、E-20-10 稼働情報の収集・
-/// モニタリング）。初期は手入力（センサー自動収集は将来拡張）。現場作業者も記録できる。
+/// モニタリング）。手入力・実績CSVに加え、設備イベント（連携API。EquipmentEventsController）で収集した区間も並ぶ。現場作業者も記録できる。
 /// <para>
 /// 設備の稼働・停止の記録はロールで絞らない（Spec.md 7.4 の意図的な例外）。
 /// 気づいた人がその場で上げられることを優先する。指示・承認は別途ロールで絞る。
@@ -31,6 +31,7 @@ public class EquipmentLogsController(
         [FromQuery] int? equipmentId = null,
         [FromQuery] int? workOrderId = null,
         [FromQuery] EquipmentLogStatus? status = null,
+        [FromQuery] bool missingCause = false,
         CancellationToken ct = default)
     {
         var query = db.EquipmentLogs.AsNoTracking().AsQueryable();
@@ -45,6 +46,12 @@ public class EquipmentLogsController(
         if (status is not null)
         {
             query = query.Where(l => l.Status == status);
+        }
+        // 原因未入力：停止・故障なのに原因が無い区間（設備イベントで原因を引けなかったもの。B-40-20-02）
+        if (missingCause)
+        {
+            query = query.Where(l => (l.Status == EquipmentLogStatus.Stopped || l.Status == EquipmentLogStatus.Failure)
+                && (l.StopCause == null || l.StopCause == ""));
         }
         return await query.OrderByDescending(l => l.Id)
             .Select(l => new EquipmentLogResponse(
@@ -63,6 +70,27 @@ public class EquipmentLogsController(
         if (outcome.Value is not { } log)
         {
             return this.BadRequestProblem(outcome.Error);
+        }
+        return await db.EquipmentLogs.AsNoTracking()
+            .Where(l => l.Id == log.Id)
+            .Select(l => new EquipmentLogResponse(
+                l.Id, l.EquipmentId, l.Equipment!.Name, l.Status,
+                l.StartedAt, l.EndedAt, l.StopCause, l.Note,
+                l.WorkOrderId, l.WorkOrder != null ? l.WorkOrder.WorkOrderNo : null, l.Source))
+            .SingleAsync(ct);
+    }
+
+    /// <summary>停止原因の追記（B-40-20-02）。ロールで絞らない（稼働記録の登録と同じ）</summary>
+    [HttpPut("{id:int}/stop-cause")]
+    public async Task<ActionResult<EquipmentLogResponse>> UpdateStopCause(
+        int id, EquipmentLogStopCauseRequest request, CancellationToken ct)
+    {
+        var outcome = await reports.UpdateStopCauseAsync(id, request.StopCause, ct);
+        if (outcome.Value is not { } log)
+        {
+            return outcome.Kind == OutcomeError.NotFound
+                ? this.NotFoundProblem(outcome.Error)
+                : this.BadRequestProblem(outcome.Error);
         }
         return await db.EquipmentLogs.AsNoTracking()
             .Where(l => l.Id == log.Id)

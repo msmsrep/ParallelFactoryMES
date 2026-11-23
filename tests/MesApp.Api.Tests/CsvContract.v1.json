@@ -162,6 +162,32 @@
     },
     {
       "area": "master",
+      "kind": "equipment-alarm-codes",
+      "columns": [
+        {
+          "name": "EquipmentAssetNo",
+          "required": false,
+          "aliases": []
+        },
+        {
+          "name": "AlarmCode",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "StopCause",
+          "required": true,
+          "aliases": []
+        },
+        {
+          "name": "IsActive",
+          "required": false,
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "area": "master",
       "kind": "tools",
       "columns": [
         {

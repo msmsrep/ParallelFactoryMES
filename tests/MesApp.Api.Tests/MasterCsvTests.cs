@@ -1834,6 +1834,36 @@ public class MasterCsvTests
         Assert.Contains("CollectsEvents", exported.Split('\n')[0]);
     }
 
+    [Fact]
+    public async Task 停止原因の対応表をCSVで入出力でき共通の行の重複を拒否する()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+        Assert.True((await ImportAsync(client, "equipments", "AssetNo,Name\nEQ-01,プレス機\n")).Succeeded);
+
+        var imported = await ImportAsync(client, "equipment-alarm-codes",
+            "EquipmentAssetNo,AlarmCode,StopCause\n,A-101,材料切れ\nEQ-01,A-101,金型の温度異常\n");
+        Assert.True(imported.Succeeded);
+        Assert.Equal(2, imported.Created);
+
+        // 同じキーは更新。共通の行もキー（資産番号が空＋アラーム番号）で突き合わせる
+        var updated = await ImportAsync(client, "equipment-alarm-codes",
+            "EquipmentAssetNo,AlarmCode,StopCause\n,A-101,材料切れ（補充待ち）\n");
+        Assert.Equal((0, 1), (updated.Created, updated.Updated));
+
+        // ファイルの中の重複と、登録の無い設備は拒否する
+        var duplicated = await ImportAsync(client, "equipment-alarm-codes",
+            "EquipmentAssetNo,AlarmCode,StopCause\n,A-200,原因1\n,A-200,原因2\nNO-SUCH,A-300,原因3\n");
+        Assert.False(duplicated.Succeeded);
+        Assert.Equal(2, duplicated.Errors.Count);
+
+        var exported = await client.GetStringAsync("/api/masters/csv/equipment-alarm-codes");
+        var lines = exported.Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("EquipmentAssetNo,AlarmCode,StopCause,IsActive", lines[0].TrimStart('﻿'));
+        Assert.Contains(",A-101,材料切れ（補充待ち）,true", lines[1]);
+        Assert.StartsWith("EQ-01,A-101,", lines[2]);
+    }
+
     private static async Task<CsvImportResult> ImportActualAsync(HttpClient client, string kind, string csv)
     {
         var content = new StringContent(csv, Encoding.UTF8);
@@ -1971,7 +2001,7 @@ public class MasterCsvTests
         // 検証のみでは何も残らない
         var dry = await PostBundleAsync(client, "masters", masters, dryRun: true);
         Assert.True(dry.Succeeded, Describe(dry));
-        Assert.Equal(20, dry.Files.Count);
+        Assert.Equal(21, dry.Files.Count);
         Assert.Empty((await client.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!);
 
         var imported = await PostBundleAsync(client, "masters", masters);
@@ -2155,9 +2185,10 @@ public class MasterCsvTests
         }
         var names = EntryNames(exported);
         // 生産計画はマスタではないので、計画があっても一括出力には入らない
-        Assert.Equal(20, names.Count);
+        Assert.Equal(21, names.Count);
         Assert.Equal("01_work-centers.csv", names[0]);
-        Assert.Equal("20_maintenance-procedures.csv", names[^1]);
+        Assert.Equal("20_maintenance-procedures.csv", names[^2]);
+        Assert.Equal("21_equipment-alarm-codes.csv", names[^1]);
 
         // パスワードは出力しないため、ユーザー系を除けば空のDBへそのまま取り込める
         using var target = new ApiFactory();
