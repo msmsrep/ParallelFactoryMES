@@ -7,6 +7,7 @@ using System.Resources;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using MesApp.Api.Localization;
+using MesApp.Api.Services.Webhooks;
 using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Audit;
 using MesApp.Core.Contracts.Auth;
@@ -596,5 +597,147 @@ public class AuthTests
 
         // 画面用の API を含む既定の文書は開発環境だけ
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/openapi/v1.json")).StatusCode);
+    }
+
+    // ---- Webhook の送信先と送信待ち（Spec.md 3.8 Webhook。WHK-01） ----
+
+    private const string WebhookSubscriptions = "/api/webhook-subscriptions";
+
+    private static async Task<CreatedWebhookSecretResponse> CreateWebhookAsync(
+        HttpClient admin, string name, bool isActive = true, params string[] eventTypes)
+    {
+        var response = await admin.PostAsJsonAsync(WebhookSubscriptions,
+            new SaveWebhookSubscriptionRequest(name, "http://192.168.0.10:1880/mes", [.. eventTypes], isActive));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<CreatedWebhookSecretResponse>())!;
+    }
+
+    [Fact]
+    public async Task Webhookの秘密の値は登録と再発行の応答にしか出ず_管理はシステム管理者だけ()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var created = await CreateWebhookAsync(admin, "班長チャット", true,
+            WebhookEventTypes.NonconformanceCreated, WebhookEventTypes.LotStatusChanged);
+        Assert.StartsWith(WebhookSecrets.Prefix, created.PlainSecret);
+        Assert.StartsWith(created.Subscription.SecretPrefix, created.PlainSecret);
+        // 保存は画面の一覧の順（WebhookEventTypes.All の順）
+        Assert.Equal([WebhookEventTypes.LotStatusChanged, WebhookEventTypes.NonconformanceCreated], created.Subscription.EventTypes);
+
+        var rotated = await (await admin.PostAsync($"{WebhookSubscriptions}/{created.Subscription.Id}/rotate-secret", null))
+            .Content.ReadFromJsonAsync<CreatedWebhookSecretResponse>();
+        Assert.NotEqual(created.PlainSecret, rotated!.PlainSecret);
+        Assert.NotNull(rotated.Subscription.SecretRotatedAt);
+
+        // 一覧・監査ログ・DB に平文が出ない。DB の値は復号すると今の平文に戻る（署名に使うため）
+        var list = await admin.GetStringAsync(WebhookSubscriptions);
+        var audits = await admin.GetStringAsync("/api/audit-logs?category=Webhook&pageSize=200");
+        foreach (var plain in new[] { created.PlainSecret, rotated.PlainSecret })
+        {
+            Assert.DoesNotContain(plain, list);
+            Assert.DoesNotContain(plain, audits);
+        }
+        Assert.Contains("Create", audits);
+        Assert.Contains("RotateSecret", audits);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            var stored = await db.WebhookSubscriptions.SingleAsync();
+            Assert.DoesNotContain(WebhookSecrets.Prefix, stored.SecretProtected);
+            Assert.Equal(rotated.PlainSecret,
+                scope.ServiceProvider.GetRequiredService<WebhookSecrets>().Unprotect(stored.SecretProtected));
+        }
+
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "manager", "Passw0rd123", MesRoles.ProductionManager);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync(WebhookSubscriptions)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.PostAsJsonAsync(WebhookSubscriptions,
+            new SaveWebhookSubscriptionRequest("x", "http://localhost/x", [WebhookEventTypes.LotStatusChanged], true))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await manager.DeleteAsync($"{WebhookSubscriptions}/{created.Subscription.Id}")).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("", "http://localhost/x", WebhookEventTypes.LotStatusChanged)]
+    [InlineData("名前", "ftp://localhost/x", WebhookEventTypes.LotStatusChanged)]
+    [InlineData("名前", "localhost/x", WebhookEventTypes.LotStatusChanged)]
+    [InlineData("名前", "http://user:pass@localhost/x", WebhookEventTypes.LotStatusChanged)]
+    [InlineData("名前", "http://localhost/x", "lot.no-such-event")]
+    [InlineData("名前", "http://localhost/x", null)]
+    public async Task Webhookの送信先の入力不正は400(string name, string url, string? eventType)
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var response = await admin.PostAsJsonAsync(WebhookSubscriptions,
+            new SaveWebhookSubscriptionRequest(name, url, eventType is null ? [] : [eventType], true));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PutAsJsonAsync($"{WebhookSubscriptions}/999",
+            new SaveWebhookSubscriptionRequest("名前", "http://localhost/x", [WebhookEventTypes.LotStatusChanged], true))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Webhookの送信待ちは購読している有効な送信先にだけ作られ_業務と一緒に巻き戻る()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var lot = await CreateWebhookAsync(admin, "ロット", true, WebhookEventTypes.LotStatusChanged);
+        var both = await CreateWebhookAsync(admin, "両方", true,
+            WebhookEventTypes.LotStatusChanged, WebhookEventTypes.EquipmentStopped);
+        await CreateWebhookAsync(admin, "無効", false, WebhookEventTypes.LotStatusChanged);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            var publisher = scope.ServiceProvider.GetRequiredService<WebhookPublisher>();
+            Assert.NotNull(await publisher.EnqueueAsync(WebhookEventTypes.LotStatusChanged, "ロット L-1 を保留にしました",
+                new { lotNo = "L-1", status = Core.Entities.LotStockStatus.OnHold }, CancellationToken.None));
+            Assert.NotNull(await publisher.EnqueueAsync(WebhookEventTypes.EquipmentStopped, "設備 EQ-01 が停止しました",
+                new { equipmentCode = "EQ-01" }, CancellationToken.None));
+            // 購読している送信先が無い種類は積まない
+            Assert.Null(await publisher.EnqueueAsync(WebhookEventTypes.NonconformanceCreated, "不適合",
+                new { }, CancellationToken.None));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                publisher.EnqueueAsync("no-such.event", "x", new { }, CancellationToken.None));
+            await db.SaveChangesAsync();
+        }
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            var outbox = await db.WebhookOutbox.AsNoTracking().Include(o => o.Deliveries).OrderBy(o => o.Id).ToListAsync();
+            Assert.Equal([WebhookEventTypes.LotStatusChanged, WebhookEventTypes.EquipmentStopped], outbox.Select(o => o.EventType));
+            Assert.Equal([lot.Subscription.Id, both.Subscription.Id],
+                outbox[0].Deliveries.Select(d => d.SubscriptionId).Order());
+            Assert.Equal([both.Subscription.Id], outbox[1].Deliveries.Select(d => d.SubscriptionId));
+            Assert.All(outbox.SelectMany(o => o.Deliveries), d => Assert.Equal(Core.Entities.WebhookDeliveryState.Pending, d.State));
+            // 区分は列挙の名前、項目名は camelCase
+            Assert.Equal("""{"lotNo":"L-1","status":"OnHold"}""", outbox[0].Payload);
+            Assert.True(outbox[1].Id > outbox[0].Id);
+        }
+
+        // 業務のトランザクションが巻き戻れば、送信待ちも残らない
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            var publisher = scope.ServiceProvider.GetRequiredService<WebhookPublisher>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await publisher.EnqueueAsync(WebhookEventTypes.LotStatusChanged, "巻き戻す", new { }, CancellationToken.None);
+            await db.SaveChangesAsync();
+            await transaction.RollbackAsync();
+        }
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            Assert.Equal(2, await db.WebhookOutbox.CountAsync());
+        }
+
+        // 送信先を消すと、その送信先の送信待ちも消える（他の送信先の分は残る）
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.DeleteAsync($"{WebhookSubscriptions}/{both.Subscription.Id}")).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+            Assert.Equal([lot.Subscription.Id], await db.WebhookDeliveries.Select(d => d.SubscriptionId).ToListAsync());
+        }
+        Assert.Contains("Delete", await admin.GetStringAsync("/api/audit-logs?category=Webhook&pageSize=200"));
     }
 }

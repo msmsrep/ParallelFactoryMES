@@ -43,6 +43,7 @@ public class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Database:Provider", _database.Provider);
         builder.UseSetting("Database:ConnectionString", _database.ConnectionString);
         builder.UseSetting("Jwt:SigningKeyFile", Path.Combine(_workDir, "jwt-signing.key"));
+        builder.UseSetting("DataProtection:KeysDirectory", Path.Combine(_workDir, "dataprotection-keys"));
         foreach (var (key, value) in _settings)
         {
             builder.UseSetting(key, value);

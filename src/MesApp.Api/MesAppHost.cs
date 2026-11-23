@@ -1,12 +1,14 @@
 ﻿using System.Globalization;
 using MesApp.Api.Services;
 using MesApp.Api.Services.FolderLink;
+using MesApp.Api.Services.Webhooks;
 using MesApp.Api.Localization;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
@@ -124,6 +126,16 @@ public static class MesAppHost
         builder.Services.Configure<FolderLinkOptions>(builder.Configuration.GetSection(FolderLinkOptions.SectionName));
         builder.Services.AddSingleton<FolderLinkService>();
         builder.Services.AddHostedService<FolderLinkWorker>();
+        // Webhook（Spec.md 3.8）。秘密の値の暗号化に Data Protection を使うので、鍵をデータディレクトリに残す
+        // （既定の置き場所は Docker では再起動で消え、復号できなくなる。Spec.md 7.7 の退避の対象）
+        builder.Services.AddDataProtection()
+            .SetApplicationName("ParallelFactoryMES")
+            .PersistKeysToFileSystem(new DirectoryInfo(MesAppDataDirectory.Resolve(
+                builder.Configuration["DataProtection:KeysDirectory"] is { Length: > 0 } keysDirectory
+                    ? keysDirectory
+                    : "dataprotection-keys")));
+        builder.Services.AddSingleton<WebhookSecrets>();
+        builder.Services.AddScoped<WebhookPublisher>();
 
         // 既定は JWT（画面用 API）。APIキーは連携API の Controller が明示したときだけ使う（ApiKeyAuthentication.IntegrationSchemes）
         builder.Services

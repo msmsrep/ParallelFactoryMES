@@ -4575,4 +4575,115 @@
   <data name="自動では更新しません。最新にするときは「更新」を押してください。設備イベントで収集する設備は、受信が一定時間（既定10分）途絶えると知らせます。" xml:space="preserve">
     <value>This list does not refresh automatically. Press "Update" to load the latest status. For equipment that collects status from equipment events, a notice appears when no events have been received for a while (10 minutes by default).</value>
   </data>
+  <data name="Webhook" xml:space="preserve">
+    <value>Webhooks</value>
+  </data>
+  <data name="署名の秘密の値" xml:space="preserve">
+    <value>Signing secret</value>
+  </data>
+  <data name="この値は今しか表示できません。受け側の設定に、今すぐ写してください。" xml:space="preserve">
+    <value>This value is shown only now. Copy it into the receiver's settings right away.</value>
+  </data>
+  <data name="受け側はこの値で本文の署名（HMAC-SHA256）を確かめ、MES から送られたことを確認します。" xml:space="preserve">
+    <value>The receiver uses this value to verify the body's signature (HMAC-SHA256) and confirm that it was sent by the MES.</value>
+  </data>
+  <data name="送信先を登録する" xml:space="preserve">
+    <value>Register a destination</value>
+  </data>
+  <data name="送信先を変更する" xml:space="preserve">
+    <value>Edit the destination</value>
+  </data>
+  <data name="例：班長チャットへの不適合通知" xml:space="preserve">
+    <value>e.g. Nonconformance alerts to the team leaders' chat</value>
+  </data>
+  <data name="送信先の URL" xml:space="preserve">
+    <value>Destination URL</value>
+  </data>
+  <data name="有効（無効にすると新しい出来事を送らない）" xml:space="preserve">
+    <value>Active (when inactive, new events are not sent)</value>
+  </data>
+  <data name="http の送信先には、本文が暗号化されずに流れます。工場の中のネットワークだけで使う送信先にしてください。" xml:space="preserve">
+    <value>Bodies sent to an http destination are not encrypted. Use it only for destinations on the factory's internal network.</value>
+  </data>
+  <data name="通知するイベント" xml:space="preserve">
+    <value>Events to notify</value>
+  </data>
+  <data name="登録済みの送信先" xml:space="preserve">
+    <value>Registered destinations</value>
+  </data>
+  <data name="登録した送信先はありません。" xml:space="preserve">
+    <value>No destinations are registered.</value>
+  </data>
+  <data name="秘密の値の先頭" xml:space="preserve">
+    <value>Secret prefix</value>
+  </data>
+  <data name="登録日時" xml:space="preserve">
+    <value>Registered at</value>
+  </data>
+  <data name="再発行する（古い値は使えなくなります）" xml:space="preserve">
+    <value>Reissue (the old value stops working)</value>
+  </data>
+  <data name="削除する（送信待ちと送信の記録も消えます）" xml:space="preserve">
+    <value>Delete (pending and past deliveries are deleted too)</value>
+  </data>
+  <data name="変更" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="秘密の値を再発行" xml:space="preserve">
+    <value>Reissue secret</value>
+  </data>
+  <data name="Webhook の送信先の一覧を取得できませんでした。" xml:space="preserve">
+    <value>Could not load the webhook destinations.</value>
+  </data>
+  <data name="Webhook の送信先の変更に失敗しました。" xml:space="preserve">
+    <value>Failed to update the webhook destination.</value>
+  </data>
+  <data name="「{0}」を変更しました。" xml:space="preserve">
+    <value>Updated "{0}".</value>
+  </data>
+  <data name="Webhook の送信先の登録に失敗しました。" xml:space="preserve">
+    <value>Failed to register the webhook destination.</value>
+  </data>
+  <data name="秘密の値の再発行に失敗しました。" xml:space="preserve">
+    <value>Failed to reissue the secret.</value>
+  </data>
+  <data name="Webhook の送信先の削除に失敗しました。" xml:space="preserve">
+    <value>Failed to delete the webhook destination.</value>
+  </data>
+  <data name="「{0}」を削除しました。" xml:space="preserve">
+    <value>Deleted "{0}".</value>
+  </data>
+  <data name="生産実績の記録" xml:space="preserve">
+    <value>Production result recorded</value>
+  </data>
+  <data name="生産実績の訂正" xml:space="preserve">
+    <value>Production result corrected</value>
+  </data>
+  <data name="作業指示の状態の変化" xml:space="preserve">
+    <value>Work order status changed</value>
+  </data>
+  <data name="製造指図の完了・取消" xml:space="preserve">
+    <value>Manufacturing order completed or canceled</value>
+  </data>
+  <data name="ロットの状態の変化" xml:space="preserve">
+    <value>Lot status changed</value>
+  </data>
+  <data name="不適合の起票" xml:space="preserve">
+    <value>Nonconformance raised</value>
+  </data>
+  <data name="設備の停止・故障" xml:space="preserve">
+    <value>Equipment stopped or failed</value>
+  </data>
+  <data name="Webhook - Parallel Factory MES" xml:space="preserve">
+    <value>Webhooks - Parallel Factory MES</value>
+  </data>
+  <data name="実績の記録・状態の変化・不適合・設備の停止などの出来事を、登録した URL へ知らせます。" xml:space="preserve">
+    <value>Sends events such as recorded results, status changes, nonconformances and equipment stops to the URLs you register.</value>
+  </data>
+  <data name="通知は読みに行くきっかけです。正しい今の値は連携API で取りに行ってください。" xml:space="preserve">
+    <value>A notification is a cue to fetch data. Get the correct current values from the integration API.</value>
+  </data>
+  <data name="送信先" xml:space="preserve">
+    <value>Destinations</value>
+  </data>
 </root>

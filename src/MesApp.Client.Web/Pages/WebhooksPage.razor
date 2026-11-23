@@ -1,0 +1,31 @@
+@page "/webhooks"
+@attribute [Authorize(Roles = MesRoles.SystemAdmin)]
+
+@* Webhook（Spec.md 3.8 Webhook。docs-dev/WebhookTasks.md）。
+   送信先は業務データの持ち出し口になるので、システム管理者専用（一覧の参照も）。
+   送信の記録のタブは WHK-02 で足す *@
+
+<PageTitle>@L["Webhook - Parallel Factory MES"]</PageTitle>
+
+<h1>@L["Webhook"]</h1>
+<p class="text-muted">
+    @L["実績の記録・状態の変化・不適合・設備の停止などの出来事を、登録した URL へ知らせます。"]
+    @L["通知は読みに行くきっかけです。正しい今の値は連携API で取りに行ってください。"]
+</p>
+
+<div class="tabs">
+    <button class="@TabClass("subscriptions")" @onclick='() => _tab = "subscriptions"'>@L["送信先"]</button>
+</div>
+
+@switch (_tab)
+{
+    case "subscriptions":
+        <SubscriptionsTab />
+        break;
+}
+
+@code {
+    private string _tab = "subscriptions";
+
+    private string TabClass(string tab) => _tab == tab ? "active" : string.Empty;
+}

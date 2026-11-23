@@ -23,7 +23,7 @@ EQE・INT では想定が毎回少なすぎた（CSV が3ファイルに分か�
 
 | カード | 状態 |
 |:--|:--|
-| WHK-01 送信先の登録と Outbox の土台 | 未着手 |
+| WHK-01 送信先の登録と Outbox の土台 | 完了（2026-11-23。Spec.md 改訂159） |
 | WHK-02 送信の常駐処理・署名・再送 | 未着手 |
 | WHK-03 v1 のイベントの発行と約束の固定 | 未着手 |
 | WHK-04 受け側の見本と利用者ガイド | 未着手 |
@@ -80,6 +80,16 @@ EQE・INT では想定が毎回少なすぎた（CSV が3ファイルに分か�
 
 **変更ファイルの想定（約20＋マイグレーション9）**：エンティティ、`MesAppDbContext.cs`、`Configurations/`（新設か既存に追記）、マイグレーション3プロバイダー（`scripts/Migrations.ps1 -Add AddWebhooks`）、DTO（`Core/Contracts/Integration/WebhookDtos.cs`）、`WebhookSubscriptionsController.cs`、`Api/Services/Webhooks/WebhookPublisher.cs`、秘密の暗号化（Data Protection の登録）、`MesAppHost.cs`（DI）、`MesRoleGroups.cs`（要れば）、画面のタブと親ページの登録、`NavMenu.razor`（要れば）、`UiText.en.resx`・`ApiText.en.resx`、`EnumLabels.cs`・`CoreText.en.resx`（送信の状態）、テスト（連携の既存クラス。無ければ `MasterTests` に）、`Spec.md`（5章・7.6・6.1・改訂履歴）、`CodeMap.md`、このファイル
 **受入基準**：管理者だけが送信先を登録・変更・削除できる／秘密は作成・再発行の応答でだけ見え、一覧・詳細では見えない／`Enqueue` した業務が巻き戻ると送信待ちも残らない／購読していない種類では送信待ちが作られない／SQL Server・PostgreSQL で同じテストが通る
+
+**実施メモ（2026-11-23）**：変更は24ファイル＋マイグレーション9（想定約20。想定外は `appsettings.json`（Data Protection の鍵の置き場所）・`ApiFactory.cs`（テストの鍵を一時ディレクトリへ）・`_Imports.razor`（タブのフォルダの名前空間）・種類の一覧 `Core/Constants/WebhookEventTypes.cs`。`MesRoleGroups.cs` は既存の `UserAdmin` で足りたので変えていない）。
+- **再送の時刻・取り出しの時刻は Unix 秒（`NextAttemptAtUnixSeconds`・`LockedAtUnixSeconds`）で持つ**。SQLite は DateTimeOffset を SQL で比べられないため（`IntegrationRequest.ExpiresAtUnixSeconds` と同じ手）。WHK-02 の取り出しは（`State`, `NextAttemptAtUnixSeconds`）の索引で引ける
+- **Data Protection の鍵をデータディレクトリの `dataprotection-keys` に永続化した**（`DataProtection:KeysDirectory`）。既定の置き場所は Docker では再起動で消え、秘密が復号できなくなる。DB と一緒に退避が要ることを Spec.md 7.7 に書いた。鍵を失ったときの扱い（復号できない送信先を失敗にして再発行を促す）は WHK-02 で決める
+- 送信待ちには本文の `data`（`Payload`）と `Summary` だけを置き、共通の包み（`id`・`sequence`・`type`・`version`・`occurredAt`）は送るときに付ける（`sequence`＝送信待ちの ID は保存するまで決まらないため）。`data` は camelCase・列挙は名前
+- 種類の一覧は `Core/Constants/WebhookEventTypes.cs` に置き、API の入力検査と画面の選択肢で同じものを使う。購読の保存はカンマ区切りで、**知らない種類も読み捨てない**（版を戻したときに購読を失わないため。画面では名前のまま出す）
+- 送信先の削除は送信待ち・送信の記録を連鎖して消す（運用ログ。止めるだけなら無効）。送信待ち（`WebhookOutbox`）の行自体は残る（他の送信先の分があり得る）。保持期間による削除は運用ログの削除をまとめて作るときに入れる
+- データモデルは 5章ではなく 3.8節に書いた（APIキー・`IntegrationRequest` と同じく、共通基盤のエンティティは 5章に載せていない）。テストは管理系の `AuthTests`（APIキーと同じ場所）に置いた
+- 画面は独立画面 `/webhooks`（ナビはシステム管理者の欄。APIキーの次）をタブの形で作り、今は「送信先」だけ。WHK-02 で「送信の記録」タブを足す
+- SQLite で全件、SQL Server・PostgreSQL で `AuthTests` の Webhook と `DatabaseProviderTests` を確認した
 
 ### WHK-02 送信の常駐処理・署名・再送
 

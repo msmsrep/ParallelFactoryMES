@@ -60,6 +60,47 @@ internal sealed class IntegrationRequestConfiguration : IEntityTypeConfiguration
     }
 }
 
+internal sealed class WebhookSubscriptionConfiguration : IEntityTypeConfiguration<WebhookSubscription>
+{
+    public void Configure(EntityTypeBuilder<WebhookSubscription> e)
+    {
+        e.Property(x => x.Name).HasMaxLength(100);
+        e.Property(x => x.Url).HasMaxLength(2000);
+        e.Property(x => x.EventTypes).HasMaxLength(1000);
+        e.Property(x => x.SecretProtected).HasMaxLength(1000);
+        e.Property(x => x.SecretPrefix).HasMaxLength(20);
+        // 送信先を消したら送信の記録も消す（運用ログ。消したことは監査ログに残る）
+        e.HasMany(x => x.Deliveries)
+            .WithOne(x => x.Subscription)
+            .HasForeignKey(x => x.SubscriptionId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class WebhookOutboxConfiguration : IEntityTypeConfiguration<WebhookOutbox>
+{
+    public void Configure(EntityTypeBuilder<WebhookOutbox> e)
+    {
+        e.HasIndex(x => x.EventId).IsUnique();
+        e.Property(x => x.EventType).HasMaxLength(100);
+        e.Property(x => x.Summary).HasMaxLength(500);
+        e.HasMany(x => x.Deliveries)
+            .WithOne(x => x.Outbox)
+            .HasForeignKey(x => x.OutboxId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class WebhookDeliveryConfiguration : IEntityTypeConfiguration<WebhookDelivery>
+{
+    public void Configure(EntityTypeBuilder<WebhookDelivery> e)
+    {
+        // 常駐処理が「送信待ちで、送ってよい時刻を過ぎたもの」を引く
+        e.HasIndex(x => new { x.State, x.NextAttemptAtUnixSeconds });
+        e.Property(x => x.LastError).HasMaxLength(1000);
+    }
+}
+
 internal sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
     public void Configure(EntityTypeBuilder<AuditLog> e)

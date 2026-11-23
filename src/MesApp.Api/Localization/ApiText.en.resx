@@ -2763,4 +2763,19 @@
   <data name="設備イベントの停止・故障の区間に入る文章" xml:space="preserve">
     <value>Text entered into stop and failure intervals from equipment events</value>
   </data>
+  <data name="Webhook の送信先が見つかりません。" xml:space="preserve">
+    <value>The webhook destination was not found.</value>
+  </data>
+  <data name="送信先の URL は http:// か https:// で始まる{0}文字以内の URL を入力してください。" xml:space="preserve">
+    <value>Enter a destination URL that starts with http:// or https:// and is at most {0} characters long.</value>
+  </data>
+  <data name="送信先の URL に利用者名・パスワードを含めないでください。受け側は署名で送り手を確かめます。" xml:space="preserve">
+    <value>Do not include a user name or password in the destination URL. The receiver verifies the sender by the signature.</value>
+  </data>
+  <data name="通知するイベントの種類を1つ以上選んでください。" xml:space="preserve">
+    <value>Select at least one event type to notify.</value>
+  </data>
+  <data name="イベントの種類 '{0}' はありません。" xml:space="preserve">
+    <value>There is no event type '{0}'.</value>
+  </data>
 </root>
