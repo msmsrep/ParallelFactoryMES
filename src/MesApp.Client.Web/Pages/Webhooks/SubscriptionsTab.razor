@@ -293,9 +293,8 @@
             }
             else
             {
-                // エラーの文は送ったときのまま（訳さない）
-                _error = L["「{0}」へのテスト送信が届きませんでした：{1}", s.Name,
-                    $"{(result?.LastStatusCode is { } code ? $"HTTP {code} " : string.Empty)}{result?.LastError}"];
+                // エラーの文は送ったときのまま（訳さない）。状態コードは文の先頭に入っている
+                _error = L["「{0}」へのテスト送信が届きませんでした：{1}", s.Name, result?.LastError ?? string.Empty];
             }
             await LoadAsync();
         }

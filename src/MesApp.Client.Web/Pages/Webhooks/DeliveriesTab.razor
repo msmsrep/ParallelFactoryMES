@@ -9,7 +9,7 @@
 <div class="card">
     <div class="form-grid">
         <div class="form-field">
-            <label>@L["送信先"]</label>
+            <label>@L["送信先の用途"]</label>
             <select @bind="_subscriptionId" @bind:after="LoadAsync">
                 <option value="">@L["すべて"]</option>
                 @foreach (var s in _subscriptions)
@@ -53,7 +53,7 @@
         <div style="overflow-x:auto;">
             <table class="table">
                 <thead>
-                    <tr><th>sequence</th><th>@L["発生日時"]</th><th>@L["送信先"]</th><th>@L["イベント"]</th><th>@L["状態"]</th><th>@L["試行回数"]</th><th>@L["最後の試行"]</th><th>@L["結果"]</th><th></th></tr>
+                    <tr><th>sequence</th><th>@L["発生日時"]</th><th>@L["送信先の用途"]</th><th>@L["イベント"]</th><th>@L["状態"]</th><th>@L["試行回数"]</th><th>@L["最後の試行"]</th><th>@L["結果"]</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (var d in _deliveries)
@@ -72,8 +72,8 @@
                             </td>
                             <td>@d.Attempts</td>
                             <td>@Format(d.LastAttemptAt)</td>
-                            @* エラーの文は送ったときのまま残している（訳さない） *@
-                            <td style="word-break:break-all;">@(d.LastStatusCode is { } code ? $"HTTP {code}" : string.Empty) @d.LastError</td>
+                            @* エラーの文は送ったときのまま残している（訳さない）。状態コードは文の先頭に入っているので重ねない *@
+                            <td style="word-break:break-all;">@(d.LastError ?? (d.LastStatusCode is { } code ? $"HTTP {code}" : string.Empty))</td>
                             <td>
                                 @if (d.State == WebhookDeliveryState.Failed)
                                 {

@@ -33,7 +33,8 @@ public class WebhookSubscriptionsController(
     {
         var rows = await db.WebhookSubscriptions.AsNoTracking().OrderBy(s => s.Id).ToListAsync(ct);
         var counts = await db.WebhookDeliveries.AsNoTracking()
-            .Where(d => d.State != WebhookDeliveryState.Delivered)
+            // テスト送信の失敗は数えない（結果はその場で返している。数えるとダッシュボードの「失敗中」が消えなくなる）
+            .Where(d => d.State != WebhookDeliveryState.Delivered && d.Outbox!.EventType != WebhookDispatcher.PingEventType)
             .GroupBy(d => new { d.SubscriptionId, d.State })
             .Select(g => new { g.Key.SubscriptionId, g.Key.State, Count = g.Count(), Retrying = g.Count(d => d.Attempts > 0) })
             .ToListAsync(ct);

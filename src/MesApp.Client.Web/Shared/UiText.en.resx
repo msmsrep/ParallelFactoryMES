@@ -4746,10 +4746,13 @@
   <data name="Webhook の送信に失敗している送信先があります：{0}" xml:space="preserve">
     <value>Some webhook destinations are failing: {0}</value>
   </data>
-  <data name="送信の記録を見る" xml:space="preserve">
-    <value>View deliveries</value>
+  <data name="送信先を見る" xml:space="preserve">
+    <value>View destinations</value>
   </data>
   <data name="送信の記録" xml:space="preserve">
     <value>Deliveries</value>
+  </data>
+  <data name="送信先の用途" xml:space="preserve">
+    <value>Destination</value>
   </data>
 </root>

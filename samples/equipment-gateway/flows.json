@@ -278,5 +278,222 @@
     "wires": [
       []
     ]
+  },
+  {
+    "id": "tab-webhook",
+    "type": "tab",
+    "label": "Webhook の受け側",
+    "info": "Parallel Factory MES の Webhook を受け、署名を確かめてチャット（Slack・Teams）へ転送する見本。\n環境変数 MES_WEBHOOK_SECRET（送信先を登録したときの秘密の値 whsec_...）・CHAT_KIND（slack か teams）・CHAT_WEBHOOK_URL（省くと模擬に送る）。\nMES の送信先の URL は http://node-red:1880/mes-webhook（同じ compose の中から）。"
+  },
+  {
+    "id": "c-wh-recv",
+    "type": "comment",
+    "name": "① MES から受けて署名を確かめる（重複は捨てる）",
+    "info": "",
+    "x": 250,
+    "y": 40,
+    "wires": [],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "wh-in",
+    "type": "http in",
+    "name": "POST /mes-webhook",
+    "url": "/mes-webhook",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 150,
+    "y": 80,
+    "wires": [
+      [
+        "wh-verify"
+      ]
+    ],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "wh-verify",
+    "type": "function",
+    "name": "署名を確かめる",
+    "func": "// MES の Webhook の署名を確かめる（Spec.md 3.8 Webhook）。\n// 署名は「X-Mes-Timestamp.本文」の HMAC-SHA256。本文は JSON に読み替える前のバイト列そのもの\n// （settings.js の httpNodeMiddleware が msg.payload に残している）。読み替えた後の JSON から作り直すと、\n// 数値の書き方（10.0000 と 10 など）が変わって署名が合わない。\nconst secret = env.get('MES_WEBHOOK_SECRET') || '';\nconst timestamp = msg.req.headers['x-mes-timestamp'] || '';\nconst signature = msg.req.headers['x-mes-signature'] || '';\nconst body = typeof msg.payload === 'string' ? msg.payload : null;\n\nfunction reject(reason) {\n    node.warn('受け付けませんでした：' + reason);\n    msg.statusCode = 401;\n    msg.payload = { error: reason };\n    return [msg, null];\n}\nif (!secret) return reject('MES_WEBHOOK_SECRET が設定されていません');\nif (body === null) return reject('本文を生のまま受け取れていません（settings.js を確かめてください）');\n// 古い要求の送り直し（再生攻撃）を弾く。MES とこの PC の時計は NTP で揃える\nif (!/^\\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return reject('時刻が5分以上ずれています');\nconst expected = 'sha256=' + crypto.createHmac('sha256', secret).update(timestamp + '.' + body, 'utf8').digest('hex');\nif (expected.length !== signature.length\n    || !crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) return reject('署名が合いません');\n\nconst event = JSON.parse(body);\n// 少なくとも1回届くので、同じ id は2回目以降を捨てる（覚えるのは直近の1000件）\nconst seen = flow.get('seenIds') || [];\nconst duplicate = seen.includes(event.id);\nif (!duplicate) {\n    seen.push(event.id);\n    flow.set('seenIds', seen.slice(-1000));\n}\n// 先に 2xx を返す（MES は応答を待っている。転送に時間がかかっても再送されないように）\nconst reply = { req: msg.req, res: msg.res, statusCode: 200, payload: { received: event.id } };\nif (duplicate) {\n    node.log('重複を捨てました：' + event.id);\n    return [reply, null];\n}\nreturn [reply, { payload: event }];\n",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [
+      {
+        "var": "crypto",
+        "module": "crypto"
+      }
+    ],
+    "x": 360,
+    "y": 80,
+    "wires": [
+      [
+        "wh-reply"
+      ],
+      [
+        "wh-to-chat",
+        "wh-received"
+      ]
+    ],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "wh-reply",
+    "type": "http response",
+    "name": "応答",
+    "statusCode": "",
+    "headers": {},
+    "x": 560,
+    "y": 60,
+    "wires": [],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "wh-received",
+    "type": "debug",
+    "name": "受けた通知",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 580,
+    "y": 120,
+    "wires": [],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "c-wh-chat",
+    "type": "comment",
+    "name": "② チャットの形にして転送する",
+    "info": "",
+    "x": 200,
+    "y": 180,
+    "wires": [],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "wh-to-chat",
+    "type": "function",
+    "name": "チャットの形にする",
+    "func": "// 通知をチャットの形にする。CHAT_KIND＝slack（既定）か teams。\n// 送り先は CHAT_WEBHOOK_URL（Slack の Incoming Webhook、Teams のワークフローの「Webhook 要求を受信したとき」の URL）。\n// 既定はこのフローの中の模擬（/chat-mock）で、実際のチャットには送らない\nconst event = msg.payload;\nconst url = env.get('CHAT_WEBHOOK_URL') || 'http://localhost:1880/chat-mock';\nconst text = '[' + event.type + '] ' + event.summary;\nmsg.url = url;\nmsg.method = 'POST';\nmsg.headers = { 'Content-Type': 'application/json' };\nif ((env.get('CHAT_KIND') || 'slack') === 'teams') {\n    // Teams のワークフローは Adaptive Card を受ける\n    msg.payload = {\n        type: 'message',\n        attachments: [{\n            contentType: 'application/vnd.microsoft.card.adaptive',\n            content: {\n                $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',\n                type: 'AdaptiveCard',\n                version: '1.4',\n                body: [{ type: 'TextBlock', text: text, wrap: true }],\n            },\n        }],\n    };\n} else {\n    msg.payload = { text: text };\n}\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 180,
+    "y": 220,
+    "wires": [
+      [
+        "wh-chat"
+      ]
+    ],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "wh-chat",
+    "type": "http request",
+    "name": "チャットへ送る",
+    "method": "use",
+    "ret": "txt",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 400,
+    "y": 220,
+    "wires": [
+      [
+        "wh-chat-result"
+      ]
+    ],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "wh-chat-result",
+    "type": "debug",
+    "name": "転送の結果",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "statusCode",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 600,
+    "y": 220,
+    "wires": [],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "c-wh-mock",
+    "type": "comment",
+    "name": "③ チャットの模擬（CHAT_WEBHOOK_URL を省いたときの送り先）",
+    "info": "",
+    "x": 270,
+    "y": 280,
+    "wires": [],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "mock-in",
+    "type": "http in",
+    "name": "POST /chat-mock",
+    "url": "/chat-mock",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 140,
+    "y": 320,
+    "wires": [
+      [
+        "mock-show",
+        "mock-reply"
+      ]
+    ],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "mock-show",
+    "type": "debug",
+    "name": "チャットに届いた形",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 380,
+    "y": 300,
+    "wires": [],
+    "z": "tab-webhook"
+  },
+  {
+    "id": "mock-reply",
+    "type": "http response",
+    "name": "200",
+    "statusCode": "200",
+    "headers": {},
+    "x": 340,
+    "y": 340,
+    "wires": [],
+    "z": "tab-webhook"
   }
 ]

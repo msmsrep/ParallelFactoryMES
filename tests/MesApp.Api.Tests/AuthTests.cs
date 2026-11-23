@@ -1012,6 +1012,9 @@ public class AuthTests
         Assert.Equal(500, ng.LastStatusCode);
         await MakeDueAsync(app);
         Assert.Equal(0, await DispatchAsync(app));
+        // 失敗したテスト送信は、送信先の「送れていない送信」に数えない（ダッシュボードの失敗中にもならない）
+        var listed = await admin.GetFromJsonAsync<List<WebhookSubscriptionResponse>>(WebhookSubscriptions);
+        Assert.Equal((0, 0, 0), (listed![0].PendingCount, listed[0].RetryingCount, listed[0].FailedCount));
         Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsync($"{WebhookSubscriptions}/999/test", null)).StatusCode);
     }
 

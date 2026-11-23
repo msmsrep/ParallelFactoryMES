@@ -7,6 +7,10 @@ PLC との通信は MES に持たせず、このゲートウェイ側で行う�
 |---|---|
 | `flows.json` | Node-RED のフロー。①模擬設備（数秒ごとに状態を変えて MQTT に出す）②MQTT を受けて送信待ちにためる ③5秒ごとにまとめて送る（送れなかった分は次の回に送り直す） |
 | `mosquitto.conf` | MQTT ブローカー（Eclipse Mosquitto）の最小構成。**認証も暗号化もしない**ので試すときだけ使う |
+| `settings.js` | Node-RED の設定。Webhook の署名を確かめるため、`/mes-webhook` への本文を JSON に読み替える前のまま残す |
+
+`flows.json` には、MES の Webhook を受けてチャット（Slack・Teams）へ転送する「Webhook の受け側」のタブもあります。
+MES の送信先に `http://node-red:1880/mes-webhook` を登録し、秘密の値を `.env` の `MES_WEBHOOK_SECRET` に入れます（運用ガイドの「Webhook」）。
 
 ## 動かし方
 
