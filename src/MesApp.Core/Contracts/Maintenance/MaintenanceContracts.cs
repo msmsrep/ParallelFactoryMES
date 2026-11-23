@@ -36,7 +36,29 @@ public record EquipmentLogRequest(
 public record EquipmentLogResponse(
     int Id, int EquipmentId, string EquipmentName, EquipmentLogStatus Status,
     DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string? StopCause, string? Note,
-    int? WorkOrderId = null, string? WorkOrderNo = null);
+    int? WorkOrderId = null, string? WorkOrderNo = null,
+    EquipmentLogSource Source = EquipmentLogSource.Manual);
+
+/// <summary>
+/// 設備ごとの今の状態（E-20-10-03 設備稼働モニタリング）。開いている稼働区間の状態を返し、
+/// 開いている区間が無い設備は <paramref name="Status"/> が null（記録なし）。
+/// </summary>
+/// <param name="ElapsedMinutes">開いている区間の開始からの経過（分。サーバーの今の時刻で数える）</param>
+/// <param name="LastEventReceivedAt">最後に設備イベントを受けた時刻（イベントで収集する設備だけ。拒否した件も含む＝ゲートウェイが生きている証拠）</param>
+/// <param name="EventsSilent">イベントで収集する設備で、受信が設定の時間より長く途絶えている（一度も受けていない場合を含む）</param>
+public record EquipmentCurrentStatusRow(
+    int EquipmentId, string AssetNo, string EquipmentName,
+    int? WorkCenterId, string? WorkCenterCode, string? WorkCenterName,
+    bool CollectsEvents,
+    EquipmentLogStatus? Status, DateTimeOffset? StartedAt, decimal? ElapsedMinutes,
+    string? StopCause, int? WorkOrderId, string? WorkOrderNo,
+    DateTimeOffset? LastEventReceivedAt, bool EventsSilent);
+
+/// <summary>
+/// 停止原因の追記（B-40-20-02）。停止・故障の区間の原因だけを書き換える。
+/// 設備イベントで原因が引けなかった区間に、後から原因を入れるのが主な使い道
+/// </summary>
+public record EquipmentLogStopCauseRequest([Required, MaxLength(500)] string StopCause);
 
 /// <summary>設備別の稼働サマリ（E-20-10-03 稼働・停止実績、E-20-30-03 パフォーマンス確認）</summary>
 public record EquipmentUtilizationRow(

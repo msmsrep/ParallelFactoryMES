@@ -1,0 +1,282 @@
+[
+  {
+    "id": "tab-gateway",
+    "type": "tab",
+    "label": "設備イベントのゲートウェイ",
+    "info": "MQTT で受けた設備の状態変化を、Parallel Factory MES の連携API（POST /api/integration/v1/equipment-events）へまとめて送る。\n環境変数 MES_URL・MES_API_KEY を使う。"
+  },
+  {
+    "id": "broker",
+    "type": "mqtt-broker",
+    "name": "mosquitto",
+    "broker": "mosquitto",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true
+  },
+  {
+    "id": "c-sim",
+    "type": "comment",
+    "z": "tab-gateway",
+    "name": "① 模擬設備（実機では PLC から読むノードに置き換える）",
+    "info": "",
+    "x": 230,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "sim-tick",
+    "type": "inject",
+    "z": "tab-gateway",
+    "name": "8秒ごと",
+    "props": [],
+    "repeat": "8",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "3",
+    "topic": "",
+    "x": 120,
+    "y": 80,
+    "wires": [
+      [
+        "sim-state"
+      ]
+    ]
+  },
+  {
+    "id": "sim-state",
+    "type": "function",
+    "z": "tab-gateway",
+    "name": "状態を変える",
+    "func": "// 模擬設備：数秒ごとに状態を変えて MQTT に出す。\n// 実機では、このノードの代わりに PLC から状態を読むノード（OPC UA・MC プロトコル・Modbus など）を置き、\n// 同じ形（state・alarmCode・occurredAt）で同じトピックへ出せばよい\nconst states = ['Running', 'Running', 'Running', 'Idle', 'Setup', 'Stopped', 'Failure'];\nconst alarms = { Stopped: ['A-101', 'A-102', 'Z-999'], Failure: ['E-201'] };\nconst state = states[Math.floor(Math.random() * states.length)];\nconst codes = alarms[state];\nmsg.topic = 'mes/equipment/' + (env.get('SIM_EQUIPMENT') || 'EQ-06') + '/state';\nmsg.payload = {\n    state: state,\n    alarmCode: codes ? codes[Math.floor(Math.random() * codes.length)] : null,\n    occurredAt: new Date().toISOString()\n};\nnode.status({ text: state });\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 300,
+    "y": 80,
+    "wires": [
+      [
+        "sim-publish"
+      ]
+    ]
+  },
+  {
+    "id": "sim-publish",
+    "type": "mqtt out",
+    "z": "tab-gateway",
+    "name": "MQTT に出す",
+    "topic": "",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "broker",
+    "x": 490,
+    "y": 80,
+    "wires": []
+  },
+  {
+    "id": "c-recv",
+    "type": "comment",
+    "z": "tab-gateway",
+    "name": "② MQTT を受けて送信待ちにためる",
+    "info": "",
+    "x": 190,
+    "y": 140,
+    "wires": []
+  },
+  {
+    "id": "mqtt-in",
+    "type": "mqtt in",
+    "z": "tab-gateway",
+    "name": "mes/equipment/+/state",
+    "topic": "mes/equipment/+/state",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 160,
+    "y": 180,
+    "wires": [
+      [
+        "to-event"
+      ]
+    ]
+  },
+  {
+    "id": "to-event",
+    "type": "function",
+    "z": "tab-gateway",
+    "name": "イベントにする",
+    "func": "// トピック mes/equipment/<資産番号>/state から設備を、本文から状態を取り出して送信待ちにためる。\n// eventId はここで振る（送り直しても同じ値のままなので、MES 側で重複として弾かれる）\nconst code = msg.topic.split('/')[2];\nconst p = msg.payload || {};\nconst seq = (flow.get('seq') || 0) + 1;\nflow.set('seq', seq);\nconst queue = flow.get('queue') || [];\nqueue.push({\n    equipmentCode: code,\n    eventId: code + '-' + Date.now() + '-' + seq,\n    occurredAt: p.occurredAt || new Date().toISOString(),\n    state: p.state,\n    alarmCode: p.alarmCode || null\n});\n// MES に届かない間もためておく。ため過ぎないよう、上限を超えたら古いものから捨てる\nconst limit = 10000;\nflow.set('queue', queue.length > limit ? queue.slice(queue.length - limit) : queue);\nnode.status({ text: '送信待ち ' + Math.min(queue.length, limit) + ' 件' });\nreturn null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 380,
+    "y": 180,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "c-send",
+    "type": "comment",
+    "z": "tab-gateway",
+    "name": "③ まとめて MES へ送る（送れなかった分は次の回に送り直す）",
+    "info": "",
+    "x": 260,
+    "y": 240,
+    "wires": []
+  },
+  {
+    "id": "send-tick",
+    "type": "inject",
+    "z": "tab-gateway",
+    "name": "5秒ごと",
+    "props": [],
+    "repeat": "5",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "5",
+    "topic": "",
+    "x": 120,
+    "y": 280,
+    "wires": [
+      [
+        "send"
+      ]
+    ]
+  },
+  {
+    "id": "send",
+    "type": "function",
+    "z": "tab-gateway",
+    "name": "まとめて送る",
+    "func": "// ためたイベントをまとめて MES へ送る。前の送信の結果が返るまでは次を送らない\nif (flow.get('sending')) {\n    return null;\n}\nconst queue = flow.get('queue') || [];\nif (queue.length === 0) {\n    return null;\n}\nconst batch = queue.slice(0, 500);\nflow.set('sending', batch.length);\nmsg.url = (env.get('MES_URL') || 'http://mesapp:8080') + '/api/integration/v1/equipment-events';\nmsg.method = 'POST';\nmsg.headers = { 'X-Api-Key': env.get('MES_API_KEY') || '', 'Content-Type': 'application/json' };\nmsg.payload = { events: batch };\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 290,
+    "y": 280,
+    "wires": [
+      [
+        "http"
+      ]
+    ]
+  },
+  {
+    "id": "http",
+    "type": "http request",
+    "z": "tab-gateway",
+    "name": "MES 連携API",
+    "method": "use",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 470,
+    "y": 280,
+    "wires": [
+      [
+        "result"
+      ]
+    ]
+  },
+  {
+    "id": "result",
+    "type": "function",
+    "z": "tab-gateway",
+    "name": "結果を見る",
+    "func": "// 送った分を送信待ちから外す。送れなかったとき（MES が止まっている・キーが違う）は外さず、次の回に送り直す。\n// 1件ごとの拒否（遅着・設定の誤りなど）は送り直しても通らないので、デバッグ欄に出すだけにする\nconst sent = flow.get('sending') || 0;\nflow.set('sending', 0);\nif (msg.statusCode === 400) {\n    // 要求の形が壊れている（送り直しても通らない）。送信待ちから外して知らせる\n    flow.set('queue', (flow.get('queue') || []).slice(sent));\n    node.status({ fill: 'red', shape: 'dot', text: '要求が拒否されました（400）' });\n    node.warn(msg.payload);\n    return null;\n}\nif (msg.statusCode === undefined) {\n    // MES に繋がらなかった（名前が引けない・接続を拒否された等）。HTTP ノードはエラーをここにも流す\n    node.status({ fill: 'yellow', shape: 'ring', text: '繋がりません。次の回に送り直します' });\n    return null;\n}\nif (msg.statusCode !== 200) {\n    node.status({ fill: 'yellow', shape: 'ring', text: '送れませんでした（' + msg.statusCode + '）。次の回に送り直します' });\n    node.warn(msg.payload);\n    return null;\n}\nflow.set('queue', (flow.get('queue') || []).slice(sent));\nconst r = msg.payload;\nnode.status({ fill: 'green', shape: 'dot', text: '採用 ' + r.accepted + '・重複 ' + r.duplicate + '・拒否 ' + r.rejected });\nconst rejected = r.results.filter(x => x.result === 'Rejected');\nif (rejected.length === 0) {\n    return null;\n}\nmsg.payload = rejected;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 650,
+    "y": 280,
+    "wires": [
+      [
+        "rejected"
+      ]
+    ]
+  },
+  {
+    "id": "rejected",
+    "type": "debug",
+    "z": "tab-gateway",
+    "name": "拒否された件",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 840,
+    "y": 280,
+    "wires": []
+  },
+  {
+    "id": "catch-http",
+    "type": "catch",
+    "z": "tab-gateway",
+    "name": "繋がらないとき",
+    "scope": [
+      "http"
+    ],
+    "uncaught": false,
+    "x": 300,
+    "y": 340,
+    "wires": [
+      [
+        "failed"
+      ]
+    ]
+  },
+  {
+    "id": "failed",
+    "type": "function",
+    "z": "tab-gateway",
+    "name": "送り直しを待つ",
+    "func": "// MES に繋がらなかった（名前が引けない・接続を拒否された等）。送信待ちは残し、次の回に送り直す\nflow.set('sending', 0);\nnode.status({ fill: 'yellow', shape: 'ring', text: '繋がりません。次の回に送り直します' });\nreturn null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 490,
+    "y": 340,
+    "wires": [
+      []
+    ]
+  }
+]

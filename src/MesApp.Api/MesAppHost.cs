@@ -107,6 +107,9 @@ public static class MesAppHost
         builder.Services.AddScoped<DashboardService>();
         builder.Services.AddScoped<ProductionPlanService>();
         builder.Services.AddScoped<ManufacturingOrderService>();
+        // 設備イベントの受信（Spec.md 3.8 連携API。docs-dev/EquipmentEventTasks.md）
+        builder.Services.Configure<EquipmentEventOptions>(builder.Configuration.GetSection(EquipmentEventOptions.SectionName));
+        builder.Services.AddScoped<EquipmentEventService>();
         builder.Services.AddScoped<WorkOrderExecutionService>();
         builder.Services.AddScoped<InspectionService>();
         builder.Services.AddScoped<MaintenanceOrderService>();

@@ -14,6 +14,7 @@ public static class MasterCsvKinds
     public const string Processes = "processes";
     public const string Equipments = "equipments";
     public const string EquipmentParts = "equipment-parts";
+    public const string EquipmentAlarmCodes = "equipment-alarm-codes";
     public const string Tools = "tools";
     public const string WorkCenters = "work-centers";
     public const string Locations = "locations";
@@ -63,6 +64,7 @@ public static class MasterCsvKinds
             new("MaintenanceThreshold", "保全閾値", false, "保全タイプに応じた日数・時間・回数"),
             new("MaintenanceParts", "保全部品", false, null),
             new("IsActive", "有効", false, "true / false"),
+            new("CollectsEvents", "設備イベントで収集", false, "true / false（true の設備は稼働記録を手入力・実績CSVで登録できない）"),
         ]),
         new(EquipmentParts, "設備の保全部品", false,
         [
@@ -71,6 +73,13 @@ public static class MasterCsvKinds
             new("Category", "管理区分", false, "Asset（資産管理部品）/ Consumable（消耗品）"),
             new("QuantityPer", "1回あたり数量", false, "0以上"),
             new("Note", "備考", false, null),
+        ]),
+        new(EquipmentAlarmCodes, "停止原因の対応表", false,
+        [
+            new("EquipmentAssetNo", "設備の資産番号", false, "空欄なら全設備共通。同じアラーム番号では設備ごとの定義が勝つ"),
+            new("AlarmCode", "アラーム番号", true, "設備の資産番号と組で、既存と一致すれば更新、無ければ新規登録"),
+            new("StopCause", "停止原因", true, "設備イベントの停止・故障の区間に入る文章"),
+            new("IsActive", "有効", false, "true / false"),
         ]),
         new(Tools, "治工具", false,
         [
@@ -265,13 +274,15 @@ public static class MasterCsvKinds
     /// <summary>
     /// 一括出力で付ける番号の順（＝取り込む順）。後の種別が前の種別のコードを参照する
     /// （ロケーション→品目の既定ロケーション、作業区→設備・工順、手順書→工順、直→ユーザー など）。
-    /// 種別を追加したら、参照先より後ろに置く。マスタの一括ZIPに入るのはここに並べた種別だけ
+    /// 種別を追加したら、参照先より後ろに置く（既存の番号を変えないよう、原則は末尾に足す）。マスタの一括ZIPに入るのはここに並べた種別だけ
     /// </summary>
     public static readonly IReadOnlyList<string> ImportOrder =
     [
         WorkCenters, Processes, Locations, Products, Skills, Shifts, Equipments, EquipmentParts, Tools,
         Checklists, DefectReasons, InspectionItems, ControlItems, InspectionDevices, Bom, WorkProcedures,
         Routing, Users, UserSkills, MaintenanceProcedures,
+        // 後から足した種別は末尾に置く（一括ZIPのファイル番号を変えない。連携で番号を頼りにしている利用者がいるため）
+        EquipmentAlarmCodes,
     ];
 
     /// <summary>

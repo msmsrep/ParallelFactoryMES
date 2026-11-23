@@ -390,8 +390,8 @@
   <data name="マスタ管理 - Parallel Factory MES" xml:space="preserve">
     <value>Master Data - Parallel Factory MES</value>
   </data>
-  <data name="品目／MBOM／工順（BOP）／工程／作業区／設備（BOE）／治工具／ロケーション／検査項目・基準／検査機・測定器／工程管理項目／作業手順書（SOP）／チェックリスト／勤務シフト／ユーザー・スキル資格。" xml:space="preserve">
-    <value>Products / MBOM / Routings (BOP) / Processes / Work centers / Equipment (BOE) / Tools / Locations / Inspection items &amp; criteria / Inspection devices / Process control items / Work procedures (SOP) / Checklists / Shifts / Users &amp; skills.</value>
+  <data name="品目／MBOM／工順（BOP）／工程／作業区／設備（BOE）／停止原因の対応表／治工具／ロケーション／検査項目・基準／検査機・測定器／工程管理項目／作業手順書（SOP）／チェックリスト／勤務シフト／ユーザー・スキル資格。" xml:space="preserve">
+    <value>Products / MBOM / Routings (BOP) / Processes / Work centers / Equipment (BOE) / Stop cause mapping / Tools / Locations / Inspection items &amp; criteria / Inspection devices / Process control items / Work procedures (SOP) / Checklists / Shifts / Users &amp; skills.</value>
   </data>
   <data name="マスタ" xml:space="preserve">
     <value>Master data</value>
@@ -3306,8 +3306,8 @@
   <data name="消耗材モニタリング" xml:space="preserve">
     <value>Consumables monitoring</value>
   </data>
-  <data name="稼働実績の記録（手入力。センサー自動収集は将来拡張）" xml:space="preserve">
-    <value>Record operation (manual entry; automatic sensor collection is a future extension)</value>
+  <data name="稼働実績の記録（手入力）" xml:space="preserve">
+    <value>Record operation (manual entry)</value>
   </data>
   <data name="対象作業指示（任意）" xml:space="preserve">
     <value>Work order (optional)</value>
@@ -4502,5 +4502,77 @@
   </data>
   <data name="キーを発行" xml:space="preserve">
     <value>Issue key</value>
+  </data>
+  <data name="設備イベントで稼働状態を収集する（稼働記録の手入力・実績CSVは受け付けない）" xml:space="preserve">
+    <value>Collect operation status from equipment events (manual entry and actuals CSV of operation logs are not accepted)</value>
+  </data>
+  <data name="稼働の収集" xml:space="preserve">
+    <value>Status collection</value>
+  </data>
+  <data name="設備イベント" xml:space="preserve">
+    <value>Equipment event</value>
+  </data>
+  <data name="手入力" xml:space="preserve">
+    <value>Manual entry</value>
+  </data>
+  <data name="記録元" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="停止原因が未入力の停止・故障だけを表示する" xml:space="preserve">
+    <value>Show only stops and failures without a stop cause</value>
+  </data>
+  <data name="原因未入力" xml:space="preserve">
+    <value>No cause entered</value>
+  </data>
+  <data name="原因を保存" xml:space="preserve">
+    <value>Save cause</value>
+  </data>
+  <data name="停止原因を入力してください。" xml:space="preserve">
+    <value>Enter the stop cause.</value>
+  </data>
+  <data name="停止原因を保存しました。" xml:space="preserve">
+    <value>Stop cause saved.</value>
+  </data>
+  <data name="停止原因の対応の登録" xml:space="preserve">
+    <value>Register a stop cause mapping</value>
+  </data>
+  <data name="停止原因の対応の編集（{0}）" xml:space="preserve">
+    <value>Edit stop cause mapping ({0})</value>
+  </data>
+  <data name="設備イベントのアラーム番号を停止原因に置き換えます。設備を「全設備共通」にした定義より、設備ごとの定義が優先します。" xml:space="preserve">
+    <value>Replaces alarm codes in equipment events with stop causes. A definition for a specific piece of equipment takes precedence over one set to "All equipment".</value>
+  </data>
+  <data name="全設備共通" xml:space="preserve">
+    <value>All equipment</value>
+  </data>
+  <data name="アラーム番号" xml:space="preserve">
+    <value>Alarm code</value>
+  </data>
+  <data name="停止原因の対応表" xml:space="preserve">
+    <value>Stop cause mapping</value>
+  </data>
+  <data name="設備の資産番号＋アラーム番号" xml:space="preserve">
+    <value>Equipment asset No. + alarm code</value>
+  </data>
+  <data name="アラーム番号と停止原因を入力してください。" xml:space="preserve">
+    <value>Enter the alarm code and the stop cause.</value>
+  </data>
+  <data name="設備の今の状態" xml:space="preserve">
+    <value>Current equipment status</value>
+  </data>
+  <data name="設備がありません。" xml:space="preserve">
+    <value>There is no equipment.</value>
+  </data>
+  <data name="経過(分)" xml:space="preserve">
+    <value>Elapsed (min)</value>
+  </data>
+  <data name="最後の受信" xml:space="preserve">
+    <value>Last received</value>
+  </data>
+  <data name="（受信が途絶えています）" xml:space="preserve">
+    <value>(no events received)</value>
+  </data>
+  <data name="自動では更新しません。最新にするときは「更新」を押してください。設備イベントで収集する設備は、受信が一定時間（既定10分）途絶えると知らせます。" xml:space="preserve">
+    <value>This list does not refresh automatically. Press "Update" to load the latest status. For equipment that collects status from equipment events, a notice appears when no events have been received for a while (10 minutes by default).</value>
   </data>
 </root>

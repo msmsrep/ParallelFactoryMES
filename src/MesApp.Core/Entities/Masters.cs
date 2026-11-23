@@ -268,6 +268,12 @@ public class Equipment : IDeactivatableMaster
     public List<EquipmentPart> Parts { get; set; } = [];
 
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// 設備イベント（PLC・ゲートウェイ）で稼働状態を収集する設備か（Spec.md 5.1 Equipment。B-40-20、E-20-10-01）。
+    /// 立てた設備では状態区間の手入力・CSV取込を拒否する（手と自動で同じ時間を二重に数えないため）
+    /// </summary>
+    public bool CollectsEvents { get; set; }
 }
 
 /// <summary>
@@ -295,6 +301,31 @@ public class EquipmentPart
     public decimal QuantityPer { get; set; }
 
     public string? Note { get; set; }
+}
+
+/// <summary>
+/// 停止原因の対応表（Spec.md 5.1 EquipmentAlarmCode。B-40-20-02）。
+/// <para>
+/// 設備イベントのアラーム番号を停止原因の文章に置き換える（PLC は原因の文章を持たないため）。
+/// 設備を空にした行は全設備共通で、同じアラーム番号に設備ごとの行があればそちらが勝つ
+/// （メーカー共通の番号を一度だけ登録し、例外の設備だけ上書きできるようにするため）。
+/// </para>
+/// </summary>
+public class EquipmentAlarmCode : IDeactivatableMaster
+{
+    public int Id { get; set; }
+
+    /// <summary>対象の設備（空なら全設備共通）</summary>
+    public int? EquipmentId { get; set; }
+    public Equipment? Equipment { get; set; }
+
+    /// <summary>アラーム番号（設備ごと、または共通の中で一意）</summary>
+    public string AlarmCode { get; set; } = string.Empty;
+
+    /// <summary>停止原因（稼働記録の停止原因にそのまま入る）</summary>
+    public string StopCause { get; set; } = string.Empty;
+
+    public bool IsActive { get; set; } = true;
 }
 
 /// <summary>

@@ -20,6 +20,14 @@ The screen is divided into tabs. Creating maintenance plans and maintenance proc
 
 ### Operation monitoring tab
 
+#### Current equipment status
+
+For each active piece of equipment, the current status (running, stopped, etc.; "No records" if there is none), the start, the elapsed time (minutes), the work order and the stop cause are listed. You can filter by **Work center** (the list reloads when you choose one).
+The list does not refresh automatically. Press **Update** to load the latest status.
+
+For equipment that collects status from equipment events, the **Last received** time is shown. When no events have been received for a while (10 minutes by default), "(no events received)" appears.
+Check whether the gateway or the network has stopped ([Receiving equipment events](operations.html#equipment-events)).
+
 #### Recording operation
 
 <ol class="steps">
@@ -35,7 +43,7 @@ The screen is divided into tabs. Creating maintenance plans and maintenance proc
 <code>Stop and failure records require a stop cause (stopCause) (B-40-20-02).</code></p>
 </div>
 
-The current version does not collect data automatically from sensors. Operation is recorded by hand.
+Equipment that collects status from equipment events (set in the equipment master) cannot be recorded by hand. Its operation is recorded automatically from the equipment.
 
 #### Operation summary by equipment
 
@@ -48,7 +56,10 @@ Records registered without an end time are not reflected in availability.</p>
 
 #### Operation history
 
-The recorded operation is listed in time order.
+The recorded operation is listed in time order, including the **Source** (manual entry, CSV import, or equipment event).
+
+Turn on **Show only stops and failures without a stop cause** to list only the stops and failures whose cause could not be looked up from equipment events.
+Enter the cause in the row and press **Save cause** to record the stop cause (the change is kept in the audit log).
 
 ---
 

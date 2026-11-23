@@ -55,6 +55,12 @@
                 <label>@L["保全部品"]</label>
                 <input @bind="_parts" />
             </div>
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" style="width:auto;" @bind="_collectsEvents" />
+                    @L["設備イベントで稼働状態を収集する（稼働記録の手入力・実績CSVは受け付けない）"]
+                </label>
+            </div>
         </div>
         <div class="actions">
             <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
@@ -137,7 +143,7 @@
     {
         <table class="table">
             <thead>
-                <tr><th>@L["資産番号"]</th><th>@L["設備名"]</th><th>@L["作業区"]</th><th>@L["設置場所（旧）"]</th><th>@L["状態"]</th><th>@L["保全タイプ"]</th><th>@L["閾値"]</th><th>@L["保全部品"]</th><th></th></tr>
+                <tr><th>@L["資産番号"]</th><th>@L["設備名"]</th><th>@L["作業区"]</th><th>@L["設置場所（旧）"]</th><th>@L["状態"]</th><th>@L["保全タイプ"]</th><th>@L["閾値"]</th><th>@L["保全部品"]</th><th>@L["稼働の収集"]</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var item in _items)
@@ -151,6 +157,7 @@
                         <td>@EnumLabels.Of(item.MaintenanceType)</td>
                         <td>@(item.MaintenanceThreshold?.ToString() ?? "-")</td>
                         <td>@(item.MaintenanceParts ?? "-")</td>
+                        <td>@(item.CollectsEvents ? L["設備イベント"].Value : L["手入力"].Value)</td>
                         <td class="actions">
                             <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
                                 <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">@L["編集"]</button>
@@ -191,6 +198,7 @@
     private MaintenanceType _maintenanceType = MaintenanceType.None;
     private decimal? _threshold;
     private string? _parts;
+    private bool _collectsEvents;
     private string? _error;
     private string? _message;
     private bool _busy;
@@ -216,6 +224,7 @@
         _maintenanceType = item.MaintenanceType;
         _threshold = item.MaintenanceThreshold;
         _parts = item.MaintenanceParts;
+        _collectsEvents = item.CollectsEvents;
     }
 
     private void ResetForm()
@@ -229,6 +238,7 @@
         _maintenanceType = MaintenanceType.None;
         _threshold = null;
         _parts = null;
+        _collectsEvents = false;
     }
 
     private async Task SaveAsync()
@@ -244,7 +254,7 @@
         try
         {
             var request = new EquipmentRequest(_assetNo, _name, _site, _status,
-                _maintenanceType, _threshold, _parts, _workCenterId == 0 ? null : _workCenterId);
+                _maintenanceType, _threshold, _parts, _workCenterId == 0 ? null : _workCenterId, _collectsEvents);
             var response = _editingId is null
                 ? await Http.PostAsJsonAsync("api/equipments", request)
                 : await Http.PutAsJsonAsync($"api/equipments/{_editingId}", request);

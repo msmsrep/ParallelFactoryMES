@@ -150,6 +150,22 @@ Places where inventory is kept. Register at least one "Material warehouse" and o
 | Maintenance type | None / Calendar / Run time / Usage count |
 | Maintenance threshold | The interval, hours or count, depending on the maintenance type |
 | Maintenance parts | Notes on replacement parts |
+| Collect operation status from equipment events | When on, operation is recorded from equipment events (received from a gateway). Manual entry and actuals CSV can no longer be used ([Receiving equipment events](operations.html#equipment-events)) |
+
+### Stop cause mapping  {#alarm-codes}
+
+**Tab: Stop cause mapping**
+
+A table that replaces alarm codes received in equipment events with stop causes in the operation history.
+
+| Field | Description |
+|---|---|
+| Equipment | The target equipment. **All equipment** applies the definition to alarm codes from any equipment |
+| Alarm code | Unique within the equipment (or within all equipment) |
+| Stop cause | The text entered in stop and failure intervals |
+
+When the same alarm code has both an all-equipment definition and an equipment-specific definition, **the equipment-specific definition takes precedence**.
+Stops with alarm codes that are not in the table are recorded without a stop cause (which can be entered later on the operation monitoring tab in maintenance).
 
 ---
 
@@ -262,7 +278,7 @@ It models a small factory that produces gear pumps. If you import the files in t
 you can try everything from manufacturing order to shipment.
 
 **[samples-master-csv.zip](https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip)**
-(work centers, processes, locations, products, skills, shifts, equipment, maintenance parts, tools, checklists, defect reasons, inspection items, process control items, inspection devices, MBOM, work procedures, routings, users and maintenance procedures).
+(work centers, processes, locations, products, skills, shifts, equipment, maintenance parts, tools, checklists, defect reasons, inspection items, process control items, inspection devices, MBOM, work procedures, routings, users, maintenance procedures and stop cause mapping).
 You can pass it as is to "Importing and exporting in bulk with ZIP" below. The CSVs inside can also be viewed in [samples/master-csv](https://github.com/msmsrep/ParallelFactoryMES/tree/main/samples/master-csv).
 
 The sample data values (product names and so on) are in Japanese.

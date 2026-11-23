@@ -524,6 +524,31 @@ public enum EquipmentLogStatus
 }
 
 /// <summary>
+/// 設備稼働履歴の記録元（Spec.md 5.5 EquipmentLog）。
+/// JSONでは数値でやり取りするため、追加は末尾のみ
+/// </summary>
+public enum EquipmentLogSource
+{
+    /// <summary>手入力</summary>
+    Manual,
+    /// <summary>CSV取込</summary>
+    Csv,
+    /// <summary>設備イベント</summary>
+    Event,
+}
+
+/// <summary>受信した設備イベントの扱い（Spec.md 5.5 EquipmentEvent）</summary>
+public enum EquipmentEventResult
+{
+    /// <summary>採用</summary>
+    Accepted,
+    /// <summary>重複</summary>
+    Duplicate,
+    /// <summary>拒否</summary>
+    Rejected,
+}
+
+/// <summary>
 /// 保全部品の管理区分（Spec.md 5.1 EquipmentPart。E-10-10-01）。
 /// 資産管理部品（金型など設備の一部として資産計上するもの）と、
 /// 消耗品（Oリングなど交換のたびに在庫から引き落とすもの）で管理形態が違う

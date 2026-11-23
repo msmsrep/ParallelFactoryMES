@@ -1,6 +1,9 @@
 # Parallel Factory MES を SQLite で動かす最小構成
 #   docker compose up -d        → http://localhost:8080
 # PostgreSQL で動かすときは compose.postgres.yaml を使う
+# 設備イベントのサンプル（MQTT ブローカーと Node-RED のゲートウェイ）も起動するときは、リポジトリの直下で
+#   docker compose --profile equipment up -d   → Node-RED は http://localhost:1880
+# （APIキーを発行してから MES_API_KEY に入れる。手順は運用ガイドの「設備イベントの受信」）
 services:
   mesapp:
     image: ghcr.io/msmsrep/parallelfactorymes:latest
@@ -24,5 +27,39 @@ services:
       TZ: Asia/Tokyo
     restart: unless-stopped
 
+  # ---- 設備イベントのサンプル（--profile equipment のときだけ起動する）----
+  # PLC との通信は MES に持たない。設備の状態を MQTT に出し、Node-RED が MES の連携APIへまとめて送る
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    profiles: [equipment]
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./samples/equipment-gateway/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
+  node-red:
+    image: nodered/node-red:4.0
+    profiles: [equipment]
+    ports:
+      - "1880:1880"
+    environment:
+      # 送り先（同じ compose の MES）と、APIキー（画面の「APIキー」で発行し、.env か環境変数で渡す）
+      MES_URL: http://mesapp:8080
+      MES_API_KEY: ${MES_API_KEY:-}
+      # 模擬設備が状態を出す設備（設備マスタで「設備イベントで収集する」を立てた設備の資産番号）
+      SIM_EQUIPMENT: EQ-06
+      # サンプルのフローを読む（画面で書き換えて保存すると、このフォルダのファイルが書き換わる）
+      FLOWS: /gateway/flows.json
+      TZ: Asia/Tokyo
+    volumes:
+      - ./samples/equipment-gateway:/gateway
+      - node-red-data:/data
+    depends_on:
+      - mosquitto
+      - mesapp
+    restart: unless-stopped
+
 volumes:
   mesapp-data:
+  node-red-data:

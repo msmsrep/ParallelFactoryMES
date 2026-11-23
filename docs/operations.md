@@ -94,6 +94,9 @@ ASP.NET Core 10 Runtime が必要です。同じLAN内の他のPCからは `http
 | フォルダ連携の取込を行う利用者 | `FolderLink__UserName` | 未設定 |
 | フォルダ連携の走査の間隔（秒） | `FolderLink__PollSeconds` | `30` |
 | フォルダ連携の結果の言語 | `FolderLink__Language` | `ja`（`en` も可） |
+| 設備イベントの1回の件数の上限 | `EquipmentEvents__MaxBatchSize` | `1000` |
+| 設備イベントの時刻の先行の許容（秒） | `EquipmentEvents__MaxFutureSkewSeconds` | `300` |
+| 設備イベントの受信が途絶えたとみなす時間（分） | `EquipmentEvents__SilenceMinutes` | `10` |
 
 ### 業務日付の境界時刻
 
@@ -214,6 +217,7 @@ Postman や Visual Studio などに読み込むと、口の一覧・引数・応
 | `GET /api/integration/v1/masters/{種別}` | マスタのCSV出力 |
 | `GET /api/integration/v1/production-results` | 生産実績を前回の続きから読む |
 | `GET /api/integration/v1/production-result-corrections` | 生産実績の訂正を前回の続きから読む |
+| `POST /api/integration/v1/equipment-events` | 設備の状態の変化を送る（[設備イベントの受信](#equipment-events)） |
 
 ### CSV を取り込む
 
@@ -265,6 +269,78 @@ Set-Content .\last-id.txt $after
 - v1（`/api/integration/v1`）の中では、**項目や口を足すだけ**で、消したり名前や意味を変えたりしません。変えるときは v2 を作ります。
 - CSV の列も同じです。列は消さず、必須の列も増やしません（新しい列は、省けば今までどおりに動きます）。列の名前を変えるときは、以前の名前でも読めるようにします。
 - 応答に知らない項目が増えても、読み飛ばすように連携を作ってください。
+
+## 設備イベントの受信  {#equipment-events}
+
+設備の稼働状態（稼働・停止・段取り・故障・アイドル）を、設備から自動で記録する仕組みです。
+**MES は PLC と直接は通信しません。** PLC の状態はゲートウェイ（Node-RED など）が読み、状態が変わったときに MES の連携API へ送ります。
+MES は届いた状態の変化を、設備ごとに時刻の順に並べて**稼働履歴の区間**（開始〜終了）に組み立てます。
+
+```
+設備・PLC ──(OPC UA・MC プロトコル・Modbus など)──▶ ゲートウェイ ──(HTTP・APIキー)──▶ MES
+                                                     （Node-RED など）     POST /api/integration/v1/equipment-events
+```
+
+### 準備する
+
+1. 設備マスタ（マスタ管理の **設備（BOE）** タブ）で、対象の設備に **設備イベントで稼働状態を収集する** を付けます。
+   付けた設備には、稼働実績を手入力や実績CSVで登録できなくなります（手と自動で同じ時間を二重に数えないため）。停止原因の追記はできます。
+2. ゲートウェイ用の利用者を作り、[APIキー](#api-keys) を発行します。受信はロールを問いません。
+3. 必要なら、アラーム番号を停止原因に置き換える **停止原因の対応表**（マスタ管理）を登録します。
+
+### 送る形
+
+状態が変わるたびに1件を作り、ためておいてまとめて送ります（1回に1,000件まで）。
+
+```json
+{
+  "events": [
+    { "equipmentCode": "EQ-06", "eventId": "EQ-06-1732323600000-1", "occurredAt": "2026-11-23T09:00:00+09:00", "state": "Running" },
+    { "equipmentCode": "EQ-06", "eventId": "EQ-06-1732324200000-2", "occurredAt": "2026-11-23T09:10:00+09:00", "state": "Stopped", "alarmCode": "A-101" }
+  ]
+}
+```
+
+| 項目 | 内容 |
+|---|---|
+| `equipmentCode` | 設備の資産番号 |
+| `eventId` | ゲートウェイが振る一意のID（設備ごとに一意。100文字まで）。**送り直しても同じ値**にする |
+| `occurredAt` | 設備で状態が変わった時刻（`+09:00` などのオフセット付き） |
+| `state` | `Running`（稼働）／`Stopped`（停止）／`Setup`（段取り）／`Failure`（故障）／`Idle`（アイドル）／`Off`（電源断・通信断） |
+| `alarmCode` | 任意。停止・故障のときのアラーム番号（停止原因の対応表で原因を引く） |
+| `workOrderNo` ＋ `operationSeq` | 任意。処理中の作業指示（指図番号と工程順序の組） |
+| `note` | 任意。備考 |
+
+```powershell
+$headers = @{ "X-Api-Key" = "pfm_..." }
+$body = @{ events = @(@{ equipmentCode = "EQ-06"; eventId = "test-1"; occurredAt = (Get-Date).ToString("o"); state = "Running" }) } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Method Post -Headers $headers -ContentType "application/json" -Body $body -Uri http://localhost:5000/api/integration/v1/equipment-events
+```
+
+### 届いた後の扱い
+
+- 新しい状態が届くと、開いている区間を閉じて次の区間を開きます。同じ状態が続けて届いても区間は変わりません。`Off` は区間を閉じるだけです。
+- 1回に送った中で時刻が前後していても、時刻の順に並べ直して反映します。
+- **同じ `eventId` を送り直すと「重複」になり、二重に記録されません。** 通信が切れたら、ためた分をそのまま送り直してください。
+- **最後に反映した時刻より前のイベントは「遅着」として拒否します。** 過去の区間は組み直しません。設備とゲートウェイの時計は NTP で揃えてください。サーバーの時刻より先すぎる時刻（既定300秒を超える）も拒否します。
+- 応答は 200 で、1件ごとの結果（`Accepted` 採用／`Duplicate` 重複／`Rejected` 拒否と理由）が入ります。全部が拒否でも 200 です。拒否した `eventId` は、直して送り直すと判定し直します。
+- 停止・故障の区間は、アラーム番号から停止原因の対応表で原因を引きます。引けなければ**原因未入力**のまま記録され、保全管理の稼働監視タブで後から入れられます。
+- 作業指示は、指定があればそれに紐づけます。指定が無ければ、**その設備を割り当てた着手中の作業指示がちょうど1件のときだけ**紐づけます。
+
+受信の様子は、保全管理の稼働監視タブの **設備の今の状態** で見られます。受信が一定時間（既定10分）途絶えると、その設備に「受信が途絶えています」と出ます（ゲートウェイが止まったことに気づけます）。
+
+### サンプルで試す（Docker）
+
+`compose.yaml` には、MQTT ブローカー（Eclipse Mosquitto）と Node-RED のゲートウェイを一緒に起動する `equipment` プロファイルがあります。
+Node-RED には、数秒ごとに状態を変える**模擬設備**と、MQTT を受けて MES へまとめて送るフローが入っています（`samples/equipment-gateway`）。
+
+1. リポジトリの直下で `docker compose --profile equipment up -d` を実行します。
+2. MES（http://localhost:8080）にサンプルのマスタを取り込みます。`EQ-06` が設備イベントで収集する設備になっています。
+3. APIキーを発行し、リポジトリの直下の `.env` に `MES_API_KEY=pfm_...` と書いて、もう一度 `docker compose --profile equipment up -d` を実行します。
+4. 稼働監視タブで、`EQ-06` の今の状態と稼働履歴が増えていくのを確かめます。Node-RED（http://localhost:1880）の「結果を見る」ノードに、採用・重複・拒否の件数が出ます。
+
+自分の設備に合わせるときは、Node-RED の「状態を変える」ノードを、PLC から状態を読むノード（OPC UA・MC プロトコル・Modbus など）に置き換えます。
+サンプルの MQTT ブローカーは認証も暗号化もしない最小構成です。本番ではパスワードと TLS を設定してください。
 
 ## セキュリティ
 

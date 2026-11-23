@@ -37,3 +37,8 @@ build/store/raw/
 # ガイドの画面写真の撮影結果（build/Capture-WalkthroughScreens.js。webp にしたものだけを docs/assets/ に置く）
 build/guide-shots/
 scripts/keys.txt
+
+# 設備イベントのサンプル：Node-RED が画面での保存時に作るバックアップと資格情報
+samples/equipment-gateway/.flows.json.backup
+samples/equipment-gateway/flows_cred.json
+samples/equipment-gateway/.flows_cred.json.backup

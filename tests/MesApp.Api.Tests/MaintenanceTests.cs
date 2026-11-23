@@ -4,6 +4,7 @@ using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Execution;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Contracts.Inventory;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
@@ -812,6 +813,319 @@ public class MaintenanceTests
         var empty = await admin.GetFromJsonAsync<List<EquipmentUtilizationRow>>(
             "/api/equipment-logs/summary?from=2026-02-01&to=2026-02-01");
         Assert.Empty(empty!);
+    }
+
+    [Fact]
+    public async Task 設備イベントで収集する設備には稼働記録を手で登録できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+        Assert.False(equipment.CollectsEvents);
+        var start = DateTimeOffset.Now.AddHours(-4);
+
+        // フラグを立てる前の手入力は通り、記録元は手入力になる
+        (await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running, start, start.AddHours(1), null, null)))
+            .EnsureSuccessStatusCode();
+
+        var updated = await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}",
+            new EquipmentRequest(equipment.AssetNo, equipment.Name, equipment.Site, equipment.Status,
+                equipment.MaintenanceType, equipment.MaintenanceThreshold, equipment.MaintenanceParts,
+                CollectsEvents: true));
+        updated.EnsureSuccessStatusCode();
+        Assert.True((await updated.Content.ReadFromJsonAsync<EquipmentResponse>())!.CollectsEvents);
+
+        // 立てた後は、手で区間を足すと同じ時間を二重に数えるので拒否する
+        var rejected = await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running, start.AddHours(1), start.AddHours(2), null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        Assert.Contains("EQ-01", await rejected.Content.ReadAsStringAsync());
+
+        var logs = await admin.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>(
+            $"/api/equipment-logs?equipmentId={equipment.Id}");
+        var log = Assert.Single(logs!.Items);
+        Assert.Equal(EquipmentLogSource.Manual, log.Source);
+    }
+
+    /// <summary>設備イベントで収集する設備（EQ-01）と、連携API のキーを付けたクライアントを用意する</summary>
+    private static async Task<(EquipmentResponse Equipment, HttpClient Gateway)> SetupEventEquipmentAsync(
+        ApiFactory factory, HttpClient admin)
+    {
+        var equipment = await CreateEquipmentAsync(admin);
+        (await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}",
+            new EquipmentRequest(equipment.AssetNo, equipment.Name, equipment.Site, equipment.Status,
+                equipment.MaintenanceType, equipment.MaintenanceThreshold, equipment.MaintenanceParts,
+                CollectsEvents: true))).EnsureSuccessStatusCode();
+        var (_, created) = await TestAuth.IssueApiKeyAsync(factory, admin, "gateway", MesRoles.Operator);
+        return (equipment, TestAuth.CreateApiKeyClient(factory, created.PlainKey));
+    }
+
+    private static async Task<EquipmentEventBatchResponse> SendEventsAsync(
+        HttpClient gateway, params EquipmentEventRequest[] events)
+    {
+        var response = await gateway.PostAsJsonAsync("/api/integration/v1/equipment-events",
+            new EquipmentEventBatchRequest([.. events]));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<EquipmentEventBatchResponse>())!;
+    }
+
+    private static async Task<List<EquipmentLogResponse>> LogsAsync(HttpClient admin, int equipmentId) =>
+        [.. (await admin.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>(
+            $"/api/equipment-logs?equipmentId={equipmentId}&pageSize=100"))!.Items.OrderBy(l => l.Id)];
+
+    [Fact]
+    public async Task 設備イベントから稼働記録の区間を組み立て重複と遅着は区間を変えない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, gateway) = await SetupEventEquipmentAsync(factory, admin);
+        using var _ = gateway;
+        var t0 = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-6).ToUnixTimeSeconds()); // PostgreSQL は µs までなので秒に丸める
+
+        // 1つの要求の中で順序が前後していても、発生時刻の順に区間になる
+        var first = await SendEventsAsync(gateway,
+            new("EQ-01", "e-3", t0.AddHours(2), "Running"),
+            new("EQ-01", "e-1", t0, "Running"),
+            new("EQ-01", "e-2", t0.AddHours(1), "Stopped", AlarmCode: "A-101"));
+        Assert.Equal(3, first.Accepted);
+        Assert.Equal([0, 1, 2], first.Results.Select(r => r.Index));
+
+        var logs = await LogsAsync(admin, equipment.Id);
+        Assert.Equal(3, logs.Count);
+        Assert.All(logs, l => Assert.Equal(EquipmentLogSource.Event, l.Source));
+        Assert.Equal([EquipmentLogStatus.Running, EquipmentLogStatus.Stopped, EquipmentLogStatus.Running], logs.Select(l => l.Status));
+        Assert.Equal(t0.AddHours(1), logs[0].EndedAt);
+        Assert.Null(logs[1].StopCause); // 原因は PLC から来ないので空のまま受ける
+        Assert.Null(logs[2].EndedAt);
+
+        // 同じ eventId の送り直しは重複、最後に反映した時刻より前は遅着として拒否、同じ状態の続きは区間を変えない
+        var second = await SendEventsAsync(gateway,
+            new("EQ-01", "e-2", t0.AddHours(1), "Stopped"),
+            new("EQ-01", "e-late", t0.AddMinutes(90), "Setup"),
+            new("EQ-01", "e-4", t0.AddHours(3), "Running"));
+        Assert.Equal(["Duplicate", "Rejected", "Accepted"], second.Results.Select(r => r.Result));
+        Assert.Contains("遅着", second.Results[1].Message);
+        Assert.Equal(3, (await LogsAsync(admin, equipment.Id)).Count);
+
+        // Off は開いている区間を閉じるだけ。次の状態で新しい区間が開く
+        var third = await SendEventsAsync(gateway,
+            new("EQ-01", "e-5", t0.AddHours(4), "Off"),
+            new("EQ-01", "e-6", t0.AddHours(5), "Setup"));
+        Assert.Equal(2, third.Accepted);
+        logs = await LogsAsync(admin, equipment.Id);
+        Assert.Equal(4, logs.Count);
+        Assert.Equal(t0.AddHours(4), logs[2].EndedAt);
+        Assert.Equal(EquipmentLogStatus.Setup, logs[3].Status);
+        Assert.Null(logs[3].EndedAt);
+
+        // 閉じた区間は稼働サマリに出る（稼働 2h＋1h、停止 1h。開いている段取りは数えない）
+        var row = Assert.Single((await admin.GetFromJsonAsync<List<EquipmentUtilizationRow>>("/api/equipment-logs/summary"))!);
+        Assert.Equal(3m, row.RunningHours);
+        Assert.Equal(1m, row.StoppedHours);
+        Assert.Equal(0m, row.SetupHours);
+    }
+
+    [Fact]
+    public async Task 設備イベントの不正な件はその件だけを拒否し直した送り直しは採用する()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, gateway) = await SetupEventEquipmentAsync(factory, admin);
+        using var _ = gateway;
+        (await admin.PostAsJsonAsync("/api/equipments",
+            new EquipmentRequest("EQ-09", "手入力の設備", null, EquipmentStatus.Available, MaintenanceType.None, null, null)))
+            .EnsureSuccessStatusCode();
+        var t0 = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-2).ToUnixTimeSeconds()); // PostgreSQL は µs までなので秒に丸める
+
+        var result = await SendEventsAsync(gateway,
+            new("EQ-01", "bad-state", t0, "Running?"),
+            new("NO-SUCH", "x-1", t0, "Running"),
+            new("EQ-09", "x-2", t0, "Running"),
+            new("EQ-01", "future", DateTimeOffset.UtcNow.AddHours(1), "Running"),
+            new("EQ-01", "", t0, "Running"),
+            new("EQ-01", "wo-half", t0, "Running", WorkOrderNo: "MO-1"));
+        Assert.Equal(0, result.Accepted);
+        Assert.Equal(6, result.Rejected);
+        Assert.Contains("NO-SUCH", result.Results[1].Message);
+        Assert.Contains("EQ-09", result.Results[2].Message);
+        Assert.Empty(await LogsAsync(admin, equipment.Id));
+
+        // 拒否した eventId は、直して送り直せば判定し直して採用する
+        var retried = await SendEventsAsync(gateway, new EquipmentEventRequest("EQ-01", "bad-state", t0, "Running"));
+        Assert.Equal(1, retried.Accepted);
+        Assert.Single(await LogsAsync(admin, equipment.Id));
+
+        // 空の要求は要求ごと 400、キーなしは 401
+        Assert.Equal(HttpStatusCode.BadRequest, (await gateway.PostAsJsonAsync("/api/integration/v1/equipment-events",
+            new EquipmentEventBatchRequest([]))).StatusCode);
+        using var anonymous = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/api/integration/v1/equipment-events",
+            new EquipmentEventBatchRequest([new("EQ-01", "x", t0, "Running")]))).StatusCode);
+
+        // 連携API の文書に載る
+        var document = await anonymous.GetStringAsync("/openapi/integration-v1.json");
+        Assert.Contains("/api/integration/v1/equipment-events", document);
+    }
+
+    [Fact]
+    public async Task 設備イベントは着手中の作業指示が1件のときだけ紐付け指定があればそれを使う()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, gateway) = await SetupEventEquipmentAsync(factory, admin);
+        using var _ = gateway;
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var (wo1, wo2) = (order.WorkOrders[0], order.WorkOrders[1]);
+        foreach (var wo in new[] { wo1, wo2 })
+        {
+            (await admin.PutAsJsonAsync($"/api/work-orders/{wo.Id}/dispatch", new DispatchRequest(null, equipment.Id, 1)))
+                .EnsureSuccessStatusCode();
+        }
+        var t0 = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-3).ToUnixTimeSeconds()); // PostgreSQL は µs までなので秒に丸める
+
+        // 割り当てただけ（未着手）では紐付けない
+        await SendEventsAsync(gateway, new EquipmentEventRequest("EQ-01", "w-1", t0, "Setup"));
+        // 着手中が1件なら紐付ける
+        (await admin.PostAsync($"/api/work-orders/{wo1.Id}/start", null)).EnsureSuccessStatusCode();
+        await SendEventsAsync(gateway, new EquipmentEventRequest("EQ-01", "w-2", t0.AddMinutes(30), "Running"));
+        // 着手中が2件になったら推測しない
+        (await admin.PostAsync($"/api/work-orders/{wo2.Id}/start", null)).EnsureSuccessStatusCode();
+        await SendEventsAsync(gateway, new EquipmentEventRequest("EQ-01", "w-3", t0.AddMinutes(60), "Idle"));
+        // 指定があればそれを使い、見つからなければ紐付けずに採用して知らせる
+        var specified = await SendEventsAsync(gateway,
+            new("EQ-01", "w-4", t0.AddMinutes(90), "Running", WorkOrderNo: wo2.OrderNo, OperationSeq: wo2.RoutingSequence),
+            new("EQ-01", "w-5", t0.AddMinutes(120), "Setup", WorkOrderNo: "NO-SUCH", OperationSeq: 1));
+        Assert.Equal(2, specified.Accepted);
+        Assert.Null(specified.Results[0].Message);
+        Assert.Contains("NO-SUCH", specified.Results[1].Message);
+
+        var logs = await LogsAsync(admin, equipment.Id);
+        Assert.Equal([null, wo1.Id, null, wo2.Id, null], logs.Select(l => l.WorkOrderId));
+    }
+
+    [Fact]
+    public async Task 設備イベントの停止原因はアラーム番号で引き引けなければ後から追記する()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, gateway) = await SetupEventEquipmentAsync(factory, admin);
+        using var _ = gateway;
+        (await admin.PostAsJsonAsync("/api/equipment-alarm-codes", new EquipmentAlarmCodeRequest(null, "A-101", "材料切れ")))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/equipment-alarm-codes", new EquipmentAlarmCodeRequest(equipment.Id, "A-102", "金型の温度異常")))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/equipment-alarm-codes", new EquipmentAlarmCodeRequest(null, "A-102", "共通の原因")))
+            .EnsureSuccessStatusCode();
+        var t0 = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-3).ToUnixTimeSeconds());
+
+        await SendEventsAsync(gateway,
+            new("EQ-01", "s-1", t0, "Stopped", AlarmCode: "A-101"),
+            new("EQ-01", "s-2", t0.AddMinutes(10), "Failure", AlarmCode: "A-102"),
+            new("EQ-01", "s-3", t0.AddMinutes(20), "Stopped", AlarmCode: "Z-999"),
+            new("EQ-01", "s-4", t0.AddMinutes(30), "Running", AlarmCode: "A-101"));
+        var logs = await LogsAsync(admin, equipment.Id);
+        // 共通の定義、設備ごとの定義（共通に勝つ）、引けない番号は空、稼働には原因を入れない
+        Assert.Equal(["材料切れ", "金型の温度異常", null, null], logs.Select(l => l.StopCause));
+
+        // 原因未入力の絞り込みには、原因の無い停止・故障だけが出る
+        var missing = await admin.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>("/api/equipment-logs?missingCause=true");
+        var target = Assert.Single(missing!.Items);
+        Assert.Equal(logs[2].Id, target.Id);
+
+        // 後から原因を入れられる（イベントで収集する設備でも）。稼働の区間には入れられない
+        var updated = await admin.PutAsJsonAsync($"/api/equipment-logs/{target.Id}/stop-cause",
+            new EquipmentLogStopCauseRequest("チョコ停（ワーク詰まり）"));
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal("チョコ停（ワーク詰まり）", (await updated.Content.ReadFromJsonAsync<EquipmentLogResponse>())!.StopCause);
+        Assert.Empty((await admin.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>("/api/equipment-logs?missingCause=true"))!.Items);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/equipment-logs/{logs[3].Id}/stop-cause",
+            new EquipmentLogStopCauseRequest("原因"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PutAsJsonAsync("/api/equipment-logs/99999/stop-cause",
+            new EquipmentLogStopCauseRequest("原因"))).StatusCode);
+
+        // 追記は変更前後を監査ログに残す
+        var audits = await admin.GetFromJsonAsync<PagedResult<MesApp.Core.Contracts.Audit.AuditLogResponse>>(
+            "/api/audit-logs?action=UpdateStopCause");
+        Assert.Contains(audits!.Items, a => a.Action == "UpdateStopCause" && a.TargetId == target.Id.ToString()
+            && a.Detail!.Contains("\"after\":\"チョコ停（ワーク詰まり）\""));  // 変更前は空（null は省かれる）
+    }
+
+    [Fact]
+    public async Task 設備の今の状態は開いた区間と受信の途絶を返す()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, gateway) = await SetupEventEquipmentAsync(factory, admin);
+        using var _ = gateway;
+        var manual = await (await admin.PostAsJsonAsync("/api/equipments",
+                new EquipmentRequest("EQ-02", "検査機", null, EquipmentStatus.Available, MaintenanceType.None, null, null)))
+            .Content.ReadFromJsonAsync<EquipmentResponse>();
+        var t0 = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-1).ToUnixTimeSeconds());
+
+        // 収集する設備で一度も受けていなければ途絶、手入力の設備は途絶を判定しない
+        var before = (await admin.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>("/api/equipment-logs/current"))!;
+        Assert.Equal(["EQ-01", "EQ-02"], before.Select(r => r.AssetNo));
+        Assert.Null(before[0].Status);
+        Assert.True(before[0].EventsSilent);
+        Assert.False(before[1].EventsSilent);
+
+        // 開いている区間の状態が出る（手入力の終了時刻なしの区間も、イベントの区間も）
+        (await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(manual!.Id, EquipmentLogStatus.Setup, t0, null, null, null))).EnsureSuccessStatusCode();
+        await SendEventsAsync(gateway,
+            new("EQ-01", "n-1", t0, "Running"),
+            new("EQ-01", "n-2", t0.AddMinutes(30), "Stopped", AlarmCode: "A-1"));
+        var after = (await admin.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>("/api/equipment-logs/current"))!;
+        Assert.Equal(EquipmentLogStatus.Stopped, after[0].Status);
+        Assert.Equal(t0.AddMinutes(30), after[0].StartedAt);
+        Assert.InRange(after[0].ElapsedMinutes!.Value, 29m, 32m);
+        Assert.NotNull(after[0].LastEventReceivedAt);
+        Assert.False(after[0].EventsSilent);
+        Assert.Equal(EquipmentLogStatus.Setup, after[1].Status);
+        Assert.Null(after[1].LastEventReceivedAt);
+
+        // 最後の受信から設定の時間（既定10分）より長く経つと途絶
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesApp.Infrastructure.MesAppDbContext>();
+            foreach (var row in db.EquipmentEvents.ToList())
+            {
+                row.ReceivedAt = DateTimeOffset.UtcNow.AddMinutes(-11);
+            }
+            await db.SaveChangesAsync();
+        }
+        var silent = (await admin.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>("/api/equipment-logs/current"))!;
+        Assert.True(silent[0].EventsSilent);
+
+        // 作業区で絞れる（どの設備も作業区に置いていないので空）
+        Assert.Empty((await admin.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>("/api/equipment-logs/current?workCenterId=9999"))!);
+    }
+
+    [Fact]
+    public async Task 同じ設備への設備イベントが同時に届いても開いた区間は1つになる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, gateway) = await SetupEventEquipmentAsync(factory, admin);
+        using var _ = gateway;
+        var t0 = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-1).ToUnixTimeSeconds()); // PostgreSQL は µs までなので秒に丸める
+
+        var states = new[] { "Running", "Stopped", "Setup", "Idle", "Failure", "Running" };
+        var sends = states.Select((state, i) => gateway.PostAsJsonAsync("/api/integration/v1/equipment-events",
+            new EquipmentEventBatchRequest([new("EQ-01", $"c-{i}", t0.AddMinutes(i), state)])));
+        var responses = await Task.WhenAll(sends);
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+
+        var logs = await LogsAsync(admin, equipment.Id);
+        Assert.Single(logs, l => l.EndedAt is null);
+        // 区間どうしは隙間も重なりもなく続く（同時に閉じ・開きが走って二重に開くことがない）
+        var ordered = logs.OrderBy(l => l.StartedAt).ToList();
+        for (var i = 1; i < ordered.Count; i++)
+        {
+            Assert.Equal(ordered[i - 1].EndedAt, ordered[i].StartedAt);
+        }
     }
 
     [Fact]

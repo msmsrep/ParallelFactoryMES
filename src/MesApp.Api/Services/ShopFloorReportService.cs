@@ -86,12 +86,19 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
     /// 作業指示への紐付けは任意（段取り・保全のように紐づかない記録もある）
     /// </summary>
     public async Task<Outcome<EquipmentLog>> AddEquipmentLogAsync(
-        EquipmentLogRequest request, string? userId, CancellationToken ct)
+        EquipmentLogRequest request, string? userId, CancellationToken ct,
+        EquipmentLogSource source = EquipmentLogSource.Manual)
     {
         var equipment = await db.Equipments.AsNoTracking().FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
         if (equipment is null || !equipment.IsActive)
         {
             return Outcome<EquipmentLog>.Invalid(ApiText.T("存在しない（または無効な）設備IDです。"));
+        }
+        // イベントで収集する設備に手で区間を足すと、同じ時間を二重に数える（Spec.md 5.5 EquipmentEvent）
+        if (equipment.CollectsEvents)
+        {
+            return Outcome<EquipmentLog>.Invalid(ApiText.T(
+                "設備 '{0}' は設備イベントで稼働状態を収集しているため、稼働記録を手で登録できません。", equipment.AssetNo));
         }
         if (request.EndedAt is not null && request.EndedAt <= request.StartedAt)
         {
@@ -119,6 +126,7 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
             StopCause = request.StopCause,
             Note = request.Note,
             RecordedByUserId = userId,
+            Source = source,
         };
         db.EquipmentLogs.Add(log);
         await db.SaveChangesAsync(ct);
@@ -130,6 +138,34 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
                 status = log.Status,
                 stopCause = log.StopCause,
             }, ct: ct);
+        return Outcome<EquipmentLog>.Ok(log);
+    }
+
+    /// <summary>
+    /// 停止原因の追記（B-40-20-02）。停止・故障の区間の原因だけを書き換え、変更前後を監査ログに残す。
+    /// 設備イベントで収集する設備にも使える（区間の手入力は拒否するが、原因は人が入れるしかないため）
+    /// </summary>
+    public async Task<Outcome<EquipmentLog>> UpdateStopCauseAsync(int logId, string stopCause, CancellationToken ct)
+    {
+        var log = await db.EquipmentLogs.FindAsync([logId], ct);
+        if (log is null)
+        {
+            return Outcome<EquipmentLog>.NotFound(ApiText.T("稼働記録（ID {0}）が見つかりません。", logId));
+        }
+        if (log.Status is not (EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure))
+        {
+            return Outcome<EquipmentLog>.Invalid(ApiText.T("停止原因を入れられるのは停止・故障の記録だけです。"));
+        }
+        var cause = stopCause.Trim();
+        if (cause.Length == 0)
+        {
+            return Outcome<EquipmentLog>.Invalid(ApiText.T("停止原因を入力してください。"));
+        }
+        var before = log.StopCause;
+        log.StopCause = cause;
+        await db.SaveChangesAsync(ct);
+        await auditLogger.LogAsync("Equipment", "UpdateStopCause", nameof(EquipmentLog), log.Id.ToString(),
+            detail: new { before, after = cause, reason = (string?)null }, ct: ct);
         return Outcome<EquipmentLog>.Ok(log);
     }
 

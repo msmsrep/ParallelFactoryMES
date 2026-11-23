@@ -1,0 +1,6 @@
+﻿EquipmentAssetNo,AlarmCode,StopCause,IsActive
+,A-101,材料切れ（補充待ち）,true
+,A-102,前工程からのワーク待ち,true
+,E-201,非常停止,true
+EQ-01,E-201,主軸の過負荷による非常停止,true
+EQ-01,E-305,工具の摩耗・折損,true

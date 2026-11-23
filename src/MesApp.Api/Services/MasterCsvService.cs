@@ -32,6 +32,7 @@ public sealed partial class MasterCsvService(
             MasterCsvKinds.Processes => await ExportProcessesAsync(includeInactive, ct),
             MasterCsvKinds.Equipments => await ExportEquipmentsAsync(includeInactive, ct),
             MasterCsvKinds.EquipmentParts => await ExportEquipmentPartsAsync(ct),
+            MasterCsvKinds.EquipmentAlarmCodes => await ExportEquipmentAlarmCodesAsync(includeInactive, ct),
             MasterCsvKinds.Tools => await ExportToolsAsync(includeInactive, ct),
             MasterCsvKinds.WorkCenters => await ExportWorkCentersAsync(includeInactive, ct),
             MasterCsvKinds.Locations => await ExportLocationsAsync(includeInactive, ct),
@@ -82,7 +83,7 @@ public sealed partial class MasterCsvService(
         return [.. items.Select(e => new string?[]
         {
             e.AssetNo, e.Name, e.WorkCenter?.Code, e.Site, e.Status.ToString(), e.MaintenanceType.ToString(),
-            Num(e.MaintenanceThreshold), e.MaintenanceParts, Bool(e.IsActive),
+            Num(e.MaintenanceThreshold), e.MaintenanceParts, Bool(e.IsActive), Bool(e.CollectsEvents),
         })];
     }
 
@@ -296,6 +297,18 @@ public sealed partial class MasterCsvService(
             {
                 s.Code, s.Name, s.StartTime.ToString("HH:mm"), s.EndTime.ToString("HH:mm"), Bool(s.IsActive),
             })];
+    }
+
+    private async Task<List<string?[]>> ExportEquipmentAlarmCodesAsync(bool includeInactive, CancellationToken ct)
+    {
+        var items = await db.EquipmentAlarmCodes.AsNoTracking().Include(a => a.Equipment)
+            .Where(a => includeInactive || a.IsActive)
+            .OrderBy(a => a.EquipmentId != null).ThenBy(a => a.Equipment!.AssetNo).ThenBy(a => a.AlarmCode)
+            .ToListAsync(ct);
+        return [.. items.Select(a => new string?[]
+        {
+            a.Equipment?.AssetNo, a.AlarmCode, a.StopCause, Bool(a.IsActive),
+        })];
     }
 
     private async Task<List<string?[]>> ExportInspectionDevicesAsync(bool includeInactive, CancellationToken ct)

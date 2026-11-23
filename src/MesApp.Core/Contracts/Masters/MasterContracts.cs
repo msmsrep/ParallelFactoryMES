@@ -104,13 +104,16 @@ public record EquipmentRequest(
     MaintenanceType MaintenanceType,
     decimal? MaintenanceThreshold,
     string? MaintenanceParts,
-    int? WorkCenterId = null);
+    int? WorkCenterId = null,
+    /// <summary>設備イベントで稼働状態を収集する（立てると状態区間の手入力・CSV取込を拒否する）</summary>
+    bool CollectsEvents = false);
 
 /// <summary>WorkCenterCode・WorkCenterName は画面表示用の付随情報（更新は WorkCenterId で行う）</summary>
 public record EquipmentResponse(
     int Id, string AssetNo, string Name, string? Site, EquipmentStatus Status,
     MaintenanceType MaintenanceType, decimal? MaintenanceThreshold, string? MaintenanceParts, bool IsActive,
-    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null);
+    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null,
+    bool CollectsEvents = false);
 
 // ---- 設備の保全部品（EquipmentPart）----
 
@@ -123,6 +126,19 @@ public record EquipmentPartRequest(
 public record EquipmentPartResponse(
     int Id, int EquipmentId, int ProductId, string ProductCode, string ProductName, string Unit,
     MaintenancePartCategory Category, decimal QuantityPer, string? Note);
+
+// ---- 停止原因の対応表（EquipmentAlarmCode。B-40-20-02）----
+
+/// <summary>EquipmentId を空にすると全設備共通の定義になる</summary>
+public record EquipmentAlarmCodeRequest(
+    int? EquipmentId,
+    [Required, MaxLength(50)] string AlarmCode,
+    [Required, MaxLength(500)] string StopCause);
+
+/// <summary>EquipmentAssetNo・EquipmentName は画面表示用の付随情報（共通の定義では null）</summary>
+public record EquipmentAlarmCodeResponse(
+    int Id, int? EquipmentId, string? EquipmentAssetNo, string? EquipmentName,
+    string AlarmCode, string StopCause, bool IsActive);
 
 // ---- 勤務シフト（直。F-10-10-01）----
 

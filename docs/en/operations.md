@@ -94,6 +94,9 @@ Edit `appsettings.json` or override the values with environment variables.
 | Folder integration: importing user | `FolderLink__UserName` | Not set |
 | Folder integration: scan interval (seconds) | `FolderLink__PollSeconds` | `30` |
 | Folder integration: language of results | `FolderLink__Language` | `ja` (`en` is also allowed) |
+| Equipment events: maximum events per request | `EquipmentEvents__MaxBatchSize` | `1000` |
+| Equipment events: allowed lead of event time (seconds) | `EquipmentEvents__MaxFutureSkewSeconds` | `300` |
+| Equipment events: time until reception is considered stopped (minutes) | `EquipmentEvents__SilenceMinutes` | `10` |
 
 ### Business date boundary hour
 
@@ -214,6 +217,7 @@ Load it into Postman, Visual Studio or similar tools to see the endpoints, param
 | `GET /api/integration/v1/masters/{type}` | Export master data as CSV |
 | `GET /api/integration/v1/production-results` | Read production results from where you left off |
 | `GET /api/integration/v1/production-result-corrections` | Read corrections to production results from where you left off |
+| `POST /api/integration/v1/equipment-events` | Send equipment status changes ([Receiving equipment events](#equipment-events)) |
 
 ### Importing CSV
 
@@ -265,6 +269,78 @@ Set-Content .\last-id.txt $after
 - Within v1 (`/api/integration/v1`), **fields and endpoints are only added**, never removed, renamed or given a new meaning. Such changes go into a v2.
 - The same applies to CSV columns. Columns are not removed and no required columns are added (if you leave out a new column, things work as before). When a column is renamed, its former name can still be read.
 - Build your integrations to skip fields they do not know, in case new fields are added to responses.
+
+## Receiving equipment events  {#equipment-events}
+
+A mechanism that records equipment operation status (running, stopped, setup, failure, idle) automatically from the equipment.
+**The MES does not communicate with PLCs directly.** A gateway (such as Node-RED) reads the PLC status and sends it to the MES integration API when the status changes.
+The MES sorts the received status changes by time for each piece of equipment and builds them into **intervals in the operation history** (start to end).
+
+```
+Equipment / PLC ──(OPC UA, MC protocol, Modbus, etc.)──▶ Gateway ──(HTTP, API key)──▶ MES
+                                                          (Node-RED, etc.)  POST /api/integration/v1/equipment-events
+```
+
+### Preparation
+
+1. In the equipment master (the **Equipment (BOE)** tab in master management), turn on **Collect operation status from equipment events** for the target equipment.
+   Operation cannot then be registered for that equipment by manual entry or actuals CSV (so the same time is not counted twice by hand and automatically). Stop causes can still be added.
+2. Create a user for the gateway and issue an [API key](#api-keys). Receiving does not depend on roles.
+3. If needed, register a **Stop cause mapping** (master management) that replaces alarm codes with stop causes.
+
+### What to send
+
+Create one event each time the status changes, collect them, and send them together (up to 1,000 at a time).
+
+```json
+{
+  "events": [
+    { "equipmentCode": "EQ-06", "eventId": "EQ-06-1732323600000-1", "occurredAt": "2026-11-23T09:00:00+09:00", "state": "Running" },
+    { "equipmentCode": "EQ-06", "eventId": "EQ-06-1732324200000-2", "occurredAt": "2026-11-23T09:10:00+09:00", "state": "Stopped", "alarmCode": "A-101" }
+  ]
+}
+```
+
+| Item | Description |
+|---|---|
+| `equipmentCode` | The equipment asset No. |
+| `eventId` | A unique ID assigned by the gateway (unique per equipment, up to 100 characters). Keep **the same value when resending** |
+| `occurredAt` | The time the status changed on the equipment (with an offset such as `+09:00`) |
+| `state` | `Running` / `Stopped` / `Setup` / `Failure` / `Idle` / `Off` (power off or connection lost) |
+| `alarmCode` | Optional. The alarm code for a stop or failure (the cause is looked up in the stop cause mapping) |
+| `workOrderNo` + `operationSeq` | Optional. The work order being processed (a pair of order number and operation sequence) |
+| `note` | Optional. A note |
+
+```powershell
+$headers = @{ "X-Api-Key" = "pfm_..." }
+$body = @{ events = @(@{ equipmentCode = "EQ-06"; eventId = "test-1"; occurredAt = (Get-Date).ToString("o"); state = "Running" }) } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Method Post -Headers $headers -ContentType "application/json" -Body $body -Uri http://localhost:5000/api/integration/v1/equipment-events
+```
+
+### What happens after an event arrives
+
+- When a new status arrives, the open interval is closed and the next interval is opened. Repeated events with the same status do not change the interval. `Off` only closes the interval.
+- Events sent together may be out of time order; they are re-sorted by time before being applied.
+- **Resending the same `eventId` results in "Duplicate" and is not recorded twice.** When the connection drops, resend the collected events as they are.
+- **Events earlier than the last applied time are rejected as late arrivals.** Past intervals are not rebuilt. Synchronize the clocks of the equipment and gateway with NTP. Times too far ahead of the server time (more than 300 seconds by default) are also rejected.
+- The response is 200 and contains a result for each event (`Accepted`, `Duplicate`, or `Rejected` with the reason). It is 200 even if all are rejected. A rejected `eventId` is judged again when it is corrected and resent.
+- For stop and failure intervals, the stop cause is looked up from the alarm code in the stop cause mapping. If it is not found, the interval is recorded **without a stop cause**, which can be entered later on the operation monitoring tab in maintenance.
+- The work order is linked if specified. If not specified, it is linked **only when exactly one started work order is assigned to that equipment**.
+
+You can see what is being received under **Current equipment status** on the operation monitoring tab in maintenance. When no events have been received for a while (10 minutes by default), "(no events received)" appears for that equipment, so you can notice that the gateway has stopped.
+
+### Trying the sample (Docker)
+
+`compose.yaml` has an `equipment` profile that also starts an MQTT broker (Eclipse Mosquitto) and a Node-RED gateway.
+Node-RED contains a **simulated piece of equipment** that changes status every few seconds and a flow that receives MQTT messages and sends them to the MES together (`samples/equipment-gateway`).
+
+1. Run `docker compose --profile equipment up -d` in the repository root.
+2. Import the sample master data into the MES (http://localhost:8080). `EQ-06` is set to collect status from equipment events.
+3. Issue an API key, write `MES_API_KEY=pfm_...` in `.env` in the repository root, and run `docker compose --profile equipment up -d` again.
+4. On the operation monitoring tab, check that the current status and operation history of `EQ-06` grow. In Node-RED (http://localhost:1880), the status of the node that checks the result (the last function node in step ③ of the flow) shows the numbers accepted, duplicate and rejected.
+
+To adapt it to your own equipment, replace the simulated equipment (the function node in step ① of the flow) with a node that reads the status from the PLC (OPC UA, MC protocol, Modbus, etc.).
+The sample MQTT broker is a minimal setup without authentication or encryption. Configure passwords and TLS for production.
 
 ## Security
 

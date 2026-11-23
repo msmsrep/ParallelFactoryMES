@@ -200,7 +200,7 @@ public sealed partial class ActualCsvService
 
             var outcome = await reports.AddEquipmentLogAsync(
                 new EquipmentLogRequest(equipmentId!.Value, status, startedAt!.Value, endedAt, stopCause, note, workOrderId),
-                userId, ct);
+                userId, ct, EquipmentLogSource.Csv);
             if (outcome.Failed)
             {
                 FailRow(reader, outcome.Error!);

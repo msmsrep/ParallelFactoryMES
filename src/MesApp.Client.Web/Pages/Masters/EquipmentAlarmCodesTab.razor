@@ -1,0 +1,162 @@
+@inject HttpClient Http
+
+@* 停止原因の対応表（Spec.md 5.1 EquipmentAlarmCode。B-40-20-02 設備停止時間・原因報告） *@
+<Notice Error="@_error" Message="@_message" />
+
+<AuthorizeView Roles="@MesRoleGroups.MasterWrite">
+    <div class="card">
+        <h2 style="margin-top:0;">@(_editingId is null ? L["停止原因の対応の登録"] : L["停止原因の対応の編集（{0}）", _alarmCode])</h2>
+        <p class="text-muted">@L["設備イベントのアラーム番号を停止原因に置き換えます。設備を「全設備共通」にした定義より、設備ごとの定義が優先します。"]</p>
+        <div class="form-grid">
+            <div class="form-field">
+                <label>@L["設備"]</label>
+                <select @bind="_equipmentId">
+                    <option value="0">@L["全設備共通"]</option>
+                    @foreach (var eq in _equipments ?? [])
+                    {
+                        <option value="@eq.Id">@eq.AssetNo @eq.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@L["アラーム番号"]</label>
+                <input @bind="_alarmCode" />
+            </div>
+            <div class="form-field">
+                <label>@L["停止原因"]</label>
+                <input @bind="_stopCause" />
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["更新"])</button>
+            @if (_editingId is not null)
+            {
+                <button class="btn btn-secondary" @onclick="ResetForm">@L["キャンセル"]</button>
+            }
+        </div>
+    </div>
+</AuthorizeView>
+
+<CsvIoPanel Kind="equipment-alarm-codes" Label="@L["停止原因の対応表"]" KeyLabel="@L["設備の資産番号＋アラーム番号"]" OnImported="LoadAsync" />
+
+<div class="card">
+    @if (_items is null)
+    {
+        <p class="text-muted">@L["読み込み中..."]</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>@L["設備"]</th><th>@L["アラーム番号"]</th><th>@L["停止原因"]</th><th>@L["状態"]</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td>@(item.EquipmentAssetNo is null ? L["全設備共通"].Value : $"{item.EquipmentAssetNo} {item.EquipmentName}")</td>
+                        <td>@item.AlarmCode</td>
+                        <td>@item.StopCause</td>
+                        <td>@(item.IsActive ? L["有効"] : L["無効"])</td>
+                        <td class="actions">
+                            <AuthorizeView Roles="@MesRoleGroups.MasterWrite" Context="pm">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Edit(item)">@L["編集"]</button>
+                                @if (item.IsActive)
+                                {
+                                    <button class="btn btn-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => DeactivateAsync(item.Id)">@L["無効化"]</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<EquipmentAlarmCodeResponse>? _items;
+    private List<EquipmentResponse>? _equipments;
+    private int? _editingId;
+    private int _equipmentId;
+    private string _alarmCode = string.Empty;
+    private string _stopCause = string.Empty;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _items = await Http.GetFromJsonAsync<List<EquipmentAlarmCodeResponse>>("api/equipment-alarm-codes?includeInactive=true");
+        _equipments = await Http.GetFromJsonAsync<List<EquipmentResponse>>("api/equipments");
+    }
+
+    private void Edit(EquipmentAlarmCodeResponse item)
+    {
+        _editingId = item.Id;
+        _equipmentId = item.EquipmentId ?? 0;
+        _alarmCode = item.AlarmCode;
+        _stopCause = item.StopCause;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _equipmentId = 0;
+        _alarmCode = string.Empty;
+        _stopCause = string.Empty;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_alarmCode) || string.IsNullOrWhiteSpace(_stopCause))
+        {
+            _error = L["アラーム番号と停止原因を入力してください。"];
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var request = new EquipmentAlarmCodeRequest(_equipmentId == 0 ? null : _equipmentId, _alarmCode, _stopCause);
+            var response = _editingId is null
+                ? await Http.PostAsJsonAsync("api/equipment-alarm-codes", request)
+                : await Http.PutAsJsonAsync($"api/equipment-alarm-codes/{_editingId}", request);
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = L["保存しました。"];
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeactivateAsync(int id)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/equipment-alarm-codes/{id}");
+            if (await response.ReadErrorAsync(L["無効化に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = L["無効化しました。"];
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

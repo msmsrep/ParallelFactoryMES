@@ -101,6 +101,9 @@ public sealed partial class MasterCsvService
             case MasterCsvKinds.InspectionDevices:
                 await ImportInspectionDevicesAsync(table, errors, counter, ct);
                 break;
+            case MasterCsvKinds.EquipmentAlarmCodes:
+                await ImportEquipmentAlarmCodesAsync(table, errors, counter, ct);
+                break;
             case MasterCsvKinds.Shifts:
                 await ImportShiftsAsync(table, errors, counter, ct);
                 break;
@@ -260,6 +263,7 @@ public sealed partial class MasterCsvService
             var threshold = reader.NumberOrNull("MaintenanceThreshold", equipment.MaintenanceThreshold, 0);
             var parts = reader.Text("MaintenanceParts", equipment.MaintenanceParts);
             var isActive = reader.Bool("IsActive", equipment.IsActive);
+            var collectsEvents = reader.Bool("CollectsEvents", equipment.CollectsEvents);
             if (reader.Failed)
             {
                 continue;
@@ -283,6 +287,7 @@ public sealed partial class MasterCsvService
             equipment.MaintenanceThreshold = threshold;
             equipment.MaintenanceParts = parts;
             equipment.IsActive = isActive;
+            equipment.CollectsEvents = collectsEvents;
 
             if (isNew)
             {
@@ -1300,6 +1305,70 @@ public sealed partial class MasterCsvService
         }
         return result;
     }
+
+    /// <summary>
+    /// 停止原因の対応表。キーは（設備の資産番号, アラーム番号）で、資産番号が空なら全設備共通。
+    /// 共通の行どうしの重複は一意索引では止まらないので、既存の行を全部読んでキーで突き合わせる（単票APIと同じ判定）
+    /// </summary>
+    private async Task ImportEquipmentAlarmCodesAsync(
+        CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)
+    {
+        var equipmentIds = await db.Equipments.AsNoTracking()
+            .ToDictionaryAsync(e => e.AssetNo, e => e.Id, StringComparer.Ordinal, ct);
+        var existing = await db.EquipmentAlarmCodes.Include(a => a.Equipment).ToListAsync(ct);
+        var byKey = existing.ToDictionary(a => AlarmKey(a.Equipment?.AssetNo, a.AlarmCode), StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in table.Rows)
+        {
+            var reader = new CsvRowReader(table, row, errors);
+            var assetNo = reader.Text("EquipmentAssetNo", null, 50);
+            var alarmCode = reader.RequiredText("AlarmCode", 50);
+            if (reader.Failed)
+            {
+                continue;
+            }
+            var key = AlarmKey(assetNo, alarmCode);
+            if (!CheckUnique(reader, seen, assetNo is null ? alarmCode : $"{assetNo} / {alarmCode}", "アラーム番号"))
+            {
+                continue;
+            }
+            int? equipmentId = null;
+            if (assetNo is not null)
+            {
+                if (!equipmentIds.TryGetValue(assetNo, out var id))
+                {
+                    reader.Fail(ApiText.T("設備 '{0}' は登録されていません。先に設備マスタを取り込んでください。", assetNo));
+                    continue;
+                }
+                equipmentId = id;
+            }
+
+            var isNew = !byKey.TryGetValue(key, out var alarm);
+            alarm ??= new EquipmentAlarmCode { EquipmentId = equipmentId, AlarmCode = alarmCode };
+            var stopCause = reader.RequiredText("StopCause", 500);
+            var isActive = reader.Bool("IsActive", alarm.IsActive);
+            if (reader.Failed)
+            {
+                continue;
+            }
+
+            alarm.StopCause = stopCause;
+            alarm.IsActive = isActive;
+            if (isNew)
+            {
+                db.EquipmentAlarmCodes.Add(alarm);
+                byKey[key] = alarm;
+                counter.Created++;
+            }
+            else
+            {
+                counter.Updated++;
+            }
+        }
+    }
+
+    private static string AlarmKey(string? assetNo, string alarmCode) => $"{assetNo}\u001f{alarmCode}"; // 区切りはコードに現れない制御文字
 
     private async Task ImportInspectionDevicesAsync(
         CsvTable table, List<CsvImportError> errors, ImportCounter counter, CancellationToken ct)

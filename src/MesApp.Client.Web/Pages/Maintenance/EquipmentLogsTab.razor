@@ -1,16 +1,81 @@
 ﻿@inject HttpClient Http
 
-@* 稼働監視（Spec.md 3.1。B-40-20、E-20-10-03、E-20-30-03）。稼働実績の手入力と、稼働サマリ・OEE・履歴の参照 *@
+@* 稼働監視（Spec.md 3.1。B-40-20、E-20-10-03、E-20-30-03）。設備の今の状態、稼働実績の手入力と、稼働サマリ・OEE・履歴の参照 *@
 <Notice Error="@_error" Message="@_message" />
 
 <div class="card">
-    <h2 style="margin-top:0;">@L["稼働実績の記録（手入力。センサー自動収集は将来拡張）"]</h2>
+    <h2 style="margin-top:0;">@L["設備の今の状態"]</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>@L["作業区"]</label>
+            <select @bind="_currentWorkCenterId" @bind:after="LoadCurrentAsync">
+                <option value="0">@L["すべて"]</option>
+                @foreach (var wc in _equipments.Where(e => e.WorkCenterId is not null)
+                             .DistinctBy(e => e.WorkCenterId).OrderBy(e => e.WorkCenterCode))
+                {
+                    <option value="@wc.WorkCenterId">@wc.WorkCenterCode @wc.WorkCenterName</option>
+                }
+            </select>
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn btn-secondary" disabled="@_busy" @onclick="LoadCurrentAsync">@L["更新"]</button>
+    </div>
+    @if (_current is null)
+    {
+        <p class="text-muted">@L["読み込み中..."]</p>
+    }
+    else if (_current.Count == 0)
+    {
+        <p class="text-muted">@L["設備がありません。"]</p>
+    }
+    else
+    {
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead><tr><th>@L["設備"]</th><th>@L["作業区"]</th><th>@L["状態"]</th><th>@L["開始"]</th><th>@L["経過(分)"]</th><th>@L["作業指示"]</th><th>@L["停止原因"]</th><th>@L["最後の受信"]</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _current)
+                    {
+                        <tr>
+                            <td>@row.AssetNo @row.EquipmentName</td>
+                            <td>@(row.WorkCenterCode ?? "-")</td>
+                            <td>@(row.Status is { } status ? EnumLabels.Of(status) : L["記録なし"].Value)</td>
+                            <td>@(row.StartedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
+                            <td>@(row.ElapsedMinutes?.ToString("0") ?? "-")</td>
+                            <td>@(row.WorkOrderNo ?? "-")</td>
+                            <td>@(row.StopCause ?? "-")</td>
+                            <td>
+                                @if (!row.CollectsEvents)
+                                {
+                                    @L["手入力"]
+                                }
+                                else
+                                {
+                                    @(row.LastEventReceivedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")
+                                    @if (row.EventsSilent)
+                                    {
+                                        <span class="text-muted"> @L["（受信が途絶えています）"]</span>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted">@L["自動では更新しません。最新にするときは「更新」を押してください。設備イベントで収集する設備は、受信が一定時間（既定10分）途絶えると知らせます。"]</p>
+    }
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">@L["稼働実績の記録（手入力）"]</h2>
     <div class="form-grid">
         <div class="form-field">
             <label>@L["設備"]</label>
             <select @bind="_log.EquipmentId">
                 <option value="0">@L["選択してください"]</option>
-                @foreach (var equipment in _equipments)
+                @foreach (var equipment in _equipments.Where(e => !e.CollectsEvents))
                 {
                     <option value="@equipment.Id">@equipment.AssetNo @equipment.Name</option>
                 }
@@ -62,29 +127,31 @@
     }
     else
     {
-        <table class="table">
-            <thead>
-                <tr><th>@L["設備"]</th><th>@L["稼働(h)"]</th><th>@L["停止(h)"]</th><th>@L["段取り(h)"]</th><th>@L["故障(h)"]</th><th>@L["アイドル(h)"]</th><th>@L["故障回数"]</th><th>@L["時間稼働率"]</th></tr>
-            </thead>
-            <tbody>
-                @foreach (var row in _utilization)
-                {
-                    <tr>
-                        <td>@row.AssetNo @row.EquipmentName</td>
-                        <td>@row.RunningHours</td>
-                        <td>@row.StoppedHours</td>
-                        <td>@row.SetupHours</td>
-                        <td>@row.FailureHours</td>
-                        <td>@row.IdleHours</td>
-                        <td>@row.FailureCount</td>
-                        <td>
-                            @row.UtilizationRate %
-                            <BarMeter Value="@row.UtilizationRate" HighIsBad="false" />
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
+                    <tr><th>@L["設備"]</th><th>@L["稼働(h)"]</th><th>@L["停止(h)"]</th><th>@L["段取り(h)"]</th><th>@L["故障(h)"]</th><th>@L["アイドル(h)"]</th><th>@L["故障回数"]</th><th>@L["時間稼働率"]</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _utilization)
+                    {
+                        <tr>
+                            <td>@row.AssetNo @row.EquipmentName</td>
+                            <td>@row.RunningHours</td>
+                            <td>@row.StoppedHours</td>
+                            <td>@row.SetupHours</td>
+                            <td>@row.FailureHours</td>
+                            <td>@row.IdleHours</td>
+                            <td>@row.FailureCount</td>
+                            <td>
+                                @row.UtilizationRate %
+                                <BarMeter Value="@row.UtilizationRate" HighIsBad="false" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 </div>
 
@@ -101,36 +168,38 @@
     }
     else
     {
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>@L["設備"]</th><th>@L["負荷(h)"]</th><th>@L["稼働(h)"]</th><th>@L["時間稼働率"]</th>
-                    <th>@L["産出数"]</th><th>@L["性能稼働率"]</th><th>@L["良品率"]</th><th>OEE</th><th>@L["カバー率"]</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var row in _oee)
-                {
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
                     <tr>
-                        <td>@row.AssetNo @row.EquipmentName</td>
-                        <td>@row.LoadHours.ToString("0.##")</td>
-                        <td>@row.RunningHours.ToString("0.##")</td>
-                        <td>@Rate(row.AvailabilityRate)</td>
-                        <td>@row.ProducedQuantity.ToString("0.##")</td>
-                        <td>@Rate(row.PerformanceRate)</td>
-                        <td>@Rate(row.QualityRate)</td>
-                        <td>
-                            @Rate(row.Oee)
-                            @if (row.Oee is not null)
-                            {
-                                <BarMeter Value="@row.Oee.Value" HighIsBad="false" />
-                            }
-                        </td>
-                        <td>@Rate(row.CoverageRate)</td>
+                        <th>@L["設備"]</th><th>@L["負荷(h)"]</th><th>@L["稼働(h)"]</th><th>@L["時間稼働率"]</th>
+                        <th>@L["産出数"]</th><th>@L["性能稼働率"]</th><th>@L["良品率"]</th><th>OEE</th><th>@L["カバー率"]</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var row in _oee)
+                    {
+                        <tr>
+                            <td>@row.AssetNo @row.EquipmentName</td>
+                            <td>@row.LoadHours.ToString("0.##")</td>
+                            <td>@row.RunningHours.ToString("0.##")</td>
+                            <td>@Rate(row.AvailabilityRate)</td>
+                            <td>@row.ProducedQuantity.ToString("0.##")</td>
+                            <td>@Rate(row.PerformanceRate)</td>
+                            <td>@Rate(row.QualityRate)</td>
+                            <td>
+                                @Rate(row.Oee)
+                                @if (row.Oee is not null)
+                                {
+                                    <BarMeter Value="@row.Oee.Value" HighIsBad="false" />
+                                }
+                            </td>
+                            <td>@Rate(row.CoverageRate)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
         <p class="text-muted">
             @L["OEE＝時間稼働率×性能稼働率×良品率。"]
             @L["性能稼働率と良品率は作業指示に紐づけて記録した稼働からしか出せないため、紐付けのない稼働は対象外にしています（どれだけを見られているかがカバー率）。"]
@@ -142,24 +211,45 @@
 
 <div class="card">
     <h2 style="margin-top:0;">@L["稼働履歴"]</h2>
+    <div class="form-field">
+        <label>
+            <input type="checkbox" style="width:auto;" checked="@_missingCauseOnly" @onchange="ToggleMissingCauseAsync" />
+            @L["停止原因が未入力の停止・故障だけを表示する"]
+        </label>
+    </div>
     @if (_logs is not null && _logs.Total > 0)
     {
-        <table class="table">
-            <thead><tr><th>@L["設備"]</th><th>@L["状態"]</th><th>@L["作業指示"]</th><th>@L["開始"]</th><th>@L["終了"]</th><th>@L["停止原因"]</th></tr></thead>
-            <tbody>
-                @foreach (var log in _logs.Items)
-                {
-                    <tr>
-                        <td>@log.EquipmentName</td>
-                        <td>@EnumLabels.Of(log.Status)</td>
-                        <td>@(log.WorkOrderNo ?? "-")</td>
-                        <td>@log.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
-                        <td>@(log.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
-                        <td>@(log.StopCause ?? "-")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead><tr><th>@L["設備"]</th><th>@L["状態"]</th><th>@L["作業指示"]</th><th>@L["開始"]</th><th>@L["終了"]</th><th>@L["停止原因"]</th><th>@L["記録元"]</th></tr></thead>
+                <tbody>
+                    @foreach (var log in _logs.Items)
+                    {
+                        <tr>
+                            <td>@log.EquipmentName</td>
+                            <td>@EnumLabels.Of(log.Status)</td>
+                            <td>@(log.WorkOrderNo ?? "-")</td>
+                            <td>@log.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                            <td>@(log.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
+                            <td>
+                                @if (NeedsCause(log))
+                                {
+                                    @* 設備イベントで原因を引けなかった区間に、後から原因を入れる（B-40-20-02） *@
+                                    <input style="width:10em;" placeholder="@L["原因未入力"]" @bind="_causeInputs[log.Id]" />
+                                    <button class="btn btn-secondary btn-sm" disabled="@_busy"
+                                            @onclick="() => SaveStopCauseAsync(log.Id)">@L["原因を保存"]</button>
+                                }
+                                else
+                                {
+                                    @(log.StopCause ?? "-")
+                                }
+                            </td>
+                            <td>@EnumLabels.Of(log.Source)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
         <Pager TItem="EquipmentLogResponse" Result="_logs"
                OnPageChanged="LoadEquipmentLogsAsync" Busy="@_busy" />
     }
@@ -182,6 +272,10 @@
 
     private List<EquipmentResponse> _equipments = [];
     private PagedResult<EquipmentLogResponse>? _logs;
+    private List<EquipmentCurrentStatusRow>? _current;
+    private int _currentWorkCenterId;
+    private bool _missingCauseOnly;
+    private readonly Dictionary<int, string?> _causeInputs = [];
     private List<EquipmentUtilizationRow>? _utilization;
     private List<EquipmentOeeRow>? _oee;
 
@@ -200,11 +294,67 @@
     /// <summary>算出できない指標は0%ではなく「-」で見せる（記録漏れを悪い評価に化けさせない）</summary>
     private static string Rate(decimal? value) => value is null ? "-" : $"{value:0.##} %";
 
-    private async Task LoadEquipmentLogsAsync(int page) =>
-        _logs = await Http.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>($"api/equipment-logs?page={page}");
+    private async Task LoadEquipmentLogsAsync(int page)
+    {
+        _logs = await Http.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>(
+            $"api/equipment-logs?page={page}&missingCause={(_missingCauseOnly ? "true" : "false")}");
+        _causeInputs.Clear();
+        foreach (var log in _logs?.Items ?? [])
+        {
+            if (NeedsCause(log))
+            {
+                _causeInputs[log.Id] = null;
+            }
+        }
+    }
+
+    private static bool NeedsCause(EquipmentLogResponse log) =>
+        log.Status is EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure && string.IsNullOrEmpty(log.StopCause);
+
+    private async Task ToggleMissingCauseAsync(ChangeEventArgs e)
+    {
+        _missingCauseOnly = e.Value is true;
+        await LoadEquipmentLogsAsync(1);
+    }
+
+    private async Task SaveStopCauseAsync(int logId)
+    {
+        var cause = _causeInputs.GetValueOrDefault(logId);
+        if (string.IsNullOrWhiteSpace(cause))
+        {
+            _error = L["停止原因を入力してください。"];
+            return;
+        }
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/equipment-logs/{logId}/stop-cause",
+                new EquipmentLogStopCauseRequest(cause));
+            if (await response.ReadErrorAsync(L["保存に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = L["停止原因を保存しました。"];
+            await LoadEquipmentLogsAsync(_logs?.Page ?? 1);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task LoadCurrentAsync()
+    {
+        var query = _currentWorkCenterId == 0 ? "" : $"?workCenterId={_currentWorkCenterId}";
+        _current = await Http.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>($"api/equipment-logs/current{query}");
+    }
 
     private async Task LoadLogsAsync()
     {
+        await LoadCurrentAsync();
         await LoadEquipmentLogsAsync(1);
         _utilization = await Http.GetFromJsonAsync<List<EquipmentUtilizationRow>>("api/equipment-logs/summary");
         _oee = await Http.GetFromJsonAsync<List<EquipmentOeeRow>>("api/oee");

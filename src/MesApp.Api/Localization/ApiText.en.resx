@@ -2118,7 +2118,7 @@
   <data name="yyyy-MM-dd HH:mm（工場の時刻）。+09:00 などのオフセット付きも可。まとまりの最初の行の値を使う" xml:space="preserve">
     <value>yyyy-MM-dd HH:mm (factory time). An offset such as +09:00 is also accepted. The value on the first row of the group is used</value>
   </data>
-  <data name="ロット &#x27;{0}&#x27; は登録されていません（PartLotNumber）。" xml:space="preserve">
+  <data name="ロット '{0}' は登録されていません（PartLotNumber）。" xml:space="preserve">
     <value>Lot '{0}' is not registered (PartLotNumber).</value>
   </data>
   <data name="予定日" xml:space="preserve">
@@ -2190,7 +2190,7 @@
   <data name="部材の備考" xml:space="preserve">
     <value>Part note</value>
   </data>
-  <data name="保全指示 &#x27;{0}&#x27; は登録されていません（MaintenanceNo）。" xml:space="preserve">
+  <data name="保全指示 '{0}' は登録されていません（MaintenanceNo）。" xml:space="preserve">
     <value>Maintenance order '{0}' is not registered (MaintenanceNo).</value>
   </data>
   <data name="検査機が見つかりません。" xml:space="preserve">
@@ -2259,13 +2259,13 @@
   <data name="有効な治工具" xml:space="preserve">
     <value>Active tool</value>
   </data>
-  <data name="操作 &#x27;{0}&#x27; には {1} が必要です。" xml:space="preserve">
+  <data name="操作 '{0}' には {1} が必要です。" xml:space="preserve">
     <value>Operation '{0}' requires {1}.</value>
   </data>
   <data name="Quantity（数量）は0より大きい値にしてください。" xml:space="preserve">
     <value>Quantity must be greater than 0.</value>
   </data>
-  <data name="ロット &#x27;{0}&#x27; は登録されていません（{1}）。" xml:space="preserve">
+  <data name="ロット '{0}' は登録されていません（{1}）。" xml:space="preserve">
     <value>Lot '{0}' is not registered ({1}).</value>
   </data>
   <data name="Move（移動）/ Adjust（数量調整）/ Status（状態変更）/ Split（分割）/ Merge（統合）/ Transfer（振替）/ Discard（廃棄）/ Return（返品）/ IssueReturn（払出戻し）" xml:space="preserve">
@@ -2337,13 +2337,13 @@
   <data name="出荷ピッキングには ShippingNo（出荷番号）が必要です。" xml:space="preserve">
     <value>Shipping picking requires ShippingNo (shipping number).</value>
   </data>
-  <data name="棚卸 &#x27;{0}&#x27; は登録されていません（StocktakeNo）。" xml:space="preserve">
+  <data name="棚卸 '{0}' は登録されていません（StocktakeNo）。" xml:space="preserve">
     <value>Stocktake '{0}' is not registered (StocktakeNo).</value>
   </data>
   <data name="CountedQuantity（実棚数量）は必須です。" xml:space="preserve">
     <value>CountedQuantity (counted quantity) is required.</value>
   </data>
-  <data name="棚卸 &#x27;{0}&#x27; にロット &#x27;{1}&#x27;・ロケーション &#x27;{2}&#x27; の明細はありません。" xml:space="preserve">
+  <data name="棚卸 '{0}' にロット '{1}'・ロケーション '{2}' の明細はありません。" xml:space="preserve">
     <value>Stocktake '{0}' has no line for lot '{1}' at location '{2}'.</value>
   </data>
   <data name="搬送指示が見つかりません。" xml:space="preserve">
@@ -2442,19 +2442,19 @@
   <data name="不適合を起票する行には Content（内容）が必要です。" xml:space="preserve">
     <value>A row that raises a nonconformance needs Content.</value>
   </data>
-  <data name="ロット &#x27;{0}&#x27; に未完了の不適合はありません。" xml:space="preserve">
+  <data name="ロット '{0}' に未完了の不適合はありません。" xml:space="preserve">
     <value>Lot '{0}' has no open nonconformance.</value>
   </data>
-  <data name="ロット &#x27;{0}&#x27; に未完了の不適合が {1} 件あります。ReportNo で指定してください。" xml:space="preserve">
+  <data name="ロット '{0}' に未完了の不適合が {1} 件あります。ReportNo で指定してください。" xml:space="preserve">
     <value>Lot '{0}' has {1} open nonconformances. Specify one with ReportNo.</value>
   </data>
   <data name="サンプルを採取する行には LotNumber・Quantity・StorageLocationCode が必要です。" xml:space="preserve">
     <value>A row that collects a sample needs LotNumber, Quantity and StorageLocationCode.</value>
   </data>
-  <data name="サンプル番号 &#x27;{0}&#x27; は既に存在します。" xml:space="preserve">
+  <data name="サンプル番号 '{0}' は既に存在します。" xml:space="preserve">
     <value>Sample number '{0}' already exists.</value>
   </data>
-  <data name="サンプル番号 &#x27;{0}&#x27; は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
+  <data name="サンプル番号 '{0}' は自動採番の形式（{1}〜）と重なるため指定できません。" xml:space="preserve">
     <value>Sample number '{0}' cannot be specified because it overlaps the auto-numbering format ({1}...).</value>
   </data>
   <data name="サンプルが見つかりません。" xml:space="preserve">
@@ -2681,5 +2681,86 @@
   </data>
   <data name="limit は1以上{0}以下で指定してください。" xml:space="preserve">
     <value>Specify limit between 1 and {0}.</value>
+  </data>
+  <data name="設備 '{0}' は設備イベントで稼働状態を収集しているため、稼働記録を手で登録できません。" xml:space="preserve">
+    <value>Equipment '{0}' collects its operation status from equipment events, so operation logs cannot be registered manually.</value>
+  </data>
+  <data name="設備イベントで収集" xml:space="preserve">
+    <value>Collected by equipment events</value>
+  </data>
+  <data name="true / false（true の設備は稼働記録を手入力・実績CSVで登録できない）" xml:space="preserve">
+    <value>true / false (equipment set to true cannot have operation logs registered by manual entry or actuals CSV)</value>
+  </data>
+  <data name="equipmentCode（設備の資産番号）がありません。" xml:space="preserve">
+    <value>equipmentCode (equipment asset number) is missing.</value>
+  </data>
+  <data name="資産番号 '{0}' の設備が見つかりません。" xml:space="preserve">
+    <value>Equipment with asset number '{0}' was not found.</value>
+  </data>
+  <data name="eventId は1〜{0}文字で指定してください。" xml:space="preserve">
+    <value>Specify eventId with 1 to {0} characters.</value>
+  </data>
+  <data name="設備 '{0}' は無効です。" xml:space="preserve">
+    <value>Equipment '{0}' is inactive.</value>
+  </data>
+  <data name="設備 '{0}' は設備イベントで収集する設定になっていません。" xml:space="preserve">
+    <value>Equipment '{0}' is not set to collect its status from equipment events.</value>
+  </data>
+  <data name="occurredAt（発生時刻）がありません。" xml:space="preserve">
+    <value>occurredAt (time of occurrence) is missing.</value>
+  </data>
+  <data name="state '{0}' は使えません（Running / Stopped / Setup / Failure / Idle / Off）。" xml:space="preserve">
+    <value>state '{0}' is not allowed (Running / Stopped / Setup / Failure / Idle / Off).</value>
+  </data>
+  <data name="{0} は{1}文字以内にしてください。" xml:space="preserve">
+    <value>{0} must be {1} characters or fewer.</value>
+  </data>
+  <data name="workOrderNo（指図番号）と operationSeq（工程順序）は組で指定してください。" xml:space="preserve">
+    <value>Specify workOrderNo (order number) and operationSeq (operation sequence) together.</value>
+  </data>
+  <data name="発生時刻 {0} がサーバーの時刻より先です。設備・ゲートウェイの時計を合わせてください。" xml:space="preserve">
+    <value>The time of occurrence {0} is ahead of the server time. Synchronize the clocks of the equipment and gateway.</value>
+  </data>
+  <data name="最後に反映した時刻 {0} より前のイベントです（遅着）。過去の区間は組み直しません。" xml:space="preserve">
+    <value>The event is earlier than the last applied time {0} (late arrival). Past intervals are not rebuilt.</value>
+  </data>
+  <data name="作業指示（指図番号 '{0}'、工程順序 {1}）が見つからないため、作業指示に紐付けずに記録しました。" xml:space="preserve">
+    <value>The work order (order number '{0}', operation sequence {1}) was not found, so the event was recorded without linking a work order.</value>
+  </data>
+  <data name="events に1件以上のイベントを入れてください。" xml:space="preserve">
+    <value>Include at least one event in events.</value>
+  </data>
+  <data name="1回に送れるイベントは {0} 件までです。" xml:space="preserve">
+    <value>Up to {0} events can be sent at a time.</value>
+  </data>
+  <data name="設備（ID {0}）が見つかりません。" xml:space="preserve">
+    <value>Equipment (ID {0}) was not found.</value>
+  </data>
+  <data name="アラーム番号 '{0}' は既に登録されています。" xml:space="preserve">
+    <value>Alarm code '{0}' is already registered.</value>
+  </data>
+  <data name="稼働記録（ID {0}）が見つかりません。" xml:space="preserve">
+    <value>Operation log (ID {0}) was not found.</value>
+  </data>
+  <data name="停止原因を入れられるのは停止・故障の記録だけです。" xml:space="preserve">
+    <value>A stop cause can be entered only for stop and failure logs.</value>
+  </data>
+  <data name="停止原因を入力してください。" xml:space="preserve">
+    <value>Enter the stop cause.</value>
+  </data>
+  <data name="停止原因の対応表" xml:space="preserve">
+    <value>Stop cause mapping</value>
+  </data>
+  <data name="アラーム番号" xml:space="preserve">
+    <value>Alarm code</value>
+  </data>
+  <data name="空欄なら全設備共通。同じアラーム番号では設備ごとの定義が勝つ" xml:space="preserve">
+    <value>Blank means all equipment. For the same alarm code, the equipment-specific definition wins</value>
+  </data>
+  <data name="設備の資産番号と組で、既存と一致すれば更新、無ければ新規登録" xml:space="preserve">
+    <value>Together with the equipment asset No., updates an existing entry if it matches, otherwise registers a new one</value>
+  </data>
+  <data name="設備イベントの停止・故障の区間に入る文章" xml:space="preserve">
+    <value>Text entered into stop and failure intervals from equipment events</value>
   </data>
 </root>
