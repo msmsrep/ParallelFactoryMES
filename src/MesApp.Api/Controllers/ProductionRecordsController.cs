@@ -1,6 +1,9 @@
 ﻿using MesApp.Api.Localization;
 using System.Security.Claims;
 using MesApp.Api.Services;
+using MesApp.Api.Services.Webhooks;
+using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Entities;
@@ -21,6 +24,7 @@ namespace MesApp.Api.Controllers;
 public class ProductionRecordsController(
     MesAppDbContext db,
     InventoryService inventory,
+    WebhookPublisher webhooks,
     IAuditLogger auditLogger) : ControllerBase
 {
     [HttpPut("{id:int}")]
@@ -96,6 +100,19 @@ public class ProductionRecordsController(
             Reason = request.Reason,
             CorrectedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
         });
+
+        // 訂正の経路はここだけ（Spec.md 3.8 Webhook）。変更前の値は上の before を、変更後は request を送る
+        await webhooks.EnqueueAsync(WebhookEventTypes.ProductionResultCorrected, async c =>
+        {
+            var orderNo = await db.ManufacturingOrders.AsNoTracking()
+                .Where(o => o.Id == record.WorkOrder!.ManufacturingOrderId).Select(o => o.OrderNo).FirstAsync(c);
+            // 送る文は保存される値なので訳さない
+            return ($"作業指示 {record.WorkOrder!.WorkOrderNo} の実績を訂正しました（良品 {record.GoodQuantity} → {request.GoodQuantity}）。",
+                new ProductionResultCorrectedData(record.Id, orderNo, record.WorkOrder.WorkOrderNo, record.WorkOrder.RoutingSequence,
+                    record.GoodQuantity, record.DefectQuantity, record.ScrapQuantity, record.ReworkQuantity,
+                    request.GoodQuantity, request.DefectQuantity, request.ScrapQuantity, request.ReworkQuantity,
+                    request.Reason));
+        }, ct);
 
         record.GoodQuantity = request.GoodQuantity;
         record.DefectQuantity = request.DefectQuantity;

@@ -548,6 +548,17 @@ public enum EquipmentEventResult
     Rejected,
 }
 
+/// <summary>Webhook の送信の状態（Spec.md 3.8 Webhook。WebhookDelivery）</summary>
+public enum WebhookDeliveryState
+{
+    /// <summary>送信待ち（再送待ちを含む）</summary>
+    Pending,
+    /// <summary>送信済み（送信先が 2xx を返した）</summary>
+    Delivered,
+    /// <summary>失敗（再送の回数が尽きた・再送しない応答だった）</summary>
+    Failed,
+}
+
 /// <summary>
 /// 保全部品の管理区分（Spec.md 5.1 EquipmentPart。E-10-10-01）。
 /// 資産管理部品（金型など設備の一部として資産計上するもの）と、

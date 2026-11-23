@@ -13,6 +13,9 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<IntegrationRequest> IntegrationRequests => Set<IntegrationRequest>();
+    public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
+    public DbSet<WebhookOutbox> WebhookOutbox => Set<WebhookOutbox>();
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // マスタ系（Spec.md 5.1）
@@ -118,6 +121,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<EquipmentLogStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<EquipmentLogSource>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<EquipmentEventResult>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<WebhookDeliveryState>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenancePartCategory>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenanceCategory>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenancePlanStatus>().HaveConversion<string>().HaveMaxLength(30);

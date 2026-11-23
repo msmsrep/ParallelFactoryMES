@@ -1,5 +1,10 @@
+using MesApp.Api.Services.Webhooks;
+using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Entities;
+using MesApp.Core.Localization;
 using MesApp.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace MesApp.Api.Services;
 
@@ -11,8 +16,9 @@ namespace MesApp.Api.Services;
 /// 遷移を <see cref="LotStatusHistory"/> として残す。
 /// </para>
 /// SaveChangesは呼び出し側が行う（InventoryServiceと同じ規約。1操作＝1トランザクション）。
+/// 変更のたびに Webhook <c>lot.status-changed</c> を同じトランザクションで積む（Spec.md 3.8 Webhook）。
 /// </summary>
-public class LotStatusService(MesAppDbContext db)
+public class LotStatusService(MesAppDbContext db, WebhookPublisher webhooks)
 {
     /// <summary>
     /// ステータスを変更し、遷移を履歴に残す。現在値と同じ場合は何もしない（無意味な履歴を作らない）。
@@ -24,14 +30,16 @@ public class LotStatusService(MesAppDbContext db)
     /// <param name="userId">操作ユーザー</param>
     /// <param name="inspectionOrderId">契機となった検査指示</param>
     /// <param name="nonconformanceReportId">契機となった不適合</param>
-    public void ChangeStatus(
+    /// <param name="ct">取消の合図</param>
+    public async Task ChangeStatusAsync(
         Lot lot, LotStockStatus to, LotStatusChangeSource source, string? reason, string? userId,
-        int? inspectionOrderId = null, int? nonconformanceReportId = null)
+        int? inspectionOrderId = null, int? nonconformanceReportId = null, CancellationToken ct = default)
     {
         if (lot.StockStatus == to)
         {
             return;
         }
+        var from = lot.StockStatus;
         db.LotStatusHistories.Add(new LotStatusHistory
         {
             LotId = lot.Id,
@@ -44,5 +52,14 @@ public class LotStatusService(MesAppDbContext db)
             ChangedByUserId = userId,
         });
         lot.StockStatus = to;
+
+        await webhooks.EnqueueAsync(WebhookEventTypes.LotStatusChanged, async c =>
+        {
+            var productCode = lot.Product?.Code
+                ?? await db.Products.Where(p => p.Id == lot.ProductId).Select(p => p.Code).FirstAsync(c);
+            // 送る文は保存される値なので訳さない（区分は原文の表示名）
+            return ($"ロット {lot.LotNumber} の在庫ステータスが「{EnumLabels.OriginalOf(from)}」から「{EnumLabels.OriginalOf(to)}」になりました。",
+                new LotStatusChangedData(lot.LotNumber, productCode, from, to, source, reason));
+        }, ct);
     }
 }

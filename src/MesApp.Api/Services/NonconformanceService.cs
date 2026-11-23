@@ -1,5 +1,8 @@
 using MesApp.Api.Localization;
+using MesApp.Api.Services.Webhooks;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Contracts.Quality;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -17,6 +20,7 @@ public sealed class NonconformanceService(
     MesAppDbContext db,
     NumberingService numbering,
     LotStatusService lotStatus,
+    WebhookPublisher webhooks,
     IAuditLogger auditLogger)
 {
     /// <summary>
@@ -68,11 +72,35 @@ public sealed class NonconformanceService(
             ReportedByUserId = userId,
         };
         db.NonconformanceReports.Add(report);
+        await webhooks.EnqueueAsync(WebhookEventTypes.NonconformanceCreated, CreatedNotice(db, report), ct);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Quality", "NonconformanceCreate", nameof(NonconformanceReport),
             report.Id.ToString(), detail: $"reportNo={report.ReportNo}, source={report.Source}", ct: ct);
         return Outcome<NonconformanceReport>.Ok(report);
     }
+
+    /// <summary>
+    /// Webhook <c>nonconformance.created</c> の本文（Spec.md 3.8 Webhook）。画面・実績CSV からの起票と、
+    /// 検査の不合格からの自動起票（<see cref="InspectionService"/>）で同じものを使う。
+    /// 対象のロット・作業指示は ID で持っているので、番号とコードを引く
+    /// </summary>
+    public static Func<CancellationToken, Task<(string Summary, object Data)?>> CreatedNotice(
+        MesAppDbContext db, NonconformanceReport report) => async ct =>
+    {
+        var lot = report.LotId is { } lotId
+            ? await db.Lots.AsNoTracking().Where(l => l.Id == lotId)
+                .Select(l => new { l.LotNumber, ProductCode = l.Product!.Code }).FirstOrDefaultAsync(ct)
+            : null;
+        var workOrder = report.WorkOrderId is { } workOrderId
+            ? await db.WorkOrders.AsNoTracking().Where(w => w.Id == workOrderId)
+                .Select(w => new { w.WorkOrderNo, ProductCode = w.Product!.Code }).FirstOrDefaultAsync(ct)
+            : null;
+        // 送る文は保存される値なので訳さない
+        var target = lot is not null ? $"ロット {lot.LotNumber}" : workOrder is not null ? $"作業指示 {workOrder.WorkOrderNo}" : null;
+        return ($"不適合 {report.ReportNo} を起票しました{(target is null ? "" : $"（{target}）")}。",
+            new NonconformanceCreatedData(report.ReportNo, report.Source, lot?.LotNumber,
+                lot?.ProductCode ?? workOrder?.ProductCode, workOrder?.WorkOrderNo));
+    };
 
     /// <summary>
     /// 対応指示（C-30-20-01）。保留→ロット保留、廃棄→ロット廃棄予定、
@@ -103,16 +131,16 @@ public sealed class NonconformanceService(
         switch (request.Action)
         {
             case NonconformanceAction.Hold when report.Lot is not null:
-                lotStatus.ChangeStatus(report.Lot, LotStockStatus.OnHold,
+                await lotStatus.ChangeStatusAsync(report.Lot, LotStockStatus.OnHold,
                     LotStatusChangeSource.Nonconformance,
                     $"不適合 {report.ReportNo} の保留指示（{request.Instruction}）",
-                    userId, nonconformanceReportId: report.Id);
+                    userId, nonconformanceReportId: report.Id, ct: ct);
                 break;
             case NonconformanceAction.Discard when report.Lot is not null:
-                lotStatus.ChangeStatus(report.Lot, LotStockStatus.ToBeDiscarded,
+                await lotStatus.ChangeStatusAsync(report.Lot, LotStockStatus.ToBeDiscarded,
                     LotStatusChangeSource.Nonconformance,
                     $"不適合 {report.ReportNo} の廃棄指示（{request.Instruction}）",
-                    userId, nonconformanceReportId: report.Id);
+                    userId, nonconformanceReportId: report.Id, ct: ct);
                 break;
             case NonconformanceAction.Rework when report.Lot is not null:
                 await AddReworkOrderAsync(report, userId, ct);
@@ -177,10 +205,10 @@ public sealed class NonconformanceService(
         // 特採：承認記録付きで次工程進行（Spec.md 5.7）
         if (report.Action == NonconformanceAction.SpecialAcceptance && report.Lot is not null)
         {
-            lotStatus.ChangeStatus(report.Lot, LotStockStatus.Normal,
+            await lotStatus.ChangeStatusAsync(report.Lot, LotStockStatus.Normal,
                 LotStatusChangeSource.Nonconformance,
                 $"不適合 {report.ReportNo} の特採承認による解放",
-                userId, nonconformanceReportId: report.Id);
+                userId, nonconformanceReportId: report.Id, ct: ct);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Quality", "NonconformanceApprove", nameof(NonconformanceReport),

@@ -1,0 +1,429 @@
+{
+  "version": 1,
+  "envelope": [
+    {
+      "name": "id",
+      "kind": "uuid",
+      "nullable": false
+    },
+    {
+      "name": "sequence",
+      "kind": "integer",
+      "nullable": false
+    },
+    {
+      "name": "type",
+      "kind": "string",
+      "nullable": false
+    },
+    {
+      "name": "version",
+      "kind": "integer",
+      "nullable": false
+    },
+    {
+      "name": "occurredAt",
+      "kind": "date-time",
+      "nullable": false
+    },
+    {
+      "name": "summary",
+      "kind": "string",
+      "nullable": false
+    }
+  ],
+  "events": [
+    {
+      "type": "equipment.stopped",
+      "data": [
+        {
+          "name": "equipmentAssetNo",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Running",
+            "Stopped",
+            "Setup",
+            "Failure",
+            "Idle"
+          ]
+        },
+        {
+          "name": "startedAt",
+          "kind": "date-time",
+          "nullable": false
+        },
+        {
+          "name": "endedAt",
+          "kind": "date-time",
+          "nullable": true
+        },
+        {
+          "name": "stopCause",
+          "kind": "string",
+          "nullable": true
+        },
+        {
+          "name": "alarmCode",
+          "kind": "string",
+          "nullable": true
+        },
+        {
+          "name": "source",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Manual",
+            "Csv",
+            "Event"
+          ]
+        },
+        {
+          "name": "workOrderNo",
+          "kind": "string",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "type": "lot.status-changed",
+      "data": [
+        {
+          "name": "lotNumber",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "productCode",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "fromStatus",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Normal",
+            "OnHold",
+            "AwaitingInspection",
+            "Defective",
+            "ToBeDiscarded"
+          ]
+        },
+        {
+          "name": "toStatus",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Normal",
+            "OnHold",
+            "AwaitingInspection",
+            "Defective",
+            "ToBeDiscarded"
+          ]
+        },
+        {
+          "name": "source",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Manual",
+            "Inspection",
+            "Nonconformance",
+            "Receiving"
+          ]
+        },
+        {
+          "name": "reason",
+          "kind": "string",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "type": "manufacturing-order.status-changed",
+      "data": [
+        {
+          "name": "orderNo",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "orderType",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Normal",
+            "Rework",
+            "Spot"
+          ]
+        },
+        {
+          "name": "productCode",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "quantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "fromStatus",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Draft",
+            "Approved",
+            "Released",
+            "Completed",
+            "Canceled"
+          ]
+        },
+        {
+          "name": "toStatus",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Draft",
+            "Approved",
+            "Released",
+            "Completed",
+            "Canceled"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "nonconformance.created",
+      "data": [
+        {
+          "name": "reportNo",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Production",
+            "Inspection",
+            "Receiving"
+          ]
+        },
+        {
+          "name": "lotNumber",
+          "kind": "string",
+          "nullable": true
+        },
+        {
+          "name": "productCode",
+          "kind": "string",
+          "nullable": true
+        },
+        {
+          "name": "workOrderNo",
+          "kind": "string",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "type": "production-result.corrected",
+      "data": [
+        {
+          "name": "productionResultId",
+          "kind": "integer",
+          "nullable": false
+        },
+        {
+          "name": "orderNo",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "workOrderNo",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "sequence",
+          "kind": "integer",
+          "nullable": false
+        },
+        {
+          "name": "beforeGoodQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "beforeDefectQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "beforeScrapQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "beforeReworkQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "afterGoodQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "afterDefectQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "afterScrapQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "afterReworkQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "reason",
+          "kind": "string",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "type": "production-result.created",
+      "data": [
+        {
+          "name": "orderNo",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "workOrderNo",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "sequence",
+          "kind": "integer",
+          "nullable": false
+        },
+        {
+          "name": "productCode",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "processCode",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "goodQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "defectQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "scrapQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "reworkQuantity",
+          "kind": "number",
+          "nullable": false
+        },
+        {
+          "name": "startedAt",
+          "kind": "date-time",
+          "nullable": false
+        },
+        {
+          "name": "endedAt",
+          "kind": "date-time",
+          "nullable": true
+        },
+        {
+          "name": "outputLotNumber",
+          "kind": "string",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "type": "work-order.status-changed",
+      "data": [
+        {
+          "name": "orderNo",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "workOrderNo",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "sequence",
+          "kind": "integer",
+          "nullable": false
+        },
+        {
+          "name": "productCode",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "processCode",
+          "kind": "string",
+          "nullable": false
+        },
+        {
+          "name": "fromStatus",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Created",
+            "Dispatched",
+            "Started",
+            "Completed",
+            "Approved",
+            "Canceled"
+          ]
+        },
+        {
+          "name": "toStatus",
+          "kind": "enum",
+          "nullable": false,
+          "values": [
+            "Created",
+            "Dispatched",
+            "Started",
+            "Completed",
+            "Approved",
+            "Canceled"
+          ]
+        }
+      ]
+    }
+  ]
+}

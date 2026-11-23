@@ -7,6 +7,10 @@
 
 <h1>@L["ダッシュボード"]</h1>
 
+<AuthorizeView Roles="@MesRoleGroups.UserAdmin">
+    <WebhookFailureNotice />
+</AuthorizeView>
+
 <div class="tabs">
     <button class="@TabClass("summary")" @onclick='() => _tab = "summary"'>@L["サマリ"]</button>
     <button class="@TabClass("trend")" @onclick='() => _tab = "trend"'>@L["推移（日・週・月）"]</button>

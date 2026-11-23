@@ -432,4 +432,13 @@
   <data name="拒否" xml:space="preserve">
     <value>Rejected</value>
   </data>
+  <data name="送信待ち" xml:space="preserve">
+    <value>Pending</value>
+  </data>
+  <data name="送信済み" xml:space="preserve">
+    <value>Delivered</value>
+  </data>
+  <data name="送信失敗" xml:space="preserve">
+    <value>Failed</value>
+  </data>
 </root>

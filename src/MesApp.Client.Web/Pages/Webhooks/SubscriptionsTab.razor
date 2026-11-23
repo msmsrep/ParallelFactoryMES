@@ -1,0 +1,320 @@
+@using MesApp.Core.Contracts.Integration
+@inject HttpClient Http
+
+@* Webhook の送信先（Spec.md 3.8 Webhook。docs-dev/WebhookTasks.md WHK-01）。
+   秘密の値は登録・再発行の直後にしか表示できない（APIキーと同じ） *@
+
+<Notice Error="@_error" Message="@_message" />
+
+@if (_secret is not null)
+{
+    <div class="card">
+        <h2 style="margin-top:0;">@L["署名の秘密の値"]</h2>
+        <p><strong>@L["この値は今しか表示できません。受け側の設定に、今すぐ写してください。"]</strong></p>
+        @* 値は長く区切りが無いので、どこででも折り返す *@
+        <pre style="white-space:pre-wrap;word-break:break-all;line-height:1.6;">@_secret.PlainSecret</pre>
+        <p class="text-muted">@L["受け側はこの値で本文の署名（HMAC-SHA256）を確かめ、MES から送られたことを確認します。"]</p>
+        <div class="actions">
+            <button class="btn btn-secondary" @onclick="() => _secret = null">@L["写したので閉じる"]</button>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <h2 style="margin-top:0;">@(_editingId is null ? L["送信先を登録する"] : L["送信先を変更する"])</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>@L["用途"]</label>
+            <input @bind="_name" maxlength="100" placeholder="@L["例：班長チャットへの不適合通知"]" />
+        </div>
+        <div class="form-field">
+            <label>@L["送信先の URL"]</label>
+            <input @bind="_url" @bind:event="oninput" maxlength="2000" placeholder="https://" />
+        </div>
+        <div class="form-field">
+            <label>
+                <input type="checkbox" style="width:auto;" @bind="_isActive" />
+                @L["有効（無効にすると新しい出来事を送らない）"]
+            </label>
+        </div>
+    </div>
+    @if (_url.Trim().StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+    {
+        <p class="text-muted">@L["http の送信先には、本文が暗号化されずに流れます。工場の中のネットワークだけで使う送信先にしてください。"]</p>
+    }
+    <div class="form-field">
+        <label>@L["通知するイベント"]</label>
+        @foreach (var type in WebhookEventTypes.All)
+        {
+            <label style="display:block;">
+                <input type="checkbox" style="width:auto;" checked="@_eventTypes.Contains(type)"
+                       @onchange="e => Toggle(type, e.Value is true)" />
+                @LabelOf(type) <code>@type</code>
+            </label>
+        }
+    </div>
+    <div class="actions">
+        <button class="btn" disabled="@_busy" @onclick="SaveAsync">@(_editingId is null ? L["登録"] : L["変更を保存"])</button>
+        @if (_editingId is not null)
+        {
+            <button class="btn btn-secondary" @onclick="ResetForm">@L["やめる"]</button>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">@L["登録済みの送信先"]</h2>
+    @if (_subscriptions is null)
+    {
+        <p class="text-muted">@L["読み込み中..."]</p>
+    }
+    else if (_subscriptions.Count == 0)
+    {
+        <p class="text-muted">@L["登録した送信先はありません。"]</p>
+    }
+    else
+    {
+        @* 列が多いので、狭い画面では表だけを横にスクロールさせる *@
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
+                    <tr><th>@L["用途"]</th><th>@L["送信先の URL"]</th><th>@L["通知するイベント"]</th><th>@L["秘密の値の先頭"]</th><th>@L["状態"]</th><th>@L["送れていない送信"]</th><th>@L["登録日時"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in _subscriptions)
+                    {
+                        <tr>
+                            <td>@s.Name</td>
+                            <td style="word-break:break-all;">@s.Url</td>
+                            <td>@string.Join(L["、"].Value, s.EventTypes.Select(LabelOf))</td>
+                            <td><code>@s.SecretPrefix…</code></td>
+                            <td>@(s.IsActive ? L["有効"] : L["無効"])</td>
+                            <td>
+                                @if (s.FailedCount > 0 || s.RetryingCount > 0)
+                                {
+                                    <strong>@L["失敗中"]</strong><br />
+                                }
+                                @L["送信待ち {0}・再送待ち {1}・停止 {2}", s.PendingCount, s.RetryingCount, s.FailedCount]
+                            </td>
+                            <td>@Format(s.CreatedAt)</td>
+                            <td>
+                                @* 再発行と削除は戻せないので、押してから確かめる二段階にする *@
+                                @if (_confirm == (s.Id, "rotate"))
+                                {
+                                    <button class="btn btn-danger" disabled="@_busy" @onclick="() => RotateAsync(s)">@L["再発行する（古い値は使えなくなります）"]</button>
+                                    <button class="btn btn-secondary" @onclick="() => _confirm = null">@L["やめる"]</button>
+                                }
+                                else if (_confirm == (s.Id, "delete"))
+                                {
+                                    <button class="btn btn-danger" disabled="@_busy" @onclick="() => DeleteAsync(s)">@L["削除する（送信待ちと送信の記録も消えます）"]</button>
+                                    <button class="btn btn-secondary" @onclick="() => _confirm = null">@L["やめる"]</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-secondary" @onclick="() => Edit(s)">@L["変更"]</button>
+                                    <button class="btn btn-secondary" disabled="@_busy" @onclick="() => TestAsync(s)">@L["テスト送信"]</button>
+                                    <button class="btn btn-secondary" @onclick='() => _confirm = (s.Id, "rotate")'>@L["秘密の値を再発行"]</button>
+                                    <button class="btn btn-secondary" @onclick='() => _confirm = (s.Id, "delete")'>@L["削除"]</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<WebhookSubscriptionResponse>? _subscriptions;
+    private CreatedWebhookSecretResponse? _secret;
+    private int? _editingId;
+    private string _name = string.Empty;
+    private string _url = string.Empty;
+    private bool _isActive = true;
+    private HashSet<string> _eventTypes = [];
+    private (int Id, string Action)? _confirm;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _subscriptions = await Http.GetFromJsonAsync<List<WebhookSubscriptionResponse>>("api/webhook-subscriptions") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _error = L["Webhook の送信先の一覧を取得できませんでした。"];
+        }
+    }
+
+    private void Toggle(string type, bool on)
+    {
+        if (on)
+        {
+            _eventTypes.Add(type);
+        }
+        else
+        {
+            _eventTypes.Remove(type);
+        }
+    }
+
+    private void Edit(WebhookSubscriptionResponse s)
+    {
+        _editingId = s.Id;
+        _name = s.Name;
+        _url = s.Url;
+        _isActive = s.IsActive;
+        _eventTypes = s.EventTypes.ToHashSet();
+        _error = null;
+        _message = null;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _name = string.Empty;
+        _url = string.Empty;
+        _isActive = true;
+        _eventTypes = [];
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _message = null;
+        _busy = true;
+        try
+        {
+            // 画面の一覧の順で送る（API 側でも並べ直す）
+            var request = new SaveWebhookSubscriptionRequest(
+                _name, _url, WebhookEventTypes.All.Where(_eventTypes.Contains).ToList(), _isActive);
+            if (_editingId is { } id)
+            {
+                var response = await Http.PutAsJsonAsync($"api/webhook-subscriptions/{id}", request);
+                if (await response.ReadErrorAsync(L["Webhook の送信先の変更に失敗しました。"]) is { } error)
+                {
+                    _error = error;
+                    return;
+                }
+                _message = L["「{0}」を変更しました。", request.Name.Trim()];
+            }
+            else
+            {
+                var response = await Http.PostAsJsonAsync("api/webhook-subscriptions", request);
+                if (await response.ReadErrorAsync(L["Webhook の送信先の登録に失敗しました。"]) is { } error)
+                {
+                    _error = error;
+                    return;
+                }
+                _secret = await response.Content.ReadFromJsonAsync<CreatedWebhookSecretResponse>();
+            }
+            ResetForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RotateAsync(WebhookSubscriptionResponse s)
+    {
+        _error = null;
+        _message = null;
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/webhook-subscriptions/{s.Id}/rotate-secret", null);
+            if (await response.ReadErrorAsync(L["秘密の値の再発行に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _confirm = null;
+            _secret = await response.Content.ReadFromJsonAsync<CreatedWebhookSecretResponse>();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(WebhookSubscriptionResponse s)
+    {
+        _error = null;
+        _message = null;
+        _busy = true;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/webhook-subscriptions/{s.Id}");
+            if (await response.ReadErrorAsync(L["Webhook の送信先の削除に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _confirm = null;
+            if (_editingId == s.Id)
+            {
+                ResetForm();
+            }
+            _message = L["「{0}」を削除しました。", s.Name];
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task TestAsync(WebhookSubscriptionResponse s)
+    {
+        _error = null;
+        _message = null;
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/webhook-subscriptions/{s.Id}/test", null);
+            if (await response.ReadErrorAsync(L["テスト送信に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            var result = await response.Content.ReadFromJsonAsync<WebhookDeliveryResponse>();
+            if (result?.State == WebhookDeliveryState.Delivered)
+            {
+                _message = L["「{0}」へのテスト送信が届きました（HTTP {1}）。", s.Name, result.LastStatusCode ?? 0];
+            }
+            else
+            {
+                // エラーの文は送ったときのまま（訳さない）。状態コードは文の先頭に入っている
+                _error = L["「{0}」へのテスト送信が届きませんでした：{1}", s.Name, result?.LastError ?? string.Empty];
+            }
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string LabelOf(string type) => type switch
+    {
+        WebhookEventTypes.ProductionResultCreated => L["生産実績の記録"],
+        WebhookEventTypes.ProductionResultCorrected => L["生産実績の訂正"],
+        WebhookEventTypes.WorkOrderStatusChanged => L["作業指示の状態の変化"],
+        WebhookEventTypes.ManufacturingOrderStatusChanged => L["製造指図の完了・取消"],
+        WebhookEventTypes.LotStatusChanged => L["ロットの状態の変化"],
+        WebhookEventTypes.NonconformanceCreated => L["不適合の起票"],
+        WebhookEventTypes.EquipmentStopped => L["設備の停止・故障"],
+        _ => type, // 訳さない（版を戻したときに残った、今の版が知らない種類）
+    };
+
+    private static string Format(DateTimeOffset? at) => at?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "-";
+}

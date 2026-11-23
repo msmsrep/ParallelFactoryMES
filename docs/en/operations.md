@@ -342,6 +342,102 @@ Node-RED contains a **simulated piece of equipment** that changes status every f
 To adapt it to your own equipment, replace the simulated equipment (the function node in step ① of the flow) with a node that reads the status from the PLC (OPC UA, MC protocol, Modbus, etc.).
 The sample MQTT broker is a minimal setup without authentication or encryption. Configure passwords and TLS for production.
 
+## Webhooks (notifications from the MES)  {#webhooks}
+
+When an event you want to know about **right away** happens, such as a nonconformance being raised, equipment stopping or a lot being put on hold, the MES notifies the URLs you register over HTTP.
+Use it for alerts to the team leaders' chat or to start the next process when production is completed.
+Systems that only need data periodically (such as inventory and costing in the ERP) can read production results with the [integration API](#integration-api) instead.
+
+Notifications are kept **thin**. Only the type, the time, the numbers of what changed and a one-sentence summary are sent.
+A notification is a cue to fetch data. Get the correct current values from the integration API (this also lets you catch up when a notification did not arrive or arrived out of order).
+
+```
+MES ──(POST, signed)──▶ Receiver (Node-RED, in-house script, etc.) ──▶ Chat, display board, ERP
+```
+
+### Registering a destination
+
+1. A system administrator opens "Administration" → "Webhooks" in the menu, and on the **Destinations** tab chooses the purpose, the destination URL and the events to notify, then clicks **Register**.
+2. Copy the **Signing secret** shown (a string starting with `whsec_`) into the receiver's settings. **The value is shown only at this time.** If it is lost, click **Reissue secret** (the old value stops working immediately, so update the receiver's settings too).
+3. Click **Send test** to check that the receiver gets it. The result is shown on the spot (a test that fails is not retried).
+
+- The URL can also be `http://` (for the factory's internal network). Bodies sent to an `http://` destination are not encrypted, so use `https://` when sending outside the company.
+- A URL containing a user name or password cannot be registered (the URL is shown as it is in the list and the audit log). The receiver verifies the sender by the signature.
+- To stop sending without deleting, clear **Active**. Deleting a destination also deletes its pending notifications and its delivery records.
+
+### Events to notify
+
+| Type | When | Main fields |
+|---|---|---|
+| `production-result.created` | A production result was recorded (from the screens, actual CSV or the integration API) | Order number, work order number, sequence, item code, good/defect quantities, output lot |
+| `production-result.corrected` | A production result was corrected | `productionResultId` of the corrected result, quantities before and after, reason |
+| `work-order.status-changed` | A work order's status changed (dispatch, start, completion, approval, cancellation) | Work order number, status before and after |
+| `manufacturing-order.status-changed` | A manufacturing order was completed or canceled | Order number, order type, status before and after |
+| `lot.status-changed` | A lot's stock status changed (hold, release, awaiting inspection, etc.) | Lot number, item code, before and after, trigger, reason |
+| `nonconformance.created` | A nonconformance was raised (including those raised automatically when an inspection fails) | Nonconformance number, source, lot number, item code |
+| `equipment.stopped` | Equipment entered a stopped or failure interval (from manual entry, actual CSV or [equipment events](#equipment-events)) | Asset number, status, stop cause, alarm code |
+
+Types and statuses are sent as English names (such as `OnHold`) so that they do not change with the display language. Internal IDs are not sent; records are identified by numbers and codes.
+The summary (`summary`) is in Japanese.
+
+### What is sent
+
+```json
+{
+  "id": "c548bec2-5e89-4210-ba22-2110c0325f09",
+  "sequence": 7,
+  "type": "equipment.stopped",
+  "version": 1,
+  "occurredAt": "2026-11-23T11:02:01+00:00",
+  "summary": "…",
+  "data": { "equipmentAssetNo": "EQ-01", "status": "Stopped", "startedAt": "2026-11-23T10:32:00+00:00", "endedAt": null,
+            "stopCause": "Material shortage", "alarmCode": null, "source": "Manual", "workOrderNo": null }
+}
+```
+
+The `summary` is a Japanese sentence such as `設備 EQ-01 が「停止」になりました（Material shortage）。` (equipment EQ-01 has stopped). <!-- 訳さない -->
+
+| Field or header | Description |
+|---|---|
+| `id` | The notification's unique ID. **The same value when resent** (the receiver uses it to discard duplicates) |
+| `sequence` | A number that increases across types (not necessarily consecutive) |
+| `data` | The content for each type (the table above). The list of fields is in the `webhooks` section of the [specification (OpenAPI)](#integration-api) |
+| `X-Mes-Event` | The type (the same as `type` in the body) |
+| `X-Mes-Delivery` | The delivery ID (the same when resent) |
+| `X-Mes-Timestamp` | The time it was sent (Unix seconds) |
+| `X-Mes-Signature` | The signature: `sha256=` followed by the lowercase hexadecimal HMAC-SHA256 of "the `X-Mes-Timestamp` value, `.`, the body", keyed with the secret |
+
+### What the receiver should check
+
+1. **Verify the signature** using the exact bytes of the body you received. If you parse the JSON and turn it back into a string, the way numbers are written and other details change and the signature no longer matches.
+2. **Check the time.** Reject the request if `X-Mes-Timestamp` is off by more than 5 minutes (to block old requests being replayed). Synchronize the clocks of the MES and the receiver with NTP.
+3. **Return 2xx right away.** The MES waits up to 10 seconds by default and resends if no response arrives. Do heavy work after responding.
+4. **Discard the second and later copies of the same `id`.** Notifications are delivered at least once, so the same notification can arrive twice. The order is not guaranteed either.
+
+### When delivery fails
+
+- If the destination cannot be reached, does not respond in time, or returns `5xx`, `408` or `429`, the MES resends at increasing intervals (1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours, 24 hours; up to 8 attempts by default).
+- Other `4xx` and `3xx` responses stop after one attempt, because resending would give the same result (redirects are not followed).
+- For a stopped notification, fix the receiver, then click **Resend** on the **Deliveries** tab. The notification's `id` does not change, so a receiver that already got it discards it as a duplicate.
+- Destinations with notifications waiting to be resent or stopped appear under "Undelivered" on the **Destinations** tab and at the top of the system administrator's **Dashboard**. Destinations are never stopped automatically.
+- Delivery records are kept for 30 days by default.
+- If the `dataprotection-keys` folder (the keys that encrypt the secrets) in the data folder is lost, the secrets cannot be decrypted and notifications to those destinations stop. Reissue the secret, update the receiver's settings, then resend (save the folder together in [Backups](#backup)).
+
+### Trying the samples
+
+- **Node-RED (Docker)**: the Node-RED in the `equipment` profile ([equipment event sample](#equipment-events)) has a tab that receives notifications, verifies the signature and forwards them to a chat (Slack or Teams) in the chat's format.
+  1. Start it with `docker compose --profile equipment up -d` and register `http://node-red:1880/mes-webhook` as a destination.
+  2. Write the secret as `MES_WEBHOOK_SECRET=whsec_...` in `.env` in the repository root and run `docker compose --profile equipment up -d` again.
+  3. Click **Send test**. The received notification and the form that reached the chat appear in the debug pane of Node-RED (http://localhost:1880).
+     By default the notifications are forwarded to a mock inside the flow, not to a real chat. To send them, write `CHAT_WEBHOOK_URL` (a Slack incoming webhook, or the URL of a Teams workflow triggered when a webhook request is received) in `.env`, plus `CHAT_KIND=teams` for Teams.
+- **Scripts**: `samples/webhook` has minimal receivers in Python (`receive_mes_webhook.py`) and PowerShell (`Receive-MesWebhook.ps1`). See the README for where to add your own processing.
+
+### Promises that keep receivers working across upgrades
+
+- Fields in the body are not removed, and their names and types do not change. A field that always had a value does not become one that may have none.
+- Fields, types and values may be added. Make the receiver skip fields it does not know.
+- When the shape must change, it is added as a separate type (v2).
+
 ## Security
 
 <div class="warn">
@@ -556,7 +652,7 @@ Decide which database to use before you start operating. If you switch the setti
 | SQL Server gives a certificate error | For a server with an internal self-signed certificate, add `TrustServerCertificate=True` to the connection string, or configure a trusted certificate on the server |
 | It stops with a permission error (cannot create tables) | Give the connecting login permission to create and change tables in the target database |
 
-## Backups
+## Backups  {#backup}
 
 ### SQLite
 
@@ -570,7 +666,7 @@ There are two safe methods.
 1. Stop the server, then copy `mesapp.db`
 2. While it is running, create a backup file with SQLite's `VACUUM INTO`
 
-With Docker, stop the container and save the whole volume (the signing key is kept along with it).
+With Docker, stop the container and save the whole volume (the signing key and the keys that encrypt the webhook secrets are kept along with it).
 Check the volume name with `docker volume ls` (with compose it is `<folder name>_mesapp-data`).
 
 ```bash
@@ -590,6 +686,11 @@ Back up with each database's standard tools (backups can be taken while it is ru
 - SQL Server: `BACKUP DATABASE mesapp TO DISK = N'...\mesapp.bak'` (or a backup from SQL Server Management Studio)
 
 To return to the initial state, drop the database, create an empty one again and restart.
+
+### Keys in the data folder
+
+Besides the database, also save `jwt-signing.key` (the sign-in signing key) and the `dataprotection-keys` folder (the keys that encrypt the [webhook](#webhooks) secrets) in the data folder.
+If `dataprotection-keys` is lost, the webhook secrets in a restored database cannot be decrypted, and you will need to reissue the secret for each destination.
 
 ## Limitations
 

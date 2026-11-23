@@ -121,6 +121,8 @@ Entity（`Core/Entities`）→ `MesAppDbContext` の `DbSet` と `Configurations
 
 **CSVの列は連携API・フォルダ連携の約束**（Spec.md 3.8 CSVの列の約束）。列は消さない・必須の列を増やさない（新しい列は省けば今までどおりに動く任意の列で足す）・改名は以前の名前を `CsvColumnInfo.Aliases` に残す。列を足したら `$env:MESAPP_UPDATE_CSV_CONTRACT='1'` で `MasterCsvTests` の「CSVの列の約束」を流して `tests/MesApp.Api.Tests/CsvContract.v1.json` を更新し、同じコミットに入れる（互換を壊す変更はこの方法でも通らない）
 
+**Webhook の本文も受け側との約束**（Spec.md 3.8 Webhook）。通知は状態を変えるサービスの中で `WebhookPublisher.EnqueueAsync` を呼んで積む（業務と同じトランザクション。`SaveChanges` の前）。data は `Core/Contracts/Integration/WebhookPayloads.cs` の型だけで、項目は消さない・名前と型を変えない・null になり得るようにしない・列挙の値を消さない。足したら `$env:MESAPP_UPDATE_WEBHOOK_CONTRACT='1'` で `AuthTests` の「Webhookの本文の約束」を流して `tests/MesApp.Api.Tests/WebhookContract.v1.json` を更新し、同じコミットに入れる
+
 ## 完了の定義（DoD・全項目必須）
 
 1. ビルド成功、**新規の警告を増やしていない**

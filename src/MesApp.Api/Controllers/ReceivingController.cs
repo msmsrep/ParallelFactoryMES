@@ -81,8 +81,8 @@ public class ReceivingController(
             return this.ConflictProblem(ex.Message);
         }
         lot.InitialQuantity = 0;
-        lotStatus.ChangeStatus(lot, LotStockStatus.ToBeDiscarded, LotStatusChangeSource.Receiving,
-            "受入取消", User.FindFirstValue(ClaimTypes.NameIdentifier));
+        await lotStatus.ChangeStatusAsync(lot, LotStockStatus.ToBeDiscarded, LotStatusChangeSource.Receiving,
+            "受入取消", User.FindFirstValue(ClaimTypes.NameIdentifier), ct: ct);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "ReceiveCancel", nameof(Lot), lotId.ToString(),
             detail: $"lot={lot.LotNumber}", ct: ct);

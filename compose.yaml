@@ -4,6 +4,8 @@
 # 設備イベントのサンプル（MQTT ブローカーと Node-RED のゲートウェイ）も起動するときは、リポジトリの直下で
 #   docker compose --profile equipment up -d   → Node-RED は http://localhost:1880
 # （APIキーを発行してから MES_API_KEY に入れる。手順は運用ガイドの「設備イベントの受信」）
+# 同じ Node-RED に Webhook の受け側の見本（署名を確かめてチャットへ転送する）も入っている。
+# MES の送信先に http://node-red:1880/mes-webhook を登録し、秘密の値を MES_WEBHOOK_SECRET に入れる（運用ガイドの「Webhook」）
 services:
   mesapp:
     image: ghcr.io/msmsrep/parallelfactorymes:latest
@@ -41,6 +43,8 @@ services:
   node-red:
     image: nodered/node-red:4.0
     profiles: [equipment]
+    # Webhook の署名を確かめるため、本文を生のまま残す設定を読む（samples/equipment-gateway/settings.js）
+    command: ["--settings", "/gateway/settings.js"]
     ports:
       - "1880:1880"
     environment:
@@ -51,6 +55,11 @@ services:
       SIM_EQUIPMENT: EQ-06
       # サンプルのフローを読む（画面で書き換えて保存すると、このフォルダのファイルが書き換わる）
       FLOWS: /gateway/flows.json
+      # Webhook の受け側：送信先を登録したときの秘密の値（whsec_...）と、転送先のチャット
+      # （CHAT_WEBHOOK_URL を省くと、フローの中の模擬に送る。CHAT_KIND は slack か teams）
+      MES_WEBHOOK_SECRET: ${MES_WEBHOOK_SECRET:-}
+      CHAT_KIND: ${CHAT_KIND:-slack}
+      CHAT_WEBHOOK_URL: ${CHAT_WEBHOOK_URL:-}
       TZ: Asia/Tokyo
     volumes:
       - ./samples/equipment-gateway:/gateway

@@ -3121,6 +3121,144 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("UserSkills");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.WebhookDelivery", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("LastStatusCode")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("LockedAtUnixSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("NextAttemptAtUnixSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("OutboxId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SubscriptionId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OutboxId");
+
+                    b.HasIndex("SubscriptionId");
+
+                    b.HasIndex("State", "NextAttemptAtUnixSeconds");
+
+                    b.ToTable("WebhookDeliveries");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WebhookOutbox", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId")
+                        .IsUnique();
+
+                    b.ToTable("WebhookOutbox");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WebhookSubscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventTypes")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SecretPrefix")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SecretProtected")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("SecretRotatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WebhookSubscriptions");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.WorkCenter", b =>
                 {
                     b.Property<int>("Id")
@@ -4782,6 +4920,25 @@ namespace MesApp.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.WebhookDelivery", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.WebhookOutbox", "Outbox")
+                        .WithMany("Deliveries")
+                        .HasForeignKey("OutboxId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.WebhookSubscription", "Subscription")
+                        .WithMany("Deliveries")
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Outbox");
+
+                    b.Navigation("Subscription");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.WorkCenter", b =>
                 {
                     b.HasOne("MesApp.Core.Entities.WorkCenter", "Parent")
@@ -5030,6 +5187,16 @@ namespace MesApp.Infrastructure.Migrations
             modelBuilder.Entity("MesApp.Core.Entities.Stocktake", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WebhookOutbox", b =>
+                {
+                    b.Navigation("Deliveries");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.WebhookSubscription", b =>
+                {
+                    b.Navigation("Deliveries");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.WorkOrder", b =>

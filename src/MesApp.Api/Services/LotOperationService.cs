@@ -115,7 +115,7 @@ public sealed class LotOperationService(
             return Outcome<Lot>.Invalid(ApiText.T("存在しないロットIDです。"));
         }
         var before = lot.StockStatus;
-        lotStatus.ChangeStatus(lot, status, LotStatusChangeSource.Manual, reason, userId);
+        await lotStatus.ChangeStatusAsync(lot, status, LotStatusChangeSource.Manual, reason, userId, ct: ct);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Inventory", "StatusChange", nameof(Lot), lot.Id.ToString(),
             detail: new

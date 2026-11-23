@@ -44,7 +44,7 @@ public sealed class EquipmentEventOptions
 /// </para>
 /// </summary>
 public sealed class EquipmentEventService(
-    MesAppDbContext db, IAuditLogger auditLogger, IOptions<EquipmentEventOptions> options)
+    MesAppDbContext db, Webhooks.WebhookPublisher webhooks, IAuditLogger auditLogger, IOptions<EquipmentEventOptions> options)
 {
     /// <summary>区間を閉じるだけの状態（電源断・通信断）。稼働履歴のステータスには無い</summary>
     public const string OffState = "Off";
@@ -249,6 +249,8 @@ public sealed class EquipmentEventService(
                     openLog.WorkOrderId = workOrderId;
                     openLog.Note = row.Note;
                     row.EquipmentLogId = openLog.Id;
+                    // 同じ時刻の変化で区間の状態を置き換えた：停止・故障になったなら知らせる（Spec.md 3.8 Webhook）
+                    await ShopFloorReportService.EnqueueStoppedAsync(webhooks, db, openLog, row.AlarmCode, ct);
                 }
             }
             else
@@ -275,6 +277,7 @@ public sealed class EquipmentEventService(
                         Source = EquipmentLogSource.Event,
                     };
                     db.EquipmentLogs.Add(openLog);
+                    await ShopFloorReportService.EnqueueStoppedAsync(webhooks, db, openLog, row.AlarmCode, ct);
                     await db.SaveChangesAsync(ct);
                     row.EquipmentLogId = openLog.Id;
                 }
