@@ -22,8 +22,8 @@ The screen is divided into tabs. Creating maintenance plans and maintenance proc
 
 #### Current equipment status
 
-For each active piece of equipment, the current status (running, stopped, etc.; "No record" if there is none), the start, the elapsed time (minutes), the work order and the stop cause are listed. You can filter by **Work center**.
-The list does not refresh automatically. Press **Refresh** to update it.
+For each active piece of equipment, the current status (running, stopped, etc.; "No records" if there is none), the start, the elapsed time (minutes), the work order and the stop cause are listed. You can filter by **Work center** (the list reloads when you choose one).
+The list does not refresh automatically. Press **Update** to load the latest status.
 
 For equipment that collects status from equipment events, the **Last received** time is shown. When no events have been received for a while (10 minutes by default), "(no events received)" appears.
 Check whether the gateway or the network has stopped ([Receiving equipment events](operations.html#equipment-events)).

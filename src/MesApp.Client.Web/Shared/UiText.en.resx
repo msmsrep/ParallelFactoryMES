@@ -390,8 +390,8 @@
   <data name="マスタ管理 - Parallel Factory MES" xml:space="preserve">
     <value>Master Data - Parallel Factory MES</value>
   </data>
-  <data name="品目／MBOM／工順（BOP）／工程／作業区／設備（BOE）／治工具／ロケーション／検査項目・基準／検査機・測定器／工程管理項目／作業手順書（SOP）／チェックリスト／勤務シフト／ユーザー・スキル資格。" xml:space="preserve">
-    <value>Products / MBOM / Routings (BOP) / Processes / Work centers / Equipment (BOE) / Tools / Locations / Inspection items &amp; criteria / Inspection devices / Process control items / Work procedures (SOP) / Checklists / Shifts / Users &amp; skills.</value>
+  <data name="品目／MBOM／工順（BOP）／工程／作業区／設備（BOE）／停止原因の対応表／治工具／ロケーション／検査項目・基準／検査機・測定器／工程管理項目／作業手順書（SOP）／チェックリスト／勤務シフト／ユーザー・スキル資格。" xml:space="preserve">
+    <value>Products / MBOM / Routings (BOP) / Processes / Work centers / Equipment (BOE) / Stop cause mapping / Tools / Locations / Inspection items &amp; criteria / Inspection devices / Process control items / Work procedures (SOP) / Checklists / Shifts / Users &amp; skills.</value>
   </data>
   <data name="マスタ" xml:space="preserve">
     <value>Master data</value>
@@ -4573,6 +4573,6 @@
     <value>(no events received)</value>
   </data>
   <data name="自動では更新しません。最新にするときは「更新」を押してください。設備イベントで収集する設備は、受信が一定時間（既定10分）途絶えると知らせます。" xml:space="preserve">
-    <value>This list does not refresh automatically. Press "Refresh" to update it. For equipment that collects status from equipment events, a notice appears when no events have been received for a while (10 minutes by default).</value>
+    <value>This list does not refresh automatically. Press "Update" to load the latest status. For equipment that collects status from equipment events, a notice appears when no events have been received for a while (10 minutes by default).</value>
   </data>
 </root>
