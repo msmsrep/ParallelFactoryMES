@@ -107,7 +107,7 @@ ZIPにしたものを Releases に添付しています（[マスタ](https://gi
 - **Microsoft Store 版（1台で試す）**: [Microsoft Store](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=ja-JP&gl=JP) からインストールします。サーバー不要で、ほかの端末からは接続できません
 - **ZIP（自己完結版・.NET不要）**: [Releases](https://github.com/msmsrep/ParallelFactoryMES/releases/latest) から
   `ParallelFactoryMES-<版>-win-x64.zip` / `-linux-x64.zip` を取得し、展開して `start.cmd`（Linux は `sh start.sh`）で起動します（ポート 5000）
-- **Docker（amd64 / arm64）**: `docker compose up -d` で起動します（ポート 8080。PostgreSQL 付きは `compose.postgres.yaml`）
+- **Docker（amd64 / arm64）**: `docker compose up -d` で起動します（ポート 8080。PostgreSQL 付きは `compose.postgres.yaml`）。設備イベントのサンプル（MQTT ブローカーと Node-RED のゲートウェイ）も動かすときは `docker compose --profile equipment up -d`（`samples/equipment-gateway`）
 
   ```bash
   docker run -d -p 8080:8080 -v mesapp-data:/data ghcr.io/msmsrep/parallelfactorymes
