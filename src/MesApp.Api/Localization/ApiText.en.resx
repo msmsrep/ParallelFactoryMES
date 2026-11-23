@@ -2778,4 +2778,10 @@
   <data name="イベントの種類 '{0}' はありません。" xml:space="preserve">
     <value>There is no event type '{0}'.</value>
   </data>
+  <data name="Webhook の送信が見つかりません。" xml:space="preserve">
+    <value>The webhook delivery was not found.</value>
+  </data>
+  <data name="再送できるのは、送信が止まったもの（{0}）だけです。" xml:space="preserve">
+    <value>Only stopped deliveries ({0}) can be resent.</value>
+  </data>
 </root>

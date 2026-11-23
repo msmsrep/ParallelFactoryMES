@@ -17,6 +17,8 @@ using MesApp.Core.Contracts.Setup;
 using MesApp.Core.Contracts.Users;
 using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -739,5 +741,310 @@ public class AuthTests
             Assert.Equal([lot.Subscription.Id], await db.WebhookDeliveries.Select(d => d.SubscriptionId).ToListAsync());
         }
         Assert.Contains("Delete", await admin.GetStringAsync("/api/audit-logs?category=Webhook&pageSize=200"));
+    }
+
+    // ---- Webhook の送信・署名・再送（Spec.md 3.8 Webhook。WHK-02） ----
+
+    /// <summary>テストの中に立てる受け側。実ネットワークには出ない。応答は積んだ順に返し、尽きたら200</summary>
+    private sealed class WebhookReceiver : HttpMessageHandler
+    {
+        public sealed record Received(Dictionary<string, string> Headers, string Body);
+
+        private readonly object _gate = new();
+        private readonly List<Received> _received = [];
+        private readonly Queue<Func<HttpResponseMessage>> _responses = new();
+
+        public List<Received> Requests { get { lock (_gate) { return [.. _received]; } } }
+
+        public void Reply(params HttpStatusCode[] codes)
+        {
+            lock (_gate)
+            {
+                foreach (var code in codes)
+                {
+                    _responses.Enqueue(() => new HttpResponseMessage(code) { Content = new StringContent("受け側の応答") });
+                }
+            }
+        }
+
+        public void ThrowOnce()
+        {
+            lock (_gate)
+            {
+                _responses.Enqueue(() => throw new HttpRequestException("接続できませんでした（テスト）"));
+            }
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var body = await request.Content!.ReadAsStringAsync(ct);
+            Func<HttpResponseMessage>? next;
+            lock (_gate)
+            {
+                _received.Add(new Received(
+                    request.Headers.Concat(request.Content.Headers).ToDictionary(h => h.Key, h => string.Join(",", h.Value)),
+                    body));
+                _responses.TryDequeue(out next);
+            }
+            return next?.Invoke() ?? new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
+    private static WebApplicationFactory<Program> WithReceiver(ApiFactory factory, WebhookReceiver receiver) =>
+        factory.WithWebHostBuilder(b => b.ConfigureTestServices(services =>
+            services.AddHttpClient(WebhookDispatcher.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => receiver)));
+
+    private static async Task<HttpClient> AdminOfAsync(WebApplicationFactory<Program> app)
+    {
+        var client = app.CreateClient();
+        (await client.PostAsJsonAsync("/api/setup/initialize",
+            new InitializeRequest(TestAuth.AdminUser, TestAuth.AdminPassword, "管理者"))).EnsureSuccessStatusCode();
+        await TestAuth.LoginAsync(client, TestAuth.AdminUser, TestAuth.AdminPassword);
+        return client;
+    }
+
+    private static async Task EnqueueAsync(WebApplicationFactory<Program> app, string lotNo)
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
+        await scope.ServiceProvider.GetRequiredService<WebhookPublisher>().EnqueueAsync(
+            WebhookEventTypes.LotStatusChanged, $"ロット {lotNo} を保留にしました", new { lotNo }, CancellationToken.None);
+        await db.SaveChangesAsync();
+    }
+
+    private static Task<int> DispatchAsync(WebApplicationFactory<Program> app) =>
+        app.Services.GetRequiredService<WebhookDispatcher>().DispatchDueAsync(CancellationToken.None);
+
+    private static async Task<List<Core.Entities.WebhookDelivery>> DeliveriesAsync(WebApplicationFactory<Program> app)
+    {
+        using var scope = app.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<MesAppDbContext>().WebhookDeliveries.AsNoTracking()
+            .OrderBy(d => d.Id).ToListAsync();
+    }
+
+    /// <summary>再送の時刻を待たずに送れるよう、送ってよい時刻を今にする</summary>
+    private static async Task MakeDueAsync(WebApplicationFactory<Program> app)
+    {
+        using var scope = app.Services.CreateScope();
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await scope.ServiceProvider.GetRequiredService<MesAppDbContext>().WebhookDeliveries
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.NextAttemptAtUnixSeconds, now));
+    }
+
+    [Fact]
+    public async Task Webhookは署名を付けて送り_受け側は秘密の値で検算できる()
+    {
+        using var factory = new ApiFactory();
+        var receiver = new WebhookReceiver();
+        using var app = WithReceiver(factory, receiver);
+        using var admin = await AdminOfAsync(app);
+        var created = await CreateWebhookAsync(admin, "ロット", true, WebhookEventTypes.LotStatusChanged);
+        await EnqueueAsync(app, "L-1");
+
+        Assert.Equal(1, await DispatchAsync(app));
+        // 送り終えたものは二度と送らない
+        Assert.Equal(0, await DispatchAsync(app));
+
+        var request = Assert.Single(receiver.Requests);
+        var timestamp = long.Parse(request.Headers[WebhookSignature.TimestampHeader], CultureInfo.InvariantCulture);
+        Assert.InRange(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - timestamp, 0, 60);
+        Assert.Equal(WebhookSignature.Compute(created.PlainSecret, timestamp, request.Body),
+            request.Headers[WebhookSignature.SignatureHeader]);
+        // 署名の形は受け側との約束（sha256= と小文字の16進64桁）
+        Assert.Matches("^sha256=[0-9a-f]{64}$", request.Headers[WebhookSignature.SignatureHeader]);
+        Assert.Equal(WebhookEventTypes.LotStatusChanged, request.Headers[WebhookSignature.EventHeader]);
+        Assert.StartsWith("application/json", request.Headers["Content-Type"]);
+
+        var delivery = Assert.Single(await DeliveriesAsync(app));
+        Assert.Equal(delivery.Id.ToString(CultureInfo.InvariantCulture), request.Headers[WebhookSignature.DeliveryHeader]);
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Delivered, delivery.State);
+        Assert.Equal(1, delivery.Attempts);
+        Assert.Equal(200, delivery.LastStatusCode);
+        Assert.NotNull(delivery.DeliveredAt);
+
+        using var body = JsonDocument.Parse(request.Body);
+        var root = body.RootElement;
+        using (var scope = app.Services.CreateScope())
+        {
+            var outbox = await scope.ServiceProvider.GetRequiredService<MesAppDbContext>().WebhookOutbox.SingleAsync();
+            Assert.Equal(outbox.EventId, root.GetProperty("id").GetGuid());
+            Assert.Equal(outbox.Id, root.GetProperty("sequence").GetInt64());
+        }
+        Assert.Equal(WebhookEventTypes.LotStatusChanged, root.GetProperty("type").GetString());
+        Assert.Equal(1, root.GetProperty("version").GetInt32());
+        Assert.Equal("ロット L-1 を保留にしました", root.GetProperty("summary").GetString());
+        Assert.Equal("L-1", root.GetProperty("data").GetProperty("lotNo").GetString());
+        root.GetProperty("occurredAt").GetDateTimeOffset();
+        // 1文字でも変えると署名が合わない
+        Assert.NotEqual(WebhookSignature.Compute(created.PlainSecret, timestamp, request.Body + " "),
+            request.Headers[WebhookSignature.SignatureHeader]);
+    }
+
+    [Fact]
+    public async Task Webhookは5xxと接続失敗では間隔を空けて再送し_4xxでは止め_回数が尽きたら止まり_手で再送できる()
+    {
+        using var factory = new ApiFactory(new Dictionary<string, string> { ["Webhooks:MaxAttempts"] = "3" });
+        var receiver = new WebhookReceiver();
+        using var app = WithReceiver(factory, receiver);
+        using var admin = await AdminOfAsync(app);
+        var created = await CreateWebhookAsync(admin, "ロット", true, WebhookEventTypes.LotStatusChanged);
+
+        // 500 → 次の再送まで待つ（すぐには送らない）→ 時刻が来たら送り、届く
+        receiver.Reply(HttpStatusCode.InternalServerError);
+        await EnqueueAsync(app, "L-1");
+        Assert.Equal(1, await DispatchAsync(app));
+        var first = Assert.Single(await DeliveriesAsync(app));
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Pending, first.State);
+        Assert.Equal(1, first.Attempts);
+        Assert.Equal(500, first.LastStatusCode);
+        Assert.Contains("受け側の応答", first.LastError);
+        Assert.True(first.NextAttemptAtUnixSeconds >= DateTimeOffset.UtcNow.AddSeconds(50).ToUnixTimeSeconds());
+        Assert.Equal(0, await DispatchAsync(app));
+        var listed = await admin.GetFromJsonAsync<List<WebhookSubscriptionResponse>>(WebhookSubscriptions);
+        Assert.Equal((0, 1, 0), (listed![0].PendingCount, listed[0].RetryingCount, listed[0].FailedCount));
+
+        await MakeDueAsync(app);
+        Assert.Equal(1, await DispatchAsync(app));
+        first = Assert.Single(await DeliveriesAsync(app));
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Delivered, first.State);
+        Assert.Equal(2, first.Attempts);
+        Assert.Null(first.LastError);
+
+        // 400 は送り直しても同じなので、1回で止める
+        receiver.Reply(HttpStatusCode.BadRequest);
+        await EnqueueAsync(app, "L-2");
+        await DispatchAsync(app);
+        var second = (await DeliveriesAsync(app))[1];
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Failed, second.State);
+        Assert.Equal(1, second.Attempts);
+
+        // 接続失敗・503 が続き、上限（3回）で止まる
+        receiver.ThrowOnce();
+        receiver.Reply(HttpStatusCode.ServiceUnavailable, HttpStatusCode.TooManyRequests);
+        await EnqueueAsync(app, "L-3");
+        for (var i = 0; i < 3; i++)
+        {
+            await MakeDueAsync(app);
+            await DispatchAsync(app);
+        }
+        var third = (await DeliveriesAsync(app))[2];
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Failed, third.State);
+        Assert.Equal(3, third.Attempts);
+        Assert.Equal(429, third.LastStatusCode);
+        listed = await admin.GetFromJsonAsync<List<WebhookSubscriptionResponse>>(WebhookSubscriptions);
+        Assert.Equal(2, listed![0].FailedCount);
+
+        // 記録の一覧（新しい順・状態で絞れる）と、手での再送
+        var failed = await admin.GetFromJsonAsync<List<WebhookDeliveryResponse>>(
+            $"/api/webhook-deliveries?subscriptionId={created.Subscription.Id}&state=Failed");
+        Assert.Equal([third.Id, second.Id], failed!.Select(d => d.Id));
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsync($"/api/webhook-deliveries/{first.Id}/resend", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsync("/api/webhook-deliveries/99999/resend", null)).StatusCode);
+        var resent = await (await admin.PostAsync($"/api/webhook-deliveries/{third.Id}/resend", null))
+            .Content.ReadFromJsonAsync<WebhookDeliveryResponse>();
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Pending, resent!.State);
+        Assert.Equal(0, resent.Attempts);
+        Assert.Equal(1, await DispatchAsync(app));
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Delivered, (await DeliveriesAsync(app))[2].State);
+        // 送り直しても通知の id は同じ（受け側は重複として捨てられる）
+        var bodies = receiver.Requests.Select(r => JsonDocument.Parse(r.Body).RootElement.GetProperty("id").GetGuid()).ToList();
+        Assert.Equal(bodies[^2], bodies[^1]);
+        Assert.Contains("Resend", await admin.GetStringAsync("/api/audit-logs?category=Webhook&pageSize=200"));
+
+        using var manager = await TestAuth.CreateUserClientAsync(
+            factory, admin, "manager", "Passw0rd123", MesRoles.ProductionManager);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync("/api/webhook-deliveries")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.PostAsync($"/api/webhook-deliveries/{second.Id}/resend", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task 同じWebhookの送信待ちを複数の処理が同時に取り出しても送るのは1回()
+    {
+        using var factory = new ApiFactory();
+        var receiver = new WebhookReceiver();
+        using var app = WithReceiver(factory, receiver);
+        using var admin = await AdminOfAsync(app);
+        await CreateWebhookAsync(admin, "ロット", true, WebhookEventTypes.LotStatusChanged);
+        for (var i = 0; i < 6; i++)
+        {
+            await EnqueueAsync(app, $"L-{i}");
+        }
+
+        var sent = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(() => DispatchAsync(app))));
+        Assert.Equal(6, sent.Sum());
+        Assert.Equal(6, receiver.Requests.Select(r => r.Headers[WebhookSignature.DeliveryHeader]).Distinct().Count());
+        Assert.Equal(6, receiver.Requests.Count);
+        Assert.All(await DeliveriesAsync(app), d => Assert.Equal(1, d.Attempts));
+    }
+
+    [Fact]
+    public async Task Webhookのテスト送信はいま送って結果を返し_失敗しても再送しない()
+    {
+        using var factory = new ApiFactory();
+        var receiver = new WebhookReceiver();
+        using var app = WithReceiver(factory, receiver);
+        using var admin = await AdminOfAsync(app);
+        // 無効の送信先にも送れる（有効にする前に受け側を確かめるため）
+        var created = await CreateWebhookAsync(admin, "まだ無効", false, WebhookEventTypes.LotStatusChanged);
+
+        var ok = await (await admin.PostAsync($"{WebhookSubscriptions}/{created.Subscription.Id}/test", null))
+            .Content.ReadFromJsonAsync<WebhookDeliveryResponse>();
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Delivered, ok!.State);
+        Assert.Equal(WebhookDispatcher.PingEventType, ok.EventType);
+        var request = Assert.Single(receiver.Requests);
+        Assert.Equal(WebhookDispatcher.PingEventType, request.Headers[WebhookSignature.EventHeader]);
+
+        receiver.Reply(HttpStatusCode.InternalServerError);
+        var ng = await (await admin.PostAsync($"{WebhookSubscriptions}/{created.Subscription.Id}/test", null))
+            .Content.ReadFromJsonAsync<WebhookDeliveryResponse>();
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Failed, ng!.State);
+        Assert.Equal(500, ng.LastStatusCode);
+        await MakeDueAsync(app);
+        Assert.Equal(0, await DispatchAsync(app));
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsync($"{WebhookSubscriptions}/999/test", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Webhookの秘密の値を復号できない送信は再送せずに止め_再発行を促す()
+    {
+        using var factory = new ApiFactory();
+        var receiver = new WebhookReceiver();
+        using var app = WithReceiver(factory, receiver);
+        using var admin = await AdminOfAsync(app);
+        await CreateWebhookAsync(admin, "ロット", true, WebhookEventTypes.LotStatusChanged);
+        await EnqueueAsync(app, "L-1");
+        using (var scope = app.Services.CreateScope())
+        {
+            // DB だけを戻して Data Protection の鍵を失ったのと同じ状態
+            await scope.ServiceProvider.GetRequiredService<MesAppDbContext>().WebhookSubscriptions
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.SecretProtected, "壊れた暗号文"));
+        }
+
+        Assert.Equal(1, await DispatchAsync(app));
+        var delivery = Assert.Single(await DeliveriesAsync(app));
+        Assert.Equal(Core.Entities.WebhookDeliveryState.Failed, delivery.State);
+        Assert.Contains("再発行", delivery.LastError);
+        Assert.Empty(receiver.Requests);
+    }
+
+    [Fact]
+    public async Task Webhookの常駐処理は送信待ちを自分で送る()
+    {
+        using var factory = new ApiFactory(new Dictionary<string, string>
+        {
+            ["Webhooks:WorkerEnabled"] = "true",
+            ["Webhooks:PollIntervalSeconds"] = "1",
+        });
+        var receiver = new WebhookReceiver();
+        using var app = WithReceiver(factory, receiver);
+        using var admin = await AdminOfAsync(app);
+        await CreateWebhookAsync(admin, "ロット", true, WebhookEventTypes.LotStatusChanged);
+        await EnqueueAsync(app, "L-1");
+
+        for (var i = 0; i < 100 && receiver.Requests.Count == 0; i++)
+        {
+            await Task.Delay(100);
+        }
+        Assert.Single(receiver.Requests);
     }
 }

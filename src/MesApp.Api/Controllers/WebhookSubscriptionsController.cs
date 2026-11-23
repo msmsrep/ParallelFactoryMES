@@ -20,18 +20,34 @@ namespace MesApp.Api.Controllers;
 [ApiController]
 [Route("api/webhook-subscriptions")]
 [Authorize]
-public class WebhookSubscriptionsController(MesAppDbContext db, WebhookSecrets secrets, IAuditLogger auditLogger) : ControllerBase
+public class WebhookSubscriptionsController(
+    MesAppDbContext db, WebhookSecrets secrets, WebhookDispatcher dispatcher, IAuditLogger auditLogger) : ControllerBase
 {
     private const int NameMaxLength = 100;
     private const int UrlMaxLength = 2000;
 
-    /// <summary>登録済みの送信先（登録順）</summary>
+    /// <summary>登録済みの送信先（登録順）。送れていない送信の件数を添える（失敗が続いている送信先を見つけるため）</summary>
     [HttpGet]
     [Authorize(Roles = MesRoleGroups.UserAdmin)]
     public async Task<ActionResult<List<WebhookSubscriptionResponse>>> List(CancellationToken ct)
     {
         var rows = await db.WebhookSubscriptions.AsNoTracking().OrderBy(s => s.Id).ToListAsync(ct);
-        return rows.Select(ToResponse).ToList();
+        var counts = await db.WebhookDeliveries.AsNoTracking()
+            .Where(d => d.State != WebhookDeliveryState.Delivered)
+            .GroupBy(d => new { d.SubscriptionId, d.State })
+            .Select(g => new { g.Key.SubscriptionId, g.Key.State, Count = g.Count(), Retrying = g.Count(d => d.Attempts > 0) })
+            .ToListAsync(ct);
+        return rows.Select(s =>
+        {
+            var pending = counts.FirstOrDefault(c => c.SubscriptionId == s.Id && c.State == WebhookDeliveryState.Pending);
+            var failed = counts.FirstOrDefault(c => c.SubscriptionId == s.Id && c.State == WebhookDeliveryState.Failed);
+            return ToResponse(s) with
+            {
+                PendingCount = (pending?.Count ?? 0) - (pending?.Retrying ?? 0),
+                RetryingCount = pending?.Retrying ?? 0,
+                FailedCount = failed?.Count ?? 0,
+            };
+        }).ToList();
     }
 
     /// <summary>送信先を登録する。秘密の値の平文はこの応答でしか返さない</summary>
@@ -107,6 +123,38 @@ public class WebhookSubscriptionsController(MesAppDbContext db, WebhookSecrets s
         await auditLogger.LogAsync("Webhook", "RotateSecret", "WebhookSubscription", Key(subscription),
             detail: new { subscription.Name, before = beforePrefix, after = prefix }, ct: ct);
         return new CreatedWebhookSecretResponse(ToResponse(subscription), plain);
+    }
+
+    /// <summary>
+    /// テスト送信（種類 <c>webhook.ping</c>）。いま1回だけ送って結果を返す（失敗しても再送しない）。
+    /// 無効の送信先にも送れる（有効にする前に受け側を確かめるため）。送信の記録にも残る
+    /// </summary>
+    [HttpPost("{id:int}/test")]
+    [Authorize(Roles = MesRoleGroups.UserAdmin)]
+    public async Task<ActionResult<WebhookDeliveryResponse>> Test(int id, CancellationToken ct)
+    {
+        var subscription = await db.WebhookSubscriptions.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (subscription is null)
+        {
+            return this.NotFoundProblem(ApiText.T("Webhook の送信先が見つかりません。"));
+        }
+        var delivery = new WebhookDelivery { SubscriptionId = id };
+        db.WebhookOutbox.Add(new WebhookOutbox
+        {
+            EventType = WebhookDispatcher.PingEventType,
+            // 受け側へ送る文（保存される値なので訳さない。WHK-03 の summary と同じ扱い）
+            Summary = $"Webhook のテスト送信です（{subscription.Name}）。",
+            Payload = System.Text.Json.JsonSerializer.Serialize(
+                new { subscriptionId = subscription.Id, name = subscription.Name }, WebhookPublisher.PayloadJson),
+            Deliveries = [delivery],
+        });
+        await db.SaveChangesAsync(ct);
+        await dispatcher.SendNowAsync(db, delivery.Id, ct);
+
+        var sent = await db.WebhookDeliveries.AsNoTracking()
+            .Include(d => d.Outbox).Include(d => d.Subscription)
+            .SingleAsync(d => d.Id == delivery.Id, ct);
+        return WebhookDeliveriesController.ToResponse(sent);
     }
 
     /// <summary>送信先を削除する。まだ送っていない送信待ちと送信の記録も消える（止めるだけなら無効にする）</summary>

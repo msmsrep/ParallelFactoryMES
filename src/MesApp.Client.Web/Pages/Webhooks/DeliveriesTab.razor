@@ -1,0 +1,159 @@
+@using MesApp.Core.Contracts.Integration
+@inject HttpClient Http
+
+@* Webhook の送信の記録（Spec.md 3.8 Webhook。docs-dev/WebhookTasks.md WHK-02）。
+   試行の結果を見て、止まった送信を手で再送する *@
+
+<Notice Error="@_error" Message="@_message" />
+
+<div class="card">
+    <div class="form-grid">
+        <div class="form-field">
+            <label>@L["送信先"]</label>
+            <select @bind="_subscriptionId" @bind:after="LoadAsync">
+                <option value="">@L["すべて"]</option>
+                @foreach (var s in _subscriptions)
+                {
+                    <option value="@s.Id">@s.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>@L["状態"]</label>
+            <select @bind="_state" @bind:after="LoadAsync">
+                <option value="">@L["すべて"]</option>
+                @foreach (var state in Enum.GetValues<WebhookDeliveryState>())
+                {
+                    <option value="@state">@EnumLabels.Of(state)</option>
+                }
+            </select>
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn btn-secondary" disabled="@_busy" @onclick="LoadAsync">@L["再読み込み"]</button>
+    </div>
+    <p class="text-muted">
+        @L["失敗した送信は間隔を空けて自動で再送し、回数が尽きると止まります。止まった送信は、受け側を直してから再送してください。"]
+        @L["新しい順に最大{0}件を表示します。", Limit]
+    </p>
+</div>
+
+<div class="card">
+    @if (_deliveries is null)
+    {
+        <p class="text-muted">@L["読み込み中..."]</p>
+    }
+    else if (_deliveries.Count == 0)
+    {
+        <p class="text-muted">@L["送信の記録はありません。"]</p>
+    }
+    else
+    {
+        @* 列が多いので、狭い画面では表だけを横にスクロールさせる *@
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
+                    <tr><th>sequence</th><th>@L["発生日時"]</th><th>@L["送信先"]</th><th>@L["イベント"]</th><th>@L["状態"]</th><th>@L["試行回数"]</th><th>@L["最後の試行"]</th><th>@L["結果"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in _deliveries)
+                    {
+                        <tr>
+                            <td>@d.Sequence</td>
+                            <td>@Format(d.OccurredAt)</td>
+                            <td>@d.SubscriptionName</td>
+                            <td><code>@d.EventType</code><br /><span class="text-muted">@d.Summary</span></td>
+                            <td>
+                                @EnumLabels.Of(d.State)
+                                @if (d.State == WebhookDeliveryState.Pending && d.Attempts > 0)
+                                {
+                                    <br /><span class="text-muted">@L["次の再送：{0}", Format(d.NextAttemptAt)]</span>
+                                }
+                            </td>
+                            <td>@d.Attempts</td>
+                            <td>@Format(d.LastAttemptAt)</td>
+                            @* エラーの文は送ったときのまま残している（訳さない） *@
+                            <td style="word-break:break-all;">@(d.LastStatusCode is { } code ? $"HTTP {code}" : string.Empty) @d.LastError</td>
+                            <td>
+                                @if (d.State == WebhookDeliveryState.Failed)
+                                {
+                                    <button class="btn btn-secondary" disabled="@_busy" @onclick="() => ResendAsync(d)">@L["再送"]</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private const int Limit = 200;
+
+    private List<WebhookSubscriptionResponse> _subscriptions = [];
+    private List<WebhookDeliveryResponse>? _deliveries;
+    private int? _subscriptionId;
+    private WebhookDeliveryState? _state;
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _subscriptions = await Http.GetFromJsonAsync<List<WebhookSubscriptionResponse>>("api/webhook-subscriptions") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _error = L["Webhook の送信先の一覧を取得できませんでした。"];
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var query = $"api/webhook-deliveries?limit={Limit}";
+        if (_subscriptionId is { } sid)
+        {
+            query += $"&subscriptionId={sid}";
+        }
+        if (_state is { } state)
+        {
+            query += $"&state={(int)state}";
+        }
+        try
+        {
+            _deliveries = await Http.GetFromJsonAsync<List<WebhookDeliveryResponse>>(query) ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _error = L["Webhook の送信の記録を取得できませんでした。"];
+        }
+    }
+
+    private async Task ResendAsync(WebhookDeliveryResponse d)
+    {
+        _error = null;
+        _message = null;
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/webhook-deliveries/{d.Id}/resend", null);
+            if (await response.ReadErrorAsync(L["再送に失敗しました。"]) is { } error)
+            {
+                _error = error;
+                return;
+            }
+            _message = L["sequence {0} を送信待ちに戻しました。まもなく送ります。", d.Sequence];
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string Format(DateTimeOffset? at) => at?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-";
+}

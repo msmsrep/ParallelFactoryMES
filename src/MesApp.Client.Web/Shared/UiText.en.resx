@@ -4686,4 +4686,70 @@
   <data name="送信先" xml:space="preserve">
     <value>Destinations</value>
   </data>
+  <data name="再読み込み" xml:space="preserve">
+    <value>Reload</value>
+  </data>
+  <data name="失敗した送信は間隔を空けて自動で再送し、回数が尽きると止まります。止まった送信は、受け側を直してから再送してください。" xml:space="preserve">
+    <value>Failed deliveries are retried automatically at increasing intervals and stop when the attempts run out. Fix the receiver, then resend stopped deliveries.</value>
+  </data>
+  <data name="新しい順に最大{0}件を表示します。" xml:space="preserve">
+    <value>Shows up to {0} entries, newest first.</value>
+  </data>
+  <data name="送信の記録はありません。" xml:space="preserve">
+    <value>There are no deliveries.</value>
+  </data>
+  <data name="イベント" xml:space="preserve">
+    <value>Event</value>
+  </data>
+  <data name="試行回数" xml:space="preserve">
+    <value>Attempts</value>
+  </data>
+  <data name="最後の試行" xml:space="preserve">
+    <value>Last attempt</value>
+  </data>
+  <data name="次の再送：{0}" xml:space="preserve">
+    <value>Next retry: {0}</value>
+  </data>
+  <data name="再送" xml:space="preserve">
+    <value>Resend</value>
+  </data>
+  <data name="Webhook の送信の記録を取得できませんでした。" xml:space="preserve">
+    <value>Could not load the webhook deliveries.</value>
+  </data>
+  <data name="再送に失敗しました。" xml:space="preserve">
+    <value>Failed to resend.</value>
+  </data>
+  <data name="sequence {0} を送信待ちに戻しました。まもなく送ります。" xml:space="preserve">
+    <value>Moved sequence {0} back to pending. It will be sent shortly.</value>
+  </data>
+  <data name="送れていない送信" xml:space="preserve">
+    <value>Undelivered</value>
+  </data>
+  <data name="失敗中" xml:space="preserve">
+    <value>Failing</value>
+  </data>
+  <data name="送信待ち {0}・再送待ち {1}・停止 {2}" xml:space="preserve">
+    <value>Pending {0} / Retrying {1} / Stopped {2}</value>
+  </data>
+  <data name="テスト送信" xml:space="preserve">
+    <value>Send test</value>
+  </data>
+  <data name="テスト送信に失敗しました。" xml:space="preserve">
+    <value>Failed to send the test.</value>
+  </data>
+  <data name="「{0}」へのテスト送信が届きました（HTTP {1}）。" xml:space="preserve">
+    <value>The test to "{0}" was delivered (HTTP {1}).</value>
+  </data>
+  <data name="「{0}」へのテスト送信が届きませんでした：{1}" xml:space="preserve">
+    <value>The test to "{0}" was not delivered: {1}</value>
+  </data>
+  <data name="Webhook の送信に失敗している送信先があります：{0}" xml:space="preserve">
+    <value>Some webhook destinations are failing: {0}</value>
+  </data>
+  <data name="送信の記録を見る" xml:space="preserve">
+    <value>View deliveries</value>
+  </data>
+  <data name="送信の記録" xml:space="preserve">
+    <value>Deliveries</value>
+  </data>
 </root>

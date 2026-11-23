@@ -1,0 +1,32 @@
+@using MesApp.Core.Contracts.Integration
+@inject HttpClient Http
+
+@* Webhook の失敗中の送信先の知らせ（Spec.md 3.8 Webhook。WHK-02）。
+   失敗が続いても送信先を自動で止めない代わりに、ダッシュボードで気付けるようにする。
+   システム管理者のダッシュボードにだけ置く（一覧の API がシステム管理者専用のため）。
+   取れなくてもダッシュボードは開けたままにする（何も出さない） *@
+
+@if (_failing.Count > 0)
+{
+    <div class="alert alert-danger">
+        @L["Webhook の送信に失敗している送信先があります：{0}", string.Join(L["、"].Value, _failing.Select(s => s.Name))]
+        <a href="webhooks">@L["送信の記録を見る"]</a>
+    </div>
+}
+
+@code {
+    private List<WebhookSubscriptionResponse> _failing = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var all = await Http.GetFromJsonAsync<List<WebhookSubscriptionResponse>>("api/webhook-subscriptions") ?? [];
+            _failing = all.Where(s => s.FailedCount > 0 || s.RetryingCount > 0).ToList();
+        }
+        catch (HttpRequestException)
+        {
+            // ダッシュボードの本体を優先する（知らせが出ないだけ）
+        }
+    }
+}

@@ -2,8 +2,7 @@
 @attribute [Authorize(Roles = MesRoles.SystemAdmin)]
 
 @* Webhook（Spec.md 3.8 Webhook。docs-dev/WebhookTasks.md）。
-   送信先は業務データの持ち出し口になるので、システム管理者専用（一覧の参照も）。
-   送信の記録のタブは WHK-02 で足す *@
+   送信先は業務データの持ち出し口になるので、システム管理者専用（一覧の参照も） *@
 
 <PageTitle>@L["Webhook - Parallel Factory MES"]</PageTitle>
 
@@ -15,12 +14,16 @@
 
 <div class="tabs">
     <button class="@TabClass("subscriptions")" @onclick='() => _tab = "subscriptions"'>@L["送信先"]</button>
+    <button class="@TabClass("deliveries")" @onclick='() => _tab = "deliveries"'>@L["送信の記録"]</button>
 </div>
 
 @switch (_tab)
 {
     case "subscriptions":
         <SubscriptionsTab />
+        break;
+    case "deliveries":
+        <DeliveriesTab />
         break;
 }
 

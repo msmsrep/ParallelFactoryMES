@@ -44,6 +44,8 @@ public class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Database:ConnectionString", _database.ConnectionString);
         builder.UseSetting("Jwt:SigningKeyFile", Path.Combine(_workDir, "jwt-signing.key"));
         builder.UseSetting("DataProtection:KeysDirectory", Path.Combine(_workDir, "dataprotection-keys"));
+        // Webhook の常駐処理は止め、テストが送信を直接呼ぶ（いつ送られるかをテストが決められるように）
+        builder.UseSetting("Webhooks:WorkerEnabled", "false");
         foreach (var (key, value) in _settings)
         {
             builder.UseSetting(key, value);

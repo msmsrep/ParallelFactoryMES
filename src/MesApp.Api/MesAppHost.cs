@@ -136,6 +136,17 @@ public static class MesAppHost
                     : "dataprotection-keys")));
         builder.Services.AddSingleton<WebhookSecrets>();
         builder.Services.AddScoped<WebhookPublisher>();
+        builder.Services.Configure<WebhookOptions>(builder.Configuration.GetSection(WebhookOptions.SectionName));
+        // リダイレクトは追わない（送信先が知らない場所へ本文と署名を転送させないため。3xx は失敗として止める）
+        builder.Services.AddHttpClient(WebhookDispatcher.HttpClientName, client =>
+            {
+                // 待ち時間は送信ごとに WebhookOptions.TimeoutSeconds で切る
+                client.Timeout = Timeout.InfiniteTimeSpan;
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("ParallelFactoryMES-Webhook/1");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+        builder.Services.AddSingleton<WebhookDispatcher>();
+        builder.Services.AddHostedService<WebhookDispatchWorker>();
 
         // 既定は JWT（画面用 API）。APIキーは連携API の Controller が明示したときだけ使う（ApiKeyAuthentication.IntegrationSchemes）
         builder.Services
