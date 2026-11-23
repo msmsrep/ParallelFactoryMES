@@ -8,6 +8,7 @@ using MesApp.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace MesApp.Api.Controllers;
 
@@ -23,8 +24,70 @@ namespace MesApp.Api.Controllers;
 [Route("api/equipment-logs")]
 [Authorize]
 public class EquipmentLogsController(
-    MesAppDbContext db, ShopFloorReportService reports, IBusinessDateService businessDate) : ControllerBase
+    MesAppDbContext db, ShopFloorReportService reports, IBusinessDateService businessDate,
+    IOptions<EquipmentEventOptions> eventOptions) : ControllerBase
 {
+    /// <summary>
+    /// 設備ごとの今の状態（E-20-10-03）。有効な設備ごとに、開いている稼働区間（状態・開始・経過・作業指示）と、
+    /// イベントで収集する設備では最後に受けた時刻と途絶の判定を返す。workCenterId で設置場所の作業区に絞れる。
+    /// <para>
+    /// 自動更新はしない（画面の「更新」で読み直す）。途絶の判定は受信の時刻で行う（設備の時計ではなく MES の時計で数えるため）
+    /// </para>
+    /// </summary>
+    [HttpGet("current")]
+    public async Task<ActionResult<List<EquipmentCurrentStatusRow>>> Current(
+        [FromQuery] int? workCenterId = null, CancellationToken ct = default)
+    {
+        var equipments = await db.Equipments.AsNoTracking()
+            .Where(e => e.IsActive && (workCenterId == null || e.WorkCenterId == workCenterId))
+            .OrderBy(e => e.AssetNo)
+            .Select(e => new
+            {
+                e.Id, e.AssetNo, e.Name, e.WorkCenterId,
+                WorkCenterCode = e.WorkCenter != null ? e.WorkCenter.Code : null,
+                WorkCenterName = e.WorkCenter != null ? e.WorkCenter.Name : null,
+                e.CollectsEvents,
+            })
+            .ToListAsync(ct);
+        var ids = equipments.Select(e => e.Id).ToList();
+
+        // 設備ごとの最新の開いた区間・最新の受信。SQLite は DateTimeOffset の最大を SQL にできないので、ID の最大で引く
+        var openLogIds = await db.EquipmentLogs.AsNoTracking()
+            .Where(l => l.EndedAt == null && ids.Contains(l.EquipmentId))
+            .GroupBy(l => l.EquipmentId).Select(g => g.Max(l => l.Id))
+            .ToListAsync(ct);
+        var openLogs = await db.EquipmentLogs.AsNoTracking()
+            .Where(l => openLogIds.Contains(l.Id))
+            .Select(l => new
+            {
+                l.EquipmentId, l.Status, l.StartedAt, l.StopCause, l.WorkOrderId,
+                WorkOrderNo = l.WorkOrder != null ? l.WorkOrder.WorkOrderNo : null,
+            })
+            .ToDictionaryAsync(l => l.EquipmentId, ct);
+        var lastEventIds = await db.EquipmentEvents.AsNoTracking()
+            .Where(e => ids.Contains(e.EquipmentId))
+            .GroupBy(e => e.EquipmentId).Select(g => g.Max(e => e.Id))
+            .ToListAsync(ct);
+        var lastReceived = await db.EquipmentEvents.AsNoTracking()
+            .Where(e => lastEventIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.EquipmentId, e => e.ReceivedAt, ct);
+
+        var now = DateTimeOffset.UtcNow;
+        var silence = TimeSpan.FromMinutes(Math.Max(1, eventOptions.Value.SilenceMinutes));
+        return equipments.Select(e =>
+        {
+            openLogs.TryGetValue(e.Id, out var log);
+            DateTimeOffset? received = lastReceived.TryGetValue(e.Id, out var at) ? at : null;
+            return new EquipmentCurrentStatusRow(
+                e.Id, e.AssetNo, e.Name, e.WorkCenterId, e.WorkCenterCode, e.WorkCenterName, e.CollectsEvents,
+                log?.Status, log?.StartedAt,
+                log is null ? null : Math.Round((decimal)(now - log.StartedAt).TotalMinutes, 1),
+                log?.StopCause, log?.WorkOrderId, log?.WorkOrderNo,
+                e.CollectsEvents ? received : null,
+                e.CollectsEvents && (received is null || now - received.Value > silence));
+        }).ToList();
+    }
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<EquipmentLogResponse>>> List(
         [FromQuery] PageQuery paging,

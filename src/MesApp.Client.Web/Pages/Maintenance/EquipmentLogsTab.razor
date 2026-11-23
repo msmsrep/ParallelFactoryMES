@@ -1,10 +1,73 @@
 ﻿@inject HttpClient Http
 
-@* 稼働監視（Spec.md 3.1。B-40-20、E-20-10-03、E-20-30-03）。稼働実績の手入力と、稼働サマリ・OEE・履歴の参照 *@
+@* 稼働監視（Spec.md 3.1。B-40-20、E-20-10-03、E-20-30-03）。設備の今の状態、稼働実績の手入力と、稼働サマリ・OEE・履歴の参照 *@
 <Notice Error="@_error" Message="@_message" />
 
 <div class="card">
-    <h2 style="margin-top:0;">@L["稼働実績の記録（手入力。センサー自動収集は将来拡張）"]</h2>
+    <h2 style="margin-top:0;">@L["設備の今の状態"]</h2>
+    <div class="form-grid">
+        <div class="form-field">
+            <label>@L["作業区"]</label>
+            <select @bind="_currentWorkCenterId">
+                <option value="0">@L["すべて"]</option>
+                @foreach (var wc in _equipments.Where(e => e.WorkCenterId is not null)
+                             .DistinctBy(e => e.WorkCenterId).OrderBy(e => e.WorkCenterCode))
+                {
+                    <option value="@wc.WorkCenterId">@wc.WorkCenterCode @wc.WorkCenterName</option>
+                }
+            </select>
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn btn-secondary" disabled="@_busy" @onclick="LoadCurrentAsync">@L["更新"]</button>
+    </div>
+    @if (_current is null)
+    {
+        <p class="text-muted">@L["読み込み中..."]</p>
+    }
+    else if (_current.Count == 0)
+    {
+        <p class="text-muted">@L["設備がありません。"]</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>@L["設備"]</th><th>@L["作業区"]</th><th>@L["状態"]</th><th>@L["開始"]</th><th>@L["経過(分)"]</th><th>@L["作業指示"]</th><th>@L["停止原因"]</th><th>@L["最後の受信"]</th></tr></thead>
+            <tbody>
+                @foreach (var row in _current)
+                {
+                    <tr>
+                        <td>@row.AssetNo @row.EquipmentName</td>
+                        <td>@(row.WorkCenterCode ?? "-")</td>
+                        <td>@(row.Status is { } status ? EnumLabels.Of(status) : L["記録なし"].Value)</td>
+                        <td>@(row.StartedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
+                        <td>@(row.ElapsedMinutes?.ToString("0") ?? "-")</td>
+                        <td>@(row.WorkOrderNo ?? "-")</td>
+                        <td>@(row.StopCause ?? "-")</td>
+                        <td>
+                            @if (!row.CollectsEvents)
+                            {
+                                @L["手入力"]
+                            }
+                            else
+                            {
+                                @(row.LastEventReceivedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")
+                                @if (row.EventsSilent)
+                                {
+                                    <span class="text-muted"> @L["（受信が途絶えています）"]</span>
+                                }
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="text-muted">@L["自動では更新しません。最新にするときは「更新」を押してください。設備イベントで収集する設備は、受信が一定時間（既定10分）途絶えると知らせます。"]</p>
+    }
+</div>
+
+<div class="card">
+    <h2 style="margin-top:0;">@L["稼働実績の記録（手入力）"]</h2>
     <div class="form-grid">
         <div class="form-field">
             <label>@L["設備"]</label>
@@ -201,6 +264,8 @@
 
     private List<EquipmentResponse> _equipments = [];
     private PagedResult<EquipmentLogResponse>? _logs;
+    private List<EquipmentCurrentStatusRow>? _current;
+    private int _currentWorkCenterId;
     private bool _missingCauseOnly;
     private readonly Dictionary<int, string?> _causeInputs = [];
     private List<EquipmentUtilizationRow>? _utilization;
@@ -273,8 +338,15 @@
         }
     }
 
+    private async Task LoadCurrentAsync()
+    {
+        var query = _currentWorkCenterId == 0 ? "" : $"?workCenterId={_currentWorkCenterId}";
+        _current = await Http.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>($"api/equipment-logs/current{query}");
+    }
+
     private async Task LoadLogsAsync()
     {
+        await LoadCurrentAsync();
         await LoadEquipmentLogsAsync(1);
         _utilization = await Http.GetFromJsonAsync<List<EquipmentUtilizationRow>>("api/equipment-logs/summary");
         _oee = await Http.GetFromJsonAsync<List<EquipmentOeeRow>>("api/oee");

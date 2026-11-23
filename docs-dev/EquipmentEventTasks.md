@@ -26,7 +26,7 @@ MES の設備稼働履歴（`EquipmentLog`）の区間に組み立てる（B-40-
 | EQE-01 土台（生イベント・収集フラグ・手入力との住み分け） | 完了（2026-11-23。Spec.md 改訂154） |
 | EQE-02 受信APIと区間の組み立て | 完了（2026-11-23。Spec.md 改訂155） |
 | EQE-03 停止原因の対応表と原因の追記 | 完了（2026-11-23。Spec.md 改訂156） |
-| EQE-04 稼働監視に今の状態を出す | 未着手 |
+| EQE-04 稼働監視に今の状態を出す | 完了（2026-11-23。Spec.md 改訂157） |
 | EQE-05 ゲートウェイのサンプル（Mosquitto＋Node-RED）と利用者ガイド | 未着手 |
 
 ## 決定事項（2026-11-23 確定）
@@ -128,6 +128,12 @@ MES の設備稼働履歴（`EquipmentLog`）の区間に組み立てる（B-40-
 
 **変更ファイルの想定（約7）**：`Core/Contracts/` の稼働監視の DTO、`EquipmentLogsController.cs`、`Web/Pages/Maintenance/EquipmentLogsTab.razor`（大きくなるなら同じフォルダに部品を分ける）、`UiText.en.resx`、`Tests/MaintenanceTests.cs`、`Spec.md`（3.5・6.1・改訂履歴）、`CodeMap.md`
 **受入基準**：開いている区間の状態が出る／手入力の設備も出る／途絶の判定が設定値で変わる
+
+**実施メモ（2026-11-23）**：変更は10ファイル（想定約7。想定外は、途絶の時間を受信の設定（`EquipmentEventOptions`）に足した `EquipmentEventService.cs`・`appsettings.json`と、バックログ）。
+- 作業区の選択肢は設備の一覧（`api/equipments` の作業区）から作り、作業区のAPIを別に呼ばない。絞り込みは設置場所の作業区との一致だけ（ラインで束ねるのは段を辿る必要があるので、要望が出てから）
+- 最新の開いた区間・最新の受信は、SQLite が DateTimeOffset の最大を SQL にできないため、設備ごとの ID の最大で引く
+- 稼働監視の見出し「稼働実績の記録（手入力。センサー自動収集は将来拡張）」は事実と合わなくなったので「稼働実績の記録（手入力）」にした（Spec.md 3.5 の同じ記述も）
+- SQLite・SQL Server・PostgreSQL で `MaintenanceTests` を確認した
 
 ### EQE-05 ゲートウェイのサンプル（Mosquitto＋Node-RED）と利用者ガイド
 

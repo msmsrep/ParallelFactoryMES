@@ -3306,8 +3306,8 @@
   <data name="消耗材モニタリング" xml:space="preserve">
     <value>Consumables monitoring</value>
   </data>
-  <data name="稼働実績の記録（手入力。センサー自動収集は将来拡張）" xml:space="preserve">
-    <value>Record operation (manual entry; automatic sensor collection is a future extension)</value>
+  <data name="稼働実績の記録（手入力）" xml:space="preserve">
+    <value>Record operation (manual entry)</value>
   </data>
   <data name="対象作業指示（任意）" xml:space="preserve">
     <value>Work order (optional)</value>
@@ -4556,5 +4556,23 @@
   </data>
   <data name="アラーム番号と停止原因を入力してください。" xml:space="preserve">
     <value>Enter the alarm code and the stop cause.</value>
+  </data>
+  <data name="設備の今の状態" xml:space="preserve">
+    <value>Current equipment status</value>
+  </data>
+  <data name="設備がありません。" xml:space="preserve">
+    <value>There is no equipment.</value>
+  </data>
+  <data name="経過(分)" xml:space="preserve">
+    <value>Elapsed (min)</value>
+  </data>
+  <data name="最後の受信" xml:space="preserve">
+    <value>Last received</value>
+  </data>
+  <data name="（受信が途絶えています）" xml:space="preserve">
+    <value>(no events received)</value>
+  </data>
+  <data name="自動では更新しません。最新にするときは「更新」を押してください。設備イベントで収集する設備は、受信が一定時間（既定10分）途絶えると知らせます。" xml:space="preserve">
+    <value>This list does not refresh automatically. Press "Refresh" to update it. For equipment that collects status from equipment events, a notice appears when no events have been received for a while (10 minutes by default).</value>
   </data>
 </root>

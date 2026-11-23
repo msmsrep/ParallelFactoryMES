@@ -22,6 +22,11 @@ public sealed class EquipmentEventOptions
 
     /// <summary>サーバーの時刻より先の発生時刻を許す幅（秒。設備の時計のずれの許容）</summary>
     public int MaxFutureSkewSeconds { get; set; } = 300;
+
+    /// <summary>
+    /// 受信が途絶えたとみなす時間（分）。稼働監視の今の状態で「受信が途絶えています」と出す（ゲートウェイの停止に気づくため）
+    /// </summary>
+    public int SilenceMinutes { get; set; } = 10;
 }
 
 /// <summary>

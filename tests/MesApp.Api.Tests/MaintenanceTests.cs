@@ -1053,6 +1053,57 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 設備の今の状態は開いた区間と受信の途絶を返す()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var (equipment, gateway) = await SetupEventEquipmentAsync(factory, admin);
+        using var _ = gateway;
+        var manual = await (await admin.PostAsJsonAsync("/api/equipments",
+                new EquipmentRequest("EQ-02", "検査機", null, EquipmentStatus.Available, MaintenanceType.None, null, null)))
+            .Content.ReadFromJsonAsync<EquipmentResponse>();
+        var t0 = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-1).ToUnixTimeSeconds());
+
+        // 収集する設備で一度も受けていなければ途絶、手入力の設備は途絶を判定しない
+        var before = (await admin.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>("/api/equipment-logs/current"))!;
+        Assert.Equal(["EQ-01", "EQ-02"], before.Select(r => r.AssetNo));
+        Assert.Null(before[0].Status);
+        Assert.True(before[0].EventsSilent);
+        Assert.False(before[1].EventsSilent);
+
+        // 開いている区間の状態が出る（手入力の終了時刻なしの区間も、イベントの区間も）
+        (await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(manual!.Id, EquipmentLogStatus.Setup, t0, null, null, null))).EnsureSuccessStatusCode();
+        await SendEventsAsync(gateway,
+            new("EQ-01", "n-1", t0, "Running"),
+            new("EQ-01", "n-2", t0.AddMinutes(30), "Stopped", AlarmCode: "A-1"));
+        var after = (await admin.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>("/api/equipment-logs/current"))!;
+        Assert.Equal(EquipmentLogStatus.Stopped, after[0].Status);
+        Assert.Equal(t0.AddMinutes(30), after[0].StartedAt);
+        Assert.InRange(after[0].ElapsedMinutes!.Value, 29m, 32m);
+        Assert.NotNull(after[0].LastEventReceivedAt);
+        Assert.False(after[0].EventsSilent);
+        Assert.Equal(EquipmentLogStatus.Setup, after[1].Status);
+        Assert.Null(after[1].LastEventReceivedAt);
+
+        // 最後の受信から設定の時間（既定10分）より長く経つと途絶
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MesApp.Infrastructure.MesAppDbContext>();
+            foreach (var row in db.EquipmentEvents.ToList())
+            {
+                row.ReceivedAt = DateTimeOffset.UtcNow.AddMinutes(-11);
+            }
+            await db.SaveChangesAsync();
+        }
+        var silent = (await admin.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>("/api/equipment-logs/current"))!;
+        Assert.True(silent[0].EventsSilent);
+
+        // 作業区で絞れる（どの設備も作業区に置いていないので空）
+        Assert.Empty((await admin.GetFromJsonAsync<List<EquipmentCurrentStatusRow>>("/api/equipment-logs/current?workCenterId=9999"))!);
+    }
+
+    [Fact]
     public async Task 同じ設備への設備イベントが同時に届いても開いた区間は1つになる()
     {
         using var factory = new ApiFactory();
