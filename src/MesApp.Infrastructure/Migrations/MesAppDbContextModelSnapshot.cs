@@ -463,6 +463,9 @@ namespace MesApp.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("CollectsEvents")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
@@ -505,6 +508,74 @@ namespace MesApp.Infrastructure.Migrations
                     b.ToTable("Equipments");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AlarmCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EquipmentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("EquipmentLogId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("OperationSeq")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReceivedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RejectReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WorkOrderNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentLogId");
+
+                    b.HasIndex("EquipmentId", "EventId")
+                        .IsUnique();
+
+                    b.HasIndex("EquipmentId", "OccurredAt");
+
+                    b.ToTable("EquipmentEvents");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentLog", b =>
                 {
                     b.Property<int>("Id")
@@ -526,6 +597,13 @@ namespace MesApp.Infrastructure.Migrations
 
                     b.Property<string>("RecordedByUserId")
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Manual");
 
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("TEXT");
@@ -3559,6 +3637,22 @@ namespace MesApp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("WorkCenter");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.EquipmentLog", null)
+                        .WithMany()
+                        .HasForeignKey("EquipmentLogId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Equipment");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentLog", b =>

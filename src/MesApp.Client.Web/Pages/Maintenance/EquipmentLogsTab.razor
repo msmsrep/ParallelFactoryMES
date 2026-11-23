@@ -145,7 +145,7 @@
     @if (_logs is not null && _logs.Total > 0)
     {
         <table class="table">
-            <thead><tr><th>@L["設備"]</th><th>@L["状態"]</th><th>@L["作業指示"]</th><th>@L["開始"]</th><th>@L["終了"]</th><th>@L["停止原因"]</th></tr></thead>
+            <thead><tr><th>@L["設備"]</th><th>@L["状態"]</th><th>@L["作業指示"]</th><th>@L["開始"]</th><th>@L["終了"]</th><th>@L["停止原因"]</th><th>@L["記録元"]</th></tr></thead>
             <tbody>
                 @foreach (var log in _logs.Items)
                 {
@@ -156,6 +156,7 @@
                         <td>@log.StartedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
                         <td>@(log.EndedAt?.ToLocalTime().ToString("MM/dd HH:mm") ?? "-")</td>
                         <td>@(log.StopCause ?? "-")</td>
+                        <td>@EnumLabels.Of(log.Source)</td>
                     </tr>
                 }
             </tbody>

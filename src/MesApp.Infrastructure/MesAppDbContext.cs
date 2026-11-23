@@ -78,6 +78,7 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
     // 設備保全系（Spec.md 5.1 MaintenanceProcedure、5.5）
     public DbSet<MaintenanceProcedure> MaintenanceProcedures => Set<MaintenanceProcedure>();
     public DbSet<EquipmentLog> EquipmentLogs => Set<EquipmentLog>();
+    public DbSet<EquipmentEvent> EquipmentEvents => Set<EquipmentEvent>();
     public DbSet<MaintenancePlan> MaintenancePlans => Set<MaintenancePlan>();
     public DbSet<MaintenanceOrder> MaintenanceOrders => Set<MaintenanceOrder>();
     public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
@@ -114,6 +115,8 @@ public class MesAppDbContext(DbContextOptions<MesAppDbContext> options)
         builder.Properties<NonconformanceStatus>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<ShipmentJudgmentResult>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<EquipmentLogStatus>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<EquipmentLogSource>().HaveConversion<string>().HaveMaxLength(30);
+        builder.Properties<EquipmentEventResult>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenancePartCategory>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenanceCategory>().HaveConversion<string>().HaveMaxLength(30);
         builder.Properties<MaintenancePlanStatus>().HaveConversion<string>().HaveMaxLength(30);

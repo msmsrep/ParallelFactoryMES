@@ -3,8 +3,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Dashboard;
 using MesApp.Core.Contracts.Integration;
+using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Planning;
 using MesApp.Core.Contracts.Users;
@@ -1800,6 +1802,45 @@ public class MasterCsvTests
         using var manager = await TestAuth.CreateUserClientAsync(
             factory, admin, "manager", "Passw0rd123", MesRoles.ProductionManager);
         Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync("/api/folder-link/status")).StatusCode);
+    }
+
+    [Fact]
+    public async Task 設備CSVで設備イベントの収集を切り替えられ実績CSVの記録元が残る()
+    {
+        using var factory = new ApiFactory();
+        using var client = await TestAuth.CreateAdminClientAsync(factory);
+
+        // 列を省いた設備CSVは今までどおり（収集しない）
+        Assert.True((await ImportAsync(client, "equipments", "AssetNo,Name\nEQ-01,プレス機\nEQ-02,検査機\n")).Succeeded);
+        Assert.True((await ImportActualAsync(client, "equipment-logs", EquipmentLogCsv)).Succeeded);
+
+        // 列で立てると、その設備の実績CSVの稼働記録は拒否される
+        Assert.True((await ImportAsync(client, "equipments", "AssetNo,Name,CollectsEvents\nEQ-01,プレス機,true\n")).Succeeded);
+        var rejected = await ImportActualAsync(client, "equipment-logs", EquipmentLogCsv);
+        Assert.False(rejected.Succeeded);
+        Assert.Contains(rejected.Errors, e => e.Message.Contains("EQ-01"));
+
+        // 列を省いて取り込み直しても、立てたフラグは保たれる
+        Assert.True((await ImportAsync(client, "equipments", "AssetNo,Name\nEQ-01,プレス機改\n")).Succeeded);
+        var equipments = await client.GetFromJsonAsync<List<EquipmentResponse>>("/api/equipments");
+        Assert.True(equipments!.Single(e => e.AssetNo == "EQ-01").CollectsEvents);
+        Assert.False(equipments!.Single(e => e.AssetNo == "EQ-02").CollectsEvents);
+
+        var logs = await client.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>("/api/equipment-logs");
+        Assert.Equal(EquipmentLogSource.Csv, Assert.Single(logs!.Items).Source);
+
+        // 出力に列が出る
+        var exported = await client.GetStringAsync("/api/masters/csv/equipments");
+        Assert.Contains("CollectsEvents", exported.Split('\n')[0]);
+    }
+
+    private static async Task<CsvImportResult> ImportActualAsync(HttpClient client, string kind, string csv)
+    {
+        var content = new StringContent(csv, Encoding.UTF8);
+        content.Headers.ContentType = new MediaTypeHeaderValue("text/csv") { CharSet = "utf-8" };
+        var response = await client.PostAsync($"/api/actuals/csv/{kind}", content);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<CsvImportResult>())!;
     }
 
     private static async Task<CsvImportResult> ImportAsync(

@@ -4503,4 +4503,19 @@
   <data name="キーを発行" xml:space="preserve">
     <value>Issue key</value>
   </data>
+  <data name="設備イベントで稼働状態を収集する（稼働記録の手入力・実績CSVは受け付けない）" xml:space="preserve">
+    <value>Collect operation status from equipment events (manual entry and actuals CSV of operation logs are not accepted)</value>
+  </data>
+  <data name="稼働の収集" xml:space="preserve">
+    <value>Status collection</value>
+  </data>
+  <data name="設備イベント" xml:space="preserve">
+    <value>Equipment event</value>
+  </data>
+  <data name="手入力" xml:space="preserve">
+    <value>Manual entry</value>
+  </data>
+  <data name="記録元" xml:space="preserve">
+    <value>Source</value>
+  </data>
 </root>

@@ -48,8 +48,32 @@ internal sealed class EquipmentLogConfiguration : IEntityTypeConfiguration<Equip
         e.HasIndex(x => x.EquipmentId);
         e.Property(x => x.StopCause).HasMaxLength(500);
         e.Property(x => x.Note).HasMaxLength(500);
+        // 既存の行は手入力として扱う（列を足すときの既定値。DBは列挙子の名前で保存する）
+        e.Property(x => x.Source).HasDefaultValue(EquipmentLogSource.Manual).HasSentinel(EquipmentLogSource.Manual);
         e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId)
             .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class EquipmentEventConfiguration : IEntityTypeConfiguration<EquipmentEvent>
+{
+    public void Configure(EntityTypeBuilder<EquipmentEvent> e)
+    {
+        // 再送の重複は設備ごとのイベントIDで弾く（同時の重複もこの一意索引で止める）
+        e.HasIndex(x => new { x.EquipmentId, x.EventId }).IsUnique();
+        e.HasIndex(x => new { x.EquipmentId, x.OccurredAt });
+        e.Property(x => x.EventId).HasMaxLength(100);
+        e.Property(x => x.State).HasMaxLength(30);
+        e.Property(x => x.AlarmCode).HasMaxLength(50);
+        e.Property(x => x.WorkOrderNo).HasMaxLength(50);
+        e.Property(x => x.Note).HasMaxLength(500);
+        e.Property(x => x.RejectReason).HasMaxLength(500);
+        e.Property(x => x.ReceivedByUserId).HasMaxLength(450);
+        e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId)
+            .OnDelete(DeleteBehavior.Cascade);
+        // 設備からの削除の連鎖が2経路にならないよう、区間側は連鎖させない（SQL Server が拒否するため）
+        e.HasOne<EquipmentLog>().WithMany().HasForeignKey(x => x.EquipmentLogId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

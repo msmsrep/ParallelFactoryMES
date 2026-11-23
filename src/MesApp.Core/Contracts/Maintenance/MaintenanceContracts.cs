@@ -36,7 +36,8 @@ public record EquipmentLogRequest(
 public record EquipmentLogResponse(
     int Id, int EquipmentId, string EquipmentName, EquipmentLogStatus Status,
     DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string? StopCause, string? Note,
-    int? WorkOrderId = null, string? WorkOrderNo = null);
+    int? WorkOrderId = null, string? WorkOrderNo = null,
+    EquipmentLogSource Source = EquipmentLogSource.Manual);
 
 /// <summary>設備別の稼働サマリ（E-20-10-03 稼働・停止実績、E-20-30-03 パフォーマンス確認）</summary>
 public record EquipmentUtilizationRow(

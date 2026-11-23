@@ -63,7 +63,57 @@ public class EquipmentLog
 
     public string? RecordedByUserId { get; set; }
 
+    /// <summary>記録元（手入力／CSV取込／設備イベント）。既存の記録は手入力として扱う</summary>
+    public EquipmentLogSource Source { get; set; } = EquipmentLogSource.Manual;
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// 受信した設備イベント（Spec.md 5.5 EquipmentEvent。B-40-20、E-20-10-01）。
+/// <para>
+/// ゲートウェイから届いた状態変化を、採用・重複・拒否のどれでも残す（区間がおかしいときに届いたものまで遡るため）。
+/// 7.6節の運用ログ（C層）に属し、稼働区間（<see cref="EquipmentLog"/>）より短く持つ。
+/// </para>
+/// </summary>
+public class EquipmentEvent
+{
+    public long Id { get; set; }
+
+    public int EquipmentId { get; set; }
+    public Equipment? Equipment { get; set; }
+
+    /// <summary>ゲートウェイが振る一意のID（設備ごとに一意。再送の重複を弾く）</summary>
+    public string EventId { get; set; } = string.Empty;
+
+    /// <summary>設備側の時刻</summary>
+    public DateTimeOffset OccurredAt { get; set; }
+
+    /// <summary>
+    /// 状態（<see cref="EquipmentLogStatus"/> の名前、または電源断・通信断の <c>Off</c>）。
+    /// 列挙にしないのは <c>Off</c> が区間の状態ではないため
+    /// </summary>
+    public string State { get; set; } = string.Empty;
+
+    public string? AlarmCode { get; set; }
+
+    /// <summary>ゲートウェイが指定した作業指示（指図番号＋工程順序。任意）</summary>
+    public string? WorkOrderNo { get; set; }
+    public int? OperationSeq { get; set; }
+
+    public string? Note { get; set; }
+
+    public EquipmentEventResult Result { get; set; }
+
+    /// <summary>拒否の理由（保存する文字列なので訳さない）</summary>
+    public string? RejectReason { get; set; }
+
+    /// <summary>このイベントで開いた・閉じた稼働区間（任意）</summary>
+    public int? EquipmentLogId { get; set; }
+
+    public DateTimeOffset ReceivedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public string? ReceivedByUserId { get; set; }
 }
 
 /// <summary>保全計画（Spec.md 5.5 MaintenancePlan。E-30-10）</summary>

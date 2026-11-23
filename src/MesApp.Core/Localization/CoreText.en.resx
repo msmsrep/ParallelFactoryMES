@@ -414,4 +414,22 @@
   <data name="間接" xml:space="preserve">
     <value>Indirect</value>
   </data>
+  <data name="手入力" xml:space="preserve">
+    <value>Manual entry</value>
+  </data>
+  <data name="CSV取込" xml:space="preserve">
+    <value>CSV import</value>
+  </data>
+  <data name="設備イベント" xml:space="preserve">
+    <value>Equipment event</value>
+  </data>
+  <data name="採用" xml:space="preserve">
+    <value>Accepted</value>
+  </data>
+  <data name="重複" xml:space="preserve">
+    <value>Duplicate</value>
+  </data>
+  <data name="拒否" xml:space="preserve">
+    <value>Rejected</value>
+  </data>
 </root>

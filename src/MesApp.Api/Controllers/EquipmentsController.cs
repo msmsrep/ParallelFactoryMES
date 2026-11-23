@@ -64,6 +64,7 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
             MaintenanceType = request.MaintenanceType,
             MaintenanceThreshold = request.MaintenanceThreshold,
             MaintenanceParts = request.MaintenanceParts,
+            CollectsEvents = request.CollectsEvents,
         };
         db.Equipments.Add(e);
         await db.SaveChangesAsync(ct);
@@ -102,6 +103,7 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
         e.MaintenanceType = request.MaintenanceType;
         e.MaintenanceThreshold = request.MaintenanceThreshold;
         e.MaintenanceParts = request.MaintenanceParts;
+        e.CollectsEvents = request.CollectsEvents;
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Master", "Update", nameof(Equipment), id.ToString(),
             detail: $"assetNo={e.AssetNo}", ct: ct);
@@ -180,6 +182,6 @@ public class EquipmentsController(MesAppDbContext db, IAuditLogger auditLogger) 
         var wc = workCenter ?? e.WorkCenter;
         return new(e.Id, e.AssetNo, e.Name, e.Site, e.Status,
             e.MaintenanceType, e.MaintenanceThreshold, e.MaintenanceParts, e.IsActive,
-            e.WorkCenterId, wc?.Code, wc?.Name);
+            e.WorkCenterId, wc?.Code, wc?.Name, e.CollectsEvents);
     }
 }

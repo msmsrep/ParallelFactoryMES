@@ -86,12 +86,19 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
     /// 作業指示への紐付けは任意（段取り・保全のように紐づかない記録もある）
     /// </summary>
     public async Task<Outcome<EquipmentLog>> AddEquipmentLogAsync(
-        EquipmentLogRequest request, string? userId, CancellationToken ct)
+        EquipmentLogRequest request, string? userId, CancellationToken ct,
+        EquipmentLogSource source = EquipmentLogSource.Manual)
     {
         var equipment = await db.Equipments.AsNoTracking().FirstOrDefaultAsync(e => e.Id == request.EquipmentId, ct);
         if (equipment is null || !equipment.IsActive)
         {
             return Outcome<EquipmentLog>.Invalid(ApiText.T("存在しない（または無効な）設備IDです。"));
+        }
+        // イベントで収集する設備に手で区間を足すと、同じ時間を二重に数える（Spec.md 5.5 EquipmentEvent）
+        if (equipment.CollectsEvents)
+        {
+            return Outcome<EquipmentLog>.Invalid(ApiText.T(
+                "設備 '{0}' は設備イベントで稼働状態を収集しているため、稼働記録を手で登録できません。", equipment.AssetNo));
         }
         if (request.EndedAt is not null && request.EndedAt <= request.StartedAt)
         {
@@ -119,6 +126,7 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
             StopCause = request.StopCause,
             Note = request.Note,
             RecordedByUserId = userId,
+            Source = source,
         };
         db.EquipmentLogs.Add(log);
         await db.SaveChangesAsync(ct);

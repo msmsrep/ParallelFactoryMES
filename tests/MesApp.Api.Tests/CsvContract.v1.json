@@ -121,6 +121,11 @@
           "name": "IsActive",
           "required": false,
           "aliases": []
+        },
+        {
+          "name": "CollectsEvents",
+          "required": false,
+          "aliases": []
         }
       ]
     },

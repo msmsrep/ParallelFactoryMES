@@ -50,7 +50,7 @@ public class EquipmentLogsController(
             .Select(l => new EquipmentLogResponse(
                 l.Id, l.EquipmentId, l.Equipment!.Name, l.Status,
                 l.StartedAt, l.EndedAt, l.StopCause, l.Note,
-                l.WorkOrderId, l.WorkOrder != null ? l.WorkOrder.WorkOrderNo : null))
+                l.WorkOrderId, l.WorkOrder != null ? l.WorkOrder.WorkOrderNo : null, l.Source))
             .ToPagedResultAsync(paging, ct);
     }
 
@@ -69,7 +69,7 @@ public class EquipmentLogsController(
             .Select(l => new EquipmentLogResponse(
                 l.Id, l.EquipmentId, l.Equipment!.Name, l.Status,
                 l.StartedAt, l.EndedAt, l.StopCause, l.Note,
-                l.WorkOrderId, l.WorkOrder != null ? l.WorkOrder.WorkOrderNo : null))
+                l.WorkOrderId, l.WorkOrder != null ? l.WorkOrder.WorkOrderNo : null, l.Source))
             .SingleAsync(ct);
     }
 

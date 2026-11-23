@@ -815,6 +815,39 @@ public class MaintenanceTests
     }
 
     [Fact]
+    public async Task 設備イベントで収集する設備には稼働記録を手で登録できない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var equipment = await CreateEquipmentAsync(admin);
+        Assert.False(equipment.CollectsEvents);
+        var start = DateTimeOffset.Now.AddHours(-4);
+
+        // フラグを立てる前の手入力は通り、記録元は手入力になる
+        (await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running, start, start.AddHours(1), null, null)))
+            .EnsureSuccessStatusCode();
+
+        var updated = await admin.PutAsJsonAsync($"/api/equipments/{equipment.Id}",
+            new EquipmentRequest(equipment.AssetNo, equipment.Name, equipment.Site, equipment.Status,
+                equipment.MaintenanceType, equipment.MaintenanceThreshold, equipment.MaintenanceParts,
+                CollectsEvents: true));
+        updated.EnsureSuccessStatusCode();
+        Assert.True((await updated.Content.ReadFromJsonAsync<EquipmentResponse>())!.CollectsEvents);
+
+        // 立てた後は、手で区間を足すと同じ時間を二重に数えるので拒否する
+        var rejected = await admin.PostAsJsonAsync("/api/equipment-logs",
+            new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running, start.AddHours(1), start.AddHours(2), null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        Assert.Contains("EQ-01", await rejected.Content.ReadAsStringAsync());
+
+        var logs = await admin.GetFromJsonAsync<PagedResult<EquipmentLogResponse>>(
+            $"/api/equipment-logs?equipmentId={equipment.Id}");
+        var log = Assert.Single(logs!.Items);
+        Assert.Equal(EquipmentLogSource.Manual, log.Source);
+    }
+
+    [Fact]
     public async Task 設備稼働ログの記録と稼働サマリを取得できる()
     {
         using var factory = new ApiFactory();

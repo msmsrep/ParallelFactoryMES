@@ -492,6 +492,9 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<bool>("CollectsEvents")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -535,6 +538,76 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                     b.ToTable("Equipments");
                 });
 
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AlarmCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("EquipmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EquipmentLogId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("OperationSeq")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReceivedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.Property<string>("RejectReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("WorkOrderNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentLogId");
+
+                    b.HasIndex("EquipmentId", "EventId")
+                        .IsUnique();
+
+                    b.HasIndex("EquipmentId", "OccurredAt");
+
+                    b.ToTable("EquipmentEvents");
+                });
+
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentLog", b =>
                 {
                     b.Property<int>("Id")
@@ -558,6 +631,13 @@ namespace MesApp.Migrations.PostgreSql.Migrations
 
                     b.Property<string>("RecordedByUserId")
                         .HasColumnType("text");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Manual");
 
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3762,6 +3842,22 @@ namespace MesApp.Migrations.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("WorkCenter");
+                });
+
+            modelBuilder.Entity("MesApp.Core.Entities.EquipmentEvent", b =>
+                {
+                    b.HasOne("MesApp.Core.Entities.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MesApp.Core.Entities.EquipmentLog", null)
+                        .WithMany()
+                        .HasForeignKey("EquipmentLogId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Equipment");
                 });
 
             modelBuilder.Entity("MesApp.Core.Entities.EquipmentLog", b =>

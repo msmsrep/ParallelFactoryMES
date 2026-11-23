@@ -63,6 +63,7 @@ public static class MasterCsvKinds
             new("MaintenanceThreshold", "保全閾値", false, "保全タイプに応じた日数・時間・回数"),
             new("MaintenanceParts", "保全部品", false, null),
             new("IsActive", "有効", false, "true / false"),
+            new("CollectsEvents", "設備イベントで収集", false, "true / false（true の設備は稼働記録を手入力・実績CSVで登録できない）"),
         ]),
         new(EquipmentParts, "設備の保全部品", false,
         [

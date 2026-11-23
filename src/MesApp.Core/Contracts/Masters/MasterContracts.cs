@@ -104,13 +104,16 @@ public record EquipmentRequest(
     MaintenanceType MaintenanceType,
     decimal? MaintenanceThreshold,
     string? MaintenanceParts,
-    int? WorkCenterId = null);
+    int? WorkCenterId = null,
+    /// <summary>設備イベントで稼働状態を収集する（立てると状態区間の手入力・CSV取込を拒否する）</summary>
+    bool CollectsEvents = false);
 
 /// <summary>WorkCenterCode・WorkCenterName は画面表示用の付随情報（更新は WorkCenterId で行う）</summary>
 public record EquipmentResponse(
     int Id, string AssetNo, string Name, string? Site, EquipmentStatus Status,
     MaintenanceType MaintenanceType, decimal? MaintenanceThreshold, string? MaintenanceParts, bool IsActive,
-    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null);
+    int? WorkCenterId = null, string? WorkCenterCode = null, string? WorkCenterName = null,
+    bool CollectsEvents = false);
 
 // ---- 設備の保全部品（EquipmentPart）----
 

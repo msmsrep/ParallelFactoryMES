@@ -82,7 +82,7 @@ public sealed partial class MasterCsvService(
         return [.. items.Select(e => new string?[]
         {
             e.AssetNo, e.Name, e.WorkCenter?.Code, e.Site, e.Status.ToString(), e.MaintenanceType.ToString(),
-            Num(e.MaintenanceThreshold), e.MaintenanceParts, Bool(e.IsActive),
+            Num(e.MaintenanceThreshold), e.MaintenanceParts, Bool(e.IsActive), Bool(e.CollectsEvents),
         })];
     }
 

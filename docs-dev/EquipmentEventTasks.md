@@ -23,7 +23,7 @@ MES の設備稼働履歴（`EquipmentLog`）の区間に組み立てる（B-40-
 
 | カード | 状態 |
 |:--|:--|
-| EQE-01 土台（生イベント・収集フラグ・手入力との住み分け） | 未着手 |
+| EQE-01 土台（生イベント・収集フラグ・手入力との住み分け） | 完了（2026-11-23。Spec.md 改訂154） |
 | EQE-02 受信APIと区間の組み立て | 未着手 |
 | EQE-03 停止原因の対応表と原因の追記 | 未着手 |
 | EQE-04 稼働監視に今の状態を出す | 未着手 |
@@ -58,10 +58,16 @@ MES の設備稼働履歴（`EquipmentLog`）の区間に組み立てる（B-40-
 - `Equipment.CollectsEvents`（bool。既定 false）。設備タブで切り替え、設備マスタCSVに任意の列 `CollectsEvents` を足して `CsvContract.v1.json` を更新する
 - `EquipmentLog` に記録元 `Source`（手入力／CSV／イベント。列挙子は末尾に追加。既存の行は手入力）を足す。画面の稼働記録一覧に出す
 - `AddEquipmentLogAsync` で、`CollectsEvents` の設備への登録を拒否する（手入力と実績CSVの両方に効く）
-- 7.6節の保持の表に `EquipmentEvent` を足し、既存の運用ログの削除（期限切れの手動削除）の対象に入れる
+- 7.6節の保持の表に `EquipmentEvent` を足す（運用ログ。既定90日）
 
 **変更ファイルの想定（約16＋マイグレーション）**：`Core/Entities/Maintenance.cs`、`Core/Entities/Masters.cs`、`Core/Entities/Enums.cs`、`Infra/MesAppDbContext.cs`、`Infra/Configurations/MaintenanceConfigurations.cs`・`MasterConfigurations.cs`（実際の名前は着手時に確認）、マイグレーション3プロバイダー（`scripts/Migrations.ps1 -Add AddEquipmentEvents`）、設備の DTO（`Core/Contracts/Masters/`）、`EquipmentsController.cs`、`Api/Services/ShopFloorReportService.cs`、設備マスタCSV（`MasterCsvService` の設備の取込・出力）、`CsvContract.v1.json`、保持・削除のサービス（7.6節の運用ログ削除。着手時に CodeMap で確認）、`Web/Pages/Masters/EquipmentsTab.razor`、`Web/Pages/Maintenance/EquipmentLogsTab.razor`、`UiText.en.resx`・`ApiText.en.resx`、`Tests/MaintenanceTests.cs`・`MasterCsvTests.cs`、`Spec.md`（5.5・5.1・7.6・3.8・改訂履歴）、`CodeMap.md`
-**受入基準**：フラグを立てた設備は手入力・実績CSVの稼働記録が拒否され、立てていない設備は今までどおり／設備CSVは `CollectsEvents` 列を省いても今までどおり取り込める／CSVの列の約束のテストが通る（足しただけ）／既存の稼働記録の記録元は手入力になる／期限切れの生イベントが運用ログの削除で消える
+**受入基準**：フラグを立てた設備は手入力・実績CSVの稼働記録が拒否され、立てていない設備は今までどおり／設備CSVは `CollectsEvents` 列を省いても今までどおり取り込める／CSVの列の約束のテストが通る（足しただけ）／既存の稼働記録の記録元は手入力になる
+
+**実施メモ（2026-11-23）**：変更は26ファイル＋マイグレーション9（想定約16。多かったのは CSV の種別定義・出力・取込が3ファイルに分かれていたこと、実績CSVの呼び出し側（`ActualCsvService.Quality.cs`）、区分の表示名（`EnumLabels.cs`・`CoreText.en.resx`）、`EquipmentLogsController.cs` の書き漏れ。設計のずれではない）。
+- **運用ログ（C層）の期限切れ削除はまだ実装されていなかった**（7.6節は方針だけ）。カードの「既存の削除の対象に入れる」は外し、7.6節の表に保持期間を書くだけにした。削除を作るときに `EquipmentEvent` も対象に入れる
+- 既存の行の記録元は、列の既定値（`HasDefaultValue(Manual)`）で `'Manual'` になる。SQLite の移行SQLを `dotnet ef migrations script` で生成して確かめた（マイグレーションのファイルは開いていない）
+- `EquipmentEvent.EquipmentLogId` の外部キーは連鎖させない（`Restrict`）。設備からの削除の連鎖が稼働履歴経由と直接の2経路になり、SQL Server が拒否するため
+- SQLite で全件、SQL Server・PostgreSQL で `MaintenanceTests`・`DatabaseProviderTests` と設備CSVのテストを確認した
 
 ### EQE-02 受信APIと区間の組み立て
 

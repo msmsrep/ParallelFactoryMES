@@ -268,6 +268,12 @@ public class Equipment : IDeactivatableMaster
     public List<EquipmentPart> Parts { get; set; } = [];
 
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// 設備イベント（PLC・ゲートウェイ）で稼働状態を収集する設備か（Spec.md 5.1 Equipment。B-40-20、E-20-10-01）。
+    /// 立てた設備では状態区間の手入力・CSV取込を拒否する（手と自動で同じ時間を二重に数えないため）
+    /// </summary>
+    public bool CollectsEvents { get; set; }
 }
 
 /// <summary>

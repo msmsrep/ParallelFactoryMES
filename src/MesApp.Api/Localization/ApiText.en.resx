@@ -2682,4 +2682,13 @@
   <data name="limit は1以上{0}以下で指定してください。" xml:space="preserve">
     <value>Specify limit between 1 and {0}.</value>
   </data>
+  <data name="設備 '{0}' は設備イベントで稼働状態を収集しているため、稼働記録を手で登録できません。" xml:space="preserve">
+    <value>Equipment '{0}' collects its operation status from equipment events, so operation logs cannot be registered manually.</value>
+  </data>
+  <data name="設備イベントで収集" xml:space="preserve">
+    <value>Collected by equipment events</value>
+  </data>
+  <data name="true / false（true の設備は稼働記録を手入力・実績CSVで登録できない）" xml:space="preserve">
+    <value>true / false (equipment set to true cannot have operation logs registered by manual entry or actuals CSV)</value>
+  </data>
 </root>

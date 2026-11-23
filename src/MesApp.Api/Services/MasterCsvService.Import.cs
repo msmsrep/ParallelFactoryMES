@@ -260,6 +260,7 @@ public sealed partial class MasterCsvService
             var threshold = reader.NumberOrNull("MaintenanceThreshold", equipment.MaintenanceThreshold, 0);
             var parts = reader.Text("MaintenanceParts", equipment.MaintenanceParts);
             var isActive = reader.Bool("IsActive", equipment.IsActive);
+            var collectsEvents = reader.Bool("CollectsEvents", equipment.CollectsEvents);
             if (reader.Failed)
             {
                 continue;
@@ -283,6 +284,7 @@ public sealed partial class MasterCsvService
             equipment.MaintenanceThreshold = threshold;
             equipment.MaintenanceParts = parts;
             equipment.IsActive = isActive;
+            equipment.CollectsEvents = collectsEvents;
 
             if (isNew)
             {
