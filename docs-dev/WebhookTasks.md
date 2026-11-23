@@ -25,7 +25,7 @@ EQE・INT では想定が毎回少なすぎた（CSV が3ファイルに分か�
 |:--|:--|
 | WHK-01 送信先の登録と Outbox の土台 | 完了（2026-11-23。Spec.md 改訂159） |
 | WHK-02 送信の常駐処理・署名・再送 | 完了（2026-11-23。Spec.md 改訂160） |
-| WHK-03 v1 のイベントの発行と約束の固定 | 未着手 |
+| WHK-03 v1 のイベントの発行と約束の固定 | 完了（2026-11-23。Spec.md 改訂161） |
 | WHK-04 受け側の見本と利用者ガイド | 未着手 |
 
 ## 決定事項（2026-11-23 確定。推奨案のまま）
@@ -128,6 +128,18 @@ EQE・INT では想定が毎回少なすぎた（CSV が3ファイルに分か�
 **変更ファイルの想定（約16）**：`WebhookPayloads.cs`、発行を足すサービス（`ShopFloorReportService`・実績訂正のサービス・`WorkOrderStatusService`・`ManufacturingOrderService`・`LotStatusService`・`NonconformanceService`・`EquipmentEventService`。約7）、OpenAPI の変換処理、`WebhookContract.v1.json`、テスト（`ProductionTests`・`QualityTests`・`MaintenanceTests` に発行の確認）、`Spec.md`、`CodeMap.md`、このファイル
 **受入基準**：表の出来事ごとに1件積まれる（画面・CSV・連携API の経路の違いで件数が変わらない）／業務が失敗・巻き戻れば積まれない／約束のテストが通り、項目を消すと落ちる／SQL Server・PostgreSQL で発行のテストが通る
 
+**実施メモ（2026-11-23）**：変更は26ファイル（想定約16。多かったのは、ロット・作業指示の状態変更を非同期にしたことで呼び出し側7ファイル（`ReceivingController`・`InspectionService`・`LotOperationService`・`ManufacturingOrderService`・`NonconformanceService`・`WorkOrderDispatchService`・`WorkOrderExecutionService`）に手が入ったこと、約束の書き出しを `WebhookContract.cs` に分けたこと、WHK-01・02 のテスト（匿名型の data を約束の型に直した）・`TestAuth.cs`（補助）・`CLAUDE.md`（約束の規則）。設計のずれではないが、非同期化は着手前に読めていなかった）。業務No は MES.md で確かめた（B-40-10-01 出来高報告・B-70-30-01 製造履歴情報変更・D-10-30-08 在庫ステータス変更・C-30-10-01 逸脱/品質不具合管理・B-40-20-02 設備停止時間・原因報告・E-20-10-03 設備稼働モニタリング）。
+- **`LotStatusService.ChangeStatus`・`WorkOrderStatusService.ChangeStatus` を `ChangeStatusAsync` にした**（14か所の呼び出し）。本文にロット・作業指示のコードを引く問い合わせが要り、発行は購読の有無を DB に聞く非同期の処理のため。同期の問い合わせや、購読の一覧を常駐の記憶に置く案は採らなかった（後者は、送信先を消した直後に古い一覧で送信を作ると外部キーで業務の保存が失敗する）
+- **生産実績の記録の通知に実績の ID を入れなかった**（カードの表では「実績の id」）。ID は保存するまで決まらず、入れるには保存を2回に分けて明示のトランザクションで包む必要がある。実績CSV は全体を1つのトランザクションで取り込むので入れ子になる。通知は「読みに行くきっかけ」なので、受け側はフィードを `afterId` の続きから読めば足りる。訂正の通知は、訂正した実績の ID（既に保存済み）を `productionResultId` で送る
+- 本文の data を作る問い合わせは、購読している送信先があるときだけ行う（`EnqueueAsync` に本文を作る関数を渡す形を足した）。Webhook を使っていない工場で業務の処理を重くしないため
+- data は `WebhookPayloads.DataTypes` の型でなければ発行が例外にする（約束の型以外を送らない）。購読できる種類の一覧とこの表がずれていないこともテストで確かめる
+- **要約は日本語で固定**にした（カードの「着手時に決める」）。保存して送る値で、`ApiText` で包むと操作した人の表示言語で変わってしまう。区分は `EnumLabels.OriginalOf`（原文）。英語の要約が要るなら、送信先ごとの言語の設定として後から足す（対象外に追記）
+- **製造指図は完了・取消だけ**を送る（表のとおり）。種類の名前は `status-changed` なので、途中の変化（承認・発行）を後から足せる。ただし足すと購読している受け側に届く件数が増えるので、足すときは v1 の約束の変更として扱う
+- OpenAPI の `webhooks` 節は、画面用の JSON の設定（列挙は数値）から型を作らず、基準ファイルと同じ書き出し（`WebhookContract`）から自前で組んだ。Webhook の本文は列挙を名前で送るため、既定の生成では形がずれる
+- 検査の不合格からの不適合の自動起票は、`NonconformanceService.CreatedNotice` を共用して発行する（専用のテストは書いていない。手での起票のテストで本文の形を確かめている）
+- 実績CSV からの記録・設備イベントの停止も、単票と同じサービスを通るので同じに出る（設備イベントはテストで確かめた。実績CSV は経路の共有で担保）
+- SQLite で全件、SQL Server・PostgreSQL で `AuthTests` の Webhook と `ExecutionTests`・`QualityTests`・`MaintenanceTests`・`InventoryTests`・`ProductionTests`・`DatabaseProviderTests` を確認した
+
 ### WHK-04 受け側の見本と利用者ガイド
 
 **目的**：利用者が自分で受け側を作れ、チャットへの転送をすぐ試せる。
@@ -153,3 +165,5 @@ WHK-04 は全部が揃ってから（ガイドの例を一度で確かめるた�
 - 送信先ごとの本文の形の変更（テンプレート）→ 中継で変換する
 - 受け側から MES への応答による処理（返事で業務を進める）
 - 運用ログ（C 層）の期限切れ削除そのもの（EQE-01 の実施メモのとおり未実装。作るときに Webhook の2表も対象に入れる）
+- 要約（`summary`）の英語版（WHK-03 で日本語固定にした。要るなら送信先ごとの言語の設定として足す）
+- 製造指図の途中の状態の変化（承認・発行）の通知（WHK-03 で完了・取消だけにした）

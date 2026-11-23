@@ -20,6 +20,7 @@ public sealed class InspectionService(
     NumberingService numbering,
     LotStatusService lotStatus,
     IBusinessDateService businessDate,
+    Webhooks.WebhookPublisher webhooks,
     IAuditLogger auditLogger)
 {
     /// <summary>
@@ -174,8 +175,8 @@ public sealed class InspectionService(
         // 履歴に検査指示IDを残すため、採番済みになってから変更する
         if (lot is not null && request.Type != InspectionOrderType.Sample)
         {
-            lotStatus.ChangeStatus(lot, LotStockStatus.AwaitingInspection, LotStatusChangeSource.Inspection,
-                $"検査指示 {order.OrderNo} の発行", userId, inspectionOrderId: order.Id);
+            await lotStatus.ChangeStatusAsync(lot, LotStockStatus.AwaitingInspection, LotStatusChangeSource.Inspection,
+                $"検査指示 {order.OrderNo} の発行", userId, inspectionOrderId: order.Id, ct: ct);
             await db.SaveChangesAsync(ct);
         }
         await auditLogger.LogAsync("Quality", "InspectionCreate", nameof(InspectionOrder), order.Id.ToString(),
@@ -314,10 +315,10 @@ public sealed class InspectionService(
         // 判定結果のロット反映（Spec.md 5.7：検査待ち→正常/不良）
         if (order.TargetLot is not null && order.Type != InspectionOrderType.Sample)
         {
-            lotStatus.ChangeStatus(order.TargetLot, pass ? LotStockStatus.Normal : LotStockStatus.Defective,
+            await lotStatus.ChangeStatusAsync(order.TargetLot, pass ? LotStockStatus.Normal : LotStockStatus.Defective,
                 LotStatusChangeSource.Inspection,
                 $"検査指示 {order.OrderNo} の総合判定：{order.OverallJudgment}",
-                userId, inspectionOrderId: order.Id);
+                userId, inspectionOrderId: order.Id, ct: ct);
             if (!string.IsNullOrWhiteSpace(grade))
             {
                 order.TargetLot.Grade = grade; // グレード管理（C-60-10-01）
@@ -327,7 +328,7 @@ public sealed class InspectionService(
         // 不合格時は不適合レポートを自動起票（不適合の連鎖：C-30）
         if (!pass)
         {
-            db.NonconformanceReports.Add(new NonconformanceReport
+            var report = new NonconformanceReport
             {
                 ReportNo = await numbering.NextNonconformanceNoAsync(ct),
                 Source = NonconformanceSource.Inspection,
@@ -336,7 +337,10 @@ public sealed class InspectionService(
                 InspectionOrderId = order.Id,
                 Content = $"検査 {order.OrderNo} で不合格判定",
                 ReportedByUserId = userId,
-            });
+            };
+            db.NonconformanceReports.Add(report);
+            await webhooks.EnqueueAsync(MesApp.Core.Constants.WebhookEventTypes.NonconformanceCreated,
+                NonconformanceService.CreatedNotice(db, report), ct);
         }
 
         await db.SaveChangesAsync(ct);
@@ -413,9 +417,9 @@ public sealed class InspectionService(
             order.JudgedByUserId = null;
             if (order.TargetLot is not null && order.Type != InspectionOrderType.Sample)
             {
-                lotStatus.ChangeStatus(order.TargetLot, LotStockStatus.AwaitingInspection,
+                await lotStatus.ChangeStatusAsync(order.TargetLot, LotStockStatus.AwaitingInspection,
                     LotStatusChangeSource.Inspection, $"検査実績の訂正による再判定待ち（{request.Reason}）",
-                    userId, inspectionOrderId: order.Id);
+                    userId, inspectionOrderId: order.Id, ct: ct);
             }
         }
         await db.SaveChangesAsync(ct);
@@ -485,8 +489,8 @@ public sealed class InspectionService(
             // 履歴が無いのは発行前から検査待ちだった場合。そのままにする
             if (before is not null)
             {
-                lotStatus.ChangeStatus(lot, before.Value, LotStatusChangeSource.Inspection,
-                    $"検査指示 {order.OrderNo} の取消による拘束解除", userId, inspectionOrderId: order.Id);
+                await lotStatus.ChangeStatusAsync(lot, before.Value, LotStatusChangeSource.Inspection,
+                    $"検査指示 {order.OrderNo} の取消による拘束解除", userId, inspectionOrderId: order.Id, ct: ct);
             }
         }
         await db.SaveChangesAsync(ct);

@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Masters;
 using MesApp.Core.Contracts.Production;
@@ -80,6 +81,77 @@ public class ExecutionTests
             $"/api/manufacturing-orders/{order.Order.Id}");
         Assert.Equal(ManufacturingOrderStatus.Completed, detail!.Order.Status);
         Assert.All(detail.WorkOrders, w => Assert.Equal(WorkOrderStatus.Approved, w.Status));
+    }
+
+    // ---- Webhook の発行（Spec.md 3.8 Webhook。docs-dev/WebhookTasks.md WHK-03） ----
+
+    [Fact]
+    public async Task 着手から承認までの出来事がWebhookの送信待ちに積まれ_失敗した操作では積まれない()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 100m, ctx.MaterialLocationId);
+        var order = await Phase3TestData.CreateReleasedOrderAsync(admin, ctx.ProductId, 10m);
+        var firstWo = order.WorkOrders[0];
+        var finalWo = order.WorkOrders[1];
+        // 購読するまでは何も積まない（Webhook を使っていない工場の業務は今までどおり）
+        Assert.Empty(await TestAuth.QueuedWebhooksAsync(factory));
+        await TestAuth.SubscribeWebhooksAsync(admin);
+
+        (await admin.PostAsync($"/api/work-orders/{firstWo.Id}/start", null)).EnsureSuccessStatusCode();
+        var record1 = (await (await admin.PostAsJsonAsync($"/api/work-orders/{firstWo.Id}/production-records",
+                new ProductionRecordRequest(10m, 0m, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now, null, false)))
+            .Content.ReadFromJsonAsync<ProductionRecordResponse>())!;
+        var queued = await TestAuth.QueuedWebhooksAsync(factory);
+        Assert.Equal([WebhookEventTypes.WorkOrderStatusChanged, WebhookEventTypes.WorkOrderStatusChanged,
+            WebhookEventTypes.ProductionResultCreated], queued.Select(q => q.Type));
+        var started = queued[0].Data;
+        Assert.Equal(order.Order.OrderNo, started.GetProperty("orderNo").GetString());
+        Assert.Equal(firstWo.WorkOrderNo, started.GetProperty("workOrderNo").GetString());
+        Assert.Equal(1, started.GetProperty("sequence").GetInt32());
+        Assert.Equal("FG-01", started.GetProperty("productCode").GetString());
+        Assert.Equal("PR-01", started.GetProperty("processCode").GetString());
+        Assert.Equal("Started", started.GetProperty("toStatus").GetString());
+        Assert.Equal("Completed", queued[1].Data.GetProperty("toStatus").GetString());
+        var created = queued[2].Data;
+        Assert.Equal(10m, created.GetProperty("goodQuantity").GetDecimal());
+        Assert.Equal(JsonValueKind.Null, created.GetProperty("outputLotNumber").ValueKind);
+        Assert.Contains(firstWo.WorkOrderNo, queued[2].Summary);
+
+        // 入力不正で記録できなかった操作は何も積まない（業務と同じトランザクション）
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(9m, 1m, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now, null, false))).StatusCode);
+        Assert.Equal(3, (await TestAuth.QueuedWebhooksAsync(factory)).Count);
+
+        (await admin.PostAsJsonAsync($"/api/work-orders/{finalWo.Id}/production-records",
+            new ProductionRecordRequest(9m, 1m, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now,
+                ctx.ProductLocationId, false))).EnsureSuccessStatusCode();
+        (await admin.PutAsJsonAsync($"/api/production-records/{record1.Id}",
+            new ProductionRecordCorrectionRequest(7m, 3m, "数え直し", ScrapQuantity: 1m, ReworkQuantity: 2m))).EnsureSuccessStatusCode();
+        (await admin.PostAsync($"/api/work-orders/{firstWo.Id}/approve", null)).EnsureSuccessStatusCode();
+        (await admin.PostAsync($"/api/work-orders/{finalWo.Id}/approve", null)).EnsureSuccessStatusCode();
+
+        queued = await TestAuth.QueuedWebhooksAsync(factory);
+        Assert.Equal(
+        [
+            WebhookEventTypes.WorkOrderStatusChanged, WebhookEventTypes.WorkOrderStatusChanged, WebhookEventTypes.ProductionResultCreated,
+            WebhookEventTypes.WorkOrderStatusChanged, WebhookEventTypes.ProductionResultCreated,
+            WebhookEventTypes.ProductionResultCorrected,
+            WebhookEventTypes.WorkOrderStatusChanged,
+            WebhookEventTypes.WorkOrderStatusChanged, WebhookEventTypes.ManufacturingOrderStatusChanged,
+        ], queued.Select(q => q.Type));
+        Assert.Equal(order.Order.OutputLotNumber, queued[4].Data.GetProperty("outputLotNumber").GetString());
+        var corrected = queued[5].Data;
+        Assert.Equal(record1.Id, corrected.GetProperty("productionResultId").GetInt64());
+        Assert.Equal(10m, corrected.GetProperty("beforeGoodQuantity").GetDecimal());
+        Assert.Equal(7m, corrected.GetProperty("afterGoodQuantity").GetDecimal());
+        Assert.Equal("数え直し", corrected.GetProperty("reason").GetString());
+        Assert.Equal("Approved", queued[7].Data.GetProperty("toStatus").GetString());
+        var completed = queued[8].Data;
+        Assert.Equal(order.Order.OrderNo, completed.GetProperty("orderNo").GetString());
+        Assert.Equal("Normal", completed.GetProperty("orderType").GetString());
+        Assert.Equal("Completed", completed.GetProperty("toStatus").GetString());
     }
 
     [Fact]

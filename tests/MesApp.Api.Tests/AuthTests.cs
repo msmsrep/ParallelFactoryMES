@@ -692,14 +692,18 @@ public class AuthTests
             var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
             var publisher = scope.ServiceProvider.GetRequiredService<WebhookPublisher>();
             Assert.NotNull(await publisher.EnqueueAsync(WebhookEventTypes.LotStatusChanged, "ロット L-1 を保留にしました",
-                new { lotNo = "L-1", status = Core.Entities.LotStockStatus.OnHold }, CancellationToken.None));
+                LotHeld("L-1"), CancellationToken.None));
             Assert.NotNull(await publisher.EnqueueAsync(WebhookEventTypes.EquipmentStopped, "設備 EQ-01 が停止しました",
-                new { equipmentCode = "EQ-01" }, CancellationToken.None));
+                new EquipmentStoppedData("EQ-01", Core.Entities.EquipmentLogStatus.Stopped, DateTimeOffset.UtcNow, null,
+                    null, null, Core.Entities.EquipmentLogSource.Manual, null), CancellationToken.None));
             // 購読している送信先が無い種類は積まない
             Assert.Null(await publisher.EnqueueAsync(WebhookEventTypes.NonconformanceCreated, "不適合",
                 new { }, CancellationToken.None));
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 publisher.EnqueueAsync("no-such.event", "x", new { }, CancellationToken.None));
+            // 約束の型（WebhookPayloads.DataTypes）以外の data は送らない
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                publisher.EnqueueAsync(WebhookEventTypes.LotStatusChanged, "x", new { lotNo = "L-1" }, CancellationToken.None));
             await db.SaveChangesAsync();
         }
 
@@ -713,7 +717,9 @@ public class AuthTests
             Assert.Equal([both.Subscription.Id], outbox[1].Deliveries.Select(d => d.SubscriptionId));
             Assert.All(outbox.SelectMany(o => o.Deliveries), d => Assert.Equal(Core.Entities.WebhookDeliveryState.Pending, d.State));
             // 区分は列挙の名前、項目名は camelCase
-            Assert.Equal("""{"lotNo":"L-1","status":"OnHold"}""", outbox[0].Payload);
+            Assert.Equal(
+                """{"lotNumber":"L-1","productCode":"RM-01","fromStatus":"Normal","toStatus":"OnHold","source":"Manual","reason":null}""",
+                outbox[0].Payload);
             Assert.True(outbox[1].Id > outbox[0].Id);
         }
 
@@ -723,7 +729,7 @@ public class AuthTests
             var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
             var publisher = scope.ServiceProvider.GetRequiredService<WebhookPublisher>();
             await using var transaction = await db.Database.BeginTransactionAsync();
-            await publisher.EnqueueAsync(WebhookEventTypes.LotStatusChanged, "巻き戻す", new { }, CancellationToken.None);
+            await publisher.EnqueueAsync(WebhookEventTypes.LotStatusChanged, "巻き戻す", LotHeld("L-9"), CancellationToken.None);
             await db.SaveChangesAsync();
             await transaction.RollbackAsync();
         }
@@ -803,12 +809,16 @@ public class AuthTests
         return client;
     }
 
+    private static LotStatusChangedData LotHeld(string lotNo) => new(
+        lotNo, "RM-01", Core.Entities.LotStockStatus.Normal, Core.Entities.LotStockStatus.OnHold,
+        Core.Entities.LotStatusChangeSource.Manual, null);
+
     private static async Task EnqueueAsync(WebApplicationFactory<Program> app, string lotNo)
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MesAppDbContext>();
         await scope.ServiceProvider.GetRequiredService<WebhookPublisher>().EnqueueAsync(
-            WebhookEventTypes.LotStatusChanged, $"ロット {lotNo} を保留にしました", new { lotNo }, CancellationToken.None);
+            WebhookEventTypes.LotStatusChanged, $"ロット {lotNo} を保留にしました", LotHeld(lotNo), CancellationToken.None);
         await db.SaveChangesAsync();
     }
 
@@ -873,7 +883,8 @@ public class AuthTests
         Assert.Equal(WebhookEventTypes.LotStatusChanged, root.GetProperty("type").GetString());
         Assert.Equal(1, root.GetProperty("version").GetInt32());
         Assert.Equal("ロット L-1 を保留にしました", root.GetProperty("summary").GetString());
-        Assert.Equal("L-1", root.GetProperty("data").GetProperty("lotNo").GetString());
+        Assert.Equal("L-1", root.GetProperty("data").GetProperty("lotNumber").GetString());
+        Assert.Equal("OnHold", root.GetProperty("data").GetProperty("toStatus").GetString());
         root.GetProperty("occurredAt").GetDateTimeOffset();
         // 1文字でも変えると署名が合わない
         Assert.NotEqual(WebhookSignature.Compute(created.PlainSecret, timestamp, request.Body + " "),
@@ -1046,5 +1057,149 @@ public class AuthTests
             await Task.Delay(100);
         }
         Assert.Single(receiver.Requests);
+    }
+
+    // ---- Webhook の本文の約束（Spec.md 3.8 Webhook。WHK-03） ----
+
+    /// <summary>基準ファイルを書き直すときに立てる環境変数（項目を足したとき。互換を壊す変更はこれでは通らない）</summary>
+    private const string UpdateWebhookContractVariable = "MESAPP_UPDATE_WEBHOOK_CONTRACT";
+
+    private sealed record ContractEvent(string Type, List<WebhookContract.Field> Data);
+
+    private sealed record WebhookContractFile(int Version, List<WebhookContract.Field> Envelope, List<ContractEvent> Events);
+
+    private static readonly JsonSerializerOptions WebhookContractJson = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    /// <summary>基準ファイルの場所（ソースの横。CSV の列の約束と同じ）</summary>
+    private static string WebhookContractPath([System.Runtime.CompilerServices.CallerFilePath] string source = "") =>
+        Path.Combine(Path.GetDirectoryName(source)!, "WebhookContract.v1.json");
+
+    private static WebhookContractFile CurrentWebhookContract() => new(1, WebhookContract.Envelope,
+        [.. WebhookContract.Describe().Select(e => new ContractEvent(e.EventType, e.Fields))]);
+
+    /// <summary>
+    /// 基準から今へ、受け側を壊す変更を挙げる。種類・項目を消す／名前を変える／型を変える／null になり得るようにする／
+    /// 列挙の値を消す、を壊す変更とする。種類・項目・列挙の値の追加と、null になり得た項目を必ず値ありにするのは壊さない
+    /// </summary>
+    private static List<string> WebhookBreakingChanges(WebhookContractFile baseline, WebhookContractFile current)
+    {
+        var problems = new List<string>();
+        void Compare(string owner, List<WebhookContract.Field> before, List<WebhookContract.Field> after)
+        {
+            foreach (var field in before)
+            {
+                var now = after.SingleOrDefault(f => f.Name == field.Name);
+                if (now is null)
+                {
+                    problems.Add($"{owner}.{field.Name}：項目が無くなった（名前を変えたときも、以前の名前の項目を残す）");
+                }
+                else if (now.Kind != field.Kind)
+                {
+                    problems.Add($"{owner}.{field.Name}：型が {field.Kind} から {now.Kind} に変わった");
+                }
+                else if (now.Nullable && !field.Nullable)
+                {
+                    problems.Add($"{owner}.{field.Name}：必ず値があった項目が null になり得るようになった");
+                }
+                else if (field.Values?.Except(now.Values ?? []).ToList() is { Count: > 0 } removed)
+                {
+                    problems.Add($"{owner}.{field.Name}：列挙の値 {string.Join(",", removed)} が無くなった");
+                }
+            }
+        }
+        Compare("(包み)", baseline.Envelope, current.Envelope);
+        foreach (var before in baseline.Events)
+        {
+            var after = current.Events.SingleOrDefault(e => e.Type == before.Type);
+            if (after is null)
+            {
+                problems.Add($"{before.Type}：種類が無くなった");
+                continue;
+            }
+            Compare(before.Type, before.Data, after.Data);
+        }
+        return problems;
+    }
+
+    [Fact]
+    public void Webhookの本文の約束_基準ファイルから受け側を壊す変更をしていない()
+    {
+        var baseline = JsonSerializer.Deserialize<WebhookContractFile>(File.ReadAllText(WebhookContractPath()), WebhookContractJson)!;
+        var problems = WebhookBreakingChanges(baseline, CurrentWebhookContract());
+        Assert.True(problems.Count == 0,
+            "Webhook の本文は受け側との約束です（Spec.md 3.8）。次の変更は受け側を壊します：\n" + string.Join("\n", problems));
+        // 購読できる種類と本文の型の表がずれていない（種類を足したら型も足す）
+        Assert.Equal(WebhookEventTypes.All.Order(StringComparer.Ordinal), WebhookPayloads.DataTypes.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Webhookの本文の約束_基準ファイルが今の形と同じ()
+    {
+        var current = JsonSerializer.Serialize(CurrentWebhookContract(), WebhookContractJson).ReplaceLineEndings("\n") + "\n";
+        if (Environment.GetEnvironmentVariable(UpdateWebhookContractVariable) == "1")
+        {
+            File.WriteAllText(WebhookContractPath(), current);
+        }
+        var saved = File.Exists(WebhookContractPath()) ? File.ReadAllText(WebhookContractPath()).ReplaceLineEndings("\n") : "";
+        Assert.True(saved == current,
+            $"Webhook の本文の形が基準ファイル（{Path.GetFileName(WebhookContractPath())}）と違います。項目を足しただけなら、" +
+            $"$env:{UpdateWebhookContractVariable}='1' を立ててこのテストを流すと基準ファイルが更新されます。更新した基準ファイルは同じコミットに入れてください。");
+    }
+
+    [Fact]
+    public void Webhookの本文の約束_削除_型の変更_null化_列挙の値の削除を見つけ_追加は通す()
+    {
+        var baseline = CurrentWebhookContract();
+        WebhookContractFile With(Func<List<WebhookContract.Field>, List<WebhookContract.Field>> change) =>
+            baseline with
+            {
+                Events = [.. baseline.Events.Select(e => e.Type == WebhookEventTypes.LotStatusChanged ? e with { Data = change(e.Data) } : e)],
+            };
+        var lot = baseline.Events.Single(e => e.Type == WebhookEventTypes.LotStatusChanged).Data;
+        var lotNumber = lot.Single(f => f.Name == "lotNumber");
+        var toStatus = lot.Single(f => f.Name == "toStatus");
+
+        Assert.NotEmpty(WebhookBreakingChanges(baseline, With(d => [.. d.Where(f => f != lotNumber)])));
+        Assert.NotEmpty(WebhookBreakingChanges(baseline, With(d => [.. d.Select(f => f == lotNumber ? f with { Kind = "integer" } : f)])));
+        Assert.NotEmpty(WebhookBreakingChanges(baseline, With(d => [.. d.Select(f => f == lotNumber ? f with { Nullable = true } : f)])));
+        Assert.NotEmpty(WebhookBreakingChanges(baseline, With(d =>
+            [.. d.Select(f => f == toStatus ? f with { Values = [.. toStatus.Values!.Skip(1)] } : f)])));
+        Assert.NotEmpty(WebhookBreakingChanges(baseline, baseline with { Events = [.. baseline.Events.Skip(1)] }));
+        Assert.NotEmpty(WebhookBreakingChanges(baseline, baseline with { Envelope = [.. baseline.Envelope.Skip(1)] }));
+
+        // 項目・列挙の値・種類を足すのはよい
+        Assert.Empty(WebhookBreakingChanges(baseline, With(d => [.. d, new WebhookContract.Field("added", "string", true, null)])));
+        Assert.Empty(WebhookBreakingChanges(baseline, With(d =>
+            [.. d.Select(f => f == toStatus ? f with { Values = [.. toStatus.Values!, "Added"] } : f)])));
+        Assert.Empty(WebhookBreakingChanges(baseline,
+            baseline with { Events = [.. baseline.Events, new ContractEvent("added.event", [])] }));
+    }
+
+    [Fact]
+    public async Task 連携APIのOpenAPI文書にWebhookの本文の形が載り_列挙は名前で書かれる()
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/openapi/integration-v1.json"));
+        var webhooks = document.RootElement.GetProperty("webhooks");
+        Assert.Equal(WebhookEventTypes.All.Order(StringComparer.Ordinal),
+            webhooks.EnumerateObject().Select(w => w.Name).Order(StringComparer.Ordinal));
+
+        var schema = webhooks.GetProperty(WebhookEventTypes.LotStatusChanged).GetProperty("post")
+            .GetProperty("requestBody").GetProperty("content").GetProperty("application/json").GetProperty("schema");
+        Assert.Equal(WebhookEventTypes.LotStatusChanged,
+            schema.GetProperty("properties").GetProperty("type").GetProperty("enum")[0].GetString());
+        var data = schema.GetProperty("properties").GetProperty("data").GetProperty("properties");
+        var toStatus = data.GetProperty("toStatus");
+        Assert.Equal("string", toStatus.GetProperty("type").GetString());
+        Assert.Contains("OnHold", toStatus.GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        // null になり得る項目は型に null を含む
+        Assert.Contains("null", data.GetProperty("reason").GetProperty("type").EnumerateArray().Select(v => v.GetString()));
     }
 }

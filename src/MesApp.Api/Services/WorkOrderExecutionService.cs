@@ -1,6 +1,9 @@
 using MesApp.Core.Localization;
 using MesApp.Api.Localization;
 using MesApp.Api.Policies;
+using MesApp.Api.Services.Webhooks;
+using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Abstractions;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Entities;
@@ -48,6 +51,7 @@ public sealed class WorkOrderExecutionService(
     InventoryService inventory,
     ManufacturingOrderService orders,
     IBusinessDateService businessDate,
+    WebhookPublisher webhooks,
     IAuditLogger auditLogger)
 {
     /// <summary>
@@ -84,8 +88,8 @@ public sealed class WorkOrderExecutionService(
             }
         }
 
-        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Started,
-            WorkOrderStatusChangeSource.Start, userId);
+        await workOrderStatus.ChangeStatusAsync(workOrder, WorkOrderStatus.Started,
+            WorkOrderStatusChangeSource.Start, userId, ct: ct);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Execution", "Start", nameof(WorkOrder), workOrderId.ToString(),
             detail: $"workOrderNo={workOrder.WorkOrderNo}", ct: ct);
@@ -106,8 +110,8 @@ public sealed class WorkOrderExecutionService(
             return Outcome<WorkOrder>.Conflict(ApiText.T("状態 '{0}' の作業指示は承認できません（完了済みのみ）。", EnumLabels.Of(workOrder.Status)));
         }
 
-        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Approved,
-            WorkOrderStatusChangeSource.Approval, userId);
+        await workOrderStatus.ChangeStatusAsync(workOrder, WorkOrderStatus.Approved,
+            WorkOrderStatusChangeSource.Approval, userId, ct: ct);
         var now = DateTimeOffset.UtcNow;
         await db.ProductionRecords
             .Where(r => r.WorkOrderId == workOrderId && r.ApprovedAt == null)
@@ -447,8 +451,22 @@ public sealed class WorkOrderExecutionService(
             OutputLocationId = outputLot is not null ? request.OutputLocationId : null,
         };
         db.ProductionRecords.Add(record);
-        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Completed,
-            WorkOrderStatusChangeSource.ProductionRecord, userId);
+        await workOrderStatus.ChangeStatusAsync(workOrder, WorkOrderStatus.Completed,
+            WorkOrderStatusChangeSource.ProductionRecord, userId, ct: ct);
+        // 画面・実績CSV・連携API のどれもここを通る（Spec.md 3.8 Webhook）。実績の ID は保存するまで決まらないので送らない
+        await webhooks.EnqueueAsync(WebhookEventTypes.ProductionResultCreated, async c =>
+        {
+            var codes = await db.WorkOrders.AsNoTracking()
+                .Where(w => w.Id == workOrderId)
+                .Select(w => new { ProductCode = w.Product!.Code, ProcessCode = w.Process!.Code })
+                .FirstAsync(c);
+            // 送る文は保存される値なので訳さない
+            return ($"作業指示 {workOrder.WorkOrderNo} の実績を記録しました（良品 {record.GoodQuantity}・不良 {record.DefectQuantity}）。",
+                new ProductionResultCreatedData(workOrder.ManufacturingOrder!.OrderNo, workOrder.WorkOrderNo,
+                    workOrder.RoutingSequence, codes.ProductCode, codes.ProcessCode, record.GoodQuantity,
+                    record.DefectQuantity, record.ScrapQuantity, record.ReworkQuantity, record.StartedAt, record.EndedAt,
+                    outputLot?.LotNumber));
+        }, ct);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Execution", "ProductionRecord", nameof(WorkOrder), workOrderId.ToString(),
             detail: new

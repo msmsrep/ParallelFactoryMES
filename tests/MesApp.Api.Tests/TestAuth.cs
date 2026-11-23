@@ -1,10 +1,14 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
+using MesApp.Core.Constants;
 using MesApp.Core.Contracts.Auth;
 using MesApp.Core.Contracts.Common;
 using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Contracts.Setup;
 using MesApp.Core.Contracts.Users;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MesApp.Api.Tests;
 
@@ -70,6 +74,29 @@ public static class TestAuth
         var response = await adminClient.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest("販売管理からの取込", userId, null));
         response.EnsureSuccessStatusCode();
         return (userId, (await response.Content.ReadFromJsonAsync<CreatedApiKeyResponse>())!);
+    }
+
+    /// <summary>積まれた Webhook の通知（種類・要約・data）</summary>
+    public sealed record QueuedWebhook(string Type, string Summary, JsonElement Data);
+
+    /// <summary>
+    /// Webhook の送信先を登録する（Spec.md 3.8 Webhook）。種類を省くとすべての種類を購読する。
+    /// 業務のテストで「この操作で通知が積まれるか」を確かめるため。送り先には実際には送らない（常駐処理は止めてある）
+    /// </summary>
+    public static async Task SubscribeWebhooksAsync(HttpClient adminClient, params string[] eventTypes)
+    {
+        var response = await adminClient.PostAsJsonAsync("/api/webhook-subscriptions", new SaveWebhookSubscriptionRequest(
+            "テストの送信先", "http://localhost/webhook", [.. eventTypes.Length == 0 ? WebhookEventTypes.All : eventTypes], true));
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>積まれた Webhook の通知（積んだ順）</summary>
+    public static async Task<List<QueuedWebhook>> QueuedWebhooksAsync(ApiFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MesApp.Infrastructure.MesAppDbContext>();
+        var rows = await db.WebhookOutbox.AsNoTracking().OrderBy(o => o.Id).ToListAsync();
+        return [.. rows.Select(o => new QueuedWebhook(o.EventType, o.Summary, JsonDocument.Parse(o.Payload).RootElement.Clone()))];
     }
 
     /// <summary>APIキーを X-Api-Key ヘッダに付けたクライアント</summary>

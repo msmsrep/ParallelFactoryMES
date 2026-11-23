@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -35,12 +36,20 @@ public sealed class WebhookPublisher(MesAppDbContext db)
     /// （<c>sequence</c> は連番にならないが、増えることだけを約束する）
     /// </summary>
     /// <param name="eventType"><see cref="WebhookEventTypes"/> の名前</param>
-    /// <param name="summary">人が読める1文</param>
-    /// <param name="data">本文の <c>data</c>（WHK-03 の約束の型）</param>
+    /// <param name="summary">人が読める1文（保存して送る値なので訳さない。サーバーの既定の言語＝日本語で書く）</param>
+    /// <param name="data">本文の <c>data</c>（<see cref="WebhookPayloads.DataTypes"/> の型）</param>
     /// <returns>積んだ行（積まなかったら null）</returns>
-    public async Task<WebhookOutbox?> EnqueueAsync(string eventType, string summary, object data, CancellationToken ct)
+    public Task<WebhookOutbox?> EnqueueAsync(string eventType, string summary, object data, CancellationToken ct) =>
+        EnqueueAsync(eventType, _ => Task.FromResult<(string, object)?>((summary, data)), ct);
+
+    /// <summary>
+    /// 出来事を積む（本文は購読している送信先があるときだけ作る）。本文にコード・番号を引く問い合わせが要るとき、
+    /// Webhook を使っていない工場で業務の処理を重くしないためにこちらを使う。<paramref name="build"/> が null を返したら積まない
+    /// </summary>
+    public async Task<WebhookOutbox?> EnqueueAsync(
+        string eventType, Func<CancellationToken, Task<(string Summary, object Data)?>> build, CancellationToken ct)
     {
-        if (!WebhookEventTypes.All.Contains(eventType))
+        if (!WebhookPayloads.DataTypes.TryGetValue(eventType, out var dataType))
         {
             // 呼び出し側の書き間違い。黙って捨てると通知が出ないことに気付けない
             throw new ArgumentException($"未定義の Webhook イベントの種類です: {eventType}", nameof(eventType));
@@ -54,9 +63,15 @@ public sealed class WebhookPublisher(MesAppDbContext db)
             .ToList();
 
         var targets = _subscriptions.Where(s => s.Types.Contains(eventType)).Select(s => s.Id).ToList();
-        if (targets.Count == 0)
+        if (targets.Count == 0 || await build(ct) is not { } built)
         {
             return null;
+        }
+        var (summary, data) = built;
+        if (data.GetType() != dataType)
+        {
+            // 約束の型（基準ファイルで固定している形）以外を送らない
+            throw new ArgumentException($"Webhook {eventType} の data は {dataType.Name} で渡してください: {data.GetType().Name}", nameof(build));
         }
 
         var outbox = new WebhookOutbox

@@ -1,5 +1,9 @@
 using MesApp.Api.Localization;
+using MesApp.Api.Services.Webhooks;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Integration;
+using MesApp.Core.Localization;
 using MesApp.Core.Contracts.Execution;
 using MesApp.Core.Contracts.Maintenance;
 using MesApp.Core.Entities;
@@ -17,8 +21,35 @@ namespace MesApp.Api.Services;
 /// 実績CSV取込の両方から呼ぶ。
 /// 保存と監査ログまで行う。トランザクションは呼び出し側が張る。
 /// </summary>
-public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger auditLogger)
+public sealed class ShopFloorReportService(MesAppDbContext db, WebhookPublisher webhooks, IAuditLogger auditLogger)
 {
+    /// <summary>
+    /// Webhook <c>equipment.stopped</c>（Spec.md 3.8 Webhook）を、停止・故障の区間なら積む。
+    /// 手入力・実績CSV（このサービス）と設備イベント（<see cref="EquipmentEventService"/>）で同じものを使う。
+    /// 区間は保存前でも、設備・作業指示は ID で持っているので番号を引ける
+    /// </summary>
+    public static async Task EnqueueStoppedAsync(
+        WebhookPublisher webhooks, MesAppDbContext db, EquipmentLog log, string? alarmCode, CancellationToken ct)
+    {
+        if (log.Status is not (EquipmentLogStatus.Stopped or EquipmentLogStatus.Failure))
+        {
+            return;
+        }
+        await webhooks.EnqueueAsync(WebhookEventTypes.EquipmentStopped, async c =>
+        {
+            var assetNo = await db.Equipments.AsNoTracking()
+                .Where(x => x.Id == log.EquipmentId).Select(x => x.AssetNo).FirstAsync(c);
+            var workOrderNo = log.WorkOrderId is { } workOrderId
+                ? await db.WorkOrders.AsNoTracking().Where(w => w.Id == workOrderId).Select(w => w.WorkOrderNo).FirstOrDefaultAsync(c)
+                : null;
+            // 送る文は保存される値なので訳さない（区分は原文の表示名）
+            var cause = string.IsNullOrWhiteSpace(log.StopCause) ? "原因未入力" : log.StopCause;
+            return ($"設備 {assetNo} が「{EnumLabels.OriginalOf(log.Status)}」になりました（{cause}）。",
+                new EquipmentStoppedData(assetNo, log.Status, log.StartedAt, log.EndedAt,
+                    string.IsNullOrWhiteSpace(log.StopCause) ? null : log.StopCause, alarmCode, log.Source, workOrderNo));
+        }, ct);
+    }
+
     /// <summary>作業時間の記録（直接作業は作業指示が必須）</summary>
     public async Task<Outcome<WorkTimeRecord>> AddWorkTimeAsync(
         WorkTimeRequest request, string userId, CancellationToken ct)
@@ -129,6 +160,7 @@ public sealed class ShopFloorReportService(MesAppDbContext db, IAuditLogger audi
             Source = source,
         };
         db.EquipmentLogs.Add(log);
+        await EnqueueStoppedAsync(webhooks, db, log, alarmCode: null, ct);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Equipment", "Log", nameof(EquipmentLog), log.Id.ToString(),
             detail: new

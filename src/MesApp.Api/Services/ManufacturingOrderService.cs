@@ -1,6 +1,9 @@
 using MesApp.Core.Localization;
 using MesApp.Api.Localization;
+using MesApp.Api.Services.Webhooks;
 using MesApp.Core.Abstractions;
+using MesApp.Core.Constants;
+using MesApp.Core.Contracts.Integration;
 using MesApp.Core.Contracts.Production;
 using MesApp.Core.Entities;
 using MesApp.Infrastructure;
@@ -27,6 +30,7 @@ public sealed class ManufacturingOrderService(
     NumberingService numbering,
     IBusinessDateService businessDate,
     WorkOrderStatusService workOrderStatus,
+    WebhookPublisher webhooks,
     IAuditLogger auditLogger)
 {
     /// <summary>
@@ -152,14 +156,16 @@ public sealed class ManufacturingOrderService(
             return OrderOutcome.Conflict(ApiText.T("状態 '{0}' の指図は取消できません。", EnumLabels.Of(order.Status)));
         }
 
+        var from = order.Status;
         order.Status = ManufacturingOrderStatus.Canceled;
         order.UpdatedAt = DateTimeOffset.UtcNow;
+        await EnqueueFinishedAsync(order, from, ct);
         foreach (var workOrder in order.WorkOrders.Where(w =>
                      w.Status is not (WorkOrderStatus.Completed or WorkOrderStatus.Approved)))
         {
-            workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Canceled,
+            await workOrderStatus.ChangeStatusAsync(workOrder, WorkOrderStatus.Canceled,
                 WorkOrderStatusChangeSource.OrderCancel, userId,
-                $"指図 {order.OrderNo} の取消に連動");
+                $"指図 {order.OrderNo} の取消に連動", ct: ct);
         }
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Production", "Cancel", nameof(ManufacturingOrder), order.Id.ToString(),
@@ -181,11 +187,27 @@ public sealed class ManufacturingOrderService(
             && w.Status != WorkOrderStatus.Approved && w.Status != WorkOrderStatus.Canceled, ct);
         if (allDone)
         {
+            var from = order.Status;
             order.Status = ManufacturingOrderStatus.Completed;
             order.UpdatedAt = now;
+            await EnqueueFinishedAsync(order, from, ct);
         }
         return allDone;
     }
+
+    /// <summary>
+    /// 指図の完了・取消を Webhook <c>manufacturing-order.status-changed</c> で知らせる（Spec.md 3.8 Webhook）。
+    /// 承認・発行などの途中の変化は v1 では送らない（購読する側が欲しいのは「終わった」ことのため）
+    /// </summary>
+    private Task EnqueueFinishedAsync(ManufacturingOrder order, ManufacturingOrderStatus from, CancellationToken ct) =>
+        webhooks.EnqueueAsync(WebhookEventTypes.ManufacturingOrderStatusChanged, async c =>
+        {
+            var productCode = order.Product?.Code
+                ?? await db.Products.Where(p => p.Id == order.ProductId).Select(p => p.Code).FirstAsync(c);
+            // 送る文は保存される値なので訳さない（区分は原文の表示名）
+            return ($"製造指図 {order.OrderNo} が「{EnumLabels.OriginalOf(order.Status)}」になりました。",
+                new ManufacturingOrderStatusChangedData(order.OrderNo, order.OrderType, productCode, order.Quantity, from, order.Status));
+        }, ct);
 
     /// <summary>
     /// 工程展開（B-10-10-01：工順に基づき工程単位の作業指示に展開）＋産出ロット採番（B-10-10-05：

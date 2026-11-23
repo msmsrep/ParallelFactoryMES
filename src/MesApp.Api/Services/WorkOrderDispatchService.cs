@@ -90,8 +90,8 @@ public sealed class WorkOrderDispatchService(
         workOrder.AssignedUserId = request.AssignedUserId;
         workOrder.AssignedEquipmentId = request.AssignedEquipmentId;
         workOrder.DispatchOrder = request.DispatchOrder;
-        workOrderStatus.ChangeStatus(workOrder, WorkOrderStatus.Dispatched,
-            WorkOrderStatusChangeSource.Dispatch, userId);
+        await workOrderStatus.ChangeStatusAsync(workOrder, WorkOrderStatus.Dispatched,
+            WorkOrderStatusChangeSource.Dispatch, userId, ct: ct);
         await db.SaveChangesAsync(ct);
         await auditLogger.LogAsync("Production", "Dispatch", nameof(WorkOrder), workOrder.Id.ToString(),
             detail: $"workOrderNo={workOrder.WorkOrderNo}, user={request.AssignedUserId}, " +

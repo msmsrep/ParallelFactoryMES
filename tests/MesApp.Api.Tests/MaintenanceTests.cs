@@ -1401,4 +1401,54 @@ public class MaintenanceTests
                 MaintenanceRequestType.Spot, null));
         Assert.Equal(HttpStatusCode.BadRequest, neither.StatusCode);
     }
+
+    // ---- Webhook の発行（Spec.md 3.8 Webhook。docs-dev/WebhookTasks.md WHK-03） ----
+
+    [Fact]
+    public async Task 設備の停止は手入力でも設備イベントでもWebhookの送信待ちに積まれ_稼働では積まれない()
+    {
+        // 手入力（終わった区間を後から登録する）
+        using (var factory = new ApiFactory())
+        {
+            using var admin = await TestAuth.CreateAdminClientAsync(factory);
+            var equipment = await CreateEquipmentAsync(admin);
+            await TestAuth.SubscribeWebhooksAsync(admin, WebhookEventTypes.EquipmentStopped);
+            var start = DateTimeOffset.Now.AddHours(-2);
+            (await admin.PostAsJsonAsync("/api/equipment-logs", new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Running,
+                start, start.AddHours(1), null, null, null))).EnsureSuccessStatusCode();
+            (await admin.PostAsJsonAsync("/api/equipment-logs", new EquipmentLogRequest(equipment.Id, EquipmentLogStatus.Stopped,
+                start.AddHours(1), start.AddHours(2), "材料切れ", null, null))).EnsureSuccessStatusCode();
+
+            var stopped = Assert.Single(await TestAuth.QueuedWebhooksAsync(factory));
+            Assert.Equal(WebhookEventTypes.EquipmentStopped, stopped.Type);
+            Assert.Equal("EQ-01", stopped.Data.GetProperty("equipmentAssetNo").GetString());
+            Assert.Equal("Stopped", stopped.Data.GetProperty("status").GetString());
+            Assert.Equal("材料切れ", stopped.Data.GetProperty("stopCause").GetString());
+            Assert.Equal("Manual", stopped.Data.GetProperty("source").GetString());
+            Assert.NotEqual(System.Text.Json.JsonValueKind.Null, stopped.Data.GetProperty("endedAt").ValueKind);
+            Assert.Contains("材料切れ", stopped.Summary);
+        }
+
+        // 設備イベント（区間が開いたとき。原因が引けなければ null で、要約は「原因未入力」）
+        using (var factory = new ApiFactory())
+        {
+            using var admin = await TestAuth.CreateAdminClientAsync(factory);
+            var (_, gateway) = await SetupEventEquipmentAsync(factory, admin);
+            await TestAuth.SubscribeWebhooksAsync(admin, WebhookEventTypes.EquipmentStopped);
+            var t0 = DateTimeOffset.UtcNow.AddMinutes(-10);
+            t0 = new DateTimeOffset(t0.Year, t0.Month, t0.Day, t0.Hour, t0.Minute, t0.Second, TimeSpan.Zero);
+            await SendEventsAsync(gateway,
+                new EquipmentEventRequest("EQ-01", "w-1", t0, "Running"),
+                new EquipmentEventRequest("EQ-01", "w-2", t0.AddMinutes(1), "Failure", AlarmCode: "E-99"));
+
+            var failure = Assert.Single(await TestAuth.QueuedWebhooksAsync(factory));
+            Assert.Equal("Failure", failure.Data.GetProperty("status").GetString());
+            Assert.Equal("Event", failure.Data.GetProperty("source").GetString());
+            Assert.Equal("E-99", failure.Data.GetProperty("alarmCode").GetString());
+            Assert.Equal(System.Text.Json.JsonValueKind.Null, failure.Data.GetProperty("stopCause").ValueKind);
+            Assert.Equal(System.Text.Json.JsonValueKind.Null, failure.Data.GetProperty("endedAt").ValueKind);
+            Assert.Equal(t0.AddMinutes(1), failure.Data.GetProperty("startedAt").GetDateTimeOffset());
+            Assert.Contains("原因未入力", failure.Summary);
+        }
+    }
 }

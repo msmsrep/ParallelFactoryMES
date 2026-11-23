@@ -12,6 +12,43 @@ namespace MesApp.Api.Tests;
 
 public class QualityTests
 {
+    // ---- Webhook の発行（Spec.md 3.8 Webhook。docs-dev/WebhookTasks.md WHK-03） ----
+
+    [Fact]
+    public async Task ロットの状態の変化と不適合の起票がWebhookの送信待ちに積まれる()
+    {
+        using var factory = new ApiFactory();
+        using var admin = await TestAuth.CreateAdminClientAsync(factory);
+        var ctx = await Phase3TestData.SetupAsync(admin);
+        var lot = await Phase3TestData.ReceiveAsync(admin, ctx.MaterialId, 10m, ctx.MaterialLocationId, lotNumber: "RM-A");
+        // 購読していない種類（ここでは作業指示）は積まない
+        await TestAuth.SubscribeWebhooksAsync(admin, WebhookEventTypes.LotStatusChanged, WebhookEventTypes.NonconformanceCreated);
+
+        (await admin.PostAsJsonAsync("/api/inventory/status",
+            new MesApp.Core.Contracts.Inventory.LotStatusRequest(lot.Id, LotStockStatus.OnHold, "品質確認中"))).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/nonconformances", new NonconformanceCreateRequest(
+            NonconformanceSource.Receiving, lot.Id, null, null, "外観不良", null, null))).EnsureSuccessStatusCode();
+
+        var queued = await TestAuth.QueuedWebhooksAsync(factory);
+        Assert.Equal([WebhookEventTypes.LotStatusChanged, WebhookEventTypes.NonconformanceCreated], queued.Select(q => q.Type));
+        var held = queued[0].Data;
+        Assert.Equal("RM-A", held.GetProperty("lotNumber").GetString());
+        Assert.Equal("RM-01", held.GetProperty("productCode").GetString());
+        Assert.Equal("Normal", held.GetProperty("fromStatus").GetString());
+        Assert.Equal("OnHold", held.GetProperty("toStatus").GetString());
+        Assert.Equal("Manual", held.GetProperty("source").GetString());
+        Assert.Equal("品質確認中", held.GetProperty("reason").GetString());
+        Assert.Contains("「保留」", queued[0].Summary);
+        var report = queued[1].Data;
+        Assert.StartsWith(NumberingServicePrefix, report.GetProperty("reportNo").GetString());
+        Assert.Equal("Receiving", report.GetProperty("source").GetString());
+        Assert.Equal("RM-A", report.GetProperty("lotNumber").GetString());
+        Assert.Equal("RM-01", report.GetProperty("productCode").GetString());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, report.GetProperty("workOrderNo").ValueKind);
+    }
+
+    private const string NumberingServicePrefix = MesApp.Api.Services.NumberingService.NonconformanceNoPrefix;
+
     [Fact]
     public async Task 検査と作業時間とトラブル報告をCSVで取り込める()
     {
