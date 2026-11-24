@@ -1,5 +1,4 @@
 using MesApp.Api;
-using MesApp.Api.Services;
 using MesApp.Infrastructure;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -33,19 +32,6 @@ internal sealed class MainForm : Form
         Text = "起動しています…",
     };
 
-    /// <summary>初回ログイン前だけ表示する資格情報の案内（ストア配布では手順書が手元にないため）</summary>
-    private readonly Label _initialCredentials = new()
-    {
-        Dock = DockStyle.Top,
-        AutoSize = false,
-        Height = 56,
-        TextAlign = ContentAlignment.MiddleCenter,
-        BackColor = Color.FromArgb(255, 249, 219),
-        ForeColor = Color.FromArgb(90, 60, 0),
-        Padding = new Padding(12, 0, 12, 0),
-        Visible = false,
-    };
-
     private WebApplication? _app;
 
     public MainForm(string[] args)
@@ -58,9 +44,6 @@ internal sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         WindowState = FormWindowState.Maximized;
 
-        // ドッキングはZオーダーの大きい方から処理されるため、上端に出す案内を先に、
-        // 残りを埋める要素を後に追加する
-        Controls.Add(_initialCredentials);
         Controls.Add(_status);
         Controls.Add(_webView);
     }
@@ -82,20 +65,8 @@ internal sealed class MainForm : Form
                     $"{StartupTimeout.TotalMinutes:0}分以内にローカルサーバーを起動できませんでした。");
             }
 
-            var (address, initialCredentials) = await startup;
+            var address = await startup;
             StartupLog.Write($"APIの起動完了: {address}");
-
-            if (initialCredentials is not null)
-            {
-                StartupLog.Write("初期管理者が未ログインのため資格情報を画面に案内します");
-                var note = initialCredentials.RegeneratesOnRestart
-                    ? "（ログイン後にパスワードの変更を求められます。変更するまでは、起動のたびに新しいパスワードになります）"
-                    : "（ログイン後にパスワードの変更を求められます）";
-                _initialCredentials.Text =
-                    $"初回ログイン　ユーザー名: {initialCredentials.UserName}　パスワード: {initialCredentials.Password}"
-                    + "\n" + note;
-                _initialCredentials.Visible = true;
-            }
 
             SetStatus("画面を読み込んでいます…");
             await ShowClientAsync(address);
@@ -117,8 +88,11 @@ internal sealed class MainForm : Form
         }
     }
 
-    /// <summary>プロセス内でKestrelを起動し、ループバックURLと（あれば）初回ログイン情報を返す</summary>
-    private async Task<(string Address, InitialCredentials? InitialCredentials)> StartApiAsync()
+    /// <summary>
+    /// プロセス内でKestrelを起動し、ループバックURLを返す。
+    /// 初期管理者は作らない。初回は画面のログイン→初期セットアップ（/setup）で利用者が作る（Spec.md 2.2 E）
+    /// </summary>
+    private async Task<string> StartApiAsync()
     {
         // ポート0でOSに空きポートを選ばせる（現場PCで使用中ポートと衝突しないようにするため）。
         // コンテンツルートは実行ファイルの場所に固定する（MSIXでは起動時の作業ディレクトリが一定しないため）。
@@ -133,7 +107,7 @@ internal sealed class MainForm : Form
         _app = MesAppHost.Build(hostArgs);
 
         StartupLog.Write("データベースを初期化します");
-        var initialCredentials = await MesAppHost.InitializeAsync(_app);
+        await MesAppHost.InitializeAsync(_app);
 
         StartupLog.Write("Kestrelを起動します");
         await _app.StartAsync();
@@ -144,7 +118,7 @@ internal sealed class MainForm : Form
         var address = addresses?.FirstOrDefault()
                       ?? throw new InvalidOperationException("ローカルサーバーのアドレスを取得できませんでした。");
 
-        return (address, initialCredentials);
+        return address;
     }
 
     /// <summary>WebView2を初期化してクライアント画面を表示する</summary>
@@ -170,43 +144,11 @@ internal sealed class MainForm : Form
             OpenInDefaultBrowser(e.Uri);
         };
 
-        // パスワード変更が済んだら案内を消す。変更後はログイン画面へ遷移する（SPA内の遷移）ため、
-        // 画面遷移のたびに変更済みかを確認し、不要になった時点で購読をやめる
-        if (_initialCredentials.Visible)
-        {
-            _webView.CoreWebView2.HistoryChanged += OnHistoryChanged;
-        }
-
         _webView.CoreWebView2.Navigate(address);
 
         _status.Visible = false;
         _webView.Visible = true;
         _webView.Focus();
-    }
-
-    /// <summary>初回ログイン案内の要否を確認し、不要になっていれば消す</summary>
-    private async void OnHistoryChanged(object? sender, object e)
-    {
-        if (!_initialCredentials.Visible || _app is null)
-        {
-            return;
-        }
-
-        try
-        {
-            if (await IdentitySeeder.IsInitialPasswordPendingAsync(_app.Services, _app.Configuration))
-            {
-                return;
-            }
-            StartupLog.Write("初期パスワードが変更されたため案内を消します");
-            _initialCredentials.Visible = false;
-            _webView.CoreWebView2.HistoryChanged -= OnHistoryChanged;
-        }
-        catch (Exception ex)
-        {
-            // 案内の表示制御でアプリを落とさない
-            StartupLog.WriteException("初回ログイン案内の更新に失敗", ex);
-        }
     }
 
     private void SetStatus(string message)

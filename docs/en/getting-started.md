@@ -34,7 +34,7 @@ Every method is free, with no activation or license key. Except when running fro
 ### Microsoft Store edition
 
 Install it from the [Microsoft Store](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=en-US&gl=US) and open **Parallel Factory MES** from the Start menu.
-The initial administrator is created automatically, and its user name and initial password are shown at the top of the screen (you can skip "Creating the initial administrator account" below).
+The first time, the sign-in screen shows that initial setup is required, so go on to "Creating the initial administrator account" below.
 
 ### ZIP
 

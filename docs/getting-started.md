@@ -34,7 +34,7 @@ next_title: 画面構成と共通操作
 ### Microsoft Store 版
 
 [Microsoft Store](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=ja-JP&gl=JP) からインストールし、スタートメニューの **Parallel Factory MES** を開きます。
-初期管理者は自動で作られ、ユーザー名と初期パスワードが画面の上に表示されます（下の「初期管理者アカウントを作る」は不要です）。
+初回はログイン画面に「初期セットアップが必要です」と表示されるので、下の「初期管理者アカウントを作る」に進んでください。
 
 ### ZIP
 

@@ -48,32 +48,19 @@ public class SetupTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    [Fact]
-    public async Task 初期管理者はパスワード自動生成を有効にするとシードされる()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task パスワードの指定がなければ初期管理者を作らず初期セットアップ画面に任せる(bool legacyGenerate)
     {
-        using var factory = new ApiFactory(new Dictionary<string, string>
+        // 誰も値を知らないアカウントを残さないための規約（Spec.md 2.2 E）。
+        // 廃止した自動生成の設定（MesAdmin:GeneratePassword）が残っていても作らない（改訂164）
+        var settings = new Dictionary<string, string> { ["MesAdmin:UserName"] = "admin" };
+        if (legacyGenerate)
         {
-            ["MesAdmin:UserName"] = "admin",
-            ["MesAdmin:GeneratePassword"] = "true",
-        });
-        using var client = factory.CreateClient();
-
-        var status = await client.GetFromJsonAsync<SetupStatusResponse>("/api/setup/status");
-        Assert.False(status!.SetupRequired);
-
-        // 生成値は保存していないので、固定パスワードでは入れない
-        var guess = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("admin", "Mes-admin1"));
-        Assert.Equal(HttpStatusCode.Unauthorized, guess.StatusCode);
-    }
-
-    [Fact]
-    public async Task パスワードの指定も自動生成もなければ初期管理者を作らない()
-    {
-        // 誰も値を知らないアカウントを残さないための規約（Spec.md 2.2 E）
-        using var factory = new ApiFactory(new Dictionary<string, string>
-        {
-            ["MesAdmin:UserName"] = "admin",
-        });
+            settings["MesAdmin:GeneratePassword"] = "true";
+        }
+        using var factory = new ApiFactory(settings);
         using var client = factory.CreateClient();
 
         var status = await client.GetFromJsonAsync<SetupStatusResponse>("/api/setup/status");

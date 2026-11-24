@@ -81,7 +81,7 @@ public static class MesAppHost
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<MesAppDbContext>()
             .AddSignInManager()
-            // 管理者によるパスワードリセット（ユーザーCSVの InitialPassword・初期管理者の再生成を含む）は
+            // 管理者によるパスワードリセット（ユーザーCSVの InitialPassword を含む）は
             // リセット用トークンを発行してから使う。プロバイダが無いと発行で例外になる
             .AddDefaultTokenProviders();
 
@@ -219,13 +219,10 @@ public static class MesAppHost
         return app;
     }
 
-    /// <summary>
-    /// DB初期化（マイグレーション適用・SQLite WAL）とロール・初期管理者シード。
-    /// 初期管理者がまだパスワードを変更していない場合はその資格情報を返す（デスクトップ配布で画面に案内するため）。
-    /// </summary>
-    public static async Task<InitialCredentials?> InitializeAsync(WebApplication app)
+    /// <summary>DB初期化（マイグレーション適用・SQLite WAL）とロール・初期管理者シード</summary>
+    public static async Task InitializeAsync(WebApplication app)
     {
         await app.Services.InitializeDatabaseAsync();
-        return await IdentitySeeder.SeedAsync(app.Services, app.Configuration);
+        await IdentitySeeder.SeedAsync(app.Services, app.Configuration);
     }
 }
