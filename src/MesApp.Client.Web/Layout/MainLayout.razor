@@ -4,8 +4,13 @@
 @inject NavigationManager Navigation
 
 <div class="app-layout">
-    <aside class="sidebar">
-        <div class="brand">Parallel Factory MES</div>
+    @* スマホ幅ではサイドバーを上部に置き、メニューをボタンで開閉する（app.css の @media） *@
+    <aside class="sidebar @(_navOpen ? "open" : null)">
+        <div class="brand">
+            <span>Parallel Factory MES</span>
+            <button class="btn btn-secondary btn-sm nav-toggle" aria-expanded="@(_navOpen ? "true" : "false")"
+                    @onclick="() => _navOpen = !_navOpen">@L["メニュー"]</button>
+        </div>
         <NavMenu />
     </aside>
     <div class="main-area">
@@ -42,6 +47,9 @@
 
     private ErrorBoundary? _errorBoundary;
 
+    /// <summary>スマホ幅でメニューを開いているか（画面を移ったら閉じる）</summary>
+    private bool _navOpen;
+
     /// <summary>エラー表示から復帰する（同じ画面を組み立て直す）</summary>
     private Task RetryAsync()
     {
@@ -58,6 +66,7 @@
     {
         // 画面を移ったらエラー表示は解除する（前の画面の失敗を引きずらない）
         _errorBoundary?.Recover();
+        _navOpen = false;
 
         if (Tokens.User?.MustChangePassword != true)
         {
