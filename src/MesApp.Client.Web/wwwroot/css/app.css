@@ -265,6 +265,24 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 .label-sheet .barcode { text-align: center; margin: 10px 0 2px; }
 .label-sheet .barcode-text { text-align: center; font-family: monospace; letter-spacing: 1px; }
 
+/* スマホ幅：サイドバーは上部の帯にしてメニューを開閉し、広い表は表そのものを横スクロールさせる
+   （表はカードの外にも置かれるので、表を block にして自分でスクロールさせる。狭い表は幅いっぱいに広がらない） */
+.nav-toggle { display: none; }
+@media (max-width: 768px) {
+    .app-layout { flex-direction: column; }
+    .sidebar { width: auto; }
+    .sidebar .brand { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; }
+    .nav-toggle { display: inline-block; }
+    .sidebar nav { display: none; }
+    .sidebar.open nav { display: block; }
+    .topbar { flex-wrap: wrap; padding: 8px 12px; }
+    .content { padding: 12px; }
+    .card { padding: 12px; }
+    .table { display: block; overflow-x: auto; }
+    .form-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+    .login-box { width: auto; max-width: 360px; margin: 0 16px; padding: 20px; }
+}
+
 @media print {
     .sidebar, .topbar, .no-print { display: none !important; }
     .content { padding: 0; max-width: none; }

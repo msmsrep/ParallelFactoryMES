@@ -18,6 +18,9 @@
   <data name="ログアウト" xml:space="preserve">
     <value>Log out</value>
   </data>
+  <data name="メニュー" xml:space="preserve">
+    <value>Menu</value>
+  </data>
   <data name="画面の読み込みに失敗しました。通信状態を確認して再試行してください。" xml:space="preserve">
     <value>Failed to load this screen. Check your connection and try again.</value>
   </data>
