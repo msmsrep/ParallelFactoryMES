@@ -4047,8 +4047,8 @@
   <data name="初期セットアップ" xml:space="preserve">
     <value>Initial Setup</value>
   </data>
-  <data name="初期管理者アカウントを作成します（初回起動時のみ有効。Spec 2.2 E）。" xml:space="preserve">
-    <value>Creates the initial administrator account (available on first launch only. Spec 2.2 E).</value>
+  <data name="初期管理者アカウントを作成します（ユーザーが1人もいないときだけ使えます）。" xml:space="preserve">
+    <value>Creates the initial administrator account (available only while no users exist).</value>
   </data>
   <data name="作成してログイン画面へ" xml:space="preserve">
     <value>Create and go to sign-in</value>

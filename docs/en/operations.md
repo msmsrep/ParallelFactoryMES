@@ -86,9 +86,7 @@ Edit `appsettings.json` or override the values with environment variables.
 | Access token lifetime (minutes) | `Jwt__AccessTokenLifetimeMinutes` | `60` |
 | Refresh token lifetime (hours) | `Jwt__RefreshTokenLifetimeHours` | `12` |
 | JWT signing key file | `Jwt__SigningKeyFile` | `jwt-signing.key` (created automatically if it does not exist) |
-| Automatic creation of the initial administrator | `MesAdmin__UserName` / `MesAdmin__Password` / `MesAdmin__DisplayName` | Not set |
-| Automatic generation of the initial password | `MesAdmin__GeneratePassword` | `false` (`true` only in the desktop edition) |
-| IPs of trusted reverse proxies | `ReverseProxy__KnownProxies__0` (`__1`, `__2` … for more) | Not set (forwarded headers are not read) |
+| Automatic creation of the initial administrator | `MesAdmin__UserName` / `MesAdmin__Password` / `MesAdmin__DisplayName` | Not set || IPs of trusted reverse proxies | `ReverseProxy__KnownProxies__0` (`__1`, `__2` … for more) | Not set (forwarded headers are not read) |
 | Networks of trusted reverse proxies | `ReverseProxy__KnownNetworks__0` (CIDR, for example `192.168.10.0/24`) | Not set |
 | Folder integration: integration folder | `FolderLink__Root` | Not set (no integration) |
 | Folder integration: importing user | `FolderLink__UserName` | Not set |
@@ -114,8 +112,7 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 ```
 
 If `MesAdmin__Password` is not specified, no initial administrator is created (so that no account is left
-whose password nobody knows). Only the desktop edition, which can show the password on screen,
-uses automatic generation with `MesAdmin__GeneratePassword=true`.
+whose password nobody knows). In that case, create it on the [initial setup screen](getting-started.html).
 
 ## Folder integration  {#folder-link}
 

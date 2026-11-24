@@ -118,8 +118,6 @@ Messages are shown here as they appear when the screen language is English. With
 | On Linux, `./start.sh` fails with "Permission denied" | ZIP files do not keep execute permissions. Start it with `sh start.sh` (it gives the program execute permission when it starts) |
 | The ZIP edition closes immediately after starting / says the port is in use | Another application is using port 5000. Change the port with `MESAPP_URLS` before starting (for example `set MESAPP_URLS=http://0.0.0.0:5100`) |
 | Data disappeared after recreating the Docker container | `/data` is not a volume. Start it with `-v mesapp-data:/data` ([Administration](operations.html#docker)) |
-| You do not know the initial password of the Store edition | The initial password keeps being shown at the top of the screen until it is changed. If it is no longer shown, it has been changed. If you have forgotten it, see "Sign-in and accounts" above |
-
 ## Display and connection
 
 | Symptom | What to do |

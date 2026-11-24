@@ -86,9 +86,7 @@ ASP.NET Core 10 Runtime が必要です。同じLAN内の他のPCからは `http
 | アクセストークン有効期限（分） | `Jwt__AccessTokenLifetimeMinutes` | `60` |
 | リフレッシュトークン有効期限（時間） | `Jwt__RefreshTokenLifetimeHours` | `12` |
 | JWT署名鍵ファイル | `Jwt__SigningKeyFile` | `jwt-signing.key`（未存在なら自動生成） |
-| 初期管理者の自動作成 | `MesAdmin__UserName` / `MesAdmin__Password` / `MesAdmin__DisplayName` | 未設定 |
-| 初期パスワードの自動生成 | `MesAdmin__GeneratePassword` | `false`（デスクトップ版のみ `true`） |
-| 信頼するリバースプロキシのIP | `ReverseProxy__KnownProxies__0`（複数は `__1`, `__2` …） | 未設定（転送ヘッダを読まない） |
+| 初期管理者の自動作成 | `MesAdmin__UserName` / `MesAdmin__Password` / `MesAdmin__DisplayName` | 未設定 || 信頼するリバースプロキシのIP | `ReverseProxy__KnownProxies__0`（複数は `__1`, `__2` …） | 未設定（転送ヘッダを読まない） |
 | 信頼するリバースプロキシのネットワーク | `ReverseProxy__KnownNetworks__0`（CIDR。例 `192.168.10.0/24`） | 未設定 |
 | フォルダ連携の連携フォルダ | `FolderLink__Root` | 未設定（連携しない） |
 | フォルダ連携の取込を行う利用者 | `FolderLink__UserName` | 未設定 |
@@ -114,8 +112,7 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 ```
 
 `MesAdmin__Password` を指定しない場合、初期管理者は作成されません（値を誰も知らない
-アカウントを残さないため）。パスワードを画面に表示できるデスクトップ版のみ、
-`MesAdmin__GeneratePassword=true` による自動生成を使います。
+アカウントを残さないため）。その場合は[初期セットアップ画面](getting-started.html)で作成します。
 
 ## フォルダ連携  {#folder-link}
 

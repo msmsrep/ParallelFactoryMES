@@ -9,7 +9,7 @@ namespace MesApp.Api;
 /// <summary>
 /// パスワード変更が未了のトークンでは、パスワード変更以外のAPIを使わせない（Spec.md 2.2 E・7.4）。
 /// <para>
-/// 初期管理者はデスクトップ配布で初期パスワードを画面に表示する（<c>IdentitySeeder</c>）ため、
+/// 初期パスワード（管理者の発行・ユーザーCSV・無人セットアップの <c>IdentitySeeder</c>）は他人も知り得るため、
 /// 変更の強制が画面側の案内だけだと、そのままのトークンで全APIを操作できてしまう。
 /// 判定はアクセストークンの <see cref="MesClaimTypes.MustChangePassword"/> クレームだけで行い、
 /// リクエストごとのDB参照はしない。
