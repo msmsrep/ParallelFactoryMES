@@ -55,6 +55,12 @@
   </svg>
   <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg><span>Parallel Factory <strong>MES</strong></span></a>
   <span class="brand-sub">{{ ui.brand_sub }}</span>
+  <!-- ガイド内検索（assets/search.js）。索引はこの言語の search.json（_includes/search-index.json） -->
+  <div class="search" role="search" data-index="{{ root }}{% if lang == "en" %}en/{% endif %}search.json" data-none="{{ ui.search_none }}">
+    <input type="search" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search_label }}" autocomplete="off" spellcheck="false"
+      role="combobox" aria-expanded="false" aria-controls="search-results" aria-autocomplete="list">
+    <div class="search-results" id="search-results" role="listbox" hidden></div>
+  </div>
   <a class="intro-link" href="intro.html">{{ ui.intro_link }}<span aria-hidden="true"> &rarr;</span></a>
   {%- if switch_url %}
   <a class="lang-link" href="{{ switch_url }}" hreflang="{{ ui.lang_switch_code }}" lang="{{ ui.lang_switch_code }}">{{ ui.lang_switch }}</a>
@@ -95,6 +101,7 @@
     </footer>
   </main>
 </div>
+<script src="{{ root }}assets/search.js" defer></script>
 </body>
 </html>
 {%- endcapture -%}

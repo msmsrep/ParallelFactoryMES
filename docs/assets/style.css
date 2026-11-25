@@ -48,6 +48,9 @@
 
 * { box-sizing: border-box; }
 
+/* 見出しへのリンク（検索の結果・目次）で飛んだとき、見出しが固定ヘッダーの下に隠れないようにする */
+html { scroll-padding-top: 68px; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -125,7 +128,6 @@ body {
 
 /* 紹介ページ（intro.html）への導線 */
 .intro-link {
-  margin-left: auto;
   white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
@@ -156,9 +158,68 @@ body {
   margin-left: 4px;
   vertical-align: 1px;
 }
-/* 狭い画面では導線を優先し、「ユーザーガイド」の副題を隠す */
-@media (max-width: 480px) {
+/* ガイド内検索（assets/search.js）。結果は検索欄の下に重ねて出す */
+.search {
+  position: relative;
+  margin-left: auto;
+  flex: 0 1 260px;
+  min-width: 0;
+}
+.search input {
+  width: 100%;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+}
+.search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; background: var(--bg); }
+.search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(24, 25, 63, .18);
+  padding: 6px;
+  z-index: 40;
+}
+.search-results a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  line-height: 1.55;
+}
+.search-results a:hover, .search-results a.active { background: var(--accent-soft); }
+.search-results b { display: block; font-size: 14px; font-weight: 600; }
+.search-results b span { color: var(--text-muted); font-weight: 400; }
+.search-results a > span { display: block; font-size: 12.5px; color: var(--text-muted); }
+.search-results mark { background: var(--g1); color: inherit; border-radius: 2px; padding: 0 1px; }
+.search-none { margin: 8px 10px; font-size: 13px; color: var(--text-muted); }
+
+.brand, .brand-sub { white-space: nowrap; }
+/* 狭い画面では検索欄と導線を優先し、「ユーザーガイド」の副題を隠す */
+@media (max-width: 900px) {
   .brand-sub { display: none; }
+}
+/* スマホの幅では、検索欄の場所を空けるためにロゴの文字を隠し、結果を画面の幅いっぱいに出す。
+   紹介ページへの導線は、さらに狭いときはメニュー（_data/nav.yml の先頭）に任せて隠す */
+@media (max-width: 640px) {
+  .brand > span { display: none; }
+  .search { flex: 1 1 auto; }
+  .search-results { position: fixed; top: 60px; left: 8px; right: 8px; width: auto; }
+}
+@media (max-width: 480px) {
+  .intro-link { display: none; }
 }
 
 /* ---------- layout ---------- */

@@ -1,0 +1,34 @@
+{%- comment -%}
+  ガイド内検索の索引（assets/search.js が読む）。言語ごとに search.json / en/search.json から呼ぶ。
+  ページを h2〜h4 の見出しで節に区切り、節ごとに「ページ名・見出し・リンク先・本文」を持たせる。
+  見出しの id は kramdown が付けるものをそのまま使うため、本文を markdownify してから区切る（GitHub Pages の標準ビルドで動くよう Liquid だけで作る）。
+  h3・h4 の節は、属する h2 の見出しを s に持たせる（「バックアップ › SQLite」のように出し、両方の語で探せるようにする）
+{%- endcomment -%}
+{%- assign dir = include.dir -%}
+{%- assign docs = site.pages | where: "dir", dir | where: "layout", "default" | where_exp: "p", "p.nav_url" | where_exp: "p", "p.nav_url != '404.html'" -%}
+[
+{%- assign first = true -%}
+{%- for p in docs -%}
+  {%- assign html = p.content | markdownify | replace: "<h3", "<h2 x3" | replace: "</h3>", "</h2>" | replace: "<h4", "<h2 x4" | replace: "</h4>", "</h2>" -%}
+  {%- assign parent = "" -%}
+  {%- assign chunks = html | split: "<h2" -%}
+  {%- for chunk in chunks -%}
+    {%- if forloop.first -%}
+      {%- assign id = "" -%}{%- assign heading = "" -%}{%- assign sect = "" -%}{%- assign body = chunk -%}
+    {%- else -%}
+      {%- assign parts = chunk | split: "</h2>" -%}
+      {%- assign head = parts | first -%}
+      {%- assign id = head | split: 'id="' | last | split: '"' | first -%}
+      {%- assign heading = head | split: ">" | shift | join: ">" | strip_html | strip -%}
+      {%- assign body = parts | shift | join: " " -%}
+      {%- assign level = head | slice: 0, 3 -%}
+      {%- if level == " x3" or level == " x4" -%}{%- assign sect = parent -%}{%- else -%}{%- assign sect = "" -%}{%- assign parent = heading -%}{%- endif -%}
+    {%- endif -%}
+    {%- if forloop.first -%}{%- assign lead = p.lead | append: " " -%}{%- else -%}{%- assign lead = "" -%}{%- endif -%}
+    {%- assign text = body | strip_html | prepend: lead | split: " " | join: " " -%}
+    {%- if heading == "" and text == "" -%}{%- continue -%}{%- endif -%}
+    {%- unless first -%},{%- endunless -%}{%- assign first = false %}
+{"p":{{ p.title | jsonify }},"u":{{ p.nav_url | jsonify }},"a":{{ id | jsonify }},"s":{{ sect | jsonify }},"h":{{ heading | jsonify }},"t":{{ text | jsonify }}}
+  {%- endfor -%}
+{%- endfor %}
+]
