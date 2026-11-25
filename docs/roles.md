@@ -5,8 +5,8 @@ nav_url: roles.html
 lead: 7つのロールと、それぞれができる操作の対応表です。ユーザーには複数のロールを付与できます。
 prev_url: reports.html
 prev_title: 帳票・ラベル・スキャン
-next_url: reference.html
-next_title: リファレンス
+next_url: operations.html
+next_title: サーバーの配置と設定
 ---
 
 ## ロールの一覧

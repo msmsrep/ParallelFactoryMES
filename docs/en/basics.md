@@ -103,4 +103,4 @@ By default the date changes at **6:00 a.m.**
 
 This means that actuals registered at 3:00 a.m. on May 2 are counted under the production date "May 1".
 This keeps night-shift actuals that cross midnight together under the same production date. The boundary time can be changed in the settings
-([Administration](operations.html)).
+([Server deployment and settings](operations.html#settings)).

@@ -5,8 +5,8 @@ nav_url: roles.html
 lead: The seven roles and a table of the operations each can perform. A user can be given more than one role.
 prev_url: reports.html
 prev_title: Reports, labels and scanning
-next_url: reference.html
-next_title: Reference
+next_url: operations.html
+next_title: Server deployment and settings
 ---
 
 ## Roles

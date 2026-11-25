@@ -39,14 +39,22 @@ ja:
         url: reports.html
       - title: ロールと権限
         url: roles.html
+  - section: 管理者向け
+    items:
+      - title: サーバーの配置と設定
+        url: operations.html
+      - title: 外部連携
+        url: integration.html
+      - title: セキュリティと監査ログ
+        url: security.html
+      - title: データベースとバックアップ
+        url: database.html
   - section: 資料
     items:
       - title: リファレンス
         url: reference.html
       - title: 困ったときは
         url: troubleshooting.html
-      - title: 管理者向け運用
-        url: operations.html
       - title: プライバシーポリシー
         url: privacy.html
 
@@ -89,13 +97,21 @@ en:
         url: reports.html
       - title: Roles and permissions
         url: roles.html
+  - section: Administration
+    items:
+      - title: Server deployment and settings
+        url: operations.html
+      - title: Integrations
+        url: integration.html
+      - title: Security and audit log
+        url: security.html
+      - title: Databases and backups
+        url: database.html
   - section: Reference
     items:
       - title: Reference
         url: reference.html
       - title: Troubleshooting
         url: troubleshooting.html
-      - title: Administration
-        url: operations.html
       - title: Privacy policy
         url: privacy.html

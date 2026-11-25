@@ -4,8 +4,8 @@ title: Privacy policy
 nav_url: privacy.html
 description: The data Parallel Factory MES handles, where it is stored and whether it is sent anywhere.
 lead: This page describes the data handled by Parallel Factory MES ("the app"). It mainly covers the Microsoft Store edition (a desktop app that runs entirely on a single PC), and also describes how data is handled when the app is deployed on a server.
-prev_url: operations.html
-prev_title: Administration
+prev_url: troubleshooting.html
+prev_title: Troubleshooting
 ---
 
 Last updated: September 21, 2026
@@ -45,7 +45,7 @@ The database, the signing key used for authentication, the startup log and the W
 
 The app runs its application server **only inside your PC (on the loopback address `127.0.0.1`)**. This traffic never leaves your PC, and other devices on the same network cannot connect to it.
 
-**Uninstalling the app deletes this folder together with all its data.** If there is data you want to keep, take a backup before uninstalling (see [Administration](operations.html)).
+**Uninstalling the app deletes this folder together with all its data.** If there is data you want to keep, take a backup before uninstalling (see [Databases and backups](database.html#backup)).
 
 ### When deployed on a server
 

@@ -102,7 +102,7 @@ ZIPにしたものを Releases に添付しています（[マスタ](https://gi
 
 ## 配布・本番相当の実行
 
-ビルド済みのものを使う場合（手順の詳細は [管理者向け運用](docs/operations.md)）:
+ビルド済みのものを使う場合（手順の詳細は [サーバーの配置と設定](docs/operations.md)）:
 
 - **Microsoft Store 版（1台で試す）**: [Microsoft Store](https://apps.microsoft.com/detail/9p9fqjzh23hc?hl=ja-JP&gl=JP) からインストールします。サーバー不要で、ほかの端末からは接続できません
 - **ZIP（自己完結版・.NET不要）**: [Releases](https://github.com/msmsrep/ParallelFactoryMES/releases/latest) から
@@ -157,7 +157,7 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
 - **HTTPS**: アプリ自身はHTTPSを強制しません。LAN運用ではリバースプロキシ（IIS / nginx）で
   HTTPSを終端し、プロキシのIPを `ReverseProxy__KnownProxies__0` に設定してください（設定しないと
   リフレッシュCookieに `Secure` が付かず、監査ログの接続元IPがプロキシのものになります）。
-  手順は [管理者向け運用](docs/operations.md) の「HTTPSで運用する」。なお**カメラによるバーコード読み取りは、ブラウザの制約により
+  手順は [セキュリティと監査ログ](docs/security.md#https) の「HTTPSで運用する」。なお**カメラによるバーコード読み取りは、ブラウザの制約により
   `localhost` 以外ではHTTPSが必須**です（USB HIDリーダーと手入力はHTTPでも動作します）。
 - **バックアップ**: SQLiteはWALモードで動作するため、**稼働中のDBファイルの単純コピーは行わないでください**。
   停止中にコピーするか、`VACUUM INTO` を使用します。
@@ -166,7 +166,7 @@ $env:MesAdmin__UserName="admin"; $env:MesAdmin__Password="Passw0rd123"; dotnet p
   起動時にそのDBへスキーマを作成します（DB自体とログインは事前に作成しておく）。
   `DateTimeOffset` はPostgreSQLではUTCで保存され、SQL Serverの既定照合順序ではコードの大文字・小文字を
   区別しません（Spec.md 4章）。**既存のSQLiteデータを移す機能はありません**。手順・バックアップ・起動しないときの確認点は
-  [管理者向け運用](docs/operations.md#database)を参照してください。
+  [データベースとバックアップ](docs/database.md#database)を参照してください。
 
   ```powershell
   $env:Database__Provider="PostgreSql"; $env:Database__ConnectionString="Host=db;Database=mesapp;Username=mesapp;Password=..."

@@ -57,7 +57,7 @@ On first launch, the initial setup screen appears, where you choose the user nam
 
 ■ Notes
 ・This app is designed for use on a single PC. If you need to share the same data across multiple PCs, consider deploying it on a server (the source code is public).
-・Uninstalling the app deletes all saved data. To keep your data, close the app and copy the data folder beforehand (see "Administration" in the user guide).
+・Uninstalling the app deletes all saved data. To keep your data, close the app and copy the data folder beforehand (see "Databases and backups" in the user guide).
 ・Even in a narrow window, the app stays usable with a collapsible menu and horizontally scrolling tables.
 ・The app uses the Microsoft Edge WebView2 Runtime to display its screens (included with Windows 11).
 ・The app's screens are available in Japanese and English.
