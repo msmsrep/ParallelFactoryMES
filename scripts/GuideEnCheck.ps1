@@ -35,7 +35,8 @@ $jaChars = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}]'
 # 対象のページ（Markdown と、レイアウトを使わない独立 HTML）
 function Get-Pages([string]$dir) {
     if (-not (Test-Path $dir)) { return @() }
-    Get-ChildItem $dir -File | Where-Object { $_.Extension -in '.md', '.html' }
+    # 404（404.md）はサイトに1枚だけ置き、日英を並べて書くので対象にしない
+    Get-ChildItem $dir -File | Where-Object { $_.Extension -in '.md', '.html' -and $_.BaseName -ne '404' }
 }
 function Get-FrontMatter([string]$path) {
     $result = @{}

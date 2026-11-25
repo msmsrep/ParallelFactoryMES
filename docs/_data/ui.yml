@@ -15,6 +15,10 @@ ja:
   lang_switch_code: en
   ja_only: ""
   ja_only_title: ""
+  # SNSで共有したときの画像（_includes/seo.html。site_url からの相対）
+  og_image: assets/og.png
+  og_image_alt: Parallel Factory MES のダッシュボード画面
+  og_locale: ja_JP
 en:
   site_title: Parallel Factory MES User Guide
   site_description: User manual for Parallel Factory MES, a manufacturing execution system
@@ -30,3 +34,6 @@ en:
   lang_switch_code: ja
   ja_only: JA
   ja_only_title: Not yet translated. Opens the Japanese page.
+  og_image: assets/en/og.png
+  og_image_alt: The Parallel Factory MES dashboard screen
+  og_locale: en_US

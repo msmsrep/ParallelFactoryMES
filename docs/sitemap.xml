@@ -1,0 +1,31 @@
+---
+# 検索エンジン向けのサイトマップ。nav_url を持つページ（ガイド・紹介・工場模型）を日英の対応つきで並べる。
+# プロジェクトサイトでは robots.txt を置けない（ドメイン直下にしか効かない）ので、Search Console から送る
+layout: null
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+{%- assign ja_pages = site.pages | where: "dir", "/" | where_exp: "p", "p.nav_url" | sort: "nav_url" -%}
+{%- for p in ja_pages -%}
+{%- if p.nav_url == "index.html" -%}{%- assign path = "" -%}{%- else -%}{%- assign path = p.nav_url -%}{%- endif -%}
+{%- assign ja = site.site_url | append: path -%}
+{%- assign en = site.site_url | append: "en/" | append: path -%}
+{%- assign pair = site.pages | where: "dir", "/en/" | where: "nav_url", p.nav_url | first %}
+  <url>
+    <loc>{{ ja }}</loc>
+    {%- if pair %}
+    <xhtml:link rel="alternate" hreflang="ja" href="{{ ja }}"/>
+    <xhtml:link rel="alternate" hreflang="en" href="{{ en }}"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="{{ ja }}"/>
+    {%- endif %}
+  </url>
+  {%- if pair %}
+  <url>
+    <loc>{{ en }}</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="{{ ja }}"/>
+    <xhtml:link rel="alternate" hreflang="en" href="{{ en }}"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="{{ ja }}"/>
+  </url>
+  {%- endif -%}
+{%- endfor %}
+</urlset>
