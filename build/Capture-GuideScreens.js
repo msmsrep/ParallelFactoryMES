@@ -4,7 +4,9 @@
 //                                     [--base http://localhost:5212] [--user admin] [--out <PNGの出力先>]
 //
 // --page walkthrough（既定）：「サンプルで見る 製造から出荷まで」（walkthrough.md）の8枚。幅1280・DPR2でページ全体
-// --page intro：紹介ページ（intro.html）の11枚。幅1440・DPR1で、画面の決まった範囲を切り出す
+// --page intro：紹介ページ（intro.html）の13枚。幅1440・DPR1で、画面の決まった範囲を切り出す
+//   稼働監視・Webhook の2枚のため、APIキーを発行して EQ-06 の設備イベントを送り、
+//   このスクリプトの中に立てた受け側（127.0.0.1:--hook-port）を Webhook の送信先に登録する
 //
 // 前提：空のDBで起動したアプリ（--base）。初期管理者が無ければ --user / --password で作る。
 // 1. samples/master-csv と samples/actual-csv の 01〜15 をZIPにして一括取込する（品目が既にあれば飛ばす）
@@ -20,6 +22,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn, execFileSync } = require('child_process');
+const http = require('http');
 
 const arg = (name, fallback) => {
     const i = process.argv.indexOf('--' + name);
@@ -33,6 +36,7 @@ const LANG = arg('lang', 'en');
 const PAGE = arg('page', 'walkthrough');
 const EDGE = arg('edge', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe');
 const PORT = Number(arg('port', '9224'));
+const HOOK_PORT = Number(arg('hook-port', '5299'));
 const ROOT = path.join(__dirname, '..');
 const OUT = arg('out', path.join(__dirname, 'guide-shots', PAGE, LANG));
 const ACTUALS_UPTO = 15; // 在庫照会の写真は実績 01〜15 を取り込んだ時点の状態（ガイドの説明と合わせる）
@@ -117,6 +121,7 @@ async function prepare() {
             console.warn('注意: SMP-FG-002 が承認済みのままではありません（walkthrough の撮影で展開済み？）。'
                 + '紹介ページの写真は取込直後の状態を前提にしています。');
         }
+        await prepareIntegration();
     } else {
         // 完了承認（完了していない作業指示は失敗するので無視する）
         for (const no of ['SMP-SF-001', 'SMP-FG-001']) {
@@ -146,6 +151,44 @@ async function prepare() {
         r3001: items(await api('GET', '/api/inventory/stocks?pageSize=200'))
             .find(st => st.lotNumber === 'R3001-260901').lotId,
     };
+}
+
+// ---- 稼働監視・Webhook の写真の下ごしらえ（intro） ----
+// 受け側はこのスクリプトの中に立て、届いた通知に 204 を返すだけにする（撮り終えたら閉じる）
+let hookServer = null;
+async function prepareIntegration() {
+    hookServer = http.createServer((req, res) => { req.resume(); req.on('end', () => { res.writeHead(204); res.end(); }); });
+    await new Promise(r => hookServer.listen(HOOK_PORT, '127.0.0.1', r));
+    const subs = items(await api('GET', '/api/webhook-subscriptions'));
+    if (subs.length === 0) {
+        const created = await api('POST', '/api/webhook-subscriptions', {
+            name: LANG === 'ja' ? '班長チャットへの通知' : 'Shift leader chat',
+            url: `http://127.0.0.1:${HOOK_PORT}/mes-webhook`,
+            eventTypes: ['equipment.stopped', 'nonconformance.created'], isActive: true,
+        });
+        await api('POST', `/api/webhook-subscriptions/${created.data.subscription.id}/test`);
+    }
+    // ゲートウェイの代わりに EQ-06（設備イベントで収集する設備）の状態の変化を送る。
+    // 最後に反映した時刻より前は「遅着」で拒否されるので、時刻は今から遡った近い過去にする
+    const admin = (await api('GET', '/api/users')).data.find(u => u.userName === USER);
+    const key = await api('POST', '/api/api-keys', { name: LANG === 'ja' ? '設備ゲートウェイ' : 'Equipment gateway', userId: admin.id, expiresAt: null });
+    const now = Date.now(), at = min => new Date(now - min * 60000).toISOString();
+    const events = [
+        { min: 58, state: 'Running' }, { min: 41, state: 'Stopped', alarmCode: 'A-101' }, { min: 36, state: 'Running' },
+        { min: 17, state: 'Setup' }, { min: 11, state: 'Running' }, { min: 3, state: 'Stopped', alarmCode: 'A-102' },
+    ].map((e, i) => ({ equipmentCode: 'EQ-06', eventId: `guide-${now}-${i}`, occurredAt: at(e.min), state: e.state, alarmCode: e.alarmCode }));
+    const res = await fetch(BASE + '/api/integration/v1/equipment-events', {
+        method: 'POST', headers: { 'X-Api-Key': key.data.plainKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events }),
+    });
+    if (!res.ok) throw new Error('設備イベントを送れませんでした: ' + res.status + ' ' + (await res.text()).slice(0, 300));
+    // 送信は常駐処理が数秒おきに拾う。テスト送信と停止2件の3件が送信済みになるまで待つ
+    for (let i = 0; i < 40; i++) {
+        const list = items(await api('GET', '/api/webhook-deliveries'));
+        if (list.length >= 3 && list.every(d => ['Delivered', 1].includes(d.state))) break;
+        await sleep(1000);
+    }
+    console.log('設備イベントを送り、Webhook の送信先を登録しました。');
 }
 
 // ---- CDP ----
@@ -347,6 +390,14 @@ async function shootClip(ws, name, { from, pad = 0, height = HEIGHT, until, shee
                 { name: 'quality', href: 'quality-analysis', clip: { from: card(1), pad: 16, height: 580 } },
                 { name: 'audit', href: 'audit-logs', clip: { from: h1, pad: 20, height: 860 } },
                 { name: 'masters', href: 'masters', clip: { from: h1, pad: 20, height: 580 } },
+                // 保全管理は稼働監視タブが既定。「設備の今の状態」のカードまで
+                { name: 'equipment', href: 'maintenance', clip: { from: h1, pad: 20, until: card(0) } },
+                {
+                    name: 'webhooks', href: 'webhooks', clip: { from: h1, pad: 20, until: card(1) }, after: async () => {
+                        await evalJs(ws, `(document.querySelectorAll('main.content .tabs button')[1].click(), true)`);
+                        await sleep(2500);
+                    },
+                },
             ];
             for (const shot of shots) {
                 await go(ws, shot.href);
@@ -364,6 +415,7 @@ async function shootClip(ws, name, { from, pad = 0, height = HEIGHT, until, shee
         } else {
             edge.kill();
         }
+        if (hookServer) hookServer.close();
         await sleep(1500);
         try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* 一時プロファイルの残骸 */ }
     }

@@ -242,6 +242,49 @@ description: "An open-source manufacturing execution system that records and tra
     </figure>
   </article>
 
+  <article class="feature flip">
+    <div class="copy">
+      <div class="codes"><span class="code">Integration API</span><span class="code">Webhooks</span></div>
+      <h3>Connect other systems<br>with CSV, an API and notifications</h3>
+      <p>CSV files exported by sales or production planning software are imported just by placing them in a chosen folder. Programs can import and export through the integration API with an API key. Events in the MES are sent to the URLs you register as Webhooks.</p>
+      <ul>
+        <li>Comes with an OpenAPI specification. Sending again does not register twice</li>
+        <li>Production results can be read from where you left off</li>
+        <li>Notifies results, status changes, nonconformances and equipment stops, and retries automatically when delivery fails</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>Webhooks</b><span class="mono">Deliveries</span></figcaption>
+      <img src="../assets/en/intro/webhooks.webp" width="1220" height="624" loading="lazy" alt="Deliveries tab of the Webhooks screen, listing an equipment stop notification and a test notification delivered to the destination">
+    </figure>
+  </article>
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">E-20-10-03</span><span class="code">Equipment events</span></div>
+      <h3>See the current status<br>of your equipment</h3>
+      <p>A gateway (such as Node-RED) reads the PLC status and sends each change to the MES. The MES assembles the changes into running, stopped and setup periods, and looks up the stop cause from the alarm code.</p>
+      <ul>
+        <li>A notice appears when no events arrive from a piece of equipment</li>
+        <li>Stops whose cause could not be looked up can be filled in later</li>
+        <li>Manually recorded and automatically collected equipment on the same screen</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>Maintenance</b><span class="mono">Operation monitoring</span></figcaption>
+      <img src="../assets/en/intro/equipment.webp" width="1220" height="629" loading="lazy" alt="Operation monitoring tab of the Maintenance screen. In the current equipment status list, EQ-06, which collects status from equipment events, is stopped while waiting for work from the previous process">
+    </figure>
+  </article>
+
+  <div class="more">
+    <h3>And more</h3>
+    <div class="gets">
+      <div class="get"><b>Production plans vs. actuals</b><p>Register planned quantities per production date, product and process, and compare them with the good quantity of production results as an achievement rate.</p></div>
+      <div class="get"><b>Japanese and English</b><p>Switch the display language at the top right of the screen. The user guide is also available in both languages.</p></div>
+      <div class="get"><b>Works on phone widths</b><p>On narrow screens the menu opens and closes, and tables scroll sideways, so it can be used from tablets and phones on the shop floor.</p></div>
+    </div>
+  </div>
+
 </section>
 
 <section class="start" id="start" aria-labelledby="start-title">
@@ -279,7 +322,7 @@ description: "An open-source manufacturing execution system that records and tra
         <h2>Try it out</h2>
         <ol class="steps">
           <li><div><b>Start it</b><p>Start one of the editions above and open <span class="mono">http://localhost:5000</span> in a browser (<span class="mono">8080</span> for Docker). The Store edition opens the app window directly. The database (SQLite) is created automatically.</p></div></li>
-          <li><div><b>Create an administrator</b><p>The first time, the initial setup guides you through creating an administrator. The Store edition creates one automatically and shows the user name and initial password at the top of the screen.</p></div></li>
+          <li><div><b>Create an administrator</b><p>The first time, the initial setup screen appears; choose the user name and password and create the administrator. The Store edition works the same way.</p></div></li>
           <li><div><b>Load the samples</b><p>Import the <a href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip">master data</a> and <a href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip">actual records</a> sample ZIPs in that order, and you are ready to try everything from manufacturing orders to shipping. The sample values, such as product names, are in Japanese.</p></div></li>
         </ol>
       </div>
