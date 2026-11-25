@@ -9,6 +9,10 @@
 # ページ間のリンクはすべて相対リンク（例: getting-started.html）のため、
 # baseurl の設定は不要です。テーマは使わず _layouts/default.html を使用します。
 
+# 公開URL（末尾は /）。canonical・hreflang・OGP・sitemap.xml の完全なURLだけに使う（ページ間のリンクは相対のまま）。
+# フォークして別の場所で公開するときはここを書き換える
+site_url: https://msmsrep.github.io/ParallelFactoryMES/
+
 title: Parallel Factory MES ユーザーガイド
 description: 製造実績管理システム Parallel Factory MES の操作マニュアル
 
