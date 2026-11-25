@@ -1,0 +1,45 @@
+{%- comment -%}
+  検索エンジンとSNS向けの head 要素（canonical・hreflang・OGP・Xカード）。
+  ガイドの共通レイアウトと、レイアウトを使わない独立ページ（intro.html・factory-tour.html とその英語版）の両方から読む。
+  - nav_url の無いページ（404.html）は canonical を出さず noindex にする
+  - 呼び出し側で title を渡す。説明文は page.description、無ければ page.lead
+  - URL は _config.yml の site_url を基点にした完全なURL（Google は hreflang・canonical に完全なURLを求める）
+  - 日英の対応は同じ nav_url を持つページの有無で判定する（docs-dev/GuideEnPlan.md）
+{%- endcomment -%}
+{%- assign seo_lang = page.lang | default: site.lang -%}
+{%- assign seo_ui = site.data.ui[seo_lang] -%}
+{%- if page.nav_url == "index.html" -%}{%- assign seo_path = "" -%}{%- else -%}{%- assign seo_path = page.nav_url -%}{%- endif -%}
+{%- assign seo_ja = site.site_url | append: seo_path -%}
+{%- assign seo_en = site.site_url | append: "en/" | append: seo_path -%}
+{%- if seo_lang == "en" -%}
+  {%- assign seo_url = seo_en -%}
+  {%- assign seo_pair = site.pages | where: "nav_url", page.nav_url | where: "dir", "/" | first -%}
+{%- else -%}
+  {%- assign seo_url = seo_ja -%}
+  {%- assign seo_pair = site.pages | where: "nav_url", page.nav_url | where: "dir", "/en/" | first -%}
+{%- endif -%}
+{%- assign seo_desc = page.description | default: page.lead | default: seo_ui.site_description | markdownify | strip_html | strip_newlines | strip -%}
+<meta name="description" content="{{ seo_desc | escape }}">
+{%- if page.nav_url %}
+<link rel="canonical" href="{{ seo_url }}">
+{%- else %}
+<meta name="robots" content="noindex">
+{%- endif %}
+{%- if page.nav_url and seo_pair %}
+<link rel="alternate" hreflang="ja" href="{{ seo_ja }}">
+<link rel="alternate" hreflang="en" href="{{ seo_en }}">
+<link rel="alternate" hreflang="x-default" href="{{ seo_ja }}">
+{%- endif %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Parallel Factory MES">
+<meta property="og:title" content="{{ include.title | escape }}">
+<meta property="og:description" content="{{ seo_desc | escape }}">
+{%- if page.nav_url %}
+<meta property="og:url" content="{{ seo_url }}">
+{%- endif %}
+<meta property="og:image" content="{{ site.site_url }}{{ seo_ui.og_image }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{ seo_ui.og_image_alt | escape }}">
+<meta property="og:locale" content="{{ seo_ui.og_locale }}">
+<meta name="twitter:card" content="summary_large_image">

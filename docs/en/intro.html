@@ -1,17 +1,30 @@
+---
+# Standalone page (no layout). Search and social head tags come from _includes/seo.html
+nav_url: intro.html
+seo_title: "Parallel Factory MES | Open-source manufacturing execution system (MES)"
+description: "An open-source manufacturing execution system that records and traces production lot by lot, from manufacturing orders to shipping."
+---
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Parallel Factory MES</title>
+<title>{{ page.seo_title }}</title>
+{% include seo.html title=page.seo_title %}
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg transform='translate(-5.5,-9.5) scale(1.06)'%3E%3Crect x='19' y='58' width='21' height='26' rx='6' fill='%23CDEBDF'/%3E%3Crect x='47' y='32' width='21' height='52' rx='6' fill='%238FD2BE'/%3E%3Crect x='75' y='46' width='21' height='38' rx='6' fill='%235CC8A8'/%3E%3Cg fill='none' stroke='%2318193F' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='12' y='50' width='21' height='26' rx='6'/%3E%3Crect x='40' y='24' width='21' height='52' rx='6'/%3E%3Crect x='68' y='38' width='21' height='38' rx='6'/%3E%3Cpath d='M13 88 H88'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
-<meta name="description" content="An open-source manufacturing execution system that records and traces production lot by lot, from manufacturing orders to shipping.">
-<link rel="alternate" hreflang="ja" href="../intro.html">
-<link rel="alternate" hreflang="en" href="intro.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="../assets/intro.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Parallel Factory MES",
+ "applicationCategory":"BusinessApplication","operatingSystem":"Windows, Linux",
+ "description":"An open-source manufacturing execution system that records and traces production lot by lot, from manufacturing orders to shipping.","inLanguage":"en","softwareVersion":"1.1.0",
+ "license":"https://www.gnu.org/licenses/agpl-3.0.html",
+ "url":"{{ site.site_url }}en/intro.html",
+ "downloadUrl":"https://github.com/msmsrep/ParallelFactoryMES/releases/latest",
+ "offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"}}
+</script>
 </head>
 <body>
 <header class="top">
