@@ -1,16 +1,23 @@
 ﻿/* Parallel Factory MES 共通スタイル（Phase 6：軽量な独自CSS。外部フレームワーク非依存） */
 
 :root {
-    --primary: #1b6ec2;
-    --primary-dark: #145a9e;
-    --bg: #f4f6f8;
+    /* 配色はアイコン（build/icon.svg）とユーザーガイドにそろえる：濃紺の線とミントの3段 */
+    --primary: #17785f;
+    --primary-dark: #125f4b;
+    --bg: #f4f8f6;
     --surface: #ffffff;
-    --border: #d7dde3;
-    --text: #212529;
-    --text-muted: #6c757d;
+    --border: #d8e2dd;
+    --text: #18193f;
+    --text-muted: #565a78;
     --danger: #c62828;
-    --success: #2e7d32;
+    --success: #145f4b;
     --warning: #ef6c00;
+    --info: #2e3787;
+    --mint-1: #cdebdf;
+    --mint-2: #8fd2be;
+    --mint-3: #5cc8a8;
+    --navy: #18193f;
+    --subtle: #eef4f1;
 }
 
 * { box-sizing: border-box; }
@@ -36,8 +43,8 @@ html, body {
 
 .sidebar {
     width: 220px;
-    background: #253544;
-    color: #dfe6ec;
+    background: var(--navy);
+    color: #e8ebf5;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -48,25 +55,31 @@ html, body {
     font-weight: bold;
     font-size: 15px;
     color: #fff;
-    border-bottom: 1px solid #3a4d5f;
+    /* 下端にアイコンの3段の色の帯を引く */
+    border-bottom: 3px solid;
+    border-image: linear-gradient(90deg, var(--mint-1) 0 33.3%, var(--mint-2) 33.3% 66.6%, var(--mint-3) 66.6%) 1;
 }
+.sidebar .brand-name { display: inline-flex; align-items: center; gap: 8px; }
+.sidebar .brand-mark { width: 24px; height: 24px; flex: none; }
+.brand-mark .l1 { fill: var(--mint-1); } .brand-mark .l2 { fill: var(--mint-2); } .brand-mark .l3 { fill: var(--mint-3); }
+.brand-mark .ln { fill: none; stroke: #e8ebf5; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
 
 .sidebar nav { padding: 8px 0; }
 
 .sidebar a {
     display: block;
     padding: 10px 16px;
-    color: #dfe6ec;
+    color: #e8ebf5;
     text-decoration: none;
 }
 
-.sidebar a:hover { background: #31465a; }
-.sidebar a.active { background: var(--primary); color: #fff; }
+.sidebar a:hover { background: #262a5a; }
+.sidebar a.active { background: var(--primary); color: #fff; box-shadow: inset 3px 0 0 var(--mint-3); }
 
 .sidebar .nav-group {
     padding: 12px 16px 4px;
     font-size: 11px;
-    color: #8fa3b5;
+    color: #a3a8c6;
     letter-spacing: 1px;
 }
 
@@ -104,8 +117,8 @@ h2 { font-size: 16px; margin: 20px 0 8px; }
     text-align: left;
     white-space: nowrap;
 }
-.table th { background: #eef2f6; font-weight: 600; }
-.table tr:hover td { background: #f6f9fc; }
+.table th { background: var(--subtle); font-weight: 600; }
+.table tr:hover td { background: #f6faf8; }
 
 /* フォーム */
 .form-grid {
@@ -141,7 +154,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 .btn:hover { background: var(--primary-dark); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
-.btn-secondary:hover { background: #eef2f6; }
+.btn-secondary:hover { background: var(--subtle); }
 .btn-danger { background: var(--danger); }
 .btn-danger:hover { background: #a51f1f; }
 .btn-sm { padding: 2px 8px; font-size: 12px; }
@@ -152,13 +165,13 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 12px;
-    background: #e0e5ea;
+    background: #e6e8ee;
     color: var(--text);
 }
-.badge-success { background: #dcedc8; color: var(--success); }
+.badge-success { background: var(--mint-1); color: var(--success); }
 .badge-warning { background: #ffe0b2; color: var(--warning); }
 .badge-danger { background: #ffcdd2; color: var(--danger); }
-.badge-info { background: #bbdefb; color: var(--primary-dark); }
+.badge-info { background: #dce0f5; color: var(--info); }
 
 .alert {
     padding: 10px 14px;
@@ -166,7 +179,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
     margin-bottom: 12px;
 }
 .alert-danger { background: #ffebee; color: var(--danger); border: 1px solid #ef9a9a; }
-.alert-success { background: #e8f5e9; color: var(--success); border: 1px solid #a5d6a7; }
+.alert-success { background: #e3f3ec; color: var(--success); border: 1px solid var(--mint-2); }
 /* 警告：エラーではない（取込は完了している）ことが色で分かるよう badge-warning と同じ系統にする */
 .alert-warning { background: #fff3e0; color: var(--warning); border: 1px solid #ffcc80; }
 
@@ -231,7 +244,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 .bar-meter {
     width: 120px;
     height: 12px;
-    background: #e6ebf0;
+    background: #e3ebe7;
     border-radius: 6px;
     overflow: hidden;
 }

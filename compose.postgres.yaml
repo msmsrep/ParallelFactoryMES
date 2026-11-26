@@ -1,7 +1,7 @@
 # Parallel Factory MES を PostgreSQL で動かす構成
 #   docker compose -f compose.postgres.yaml up -d      → http://localhost:8080
 # パスワードは .env ファイル（POSTGRES_PASSWORD=...）で与える。未設定だと起動しない
-# 既存の SQLite のデータを PostgreSQL へ移す機能はない（docs/operations.md）
+# 既存の SQLite のデータを PostgreSQL へ移す機能はない（docs/database.md）
 services:
   db:
     image: postgres:17

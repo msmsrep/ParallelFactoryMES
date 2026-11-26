@@ -26,7 +26,7 @@ For each active piece of equipment, the current status (running, stopped, etc.; 
 The list does not refresh automatically. Press **Update** to load the latest status.
 
 For equipment that collects status from equipment events, the **Last received** time is shown. When no events have been received for a while (10 minutes by default), "(no events received)" appears.
-Check whether the gateway or the network has stopped ([Receiving equipment events](operations.html#equipment-events)).
+Check whether the gateway or the network has stopped ([Receiving equipment events](integration.html#equipment-events)).
 
 #### Recording operation
 

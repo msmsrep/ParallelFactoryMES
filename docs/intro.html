@@ -245,6 +245,49 @@ description: "製造指図から出荷まで、ロット単位で記録・追跡
     </figure>
   </article>
 
+  <article class="feature flip">
+    <div class="copy">
+      <div class="codes"><span class="code">連携API</span><span class="code">Webhook</span></div>
+      <h3>ほかのシステムとは、<br>CSV・API・通知でつなぐ</h3>
+      <p>販売管理や生産計画のソフトが出すCSVは、決めたフォルダに置くだけで取り込めます。プログラムからは、APIキーで連携APIを呼んで取込・出力ができます。MESの側で起きたことは、Webhook で登録したURLへ知らせます。</p>
+      <ul>
+        <li>連携APIの仕様書（OpenAPI）つき。送り直しても二重に登録しない</li>
+        <li>生産実績は「前回の続きから」読み出せる</li>
+        <li>通知は実績・状態の変化・不適合・設備の停止。届かなければ自動で再送</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>Webhook</b><span class="mono">送信の記録</span></figcaption>
+      <img src="assets/intro/webhooks.webp" width="1220" height="602" loading="lazy" alt="Webhook画面の送信の記録タブ。設備の停止とテスト送信の通知が、送信先へ送信済みになった一覧">
+    </figure>
+  </article>
+
+  <article class="feature">
+    <div class="copy">
+      <div class="codes"><span class="code">E-20-10-03</span><span class="code">設備イベント</span></div>
+      <h3>設備の今の状態が、<br>その場で分かる</h3>
+      <p>PLCの状態をゲートウェイ（Node-REDなど）が読み、変わるたびにMESへ送ります。MESはそれを稼働・停止・段取りの区間に組み立て、アラーム番号から停止原因を引き当てます。</p>
+      <ul>
+        <li>受信が途絶えたら、その設備に知らせが出る</li>
+        <li>引き当てられなかった停止は、後から原因を入れられる</li>
+        <li>手入力の設備と、自動で集める設備を同じ画面で</li>
+      </ul>
+    </div>
+    <figure class="screen">
+      <figcaption><b>設備保全</b><span class="mono">稼働監視</span></figcaption>
+      <img src="assets/intro/equipment.webp" width="1220" height="633" loading="lazy" alt="設備保全画面の稼働監視タブ。設備の今の状態の一覧で、設備イベントで収集するEQ-06が停止中、停止原因は前工程からのワーク待ち">
+    </figure>
+  </article>
+
+  <div class="more">
+    <h3>そのほかにも</h3>
+    <div class="gets">
+      <div class="get"><b>生産計画と予実</b><p>製造日×品目×工程ごとに計画数量を登録し、生産実績の良品数と並べて達成率を見られます。</p></div>
+      <div class="get"><b>日本語と英語</b><p>画面の右上で表示言語を切り替えられます。ユーザーガイドも日英の2言語です。</p></div>
+      <div class="get"><b>スマホの幅でも</b><p>狭い画面ではメニューを開閉でき、表は横にスクロールします。現場のタブレットやスマホから使えます。</p></div>
+    </div>
+  </div>
+
 </section>
 
 <section class="start" id="start" aria-labelledby="start-title">
@@ -282,7 +325,7 @@ description: "製造指図から出荷まで、ロット単位で記録・追跡
         <h2>動かしてみる</h2>
         <ol class="steps">
           <li><div><b>起動する</b><p>上のどれかで起動し、ブラウザで <span class="mono">http://localhost:5000</span>（Docker は <span class="mono">8080</span>）を開きます。ストア版はアプリの画面がそのまま開きます。データベース（SQLite）は自動で作られます。</p></div></li>
-          <li><div><b>管理者を作る</b><p>最初は初期セットアップの案内が出るので、管理者を作ります。ストア版は管理者が自動で作られ、ユーザー名と初期パスワードが画面の上に表示されます。</p></div></li>
+          <li><div><b>管理者を作る</b><p>最初は初期セットアップの画面が出るので、管理者のユーザー名とパスワードを決めて作ります。ストア版も同じです。</p></div></li>
           <li><div><b>サンプルを入れる</b><p><a href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-master-csv.zip">マスタ</a>・<a href="https://github.com/msmsrep/ParallelFactoryMES/releases/latest/download/samples-actual-csv.zip">実績</a>のサンプルZIPをこの順に取り込むと、製造指図から出荷まで試せる状態になります。</p></div></li>
         </ol>
       </div>

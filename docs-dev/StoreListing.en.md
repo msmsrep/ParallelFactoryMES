@@ -43,20 +43,22 @@ Parallel Factory MES is a manufacturing execution system (MES) that records manu
 [Maintenance] Equipment operation records, maintenance plans, orders and results, work procedures, tool life management
 [Reports] Print work orders and lot tags or save them as PDF (with barcodes). Works with USB barcode readers
 [Master Data & Integration] Bulk import and export of master data such as products, processes, routings and equipment via CSV (UTF-8 / Shift_JIS)
+[Notifications] Webhooks that immediately notify a URL you register (such as your team chat) when a nonconformance is raised, equipment stops, a lot is put on hold and so on
 [Administration] Users and roles (permissions), audit log of operations
 
 ■ Records you can trace later
 Status changes of manufacturing orders, work orders and lots are kept as history, and the audit log shows who changed what and when. When a record is corrected, its original content and the reason for the correction are kept as well.
 
 ■ Your data stays on this PC
-All data you enter is stored on this PC and is never sent to anyone, including the developer. There is no usage tracking and no advertising. The app's screens run only inside this PC and cannot be reached from other devices on the network.
+All data you enter is stored on this PC and is never sent to anyone, including the developer (if you register a webhook, notifications are sent only to that destination). There is no usage tracking and no advertising. The app's screens run only inside this PC and cannot be reached from other devices on the network.
 
 ■ Getting started
-On first launch, a system administrator account is created automatically, and its user name and password are shown at the top of the window. Sign in, change the password, then register processes, products and routings under Master Data. The user guide (website) explains each operation with screenshots.
+On first launch, the initial setup screen appears, where you choose the user name and password for the system administrator account. Sign in, then register processes, products and routings under Master Data. The user guide (website) explains each operation with screenshots.
 
 ■ Notes
 ・This app is designed for use on a single PC. If you need to share the same data across multiple PCs, consider deploying it on a server (the source code is public).
-・Uninstalling the app deletes all saved data. To keep your data, close the app and copy the data folder beforehand (see "Administration" in the user guide).
+・Uninstalling the app deletes all saved data. To keep your data, close the app and copy the data folder beforehand (see "Databases and backups" in the user guide).
+・Even in a narrow window, the app stays usable with a collapsible menu and horizontally scrolling tables.
 ・The app uses the Microsoft Edge WebView2 Runtime to display its screens (included with Windows 11).
 ・The app's screens are available in Japanese and English.
 
@@ -81,7 +83,8 @@ Equipment maintenance plans, orders and results, plus tool life management
 Print work orders and lot tags or save them as PDF (with barcodes)
 Bulk CSV import and export of master data (UTF-8 / Shift_JIS detected automatically)
 Role-based permissions and an audit log that keeps values before and after each change
-Data is stored only on this PC. No server, no internet connection, no usage tracking
+Webhooks that immediately notify a registered URL of nonconformances, equipment stops and more
+Data is stored only on this PC. No server needed, no usage tracking (the only thing sent out is to webhook destinations you register)
 ```
 
 ## スクリーンショット

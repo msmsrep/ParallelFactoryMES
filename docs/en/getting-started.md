@@ -25,7 +25,7 @@ Every method is free, with no activation or license key. Except when running fro
 | Item | Details |
 |---|---|
 | Server | One Windows / Linux (x64) PC, or an environment that runs Docker (amd64 / arm64). The Store edition needs Windows 10 (2004 or later) / 11 |
-| Database | Not required. By default an SQLite file (`mesapp.db`) is created automatically. PostgreSQL / SQL Server can also be used ([Administration](operations.html#database)) |
+| Database | Not required. By default an SQLite file (`mesapp.db`) is created automatically. PostgreSQL / SQL Server can also be used ([Databases and backups](database.html#database)) |
 | Client devices | A modern browser (Chrome, Edge and so on). No dedicated app needs to be installed |
 | Network | Client devices must be able to reach the server's URL |
 
@@ -55,7 +55,7 @@ docker run -d -p 8080:8080 -v mesapp-data:/data ghcr.io/msmsrep/parallelfactorym
 ```
 
 Open `http://localhost:8080` in a browser. Without `-v mesapp-data:/data`, your data is lost when the container is recreated.
-To run it together with PostgreSQL, see [Administration](operations.html#docker).
+To run it together with PostgreSQL, see [Server deployment and settings](operations.html#docker).
 
 ### Running from source (for development)
 
@@ -65,7 +65,7 @@ Install the .NET 10 SDK and run the following in the repository root. By default
 dotnet run --project src/MesApp.Api
 ```
 
-For the settings needed to use it from other PCs on the same LAN (port, firewall, HTTPS), see [Administration](operations.html).
+For the settings needed to use it from other PCs on the same LAN (port, firewall, HTTPS), see [Server deployment and settings](operations.html).
 
 <div class="note">
 <p>The database file and signing key are created automatically in the <strong>data folder</strong>. You do not need to create a database.

@@ -37,8 +37,30 @@
 
 <header class="topbar">
   <button class="menu-toggle" aria-label="{{ ui.menu }}" onclick="document.body.classList.toggle('nav-open')">☰</button>
-  <a class="brand" href="index.html">Parallel Factory <strong>MES</strong></a>
+  <!-- ロゴは build/icon.svg と同じ図柄。暗いテーマで線の色を変えられるようインラインで持つ（intro.html と同じ） -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="logo" viewBox="0 0 100 100">
+      <g transform="translate(-5.5,-9.5) scale(1.06)">
+        <rect class="l1" x="19" y="58" width="21" height="26" rx="6"/>
+        <rect class="l2" x="47" y="32" width="21" height="52" rx="6"/>
+        <rect class="l3" x="75" y="46" width="21" height="38" rx="6"/>
+        <g class="ln">
+          <rect x="12" y="50" width="21" height="26" rx="6"/>
+          <rect x="40" y="24" width="21" height="52" rx="6"/>
+          <rect x="68" y="38" width="21" height="38" rx="6"/>
+          <path d="M13 88 H88"/>
+        </g>
+      </g>
+    </symbol>
+  </svg>
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg><span>Parallel Factory <strong>MES</strong></span></a>
   <span class="brand-sub">{{ ui.brand_sub }}</span>
+  <!-- ガイド内検索（assets/search.js）。索引はこの言語の search.json（_includes/search-index.json） -->
+  <div class="search" role="search" data-index="{{ root }}{% if lang == "en" %}en/{% endif %}search.json" data-none="{{ ui.search_none }}">
+    <input type="search" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search_label }}" autocomplete="off" spellcheck="false"
+      role="combobox" aria-expanded="false" aria-controls="search-results" aria-autocomplete="list">
+    <div class="search-results" id="search-results" role="listbox" hidden></div>
+  </div>
   <a class="intro-link" href="intro.html">{{ ui.intro_link }}<span aria-hidden="true"> &rarr;</span></a>
   {%- if switch_url %}
   <a class="lang-link" href="{{ switch_url }}" hreflang="{{ ui.lang_switch_code }}" lang="{{ ui.lang_switch_code }}">{{ ui.lang_switch }}</a>
@@ -79,6 +101,7 @@
     </footer>
   </main>
 </div>
+<script src="{{ root }}assets/search.js" defer></script>
 </body>
 </html>
 {%- endcapture -%}

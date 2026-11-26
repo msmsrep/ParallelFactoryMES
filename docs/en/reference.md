@@ -3,8 +3,8 @@ layout: default
 title: Reference
 nav_url: reference.html
 lead: Lists of statuses, numbering rules, the business date and a glossary. For reference when you are unsure during operation.
-prev_url: roles.html
-prev_title: Roles and permissions
+prev_url: database.html
+prev_title: Databases and backups
 next_url: troubleshooting.html
 next_title: Troubleshooting
 ---
@@ -102,7 +102,7 @@ Daily totals and numbering use the **business date**, not the calendar date.
 - Example: actuals at 3:00 a.m. on May 2 → the production date is "May 1"
 
 This keeps night-shift actuals that cross midnight together under one production date.
-The boundary time can be changed in the settings ([Administration](operations.html#settings)).
+The boundary time can be changed in the settings ([Server deployment and settings](operations.html#settings)).
 
 The business date is used for numbering and for the period in quality analysis.
 
@@ -121,7 +121,7 @@ The business date is used for numbering and for the period in quality analysis.
 | Shipping needs a shipment judgment | A shipment cannot be carried out without an approved "Approved" or "Special acceptance" judgment |
 | Approval is single-step | Each approval is finalized with one approval operation (there is no multi-step workflow) |
 | Corrections need a reason | Quantity adjustments and inspection result corrections require a reason, which is recorded in the audit log |
-| Records cannot be erased | The audit log is only ever added to; individual records cannot be changed or deleted. Only entries older than the retention period (5 years by default) can be deleted in bulk by an administrator, with a reason ([Audit log](operations.html#audit-log)) |
+| Records cannot be erased | The audit log is only ever added to; individual records cannot be changed or deleted. Only entries older than the retention period (5 years by default) can be deleted in bulk by an administrator, with a reason ([Audit log](security.html#audit-log)) |
 
 ---
 

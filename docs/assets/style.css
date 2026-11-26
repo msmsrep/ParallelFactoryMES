@@ -1,41 +1,55 @@
 :root {
+  /* 配色はアイコン（build/icon.svg）と紹介ページ（intro.css）にそろえる：濃紺の線とミントの3段 */
   --bg: #ffffff;
-  --bg-alt: #f6f8fa;
-  --bg-side: #f9fafb;
-  --text: #1f2328;
-  --text-muted: #59636e;
-  --border: #d8dee4;
-  --accent: #1f6feb;
-  --accent-soft: #ddf0ff;
+  --bg-alt: #f4f8f6;
+  --bg-side: #f7faf9;
+  --text: #18193f;
+  --text-muted: #565a78;
+  --border: #d8e2dd;
+  --accent: #17785f;
+  --accent-soft: #e3f3ec;
+  --info: #2e3787;
+  --g1: #cdebdf;
+  --g2: #8fd2be;
+  --g3: #5cc8a8;
+  --logo-ink: #18193f;
   --danger: #b42318;
   --warn: #8a5a00;
   --warn-bg: #fff6e0;
-  --ok: #1a7f37;
-  --ok-bg: #e6f6ec;
-  --code-bg: #f2f4f7;
+  --ok: #17785f;
+  --ok-bg: #e3f3ec;
+  --code-bg: #eef3f1;
   --sidebar-w: 268px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1216;
-    --bg-alt: #161b22;
-    --bg-side: #12161c;
-    --text: #e6edf3;
-    --text-muted: #9aa4b0;
-    --border: #2b323b;
-    --accent: #6cb0ff;
-    --accent-soft: #16283f;
+    --bg: #0f1024;
+    --bg-alt: #171933;
+    --bg-side: #131529;
+    --text: #e8ebf5;
+    --text-muted: #a0a5c2;
+    --border: #2a2d4f;
+    --accent: #5cc8a8;
+    --accent-soft: #16302d;
+    --info: #aeb6f0;
+    --g1: #1f4a40;
+    --g2: #2f7a66;
+    --g3: #5cc8a8;
+    --logo-ink: #e8ebf5;
     --danger: #ff8a80;
     --warn: #e3b341;
     --warn-bg: #2a2213;
-    --ok: #56d364;
-    --ok-bg: #12261a;
-    --code-bg: #1a2029;
+    --ok: #5cc8a8;
+    --ok-bg: #16302d;
+    --code-bg: #1c1f3b;
   }
 }
 
 * { box-sizing: border-box; }
+
+/* 見出しへのリンク（検索の結果・目次）で飛んだとき、見出しが固定ヘッダーの下に隠れないようにする */
+html { scroll-padding-top: 68px; }
 
 body {
   margin: 0;
@@ -56,7 +70,7 @@ body {
   top: 8px;
   z-index: 100;
   background: var(--accent);
-  color: #fff;
+  color: var(--bg);
   padding: 8px 12px;
   border-radius: 6px;
 }
@@ -71,16 +85,30 @@ body {
   gap: 10px;
   height: 52px;
   padding: 0 16px;
-  background: var(--bg-alt);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
+/* ヘッダー下端にアイコンの3段の色を帯で引く */
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--g1) 0 33.3%, var(--g2) 33.3% 66.6%, var(--g3) 66.6%);
+}
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--text);
   text-decoration: none;
   font-size: 15px;
   letter-spacing: .01em;
 }
 .brand strong { color: var(--accent); }
+.brand-mark { width: 26px; height: 26px; flex: none; }
+#logo .l1 { fill: var(--g1); } #logo .l2 { fill: var(--g2); } #logo .l3 { fill: var(--g3); }
+#logo .ln { fill: none; stroke: var(--logo-ink); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
 .brand-sub {
   color: var(--text-muted);
   font-size: 13px;
@@ -100,7 +128,6 @@ body {
 
 /* 紹介ページ（intro.html）への導線 */
 .intro-link {
-  margin-left: auto;
   white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
@@ -131,9 +158,68 @@ body {
   margin-left: 4px;
   vertical-align: 1px;
 }
-/* 狭い画面では導線を優先し、「ユーザーガイド」の副題を隠す */
-@media (max-width: 480px) {
+/* ガイド内検索（assets/search.js）。結果は検索欄の下に重ねて出す */
+.search {
+  position: relative;
+  margin-left: auto;
+  flex: 0 1 260px;
+  min-width: 0;
+}
+.search input {
+  width: 100%;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+}
+.search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; background: var(--bg); }
+.search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(24, 25, 63, .18);
+  padding: 6px;
+  z-index: 40;
+}
+.search-results a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  line-height: 1.55;
+}
+.search-results a:hover, .search-results a.active { background: var(--accent-soft); }
+.search-results b { display: block; font-size: 14px; font-weight: 600; }
+.search-results b span { color: var(--text-muted); font-weight: 400; }
+.search-results a > span { display: block; font-size: 12.5px; color: var(--text-muted); }
+.search-results mark { background: var(--g1); color: inherit; border-radius: 2px; padding: 0 1px; }
+.search-none { margin: 8px 10px; font-size: 13px; color: var(--text-muted); }
+
+.brand, .brand-sub { white-space: nowrap; }
+/* 狭い画面では検索欄と導線を優先し、「ユーザーガイド」の副題を隠す */
+@media (max-width: 900px) {
   .brand-sub { display: none; }
+}
+/* スマホの幅では、検索欄の場所を空けるためにロゴの文字を隠し、結果を画面の幅いっぱいに出す。
+   紹介ページへの導線は、さらに狭いときはメニュー（_data/nav.yml の先頭）に任せて隠す */
+@media (max-width: 640px) {
+  .brand > span { display: none; }
+  .search { flex: 1 1 auto; }
+  .search-results { position: fixed; top: 60px; left: 8px; right: 8px; width: auto; }
+}
+@media (max-width: 480px) {
+  .intro-link { display: none; }
 }
 
 /* ---------- layout ---------- */
@@ -179,6 +265,7 @@ body {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--g3);
 }
 
 .content {
@@ -199,6 +286,8 @@ h2 {
   margin: 44px 0 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
+  /* 下線の左端にアクセントを短く重ねる */
+  background: linear-gradient(var(--g3), var(--g3)) left bottom / 48px 2px no-repeat;
 }
 h3 { font-size: 17px; margin: 30px 0 8px; }
 h4 { font-size: 15px; margin: 22px 0 6px; color: var(--text-muted); }
@@ -270,7 +359,7 @@ tbody tr:nth-child(even) td { background: var(--bg-alt); }
   background: var(--bg-alt);
   font-size: 14.5px;
 }
-.note { border-left: 4px solid var(--accent); }
+.note { border-left: 4px solid var(--info); }
 .warn { border-left: 4px solid var(--warn); background: var(--warn-bg); }
 .tip  { border-left: 4px solid var(--ok); background: var(--ok-bg); }
 .note p:first-child, .warn p:first-child, .tip p:first-child { margin-top: 0; }
@@ -293,7 +382,7 @@ ol.steps > li::before {
   height: 25px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--bg);
   font-size: 13px;
   font-weight: 700;
   display: flex;
@@ -386,16 +475,16 @@ ol.steps > li::before {
 /* ---------- 図解（walkthrough.md） ---------- */
 /* 担当ロールの色。図の枠と凡例で同じ色を使う */
 :root {
-  --r-pm: #1f6feb; --r-pm-bg: #ddf0ff;   /* 生産管理 */
-  --r-op: #1a7f37; --r-op-bg: #e6f6ec;   /* 現場作業者 */
+  --r-pm: #2e3787; --r-pm-bg: #dce0f5;   /* 生産管理 */
+  --r-op: #17785f; --r-op-bg: #e3f3ec;   /* 現場作業者 */
   --r-lg: #9a6700; --r-lg-bg: #fff6e0;   /* 物流・倉庫 */
   --r-qc: #8250df; --r-qc-bg: #f3ecff;   /* 品質管理・品質保証 */
   --r-ng: #b42318; --r-ng-bg: #ffebe9;   /* 不良・逸脱 */
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --r-pm: #6cb0ff; --r-pm-bg: #16283f;
-    --r-op: #56d364; --r-op-bg: #12261a;
+    --r-pm: #aeb6f0; --r-pm-bg: #232a55;
+    --r-op: #8fd2be; --r-op-bg: #16302d;
     --r-lg: #e3b341; --r-lg-bg: #2a2213;
     --r-qc: #c297ff; --r-qc-bg: #231a38;
     --r-ng: #ff8a80; --r-ng-bg: #3a1618;

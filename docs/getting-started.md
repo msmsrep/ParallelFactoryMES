@@ -25,7 +25,7 @@ next_title: 画面構成と共通操作
 | 項目 | 内容 |
 |---|---|
 | サーバー | Windows / Linux（x64）のPC 1台、または Docker が動く環境（amd64 / arm64）。Store 版は Windows 10（2004 以降）/ 11 |
-| データベース | 不要。既定ではSQLiteのファイル（`mesapp.db`）が自動生成されます。PostgreSQL / SQL Server も使えます（[管理者向け運用](operations.html#database)） |
+| データベース | 不要。既定ではSQLiteのファイル（`mesapp.db`）が自動生成されます。PostgreSQL / SQL Server も使えます（[データベースとバックアップ](database.html#database)） |
 | 利用端末 | モダンブラウザ（Chrome / Edge など）。専用アプリのインストールは不要です |
 | ネットワーク | 端末からサーバーのURLにアクセスできること |
 
@@ -55,7 +55,7 @@ docker run -d -p 8080:8080 -v mesapp-data:/data ghcr.io/msmsrep/parallelfactorym
 ```
 
 ブラウザで `http://localhost:8080` を開きます。`-v mesapp-data:/data` を付けないと、コンテナを作り直したときにデータが消えます。
-PostgreSQL と一緒に動かす場合は[管理者向け運用](operations.html#docker)を参照してください。
+PostgreSQL と一緒に動かす場合は[サーバーの配置と設定](operations.html#docker)を参照してください。
 
 ### ソースから動かす（開発用）
 
@@ -65,7 +65,7 @@ PostgreSQL と一緒に動かす場合は[管理者向け運用](operations.html
 dotnet run --project src/MesApp.Api
 ```
 
-同じLAN内の他のPCから使う場合の設定（ポート・ファイアウォール・HTTPS）は[管理者向け運用](operations.html)を参照してください。
+同じLAN内の他のPCから使う場合の設定（ポート・ファイアウォール・HTTPS）は[サーバーの配置と設定](operations.html)を参照してください。
 
 <div class="note">
 <p>データベースファイルと署名鍵は<strong>データ保存先</strong>に自動生成されます。データベースの作成作業は不要です。

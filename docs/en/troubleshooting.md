@@ -5,8 +5,8 @@ nav_url: troubleshooting.html
 lead: Common error messages and what to do about them. Look for the text shown in the red bar.
 prev_url: reference.html
 prev_title: Reference
-next_url: operations.html
-next_title: Administration
+next_url: privacy.html
+next_title: Privacy policy
 ---
 
 Messages are shown here as they appear when the screen language is English. With the screen in Japanese, they appear in Japanese; see the [Japanese version](../troubleshooting.html) of this page.
@@ -117,14 +117,14 @@ Messages are shown here as they appear when the screen language is English. With
 | Starting the ZIP edition shows "Windows protected your PC" | This warning is attached to files obtained from the internet. You can start it with **More info → Run anyway**. To stop it appearing every time, check **Unblock** in the properties of the ZIP file before extracting, and extract it again |
 | On Linux, `./start.sh` fails with "Permission denied" | ZIP files do not keep execute permissions. Start it with `sh start.sh` (it gives the program execute permission when it starts) |
 | The ZIP edition closes immediately after starting / says the port is in use | Another application is using port 5000. Change the port with `MESAPP_URLS` before starting (for example `set MESAPP_URLS=http://0.0.0.0:5100`) |
-| Data disappeared after recreating the Docker container | `/data` is not a volume. Start it with `-v mesapp-data:/data` ([Administration](operations.html#docker)) |
+| Data disappeared after recreating the Docker container | `/data` is not a volume. Start it with `-v mesapp-data:/data` ([Server deployment and settings](operations.html#docker)) |
 ## Display and connection
 
 | Symptom | What to do |
 |---|---|
 | The screen stays at "Loading..." | The server has stopped or the network is disconnected. Check with your administrator |
 | You are suddenly returned to the sign-in screen while working | The access token has expired. Sign in again. The expiry time can be changed in the settings |
-| You cannot connect from another PC | The server's firewall must allow incoming connections on the port ([Administration](operations.html)) |
+| You cannot connect from another PC | The server's firewall must allow incoming connections on the port ([Server deployment and settings](operations.html)) |
 
 ---
 

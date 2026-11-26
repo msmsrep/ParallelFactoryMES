@@ -14,7 +14,7 @@ so you can use it directly from shop-floor PCs and tablets.
 
 - **It manages the whole flow from manufacturing order to shipment.** Manufacturing order → work orders for each process → actuals → inventory → inspection → shipment judgment → shipment.
 - **It traces everything by lot.** You can follow in both directions which material lots went into which product lots.
-- **Every record keeps "who and when".** Corrections to actuals and inspections, master data changes, inventory operations and cancellations are recorded in the audit log, which you can view on the [Audit Log screen](operations.html#audit-log) (system administrators only).
+- **Every record keeps "who and when".** Corrections to actuals and inspections, master data changes, inventory operations and cancellations are recorded in the audit log, which you can view on the [Audit Log screen](security.html#audit-log) (system administrators only).
 
 <a class="intro-banner" href="intro.html">
   <img src="../assets/en/intro/dashboard.webp" width="1440" height="660" alt="" loading="lazy">

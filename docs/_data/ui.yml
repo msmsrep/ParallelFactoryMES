@@ -6,6 +6,9 @@ ja:
   menu: メニュー
   brand_sub: ユーザーガイド
   intro_link: 紹介ページ
+  search_placeholder: ガイドを検索（/）
+  search_label: ガイドを検索
+  search_none: 見つかりませんでした。別の言葉で試してください。
   nav_label: ガイド目次
   pager_label: ページ送り
   foot_version: Parallel Factory MES ユーザーガイド ／ 対象バージョン：Phase 1〜7
@@ -26,6 +29,9 @@ en:
   menu: Menu
   brand_sub: User Guide
   intro_link: Overview
+  search_placeholder: Search the guide (/)
+  search_label: Search the guide
+  search_none: No results. Try different words.
   nav_label: Guide contents
   pager_label: Page navigation
   foot_version: Parallel Factory MES User Guide / Covers Phase 1–7

@@ -1,0 +1,5 @@
+---
+# ガイド内検索の索引（英語版）。中身は _includes/search-index.json
+layout: null
+---
+{% include search-index.json dir="/en/" %}

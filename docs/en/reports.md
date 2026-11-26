@@ -59,7 +59,7 @@ If you print lot tags when receiving and when production is completed and attach
 This is a browser security restriction and cannot be worked around by the system.</p>
 <p>If you run on a LAN over HTTP, <strong>we recommend using a USB barcode reader</strong>.
 To use the camera, put the system behind a reverse proxy (IIS / nginx) with HTTPS
-(<a href="operations.html#https">Running with HTTPS</a>).</p>
+(<a href="security.html#https">Running with HTTPS</a>).</p>
 </div>
 
 Where the camera cannot be used, the following message is shown.
